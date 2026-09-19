@@ -4,6 +4,7 @@ import {
   type Adr,
   type DecisionLog,
   type RelationType,
+  type Repair,
   type Status,
   type TemplateInfo
 } from '@adr-tool/core'
@@ -56,6 +57,12 @@ const TEXT_STAYS: Caution = {
   lead: 'The tool does not change the text of an ADR:',
   advice:
     'A link in the text that points to the old file name has to be changed by hand, after the Renumber.'
+}
+
+const RELATION_IS_AUTHORITATIVE: Caution = {
+  lead: 'The tool cannot know everything:',
+  advice:
+    'A repair takes the Relations of accepted ADRs as true. If a Relation is what is wrong, cancel and fix the file by hand.'
 }
 
 /** What a decision is called on its button, and again on the button that confirms it. */
@@ -278,22 +285,31 @@ class AppState {
         }
   }
 
-  /** Ask to give an ADR that shares its number — the selected one, unless named — the next number of the log. */
-  async renumber(id = this.selected?.id): Promise<void> {
+  /** Ask for one of the repairs of a Problem. The main process plans it; nothing is written yet. */
+  async repair(repair: Repair): Promise<void> {
     const [tab, log] = [this.active, this.log]
-    const adr = log?.adrs.find((candidate) => candidate.id === id)
+    const adr = log?.adrs.find((candidate) => candidate.id === repair.adr)
     if (!tab || !log || !adr) return
-    const plan = await window.api.planRenumber(tab.repository.id, log.path, adr.id)
+    const renumbers = repair.kind === 'renumber'
+    const plan = await window.api.planRepair({
+      repositoryId: tab.repository.id,
+      logPath: log.path,
+      repair
+    })
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: `Renumber ADR ${prefixOf(adr)}`,
-          action: 'Renumber',
+          title: `${renumbers ? 'Renumber' : 'Repair'} ADR ${prefixOf(adr)}`,
+          action: renumbers ? 'Renumber' : 'Repair',
           change: plan.change,
           applying: false,
-          caution: TEXT_STAYS
+          caution: renumbers ? TEXT_STAYS : RELATION_IS_AUTHORITATIVE
         }
-      : { kind: 'refused', title: `Cannot renumber ADR ${prefixOf(adr)}`, reason: plan.reason }
+      : {
+          kind: 'refused',
+          title: `Cannot ${renumbers ? 'renumber' : 'repair'} ADR ${prefixOf(adr)}`,
+          reason: plan.reason
+        }
   }
 
   /** Open the dialog for a new ADR; with a Relation, one that supersedes or amends the selected ADR. */

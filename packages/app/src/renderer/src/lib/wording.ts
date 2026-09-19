@@ -1,4 +1,14 @@
-import type { Adr, FileChange, Problem, Relation, RelationType, Status } from '@adr-tool/core'
+import {
+  nextPrefix,
+  type Adr,
+  type DecisionLog,
+  type FileChange,
+  type Problem,
+  type Relation,
+  type RelationType,
+  type Repair,
+  type Status
+} from '@adr-tool/core'
 
 export const STATUS_LABEL: Record<Status | 'unknown', string> = {
   proposed: 'Proposed',
@@ -64,6 +74,26 @@ export function prefixOf(adr: Adr): string {
   if (adr.number !== undefined || digits.length !== 8) return digits
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
 }
+
+/** What a repair is called on its button, and again on the button that confirms it. */
+export function repairLabel(repair: Repair, log: DecisionLog): string {
+  switch (repair.kind) {
+    case 'lowercase-status':
+      return 'Write it in lowercase'
+    case 'remove-item':
+      return `Remove ${repair.item} from ${repair.key}`
+    case 'add-back-reference':
+      return `Add ${repair.item} to ${repair.key}`
+    case 'set-status':
+      return `Set the Status to ${repair.status}`
+    case 'renumber':
+      return `Renumber to ${nextPrefix(log, '')}`
+  }
+}
+
+/** Under a Problem that has no repair. */
+export const NO_REPAIR =
+  'The tool cannot know what was meant here. Fix the frontmatter of the file in an editor; the view follows.'
 
 /** Above the Problems that are listed under an ADR whose frontmatter cannot be read. */
 export const CONSEQUENCES_LEAD =

@@ -11,7 +11,7 @@ import {
   type Session
 } from '../shared/ipc'
 import { Repositories } from './repositories'
-import { metadataEditRequest } from './requests'
+import { metadataEditRequest, repairRequest } from './requests'
 import { readSession, writeSession } from './session-store'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
@@ -134,15 +134,11 @@ function registerIpc(): void {
     return repositories.planMetadataEdit(edit)
   })
 
-  ipcMain.handle(
-    CHANNEL.planRenumber,
-    (_, repositoryId: unknown, logPath: unknown, adrId: unknown) => {
-      if (![repositoryId, logPath, adrId].every((value) => typeof value === 'string')) {
-        return { ok: false, reason: 'This request cannot be understood.' }
-      }
-      return repositories.planRenumber(repositoryId as string, logPath as string, adrId as string)
-    }
-  )
+  ipcMain.handle(CHANNEL.planRepair, (_, request: unknown) => {
+    const repair = repairRequest(request)
+    if (!repair) return { ok: false, reason: 'This request cannot be understood.' }
+    return repositories.planRepair(repair)
+  })
 
   ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
     typeof changeId === 'string'
