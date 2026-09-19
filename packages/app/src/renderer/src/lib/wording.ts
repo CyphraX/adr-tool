@@ -3,6 +3,7 @@ import {
   type Adr,
   type DecisionLog,
   type FileChange,
+  type ForeignFormat,
   type Problem,
   type Relation,
   type RelationType,
@@ -89,6 +90,19 @@ export function repairLabel(repair: Repair, log: DecisionLog): string {
     case 'renumber':
       return `Renumber to ${nextPrefix(log, '')}`
   }
+}
+
+/** What a foreign format is called. */
+export const FORMAT_LABEL: Record<ForeignFormat, string> = { 'adr-tools': 'adr-tools' }
+
+/** In the header of an ADR that is written in a foreign format. */
+export function describeForeign(format: ForeignFormat): string {
+  return `Written in the format of ${FORMAT_LABEL[format]}. The tool reads that format and never writes it: Status, Relations and the date are taken from the text below, and nothing here changes the file.`
+}
+
+/** Under a Problem without a Repair, when it is reported on an ADR in a foreign format. */
+export function noRepairIn(format: ForeignFormat): string {
+  return `The tool reads the format of ${FORMAT_LABEL[format]} and never writes it. Fix the file in an editor; the view follows.`
 }
 
 /** Under a Problem that has no Repair. */
