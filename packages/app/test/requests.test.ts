@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { metadataEditRequest } from '../src/main/requests'
+import { metadataEditRequest, repairRequest } from '../src/main/requests'
 
 const valid = {
   repositoryId: 'r1',
@@ -44,5 +44,44 @@ describe('a Metadata edit as the renderer sends it', () => {
     ]) {
       expect(metadataEditRequest(request)).toBeUndefined()
     }
+  })
+})
+
+describe('a repair as the renderer sends it', () => {
+  const request = (repair: unknown): unknown => ({
+    repositoryId: 'r1',
+    logPath: 'docs/adr',
+    repair
+  })
+
+  it('goes on when it is one of the repairs core knows, with nothing else on it', () => {
+    const repairs = [
+      { kind: 'lowercase-status', adr: '0001-a' },
+      { kind: 'remove-item', adr: '0001-a', key: 'depends-on', item: '0009-gone' },
+      { kind: 'add-back-reference', adr: '0001-a', key: 'amended-by', item: '0002-b' },
+      { kind: 'set-status', adr: '0001-a', status: 'superseded' },
+      { kind: 'renumber', adr: '0001-a' }
+    ]
+    for (const repair of repairs) {
+      expect(repairRequest(request({ ...repair, path: '../outside.md' }))).toEqual(request(repair))
+    }
+  })
+
+  it('is dropped when it is anything else', () => {
+    for (const repair of [
+      undefined,
+      'renumber',
+      { kind: 'renumber' },
+      { kind: 'delete', adr: '0001-a' },
+      { kind: 'remove-item', adr: '0001-a', key: 'title', item: 'x' },
+      { kind: 'remove-item', adr: '0001-a', key: 'tags' },
+      { kind: 'add-back-reference', adr: '0001-a', key: 'supersedes', item: '0002-b' },
+      { kind: 'set-status', adr: '0001-a', status: 'rejected' }
+    ]) {
+      expect(repairRequest(request(repair))).toBeUndefined()
+    }
+    expect(
+      repairRequest({ repositoryId: 'r1', repair: { kind: 'renumber', adr: 'a' } })
+    ).toBeUndefined()
   })
 })

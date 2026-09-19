@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { nextPrefix, type Adr, type DecisionLog, type Relation } from '@adr-tool/core'
+  import { repairsOf, type Adr, type DecisionLog, type Relation } from '@adr-tool/core'
   import type { Decision } from '../../../shared/ipc'
   import { problemsOf } from '../lib/problems'
   import { DECISION_LABEL, app, statusKey } from '../lib/state.svelte'
@@ -8,7 +8,8 @@
     describeCause,
     describeProblem,
     prefixOf,
-    relationLabel
+    relationLabel,
+    repairLabel
   } from '../lib/wording'
   import BodyEditor from './BodyEditor.svelte'
   import MarkdownDocument from './MarkdownDocument.svelte'
@@ -139,9 +140,11 @@
               <button class="cause" onclick={() => app.select(cause)}>{describeCause(cause)}</button
               >
             {/if}
-            {#if problem.kind === 'duplicate-number' && !editing}
-              <!-- The repair of this Problem: one of the two moves, and the person says which. -->
-              <button onclick={() => app.renumber()}>Renumber to {nextPrefix(log, '')}</button>
+            {#if cause === undefined && !editing}
+              <!-- The repairs that write to this ADR. One that writes to another ADR is offered there. -->
+              {#each repairsOf(log, problem).filter((repair) => repair.adr === adr.id) as repair, nth (nth)}
+                <button onclick={() => app.repair(repair)}>{repairLabel(repair, log)}</button>
+              {/each}
             {/if}
           </li>
         {/each}

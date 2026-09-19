@@ -4,6 +4,7 @@ import {
   type Adr,
   type DecisionLog,
   type RelationType,
+  type Repair,
   type Status,
   type TemplateInfo
 } from '@adr-tool/core'
@@ -56,6 +57,12 @@ const TEXT_STAYS: Caution = {
   lead: 'The tool does not change the text of an ADR:',
   advice:
     'A link in the text that points to the old file name has to be changed by hand, after the Renumber.'
+}
+
+const RELATION_IS_AUTHORITATIVE: Caution = {
+  lead: 'Before you repair:',
+  advice:
+    'A Repair takes what the ADRs say in supersedes and amends as true. If that is what is wrong, cancel and fix the file by hand.'
 }
 
 /** What a decision is called on its button, and again on the button that confirms it. */
@@ -278,22 +285,35 @@ class AppState {
         }
   }
 
-  /** Ask to give an ADR that shares its number — the selected one, unless named — the next number of the log. */
-  async renumber(id = this.selected?.id): Promise<void> {
+  /** Ask for one of the repairs of a Problem. The main process plans it; nothing is written yet. */
+  async repair(repair: Repair): Promise<void> {
     const [tab, log] = [this.active, this.log]
-    const adr = log?.adrs.find((candidate) => candidate.id === id)
+    const adr = log?.adrs.find((candidate) => candidate.id === repair.adr)
     if (!tab || !log || !adr) return
-    const plan = await window.api.planRenumber(tab.repository.id, log.path, adr.id)
+    // A Renumber is known by its own name, and warns about something else.
+    const [verb, caution] =
+      repair.kind === 'renumber'
+        ? (['Renumber', TEXT_STAYS] as const)
+        : (['Repair', RELATION_IS_AUTHORITATIVE] as const)
+    const plan = await window.api.planRepair({
+      repositoryId: tab.repository.id,
+      logPath: log.path,
+      repair
+    })
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: `Renumber ADR ${prefixOf(adr)}`,
-          action: 'Renumber',
+          title: `${verb} ADR ${prefixOf(adr)}`,
+          action: verb,
           change: plan.change,
           applying: false,
-          caution: TEXT_STAYS
+          caution
         }
-      : { kind: 'refused', title: `Cannot renumber ADR ${prefixOf(adr)}`, reason: plan.reason }
+      : {
+          kind: 'refused',
+          title: `Cannot ${verb.toLowerCase()} ADR ${prefixOf(adr)}`,
+          reason: plan.reason
+        }
   }
 
   /** Open the dialog for a new ADR; with a Relation, one that supersedes or amends the selected ADR. */

@@ -13,7 +13,7 @@ import {
   planEditBody,
   planEditMetadata,
   planReject,
-  planRenumber,
+  planRepair,
   type ChangeSet,
   type DecisionLog,
   type Plan,
@@ -26,7 +26,8 @@ import type {
   Decision,
   MetadataEditRequest,
   OpenRepository,
-  PlanResult
+  PlanResult,
+  RepairRequest
 } from '../shared/ipc'
 import { nodeFileSystem } from './node-file-system'
 import { watchPaths } from './watch-paths'
@@ -130,9 +131,11 @@ export class Repositories {
     )
   }
 
-  /** Plan giving an ADR that shares its number the next one of its Decision Log. */
-  async planRenumber(repositoryId: string, logPath: string, adrId: string): Promise<PlanResult> {
-    return this.plan(repositoryId, logPath, (fs, log) => planRenumber(fs, log, adrId))
+  /** Plan the repair of a Problem, against the Problems the log has on disk right now. */
+  async planRepair(request: RepairRequest): Promise<PlanResult> {
+    return this.plan(request.repositoryId, request.logPath, (fs, log) =>
+      planRepair(fs, log, request.repair)
+    )
   }
 
   async listTemplates(repositoryId: string): Promise<Templates> {
