@@ -140,6 +140,18 @@ function registerIpc(): void {
     return repositories.planRepair(repair)
   })
 
+  ipcMain.handle(CHANNEL.history, (_, ...ids: unknown[]) =>
+    ids.length === 3 && ids.every((id) => typeof id === 'string')
+      ? repositories.history(...(ids as [string, string, string]))
+      : []
+  )
+
+  ipcMain.handle(CHANNEL.historyChange, (_, ...ids: unknown[]) =>
+    ids.length === 4 && ids.every((id) => typeof id === 'string')
+      ? repositories.historyChange(...(ids as [string, string, string, string]))
+      : undefined
+  )
+
   ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
     typeof changeId === 'string'
       ? repositories.applyChange(changeId)
