@@ -89,6 +89,8 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 *Done when:* the app shows this repository's three ADRs, and editing one of them in another editor updates the view.
 
+*Status (2026-09-19):* built. Both parts of the done-when were checked in the running app over its debugging port: the list shows this repository's three ADRs, and a title edited on disk — and reverted with git — reaches the list within two seconds while the selection stays. The renderer never names a path; it refers to a repository by an id the main process hands out. Known gaps: images with relative paths in an ADR do not load, because the renderer has no file access; panes cannot be resized yet.
+
 ### M3 — Write path
 
 - `core`: new ADR from a Template; Accept, Reject, Deprecate; Amend and Supersede with their effect at acceptance; Correction with its record in the Metadata; Renumber. Built-in Templates: Minimal, Nygard, MADR.
