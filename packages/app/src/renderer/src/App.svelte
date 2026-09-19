@@ -7,6 +7,7 @@
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
   import ProblemsList from './components/ProblemsList.svelte'
+  import RelationsGraph from './components/RelationsGraph.svelte'
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
@@ -61,10 +62,16 @@
         {/if}
       </main>
     {:else}
-      <div class="panes" class:wide-editor={app.editing?.mode === 'split'}>
+      <div
+        class="panes"
+        class:wide-editor={app.editing?.mode === 'split'}
+        class:wide-middle={app.active.view === 'graph'}
+      >
         <Sidebar />
         {#if app.active.view === 'problems'}
           <ProblemsList />
+        {:else if app.active.view === 'graph' && app.log}
+          <RelationsGraph log={app.log} />
         {:else}
           <AdrList />
         {/if}
@@ -102,12 +109,18 @@
     min-height: 0;
   }
 
+  /* A drawing needs room; the ADR next to it is there to be glanced at. */
+  .panes.wide-middle {
+    grid-template-columns: 210px minmax(0, 2fr) minmax(360px, 1fr);
+  }
+
   /* Source and preview side by side need room; the list steps aside while they are open. */
   .panes.wide-editor {
     grid-template-columns: 210px minmax(0, 1fr);
   }
 
-  .panes.wide-editor > :global(.list) {
+  .panes.wide-editor > :global(.list),
+  .panes.wide-editor > :global(.graph) {
     display: none;
   }
 

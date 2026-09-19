@@ -16,8 +16,8 @@ import { prefixOf } from './wording'
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
 
-/** What the middle pane lists: the ADRs of the log in view, or its Problems. */
-export type ListView = 'adrs' | 'problems'
+/** What the middle pane shows of the log in view: its ADRs, their Relations as a graph, or its Problems. */
+export type ListView = 'adrs' | 'graph' | 'problems'
 
 interface Tab {
   repository: OpenRepository

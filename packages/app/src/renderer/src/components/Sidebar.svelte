@@ -63,6 +63,19 @@
   </section>
 
   <section>
+    <h2>Relations</h2>
+    <button
+      class="row"
+      class:current={view === 'graph'}
+      aria-pressed={view === 'graph'}
+      onclick={() => app.show('graph')}
+    >
+      <span class="label all">Graph</span>
+      <span class="count">{app.log?.relations.length ?? 0}</span>
+    </button>
+  </section>
+
+  <section>
     <h2>Check</h2>
     <button
       class="row"
