@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 created: 2026-09-20
+decided: 2026-09-20
 tags: [core, file-format]
 depends-on: [0002-never-reserialize-markdown, 0003-on-disk-contract, 0004-operations-return-change-sets]
 ---
