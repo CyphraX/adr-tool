@@ -7,7 +7,7 @@ The milestones are ordered from the tightest constraint outward. The tightest co
 
 ## Working mode
 
-- One branch and one pull request per milestone. `main` stays green.
+- One branch and one pull request per milestone; a large milestone comes in parts, each its own pull request that leaves `main` working. `main` stays green.
 - CI runs lint, type check and tests on Windows, macOS and Linux from M0 on. Path handling, line endings and file watching differ per platform, and we want to find that out early.
 - `core` is built test-first. The first test is the round trip from ADR-0002: open a file, save it unchanged, get identical bytes.
 - Hard-to-reverse decisions get an ADR in `docs/adr/`. New domain terms go into CONTEXT.md the moment they are settled.
