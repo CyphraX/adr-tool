@@ -228,6 +228,18 @@ export function appendCorrection(view: SourceView, entry: CorrectionEntry): Text
   ]
 }
 
+/**
+ * Give a key of somebody else's the name of one of the tool's keys, where it stands: the
+ * value, its style and everything around it stay. Migration does this to MADR 3's `deciders`.
+ */
+export function renameKey(view: SourceView, from: string, to: MetadataKey): TextEdit[] {
+  const fm = readFrontmatter(view)
+  if (fm.find(to)) throw new MetadataNotWritableError(`"${to}" is there already`)
+  const pair = fm.find(from)
+  if (!pair) return []
+  return [{ start: fm.abs(pair.key.range![0]), end: fm.abs(pair.key.range![1]), insert: to }]
+}
+
 /** Remove a Metadata key with its value. Comments above it belong to the author and stay. */
 export function removeKey(view: SourceView, key: MetadataKey): TextEdit[] {
   const fm = readFrontmatter(view)
@@ -243,7 +255,7 @@ type KeyedPair = Pair<Scalar, Scalar | YAMLSeq | YAMLMap | null>
 interface Frontmatter {
   /** Translate an offset inside the YAML text into an offset inside the file. */
   abs(offset: number): number
-  find(key: MetadataKey): KeyedPair | undefined
+  find(key: string): KeyedPair | undefined
   /** Insert `key: value`, or `key:` followed by the lines of a block when `block` is given. */
   insertKey(key: MetadataKey, formattedValue: string, block?: readonly string[]): TextEdit
 }
@@ -291,8 +303,7 @@ function readFrontmatter(view: SourceView): Frontmatter {
   }
   const pairs = ((doc.contents?.items ?? []) as KeyedPair[]).filter((pair) => isScalar(pair.key))
   const abs = (offset: number): number => span.start + offset
-  const find = (key: MetadataKey): KeyedPair | undefined =>
-    pairs.find((pair) => pair.key.value === key)
+  const find = (key: string): KeyedPair | undefined => pairs.find((pair) => pair.key.value === key)
 
   return {
     abs,
