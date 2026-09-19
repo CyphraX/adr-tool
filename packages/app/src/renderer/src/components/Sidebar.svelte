@@ -1,6 +1,7 @@
 <script lang="ts">
   import { STATUSES } from '@adr-tool/core'
   import { app, statusKey, type StatusFilter } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { MIGRATE_LOG_HINT, STATUS_LABEL } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
@@ -31,9 +32,9 @@
   ])
 </script>
 
-<nav aria-label="Decision Logs and filters">
+<nav aria-label={t.sidebar.label}>
   <section>
-    <h2>Decision Logs</h2>
+    <h2>{t.sidebar.logs}</h2>
     {#each logs as log (log.path)}
       <button
         class="row"
@@ -41,14 +42,14 @@
         aria-current={log.path === app.log?.path}
         onclick={() => app.showLog(log.path)}
       >
-        <span class="label">{log.path === '' ? '(repository root)' : log.path}</span>
+        <span class="label">{log.path === '' ? t.sidebar.root : log.path}</span>
         <span class="count">{log.adrs.length}</span>
       </button>
     {/each}
   </section>
 
   <section>
-    <h2>Status</h2>
+    <h2>{t.sidebar.status}</h2>
     {#each filters as candidate (candidate)}
       <button
         class="row"
@@ -57,7 +58,7 @@
         onclick={() => app.filterBy(candidate)}
       >
         {#if candidate === 'all'}
-          <span class="label all">All</span>
+          <span class="label all">{t.sidebar.all}</span>
         {:else}
           <StatusMark status={candidate} />
           <span class="label">{STATUS_LABEL[candidate]}</span>
@@ -68,27 +69,27 @@
   </section>
 
   <section>
-    <h2>Relations</h2>
+    <h2>{t.sidebar.relations}</h2>
     <button
       class="row"
       class:current={view === 'graph'}
       aria-pressed={view === 'graph'}
       onclick={() => app.show('graph')}
     >
-      <span class="label all">Graph</span>
+      <span class="label all">{t.sidebar.graph}</span>
       <span class="count">{app.log?.relations.length ?? 0}</span>
     </button>
   </section>
 
   <section>
-    <h2>Check</h2>
+    <h2>{t.sidebar.check}</h2>
     <button
       class="row"
       class:current={view === 'problems'}
       aria-pressed={view === 'problems'}
       onclick={() => app.show('problems')}
     >
-      <span class="label all">Problems</span>
+      <span class="label all">{t.sidebar.problems}</span>
       <span class="count" class:some={app.problemGroups.length > 0}>
         {app.problemGroups.length}
       </span>
@@ -101,18 +102,18 @@
         onclick={() => app.migrate('log')}
         title={MIGRATE_LOG_HINT}
       >
-        <span class="label all">Migrate</span>
+        <span class="label all">{t.sidebar.migrate}</span>
         <span class="count">{foreign}</span>
       </button>
     {/if}
   </section>
 
   {#if git}
-    <footer title="The branch that is checked out, and the ADR files with uncommitted changes">
-      <span>Branch</span>
-      <span class="branch">{git.branch ?? 'detached HEAD'}</span>
+    <footer title={t.sidebar.branchHint}>
+      <span>{t.sidebar.branch}</span>
+      <span class="branch">{git.branch ?? t.sidebar.detached}</span>
       {#if git.changed.length > 0}
-        <span class="changed">{git.changed.length} uncommitted</span>
+        <span class="changed">{t.sidebar.uncommitted(git.changed.length)}</span>
       {/if}
     </footer>
   {/if}

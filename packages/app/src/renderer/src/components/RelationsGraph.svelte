@@ -3,6 +3,7 @@
   import { NODE, SAME_LAYER_REACH, layoutGraph, type GraphEdge } from '../lib/graph-layout'
   import { problemsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
@@ -61,18 +62,15 @@
 
 <div class="graph">
   <div class="head">
-    <h2>Relations</h2>
+    <h2>{t.graph.heading}</h2>
     <span class="tools">
-      <button onclick={() => app.startSearching()}>Search</button>
-      <button onclick={() => app.show('adrs')}>Back to the ADRs</button>
+      <button onclick={() => app.startSearching()}>{t.search}</button>
+      <button onclick={() => app.show('adrs')}>{t.backToAdrs}</button>
     </span>
   </div>
 
   {#if layout.nodes.length === 0}
-    <p class="empty">
-      No ADR of this Decision Log has a Relation yet. Supersede or amend an ADR, or add a Relation
-      in its Metadata, and it shows up here.
-    </p>
+    <p class="empty">{t.graph.empty}</p>
   {:else}
     <div class="canvas">
       <div class="drawing" style:width="{layout.width}px" style:height="{layout.height}px">
@@ -123,7 +121,7 @@
               <span class="prefix">{prefixOf(adr)}</span>
               <span class="title">{adr.title ?? adr.id}</span>
               {#if problems > 0}
-                <span class="problems" title="{problems} {problems === 1 ? 'Problem' : 'Problems'}">
+                <span class="problems" title={t.problemCount(problems)}>
                   {problems}
                 </span>
               {/if}
@@ -134,11 +132,8 @@
     </div>
 
     <footer>
-      <p class="reading">
-        Read it from left to right: an ADR stands to the right of what it supersedes, amends or
-        depends on, and its arrow points there.
-      </p>
-      <ul class="legend" aria-label="What the lines mean">
+      <p class="reading">{t.graph.howToRead}</p>
+      <ul class="legend" aria-label={t.graph.legend}>
         {#each RELATION_TYPES as type (type)}
           <li>
             <svg width="34" height="10" aria-hidden="true">
@@ -155,21 +150,17 @@
           <svg width="34" height="10" aria-hidden="true">
             <path class="supersedes pending" d="M1 5H32" marker-end="url(#arrow)" />
           </svg>
-          proposed
+          {t.graph.proposed}
         </li>
         <li>
           <svg width="34" height="10" aria-hidden="true">
             <path class="supersedes void" d="M1 5H32" marker-end="url(#arrow)" />
           </svg>
-          never took effect
+          {t.neverTookEffect}
         </li>
       </ul>
       {#if layout.unrelated > 0}
-        <p>
-          {layout.unrelated === 1
-            ? 'One ADR has no Relation and is not drawn.'
-            : `${layout.unrelated} ADRs have no Relation and are not drawn.`}
-        </p>
+        <p>{t.graph.unrelated(layout.unrelated)}</p>
       {/if}
     </footer>
   {/if}

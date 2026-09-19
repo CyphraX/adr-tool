@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { summarizeChange } from '../lib/wording'
   import FileDiff from './FileDiff.svelte'
 
@@ -39,12 +40,12 @@
 
       <div class="files">
         {#each files as file (file.path)}
-          <FileDiff {file} unchanged="The file is renamed. Its text does not change." />
+          <FileDiff {file} unchanged={t.diff.renamedOnly} />
         {/each}
       </div>
 
       <footer>
-        <button onclick={() => app.dismissReview()}>Cancel</button>
+        <button onclick={() => app.dismissReview()}>{t.cancel}</button>
         <button
           bind:this={confirm}
           class="primary"
@@ -57,14 +58,16 @@
     {:else if review.kind === 'confirm'}
       <p class="reason">{review.reason}</p>
       <footer>
-        <button bind:this={confirm} onclick={() => app.dismissReview()}>Keep editing</button>
+        <button bind:this={confirm} onclick={() => app.dismissReview()}
+          >{t.review.discard.stay}</button
+        >
         <button class="primary" onclick={() => app.confirmReview()}>{review.action}</button>
       </footer>
     {:else}
       <p class="reason">{review.reason}</p>
       <footer>
         <button bind:this={confirm} class="primary" onclick={() => app.dismissReview()}>
-          Close
+          {t.close}
         </button>
       </footer>
     {/if}

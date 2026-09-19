@@ -35,6 +35,7 @@ import type {
 import { gitIn } from './git'
 import { historyChangeOf, historyOf } from './history'
 import { nodeFileSystem } from './node-file-system'
+import { t } from './strings'
 import { watchPaths } from './watch-paths'
 
 const RELOAD_DELAY_MS = 150
@@ -180,7 +181,7 @@ export class Repositories {
     build: (fs: ReturnType<typeof nodeFileSystem>, log: DecisionLog) => Promise<Plan>
   ): Promise<PlanResult> {
     const entry = this.entries.get(repositoryId)
-    if (!entry) return { ok: false, reason: 'This repository is no longer open.' }
+    if (!entry) return { ok: false, reason: t.repositoryClosed }
 
     const fs = nodeFileSystem(entry.root)
     const logs = (await openRepository(fs)).logs
@@ -188,7 +189,7 @@ export class Repositories {
       logPath === undefined && logs.length === 0
         ? FIRST_LOG
         : logs.find((candidate) => candidate.path === (logPath ?? logs[0]?.path))
-    if (!log) return { ok: false, reason: `There is no Decision Log at ${logPath} any more.` }
+    if (!log) return { ok: false, reason: t.noLogAt(logPath) }
 
     const plan = await build(fs, log)
     if (!plan.ok) return plan
@@ -244,14 +245,14 @@ export class Repositories {
     const planned = this.planned.get(changeId)
     const entry = planned && this.entries.get(planned.repositoryId)
     this.planned.delete(changeId)
-    if (!planned || !entry) return { applied: false, reason: 'This change is no longer available.' }
+    if (!planned || !entry) return { applied: false, reason: t.changeGone }
 
     const result = await applyChangeSet(nodeFileSystem(entry.root), planned.changeSet)
     if (!result.applied) {
       const files = result.conflicts.join(', ')
       return {
         applied: false,
-        reason: `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`
+        reason: t.changedSincePreview(files)
       }
     }
     return { applied: true, repository: await this.load(entry) }

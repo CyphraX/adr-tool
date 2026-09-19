@@ -13,6 +13,7 @@ import {
 import { Repositories } from './repositories'
 import { metadataEditRequest, migrationRequest, repairRequest } from './requests'
 import { readSession, writeSession } from './session-store'
+import { t } from './strings'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
 
@@ -58,7 +59,7 @@ function registerIpc(): void {
 
   ipcMain.handle(CHANNEL.openRepository, async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
-    const options = { title: 'Open repository', properties: ['openDirectory' as const] }
+    const options = { title: t.openRepository, properties: ['openDirectory' as const] }
     const picked = await (window
       ? dialog.showOpenDialog(window, options)
       : dialog.showOpenDialog(options))
@@ -86,7 +87,7 @@ function registerIpc(): void {
     (_, repositoryId: unknown, logPath: unknown, adrId: unknown, decision: unknown) => {
       const known = decision === 'accept' || decision === 'reject' || decision === 'deprecate'
       if (![repositoryId, logPath, adrId].every((value) => typeof value === 'string') || !known) {
-        return { ok: false, reason: 'This request cannot be understood.' }
+        return { ok: false, reason: t.notUnderstood }
       }
       return repositories.planDecision(
         repositoryId as string,
@@ -115,7 +116,7 @@ function registerIpc(): void {
       (relation === undefined ||
         ((relation['type'] === 'supersedes' || relation['type'] === 'amends') &&
           typeof relation['target'] === 'string'))
-    if (!valid) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!valid) return { ok: false, reason: t.notUnderstood }
     return repositories.planCreate(given as unknown as CreateRequest)
   })
 
@@ -123,26 +124,26 @@ function registerIpc(): void {
     const fields = ['repositoryId', 'logPath', 'adrId', 'base', 'body', 'note'] as const
     const given = typeof request === 'object' && request !== null ? request : {}
     if (!fields.every((field) => typeof (given as Record<string, unknown>)[field] === 'string')) {
-      return { ok: false, reason: 'This request cannot be understood.' }
+      return { ok: false, reason: t.notUnderstood }
     }
     return repositories.planBodyEdit(given as BodyEditRequest)
   })
 
   ipcMain.handle(CHANNEL.planMetadataEdit, (_, request: unknown) => {
     const edit = metadataEditRequest(request)
-    if (!edit) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!edit) return { ok: false, reason: t.notUnderstood }
     return repositories.planMetadataEdit(edit)
   })
 
   ipcMain.handle(CHANNEL.planRepair, (_, request: unknown) => {
     const repair = repairRequest(request)
-    if (!repair) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!repair) return { ok: false, reason: t.notUnderstood }
     return repositories.planRepair(repair)
   })
 
   ipcMain.handle(CHANNEL.planMigration, (_, request: unknown) => {
     const migration = migrationRequest(request)
-    if (!migration) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!migration) return { ok: false, reason: t.notUnderstood }
     return repositories.planMigration(migration)
   })
 
@@ -161,7 +162,7 @@ function registerIpc(): void {
   ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
     typeof changeId === 'string'
       ? repositories.applyChange(changeId)
-      : { applied: false, reason: 'This request cannot be understood.' }
+      : { applied: false, reason: t.notUnderstood }
   )
 
   ipcMain.handle(CHANNEL.discardChange, (_, changeId: unknown) => {

@@ -12,7 +12,8 @@
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import { app } from './lib/state.svelte'
-  import { describeProblem } from './lib/wording'
+  import { t } from './lib/strings'
+  import { codeSpans, describeProblem } from './lib/wording'
 
   onMount(() => void app.start())
 
@@ -33,32 +34,35 @@
 
 <svelte:window {onkeydown} />
 
+{#snippet withCode(text: string)}
+  {#each codeSpans(text) as part, position (position)}{#if part.code}<code>{part.text}</code
+      >{:else}{part.text}{/if}{/each}
+{/snippet}
+
 {#if app.ready}
   <div class="window">
     <TabBar />
 
     {#if !app.active || !repository}
       <main class="message">
-        <h1>No repository open</h1>
-        <p>Open the folder of a git repository to read its Architecture Decision Records.</p>
-        <button class="primary" onclick={() => app.open()}>Open repository</button>
+        <h1>{t.welcome.noRepository}</h1>
+        <p>{t.welcome.noRepositoryLead}</p>
+        <button class="primary" onclick={() => app.open()}>{t.tabs.open}</button>
       </main>
     {:else if repository.logs.length === 0}
       <main class="message">
         {#if repository.problems.length > 0}
-          <h1>This repository's ADR configuration cannot be used</h1>
+          <h1>{t.welcome.badConfiguration}</h1>
           {#each repository.problems as problem, position (position)}
             <p>{describeProblem(problem)}</p>
           {/each}
         {:else}
-          <h1>No ADRs found in {app.active.repository.name}</h1>
-          <p>
-            ADR Tool looks for <code>.adr/config.yml</code>, then for adr-tools'
-            <code>.adr-dir</code>, then for the folders <code>docs/adr</code>, <code>doc/adr</code>
-            and <code>docs/decisions</code>. As soon as one of them appears, the ADRs show up here.
-          </p>
-          <p>Or start here: the first ADR is created in <code>docs/adr</code>.</p>
-          <button class="primary" onclick={() => app.startCreating()}>Create the first ADR</button>
+          <h1>{t.welcome.noAdrs(app.active.repository.name)}</h1>
+          <p>{@render withCode(t.welcome.whereItLooks)}</p>
+          <p>{@render withCode(t.welcome.orStartHere)}</p>
+          <button class="primary" onclick={() => app.startCreating()}
+            >{t.welcome.createFirst}</button
+          >
         {/if}
       </main>
     {:else}
@@ -81,8 +85,8 @@
           <main class="message on-paper">
             <p>
               {app.active.view === 'problems'
-                ? 'Select an ADR to see what is wrong with it.'
-                : 'Select an ADR to read it.'}
+                ? t.welcome.selectToSeeProblems
+                : t.welcome.selectToRead}
             </p>
           </main>
         {/if}

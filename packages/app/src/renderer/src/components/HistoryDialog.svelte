@@ -2,6 +2,7 @@
   import { WORKING_TREE } from '../../../shared/ipc'
   import { formatDate } from '../lib/history'
   import { app } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import FileDiff from './FileDiff.svelte'
 
   // What git knows about one ADR: its commits through every rename on the left, and on the
@@ -30,25 +31,19 @@
     <h1 id="history-title">{history.title}</h1>
 
     {#if history.entries === undefined}
-      <p class="note">Asking git …</p>
+      <p class="note">{t.history.asking}</p>
     {:else if history.entries.length === 0}
-      <p class="note">
-        git knows nothing about this file: the folder is not a git repository, git is not installed,
-        or the file has never been committed.
-      </p>
+      <p class="note">{t.history.unknown}</p>
     {:else}
       {#if history.notFound}
-        <p class="note">
-          No commit of this file records that Correction as it reads now. This is the whole history
-          of the file.
-        </p>
+        <p class="note">{t.history.correctionNotFound}</p>
       {/if}
       <div class="panes">
         <div
           class="entries"
           role="listbox"
           tabindex="0"
-          aria-label="Commits"
+          aria-label={t.history.commits}
           aria-activedescendant={history.selectedId ? `entry-${history.selectedId}` : undefined}
           {onkeydown}
         >
@@ -68,14 +63,14 @@
               <span class="subject" title={entry.subject}>{entry.subject}</span>
               <span class="who">
                 {#if entry.id === WORKING_TREE}
-                  on disk
+                  {t.history.onDisk}
                 {:else}
                   {entry.author} · {formatDate(entry.date ?? '')}
                   <span class="sha">{entry.id.slice(0, 7)}</span>
                 {/if}
               </span>
               {#if entry.renamedFrom !== undefined}
-                <span class="who">renamed from {entry.renamedFrom}</span>
+                <span class="who">{t.history.renamedFrom(entry.renamedFrom)}</span>
               {/if}
             </div>
           {/each}
@@ -83,23 +78,18 @@
 
         <div class="change">
           {#if history.change}
-            <FileDiff
-              file={history.change}
-              unchanged="The file was renamed. Its text did not change."
-            />
+            <FileDiff file={history.change} unchanged={t.diff.wasRenamedOnly} />
           {:else if history.change === null}
-            <p class="note">
-              git cannot show this change any more. The file or the commit is gone.
-            </p>
+            <p class="note">{t.history.gone}</p>
           {:else}
-            <p class="note">Reading the change …</p>
+            <p class="note">{t.history.reading}</p>
           {/if}
         </div>
       </div>
     {/if}
 
     <footer>
-      <button class="primary" onclick={() => app.closeHistory()}>Close</button>
+      <button class="primary" onclick={() => app.closeHistory()}>{t.close}</button>
     </footer>
   {/if}
 </dialog>
