@@ -29,7 +29,7 @@ This is the plan of the ADR tool, which becomes the Decisions module of a larger
 ## Next — the first follow-ups after v1
 
 1. **`adr lint` CLI for CI.** Checks that Metadata is valid, that Relations and Back-references are consistent, and that no numbers collide. Built on `core`; this is what carries the tool into teams.
-2. **More foreign formats:** MADR 2.x and log4brains.
+2. **More foreign formats:** the rest of MADR 2.x and log4brains (v1 reads their Status, from the list under the title, and nothing else).
 
 ## Later
 

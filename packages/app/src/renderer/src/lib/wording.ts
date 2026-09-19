@@ -93,14 +93,19 @@ export function repairLabel(repair: Repair, log: DecisionLog): string {
   }
 }
 
-/** What tells the tool that a file is in a foreign format. */
+/** What tells the tool that a file is in a foreign format, and what it takes from there. */
 const FOREIGN_SIGN: Record<ForeignFormat, string> = {
-  'adr-tools': 'no frontmatter, and a Status section in its text'
+  'adr-tools':
+    'no frontmatter, and a Status section in its text. Its Status, its Relations and Back-references and the day it was created are taken from there',
+  madr: 'a Status that names a successor, the Status in the list under the title, or "deciders" for the decision-makers. They are read as MADR means them'
 }
+
+/** Next to a Relation that only the other ADR's file records. */
+export const IMPLIED_NOTE = 'recorded in that file, not in this one'
 
 /** In the header of an ADR that is written in a foreign format. */
 export function describeForeign(format: ForeignFormat): string {
-  return `Read as a file of ${FOREIGN_FORMAT_NAMES[format]}: ${FOREIGN_SIGN[format]}. Its Status, its Relations and Back-references and the day it was created are taken from there. The tool never writes this format, so nothing here changes what the file says.`
+  return `Read as a file of ${FOREIGN_FORMAT_NAMES[format]}: ${FOREIGN_SIGN[format]}. The tool never writes this format, so nothing here changes what the file says.`
 }
 
 /** Under a Problem without a Repair, when it is reported on an ADR in a foreign format. */

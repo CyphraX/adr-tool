@@ -81,10 +81,14 @@ function candidatesOf(log: DecisionLog, problem: Problem): Repair[] {
     case 'supersedes-cycle':
       // Every Relation between the ADRs of the group. Taking one out opens a circle; where
       // several circles share ADRs, what is left of them is reported again.
+      // Only a Relation that is written in the file of its ADR can be taken out of it.
       return log.relations
         .filter(
           ({ type, from, to }) =>
-            type === 'supersedes' && problem.adrs.includes(from) && problem.adrs.includes(to)
+            type === 'supersedes' &&
+            problem.adrs.includes(from) &&
+            problem.adrs.includes(to) &&
+            log.adrs.find((adr) => adr.id === from)?.metadata.relations.supersedes.includes(to)
         )
         .map(({ from, to }) => ({ kind: 'remove-item', adr: from, key: 'supersedes', item: to }))
     case 'duplicate-number':
