@@ -3,6 +3,8 @@
 Records what was deliberately left out of v1, so that it does not drop out of focus.
 Agreed in the design session of 2026-09-19. Vocabulary follows [CONTEXT.md](../CONTEXT.md).
 
+This is the plan of the ADR tool, which becomes the Decisions module of a larger suite; where the project as a whole is heading is in [vision.md](vision.md).
+
 ## v1
 
 - Desktop app (Electron + Svelte 5 + TypeScript) for Windows, macOS and Linux, plus the UI-free `core` package it is built on
@@ -22,7 +24,7 @@ Agreed in the design session of 2026-09-19. Vocabulary follows [CONTEXT.md](../C
 - Editor mode 3, the live editor, in its light form: headings, emphasis, links, lists and code are rendered inline; tables stay source
 - Licence and business model (open source or commercial). Until that is decided the app stays local-only: no backend, no accounts, no telemetry
 - Distribution: installers for all three platforms, code signing, auto-update
-- Final product name
+- Final product name; the working title is Softarch Suite (see [vision.md](vision.md))
 
 ## Next — the first follow-ups after v1
 
