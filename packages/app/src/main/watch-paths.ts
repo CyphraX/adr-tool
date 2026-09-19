@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { Repository } from '@adr-tool/core'
+import { DEFAULT_LOG_PATHS, type Repository } from '@adr-tool/core'
 
 /**
  * What has to be watched so that the view follows the disk: the repository root (for
@@ -9,11 +9,11 @@ import type { Repository } from '@adr-tool/core'
  * `node_modules`.
  */
 export function watchPaths(root: string, repository: Repository): string[] {
+  const parentsOfDefaults = DEFAULT_LOG_PATHS.map((path) => path.split('/')[0]!)
   const paths = [
     root,
     join(root, '.adr'),
-    join(root, 'docs'),
-    join(root, 'doc'),
+    ...parentsOfDefaults.map((parent) => join(root, parent)),
     ...repository.logs.map((log) => join(root, log.path))
   ]
   return [...new Set(paths)].sort()
