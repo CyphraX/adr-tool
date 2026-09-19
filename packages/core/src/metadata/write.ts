@@ -3,6 +3,7 @@ import type { Pair, Scalar, YAMLMap, YAMLSeq } from 'yaml'
 import type { TextEdit } from '../text/edit'
 import type { SourceView } from '../text/source'
 import { METADATA_KEYS, type MetadataKey } from './keys'
+import { scalarText } from './scalar'
 
 /** The file's Metadata is in a state the tool must not write into; a person has to fix it first. */
 export class MetadataNotWritableError extends Error {}
@@ -17,35 +18,29 @@ export function setScalar(view: SourceView, key: MetadataKey, value: string): Te
   if (!pair) return [fm.insertKey(key, formatScalar(value))]
 
   const node = pair.value
-  if (node === null) {
-    const colon = view.text.indexOf(':', fm.abs(pair.key.range![1]))
-    return [{ start: colon + 1, end: colon + 1, insert: ' ' + formatScalar(value) }]
+  if (node === null || scalarText(node) === undefined) {
+    if (node !== null && !isScalar(node)) {
+      throw new MetadataNotWritableError(`"${key}" is not a single value`)
+    }
+    return [fillEmptyValue(view, fm, pair, formatScalar(value))]
   }
-  if (!isScalar(node)) throw new MetadataNotWritableError(`"${key}" is not a single value`)
-
   const [start, end] = [fm.abs(node.range![0]), fm.abs(node.range![1])]
-  if (start === end) {
-    // `key:` with nothing after it: the empty value sits right behind the colon.
-    const gap = view.text[start - 1] === ':' ? ' ' : ''
-    return [{ start, end, insert: gap + formatScalar(value) }]
-  }
-  return [{ start, end, insert: formatScalar(value, node.type) }]
+  return [{ start, end, insert: formatScalar(value, (node as Scalar).type) }]
 }
 
 /** Add an item to a list-valued Metadata key, keeping the style the list already has. */
 export function addToList(view: SourceView, key: MetadataKey, item: string): TextEdit[] {
   const fm = readFrontmatter(view)
   const pair = fm.find(key)
-  if (!pair || pair.value === null) {
-    const edits = pair ? removeKey(view, key) : []
-    return [...edits, fm.insertKey(key, `[${formatScalar(item)}]`)]
-  }
+  if (!pair) return [fm.insertKey(key, `[${formatScalar(item)}]`)]
 
   const node = pair.value
-  if (isScalar(node)) {
-    if (node.value === item) return []
-    if (node.value === null)
-      return [...removeKey(view, key), fm.insertKey(key, `[${formatScalar(item)}]`)]
+  if (node === null || isScalar(node)) {
+    const only = scalarText(node)
+    if (only === item) return []
+    if (node === null || only === undefined) {
+      return [fillEmptyValue(view, fm, pair, `[${formatScalar(item)}]`)]
+    }
     // A single value where a list is expected reads as a list of one; appending makes it a real list.
     const [start, end] = [fm.abs(node.range![0]), fm.abs(node.range![1])]
     const existing = view.text.slice(start, end)
@@ -54,7 +49,7 @@ export function addToList(view: SourceView, key: MetadataKey, item: string): Tex
   if (!isSeq(node)) throw new MetadataNotWritableError(`"${key}" is not a list`)
 
   const items = (node as YAMLSeq<Scalar>).items
-  if (items.some((existing) => isScalar(existing) && existing.value === item)) return []
+  if (items.some((existing) => scalarText(existing) === item)) return []
   const last = items.at(-1)
 
   if (node.flow) {
@@ -72,6 +67,17 @@ export function addToList(view: SourceView, key: MetadataKey, item: string): Tex
   const at = fm.abs(last.range![2])
   const lead = view.text[at - 1] === '\n' ? '' : view.eol
   return [{ start: at, end: at, insert: `${lead}${indent}- ${formatScalar(item)}${view.eol}` }]
+}
+
+/** `key:` with nothing after it: the value goes right behind the colon. */
+function fillEmptyValue(
+  view: SourceView,
+  fm: Frontmatter,
+  pair: KeyedPair,
+  formattedValue: string
+): TextEdit {
+  const colon = view.text.indexOf(':', fm.abs(pair.key.range![1]))
+  return { start: colon + 1, end: colon + 1, insert: ` ${formattedValue}` }
 }
 
 /** Remove a Metadata key with its value. Comments above it belong to the author and stay. */

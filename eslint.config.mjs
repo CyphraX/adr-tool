@@ -17,5 +17,12 @@ export default defineConfig(
       }
     }
   },
+  {
+    // Tests are full of one-line helpers whose return type is whatever they wrap.
+    files: ['**/test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
   eslintConfigPrettier
 )

@@ -66,6 +66,10 @@ _Avoid_: Backlink, inverse Relation, reverse link
 
 ### Housekeeping
 
+**Problem**:
+An inconsistency in a Decision Log that the tool detects and names — invalid Metadata, a Relation to an ADR that does not exist, a missing Back-reference, a duplicate number. Some Problems have a repair.
+_Avoid_: Error, warning, issue, finding
+
 **Renumber**:
 To give an ADR a new number after two ADRs in one Decision Log ended up with the same one, renaming its file and rewriting every Relation and Back-reference that points to it.
 _Avoid_: Rename, re-index
