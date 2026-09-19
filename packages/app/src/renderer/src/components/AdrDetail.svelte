@@ -133,9 +133,11 @@
         {#each adr.metadata.corrections as correction, position (position)}
           <li>
             <span class="kind">Corrected</span>
-            {correction.date}{correction.author ? ` by ${correction.author}` : ''}{correction.note
-              ? `: ${correction.note}`
-              : ''}
+            <span class="what">
+              {correction.date}{correction.author ? ` by ${correction.author}` : ''}{correction.note
+                ? `: ${correction.note}`
+                : ''}
+            </span>
             {#if git}
               <!-- The marker of a Correction leads to what it changed. -->
               <button onclick={() => app.showHistory(position)}>Show the change</button>
@@ -230,8 +232,19 @@
     background: color-mix(in srgb, var(--proposed) 14%, transparent);
   }
 
+  /* In a narrow pane the note wraps; the marker's button stays whole. */
+  .corrections li {
+    flex-wrap: wrap;
+  }
+
+  .corrections .what {
+    flex: 1 1 10rem;
+    min-width: 0;
+  }
+
   .corrections button {
-    margin-left: 8px;
+    flex: none;
+    margin-left: auto;
     white-space: nowrap;
     color: var(--ink-soft);
     text-decoration: underline;
@@ -246,6 +259,7 @@
 
   .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-top: 12px;
   }
