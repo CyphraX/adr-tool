@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FileChange } from '@adr-tool/core'
-import { summarizeChange } from '../src/renderer/src/lib/wording'
+import { codeSpans, summarizeChange } from '../src/renderer/src/lib/wording'
 
 const changed = (path: string): FileChange => ({ path, before: 'a\n', after: 'b\n' })
 const created: FileChange = { path: 'new.md', before: '', after: 'text\n', creates: true }
@@ -29,5 +29,25 @@ describe('what a change does, in one sentence', () => {
 
   it('has something to say about a change without files', () => {
     expect(summarizeChange([])).toBe('This changes nothing.')
+  })
+})
+
+describe('a text that names files, for the markup to set in code', () => {
+  it('splits at the backticks and says which parts are code', () => {
+    expect(codeSpans('Look for `.adr-dir`, then for `docs/adr`.')).toEqual([
+      { text: 'Look for ', code: false },
+      { text: '.adr-dir', code: true },
+      { text: ', then for ', code: false },
+      { text: 'docs/adr', code: true },
+      { text: '.', code: false }
+    ])
+  })
+
+  it('leaves a text without backticks as it is, and has no empty parts', () => {
+    expect(codeSpans('Nothing here.')).toEqual([{ text: 'Nothing here.', code: false }])
+    expect(codeSpans('`docs/adr` first')).toEqual([
+      { text: 'docs/adr', code: true },
+      { text: ' first', code: false }
+    ])
   })
 })

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from '../lib/strings'
+
   // A list of short free texts: tags, decision-makers. Enter adds what was typed, and so does
   // leaving the field, so that nothing typed is lost on the way to the Save button.
   let {
@@ -37,8 +39,9 @@
   {#each items as item (item)}
     <span class="chip">
       {item}
-      <button aria-label={`Remove ${item}`} onclick={() => items.splice(items.indexOf(item), 1)}
-        >×</button
+      <button
+        aria-label={t.metadata.remove(item)}
+        onclick={() => items.splice(items.indexOf(item), 1)}>×</button
       >
     </span>
   {/each}
@@ -46,7 +49,7 @@
     bind:value={text}
     type="text"
     list={`${uid}-suggestions`}
-    aria-label={`Add to ${label}`}
+    aria-label={t.metadata.addTo(label)}
     {placeholder}
     {onkeydown}
     {oninput}

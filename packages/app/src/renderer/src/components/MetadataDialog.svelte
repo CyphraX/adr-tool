@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Adr, RelationType } from '@adr-tool/core'
   import { app, statusKey } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import AdrPicker from './AdrPicker.svelte'
   import ChipInput from './ChipInput.svelte'
@@ -13,13 +14,6 @@
   const adrs = $derived(app.log?.adrs ?? [])
   const adr = $derived(adrs.find((candidate) => candidate.id === editing?.adrId))
   const proposed = $derived(adr !== undefined && statusKey(adr) === 'proposed')
-
-  const ABOUT: Record<RelationType, string> = {
-    supersedes: 'Replaces that decision as a whole, once this ADR is accepted.',
-    amends: 'Refines or extends part of that decision, once this ADR is accepted.',
-    'depends-on': 'This decision only holds while that one does.',
-    'relates-to': 'Worth reading together.'
-  }
 
   // What an ADR supersedes or amends is fixed once it has been decided.
   const types = $derived<RelationType[]>(
@@ -68,34 +62,34 @@
 >
   {#if editing && adr}
     <h1 id="metadata-title">
-      Metadata of ADR {prefixOf(adr)}
+      {t.metadata.title(prefixOf(adr))}
       <span class="of">{adr.title ?? adr.id}</span>
     </h1>
 
     <div class="field">
-      <h2>Decision-makers</h2>
+      <h2>{t.metadata.decisionMakers}</h2>
       <ChipInput
         bind:items={editing.decisionMakers}
         suggestions={knownDecisionMakers}
-        label="Decision-makers"
-        placeholder="A name, then Enter"
+        label={t.metadata.decisionMakers}
+        placeholder={t.metadata.decisionMakersPlaceholder}
       />
     </div>
 
     <div class="field">
-      <h2>Tags</h2>
+      <h2>{t.metadata.tags}</h2>
       <ChipInput
         bind:items={editing.tags}
         suggestions={knownTags}
-        label="Tags"
-        placeholder="A tag, then Enter"
+        label={t.metadata.tags}
+        placeholder={t.metadata.tagsPlaceholder}
       />
     </div>
 
     {#each types as type (type)}
       {@const chosen = editing.relations[type]}
       <div class="field">
-        <h2>{RELATION_TYPE_LABEL[type]} <span class="about">{ABOUT[type]}</span></h2>
+        <h2>{RELATION_TYPE_LABEL[type]} <span class="about">{t.metadata.about[type]}</span></h2>
         {#if chosen.length > 0}
           <ul aria-label={RELATION_TYPE_LABEL[type]}>
             {#each chosen as id (id)}
@@ -106,10 +100,10 @@
                   <span class="prefix">{prefixOf(other)}</span>
                   <span class="title">{other.title ?? other.id}</span>
                 {:else}
-                  <span class="title">{id} — not in this Decision Log</span>
+                  <span class="title">{t.metadata.notInLog(id)}</span>
                 {/if}
                 <button
-                  aria-label={`Remove ${id}`}
+                  aria-label={t.metadata.remove(id)}
                   onclick={() => chosen.splice(chosen.indexOf(id), 1)}>×</button
                 >
               </li>
@@ -118,25 +112,22 @@
         {/if}
         <AdrPicker
           candidates={candidates(type, chosen)}
-          label={`Add to ${RELATION_TYPE_LABEL[type]}`}
+          label={t.metadata.addTo(RELATION_TYPE_LABEL[type])}
           onpick={(id) => chosen.push(id)}
         />
       </div>
     {/each}
 
     {#if !proposed}
-      <p class="hint">
-        What this ADR supersedes or amends was fixed when it was decided. Status and dates change
-        through the actions of the ADR, never here.
-      </p>
+      <p class="hint">{t.metadata.hintDecided}</p>
     {:else}
-      <p class="hint">Status and dates change through the actions of the ADR, never here.</p>
+      <p class="hint">{t.metadata.hintProposed}</p>
     {/if}
 
     <footer>
-      <button onclick={() => app.cancelEditingMetadata()}>Cancel</button>
+      <button onclick={() => app.cancelEditingMetadata()}>{t.cancel}</button>
       <button class="primary" disabled={!app.metadataDirty} onclick={() => app.saveMetadata()}>
-        Review changes
+        {t.metadata.review}
       </button>
     </footer>
   {/if}

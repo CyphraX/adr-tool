@@ -48,6 +48,17 @@ export function relationLabel(relation: Relation, side: 'from' | 'to'): string {
   return (pending ?? RELATION_WORDING[relation.type])[side]
 }
 
+/**
+ * A text of strings.ts that names files sets them between backticks; the markup sets those
+ * parts in code. So a sentence stays one sentence, and a translation can move the names.
+ */
+export function codeSpans(text: string): { text: string; code: boolean }[] {
+  return text
+    .split('`')
+    .map((part, position) => ({ text: part, code: position % 2 === 1 }))
+    .filter((part) => part.text !== '')
+}
+
 const count = (files: number): string => (files === 1 ? 'one file' : `${files} files`)
 
 /** What a change does to how many files, in one sentence: "This renames one file and changes 3 files." */

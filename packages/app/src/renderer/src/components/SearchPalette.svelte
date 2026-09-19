@@ -1,6 +1,7 @@
 <script lang="ts">
   import { searchLogs } from '../lib/search'
   import { app, statusKey } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { STATUS_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
@@ -37,14 +38,14 @@
   }
 </script>
 
-<dialog bind:this={dialog} oncancel={() => app.stopSearching()} aria-label="Search the ADRs">
+<dialog bind:this={dialog} oncancel={() => app.stopSearching()} aria-label={t.searching.label}>
   {#if app.searching}
     <input
       bind:value={app.searching.query}
       oninput={() => (chosen = 0)}
       {onkeydown}
       type="search"
-      placeholder="Search titles, text, tags, people — or type a number"
+      placeholder={t.searching.placeholder}
       spellcheck="false"
       role="combobox"
       aria-autocomplete="list"
@@ -54,7 +55,7 @@
     />
 
     {#if found.length > 0}
-      <div id="hits" class="hits" role="listbox" aria-label="ADRs found">
+      <div id="hits" class="hits" role="listbox" aria-label={t.searching.found}>
         {#each found as hit, index (hit.logPath + hit.adr.id)}
           {@const status = statusKey(hit.adr)}
           <!-- The keyboard is handled by the input above. -->
@@ -88,10 +89,10 @@
         {/each}
       </div>
       {#if all.length > found.length}
-        <p class="more">The best {found.length} of {all.length}. Another word narrows it down.</p>
+        <p class="more">{t.searching.more(found.length, all.length)}</p>
       {/if}
     {:else if app.searching.query.trim() !== ''}
-      <p class="none">No ADR has all of these words.</p>
+      <p class="none">{t.searching.none}</p>
     {/if}
   {/if}
 </dialog>

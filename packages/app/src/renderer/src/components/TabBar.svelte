@@ -1,9 +1,10 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
 </script>
 
 <header>
-  <div class="tabs" role="tablist" aria-label="Open repositories">
+  <div class="tabs" role="tablist" aria-label={t.tabs.label}>
     {#each app.tabs as tab (tab.repository.id)}
       {@const id = tab.repository.id}
       <div class="tab" class:active={id === app.activeId}>
@@ -18,7 +19,7 @@
         </button>
         <button
           class="close"
-          aria-label="Close {tab.repository.name}"
+          aria-label={t.tabs.close(tab.repository.name)}
           onclick={() => app.close(id)}
         >
           <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
@@ -28,7 +29,7 @@
       </div>
     {/each}
   </div>
-  <button class="open" onclick={() => app.open()}>Open repository</button>
+  <button class="open" onclick={() => app.open()}>{t.tabs.open}</button>
 </header>
 
 <style>

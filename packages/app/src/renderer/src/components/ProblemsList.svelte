@@ -2,6 +2,7 @@
   import { repairsOf, type Adr, type Problem } from '@adr-tool/core'
   import { adrsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import {
     CONSEQUENCES_LEAD,
     NO_REPAIR,
@@ -30,17 +31,17 @@
 
 <div class="list">
   <div class="head">
-    <h2>Problems</h2>
+    <h2>{t.problems.heading}</h2>
     <span class="tools">
-      <button onclick={() => app.startSearching()}>Search</button>
-      <button onclick={() => app.show('adrs')}>Back to the ADRs</button>
+      <button onclick={() => app.startSearching()}>{t.search}</button>
+      <button onclick={() => app.show('adrs')}>{t.backToAdrs}</button>
     </span>
   </div>
 
   {#if app.problemGroups.length === 0}
-    <p class="empty">No Problems in this Decision Log.</p>
+    <p class="empty">{t.problems.none}</p>
   {:else}
-    <ul class="groups" aria-label="Problems">
+    <ul class="groups" aria-label={t.problems.heading}>
       {#each app.problemGroups as { problem, consequences }, position (position)}
         {@const log = app.log}
         {@const repairs = log ? repairsOf(log, problem) : []}
