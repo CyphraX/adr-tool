@@ -65,6 +65,15 @@ export function prefixOf(adr: Adr): string {
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
 }
 
+/** Above the Problems that are listed under an ADR whose frontmatter cannot be read. */
+export const CONSEQUENCES_LEAD =
+  'Reported only because this file cannot be read. Fix its frontmatter first, then look again: some of this may turn out to be real.'
+
+/** Next to a Problem on one ADR that is only reported because of another ADR's broken file. */
+export function describeCause(cause: string): string {
+  return `Reported only because the frontmatter of ${cause} cannot be read.`
+}
+
 export function describeProblem(problem: Problem): string {
   switch (problem.kind) {
     case 'unterminated-frontmatter':

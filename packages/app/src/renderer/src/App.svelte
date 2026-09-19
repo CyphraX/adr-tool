@@ -5,6 +5,7 @@
   import ChangeDialog from './components/ChangeDialog.svelte'
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
+  import ProblemsList from './components/ProblemsList.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import { app } from './lib/state.svelte'
@@ -46,12 +47,20 @@
     {:else}
       <div class="panes" class:wide-editor={app.editing?.mode === 'split'}>
         <Sidebar />
-        <AdrList />
+        {#if app.active.view === 'problems'}
+          <ProblemsList />
+        {:else}
+          <AdrList />
+        {/if}
         {#if app.selected && app.log}
           <AdrDetail adr={app.selected} log={app.log} />
         {:else}
           <main class="message on-paper">
-            <p>Select an ADR to read it.</p>
+            <p>
+              {app.active.view === 'problems'
+                ? 'Select an ADR to see what is wrong with it.'
+                : 'Select an ADR to read it.'}
+            </p>
           </main>
         {/if}
       </div>

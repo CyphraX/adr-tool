@@ -1,8 +1,15 @@
 <script lang="ts">
   import { nextPrefix, type Adr, type DecisionLog, type Relation } from '@adr-tool/core'
   import type { Decision } from '../../../shared/ipc'
-  import { DECISION_LABEL, app, problemsOf, statusKey } from '../lib/state.svelte'
-  import { STATUS_LABEL, describeProblem, prefixOf, relationLabel } from '../lib/wording'
+  import { problemsOf } from '../lib/problems'
+  import { DECISION_LABEL, app, statusKey } from '../lib/state.svelte'
+  import {
+    STATUS_LABEL,
+    describeCause,
+    describeProblem,
+    prefixOf,
+    relationLabel
+  } from '../lib/wording'
   import BodyEditor from './BodyEditor.svelte'
   import MarkdownDocument from './MarkdownDocument.svelte'
   import StatusMark from './StatusMark.svelte'
@@ -19,7 +26,7 @@
 
   const status = $derived(statusKey(adr))
   const editing = $derived(app.editing?.adrId === adr.id)
-  const problems = $derived(problemsOf(log, adr.id))
+  const problems = $derived(problemsOf(app.problemGroups, adr.id))
 
   // Both directions: what this ADR says about others, and what others say about it.
   const relations = $derived.by((): Line[] => {
@@ -125,9 +132,13 @@
 
     {#if problems.length > 0}
       <ul class="problems" aria-label="Problems">
-        {#each problems as problem, position (position)}
-          <li>
+        {#each problems as { problem, cause }, position (position)}
+          <li class:follows={cause !== undefined}>
             {describeProblem(problem)}
+            {#if cause !== undefined}
+              <button class="cause" onclick={() => app.select(cause)}>{describeCause(cause)}</button
+              >
+            {/if}
             {#if problem.kind === 'duplicate-number' && !editing}
               <!-- The repair of this Problem: one of the two moves, and the person says which. -->
               <button onclick={() => app.renumber()}>Renumber to {nextPrefix(log, '')}</button>
@@ -294,6 +305,23 @@
 
   .problems button:hover {
     background: var(--hover);
+  }
+
+  .problems .follows {
+    border-left-color: var(--line-strong);
+    background: var(--panel);
+    color: var(--ink-soft);
+  }
+
+  .problems .cause {
+    display: inline;
+    margin: 0;
+    text-align: left;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .problems li {
