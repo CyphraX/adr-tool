@@ -31,6 +31,23 @@ export type Decision = 'accept' | 'reject' | 'deprecate'
 export interface PlannedChange {
   readonly changeId: string
   readonly changeSet: ChangeSet
+  /** What the person should look at before confirming. */
+  readonly warnings: readonly string[]
+}
+
+/**
+ * An edit of an ADR's body as the editor hands it over. This text is input to planning:
+ * `core` turns it into a change set, and only that is ever written.
+ */
+export interface BodyEditRequest {
+  readonly repositoryId: string
+  readonly logPath: string
+  readonly adrId: string
+  /** The body the edit started from, exactly as it was received. */
+  readonly base: string
+  readonly body: string
+  /** What was corrected. Only used when the ADR is no longer proposed. */
+  readonly note: string
 }
 
 export type PlanResult =
@@ -58,6 +75,8 @@ export interface Api {
     adrId: string,
     decision: Decision
   ): Promise<PlanResult>
+  /** Plan saving an edited body. Nothing is written until the change is applied. */
+  planBodyEdit(request: BodyEditRequest): Promise<PlanResult>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
   applyChange(changeId: string): Promise<ApplyResult>
   discardChange(changeId: string): Promise<void>
@@ -74,6 +93,7 @@ export const CHANNEL = {
   setActiveRepository: 'repository:set-active',
   repositoryChanged: 'repository:changed',
   planDecision: 'change:plan-decision',
+  planBodyEdit: 'change:plan-body-edit',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
   openExternal: 'shell:open-external'

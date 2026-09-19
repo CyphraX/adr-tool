@@ -29,6 +29,21 @@
         Nothing else in {files.length === 1 ? 'it' : 'them'} is touched.
       </p>
 
+      {#if review.change.warnings.length > 0}
+        <div class="warnings">
+          <p>This looks like more than a Correction:</p>
+          <ul>
+            {#each review.change.warnings as warning (warning)}
+              <li>{warning}</li>
+            {/each}
+          </ul>
+          <p>
+            If it changes what was decided, cancel and write a new ADR that amends or supersedes
+            this one. If it does not, save.
+          </p>
+        </div>
+      {/if}
+
       <div class="files">
         {#each files as file (file.path)}
           <section>
@@ -52,6 +67,12 @@
         >
           {review.action}
         </button>
+      </footer>
+    {:else if review.kind === 'confirm'}
+      <p class="reason">{review.reason}</p>
+      <footer>
+        <button bind:this={confirm} onclick={() => app.dismissReview()}>Keep editing</button>
+        <button class="primary" onclick={() => app.confirmReview()}>{review.action}</button>
       </footer>
     {:else}
       <p class="reason">{review.reason}</p>
@@ -101,6 +122,19 @@
 
   .reason {
     color: var(--ink);
+  }
+
+  .warnings {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-left: 3px solid var(--proposed);
+    background: color-mix(in srgb, var(--proposed) 10%, transparent);
+    line-height: 1.55;
+  }
+
+  .warnings ul {
+    margin: 4px 0;
+    padding-left: 1.3em;
   }
 
   .files {

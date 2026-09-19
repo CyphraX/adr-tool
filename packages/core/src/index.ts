@@ -23,3 +23,4 @@ export {
   type Plan
 } from './change/change-set'
 export { planAccept, planDeprecate, planReject, type Today } from './lifecycle/decide'
+export { planEditBody, recordsCorrection, type BodyEdit } from './lifecycle/edit-body'
