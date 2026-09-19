@@ -1,4 +1,4 @@
-import type { ChangeSet, RelationType, Repository, Templates } from '@adr-tool/core'
+import type { ChangeSet, RelationType, Repair, Repository, Templates } from '@adr-tool/core'
 
 /**
  * The contract between the main process and the sandboxed renderer.
@@ -77,6 +77,13 @@ export interface MetadataEditRequest {
   readonly relations: Readonly<Record<RelationType, readonly string[]>>
 }
 
+/** One of the repairs `core` offers for a Problem of the log. `core` checks that it still does. */
+export interface RepairRequest {
+  readonly repositoryId: string
+  readonly logPath: string
+  readonly repair: Repair
+}
+
 export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
   | { readonly ok: false; readonly reason: string }
@@ -108,8 +115,8 @@ export interface Api {
   planCreate(request: CreateRequest): Promise<PlanResult>
   /** Plan saving an edited body. Nothing is written until the change is applied. */
   planBodyEdit(request: BodyEditRequest): Promise<PlanResult>
-  /** Plan a Renumber of an ADR that shares its number. Nothing is written until the change is applied. */
-  planRenumber(repositoryId: string, logPath: string, adrId: string): Promise<PlanResult>
+  /** Plan the repair of a Problem; a Renumber is one. Nothing is written until the change is applied. */
+  planRepair(request: RepairRequest): Promise<PlanResult>
   /** Plan an edit of the Metadata lists. Nothing is written until the change is applied. */
   planMetadataEdit(request: MetadataEditRequest): Promise<PlanResult>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
@@ -130,7 +137,7 @@ export const CHANNEL = {
   planDecision: 'change:plan-decision',
   planBodyEdit: 'change:plan-body-edit',
   planMetadataEdit: 'change:plan-metadata-edit',
-  planRenumber: 'change:plan-renumber',
+  planRepair: 'change:plan-repair',
   planCreate: 'change:plan-create',
   listTemplates: 'templates:list',
   applyChange: 'change:apply',
