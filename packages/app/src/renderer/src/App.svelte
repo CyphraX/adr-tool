@@ -3,6 +3,7 @@
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
   import ChangeDialog from './components/ChangeDialog.svelte'
+  import NewAdrDialog from './components/NewAdrDialog.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import { app } from './lib/state.svelte'
@@ -37,6 +38,8 @@
             <code>.adr-dir</code>, then for the folders <code>docs/adr</code>, <code>doc/adr</code>
             and <code>docs/decisions</code>. As soon as one of them appears, the ADRs show up here.
           </p>
+          <p>Or start here: the first ADR is created in <code>docs/adr</code>.</p>
+          <button class="primary" onclick={() => app.startCreating()}>Create the first ADR</button>
         {/if}
       </main>
     {:else}
@@ -53,6 +56,7 @@
       </div>
     {/if}
   </div>
+  <NewAdrDialog />
   <ChangeDialog />
 {/if}
 

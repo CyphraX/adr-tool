@@ -1,4 +1,4 @@
-import type { Adr, DecisionLog, Problem, Status } from '@adr-tool/core'
+import type { Adr, DecisionLog, Problem, Status, TemplateInfo } from '@adr-tool/core'
 import type { Decision, OpenRepository, PlannedChange } from '../../../shared/ipc'
 import { prefixOf } from './wording'
 
@@ -51,6 +51,16 @@ interface Editing {
   missing: boolean
 }
 
+/** A new ADR being described in the dialog. */
+interface Creating {
+  repositoryId: string
+  title: string
+  template: string
+  templates: readonly TemplateInfo[]
+  /** Set when the new ADR is written to supersede or amend the selected one. */
+  relation: { type: 'supersedes' | 'amends'; target: string } | undefined
+}
+
 const withLf = (text: string): string => text.replaceAll('\r\n', '\n')
 
 /** Everything the window shows: the open repositories as tabs, and per tab what is selected. */
@@ -60,6 +70,7 @@ class AppState {
   ready = $state(false)
   review = $state<Review | undefined>(undefined)
   editing = $state<Editing | undefined>(undefined)
+  creating = $state<Creating | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -170,6 +181,51 @@ class AppState {
         }
   }
 
+  /** Open the dialog for a new ADR; with a Relation, one that supersedes or amends the selected ADR. */
+  startCreating(type?: 'supersedes' | 'amends'): void {
+    const tab = this.active
+    if (!tab) return
+    const target = this.selected?.id
+    this.leaveEditor(async () => {
+      const { templates, defaultName } = await window.api.listTemplates(tab.repository.id)
+      this.creating = {
+        repositoryId: tab.repository.id,
+        title: '',
+        template: defaultName,
+        templates,
+        relation: type && target ? { type, target } : undefined
+      }
+    })
+  }
+
+  cancelCreating(): void {
+    this.creating = undefined
+  }
+
+  /** Plan the new ADR. The preview shows the whole file before it is written. */
+  async create(): Promise<void> {
+    const creating = this.creating
+    if (!creating || creating.title.trim() === '') return
+    const plan = await window.api.planCreate({
+      repositoryId: creating.repositoryId,
+      logPath: this.log?.path,
+      title: creating.title,
+      template: creating.template,
+      // A reactive proxy cannot cross the process boundary; send a plain copy.
+      ...(creating.relation && { relation: $state.snapshot(creating.relation) })
+    })
+    this.creating = undefined
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: 'Create the ADR',
+          action: 'Create',
+          change: plan.change,
+          applying: false
+        }
+      : { kind: 'refused', title: 'The ADR cannot be created', reason: plan.reason }
+  }
+
   /** Start editing the body of the selected ADR. */
   edit(): void {
     const [tab, log, adr] = [this.active, this.log, this.selected]
@@ -243,6 +299,13 @@ class AppState {
       if (review.action === 'Save') this.editing = undefined
       this.replace(result.repository)
       this.review = undefined
+      // A new ADR is an empty Template until somebody writes it: go straight to its body.
+      const createdId = review.change.createdId
+      if (createdId !== undefined && this.active) {
+        this.active.statusFilter = 'all'
+        this.active.selectedId = createdId
+        this.edit()
+      }
     } else {
       this.review = { kind: 'refused', title: 'The change was not written', reason: result.reason }
     }

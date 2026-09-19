@@ -81,7 +81,7 @@ Rules:
 
 - The body is the author's. The tool changes it in exactly one situation: Migration of a foreign ADR may remove a `## Status` section whose content was captured completely in the Metadata, and shows the diff first.
 - The **title** is the text of the first level-one ATX heading (`# …`) in the body that is not inside a code block. An ADR without one is shown under its ID.
-- A new ADR gets its body from a Template.
+- A new ADR gets its body from a Template (section 7).
 
 ## 5. What each operation writes
 
@@ -116,7 +116,7 @@ The tool looks, in this order, and stops at the first step that yields something
 1. `.adr/config.yml` in the repository root.
 2. `.adr-dir` in the repository root — adr-tools' file holding the relative path of its directory.
 3. The directories `docs/adr`, `doc/adr` and `docs/decisions`; each one that exists is a Decision Log.
-4. Nothing found: the app asks, and the answer is written to `.adr/config.yml`.
+4. Nothing found: the repository has no Decision Log yet. The first ADR is created in `docs/adr` (section 7).
 
 Opening a repository never writes. `.adr/` is created the first time something has to be configured.
 
@@ -125,15 +125,31 @@ Opening a repository never writes. `.adr/` is created the first time something h
 logs:
   - path: docs/adr
     naming: sequential    # or: date; optional, detected when absent
+templates:
+  default: madr           # optional; `minimal` when absent
 ```
 
-Further keys arrive with Templates and are specified then.
+## 7. Templates and new ADRs
 
-## 7. Foreign formats
+A **Template** is a Markdown file that gives a new ADR its body. It never contains frontmatter: the Metadata of a new ADR comes from the tool. A Template that starts with `---` frontmatter cannot be used, and the tool says so.
+
+- Templates of a repository live in `.adr/templates/`, one `.md` file each; the file name without `.md` is the Template's name.
+- Three Templates are built in: `minimal` (a title and a few sentences), `nygard` (Context, Decision, Consequences) and `madr`. A file of the same name in `.adr/templates/` takes the place of a built-in one.
+- `templates.default` in `.adr/config.yml` names the Template that is preselected. Without it, that is `minimal`.
+- Three placeholders are filled in when an ADR is created, once and without any logic: `{{title}}`, `{{date}}` (today, `YYYY-MM-DD`) and `{{number}}` (the prefix of the new ID as written, e.g. `0009`).
+
+A new ADR:
+
+- **ID.** In a `sequential` log the number is the highest existing number plus one, padded to four digits or to the widest prefix the log already has. In a `date` log the prefix is today's date. The slug is made from the title: lowercase, German umlauts and `ß` written out (`ä` → `ae`), other accents dropped, everything that is not a letter or a digit turned into a dash, at most 60 characters. A title that leaves no slug is refused, and so is an ID that already exists — the tool does not skip ahead to a free one.
+- **Metadata.** `status: proposed` and `created`. An ADR created to supersede or amend another one also carries that Relation; the target must be one that may be superseded or amended (section 5). Nothing is written to the target until the new ADR is accepted.
+- **Bytes.** The file uses the line ending most ADRs of its Decision Log use, LF when there are none or on a tie, and has no byte order mark.
+- In a repository without any Decision Log, the first ADR is created in `docs/adr`, where the tool finds it again without any configuration.
+
+## 8. Foreign formats
 
 ADRs written by adr-tools and in MADR 3/4 are recognized and read tolerantly — Status in a `## Status` section or a `status:` key in other spellings, "superseded by" in its various forms, unknown Status values shown as written. The tool never writes these formats. The first time it is asked to modify such an ADR it offers Migration into the format above. The mapping is specified here when the readers are built; what is known about the formats is in [the survey](research/adr-format-survey.md).
 
-## 8. Examples
+## 9. Examples
 
 The smallest valid ADR:
 

@@ -18,6 +18,9 @@
 </script>
 
 <div class="list">
+  <div class="tools">
+    <button onclick={() => app.startCreating()}>New ADR</button>
+  </div>
   <div class="head" aria-hidden="true">
     <span class="prefix">{app.log?.naming === 'date' ? 'Date' : 'No.'}</span>
     <span>Title</span>
@@ -82,6 +85,25 @@
     min-height: 0;
     background: var(--panel-raised);
     border-right: 1px solid var(--line);
+  }
+
+  .tools {
+    display: flex;
+    justify-content: flex-end;
+    flex: none;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tools button {
+    padding: 3px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: var(--paper);
+  }
+
+  .tools button:hover {
+    background: var(--hover);
   }
 
   .head,
