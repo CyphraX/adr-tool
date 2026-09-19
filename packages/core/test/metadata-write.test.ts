@@ -74,6 +74,17 @@ describe('setScalar', () => {
     expect(result.after.startsWith('\uFEFF---\nstatus: rejected\n---\n')).toBe(true)
   })
 
+  it('fills a key that is there without a value, however the emptiness was written', () => {
+    const text = '---\nstatus:\ncreated: ~   # unknown\ntags: null\n---\n'
+    const status = write(text, (view) => setScalar(view, 'status', 'accepted'))
+    expect(status.added).toEqual(['status: accepted\n'])
+    const created = write(text, (view) => setScalar(view, 'created', '2026-03-02'))
+    expect(created.added).toEqual(['created: 2026-03-02   # unknown\n'])
+    const tags = write(text, (view) => addToList(view, 'tags', 'persistence'))
+    expect(tags.added).toEqual(['tags: [persistence]\n'])
+    expect(tags.removed).toEqual(['tags: null\n'])
+  })
+
   it('quotes a value that would not read back as the same string', () => {
     const text = '---\nstatus: accepted\n---\n'
     const colon = write(text, (view) => setScalar(view, 'created', 'a: b'))

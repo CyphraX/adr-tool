@@ -69,13 +69,20 @@ export function addToList(view: SourceView, key: MetadataKey, item: string): Tex
   return [{ start: at, end: at, insert: `${lead}${indent}- ${formatScalar(item)}${view.eol}` }]
 }
 
-/** `key:` with nothing after it: the value goes right behind the colon. */
+/**
+ * Give a key its first value. `key:` with nothing after it gets the value right behind the
+ * colon; an empty value that was spelled out (`key: ~`, `key: null`) is replaced.
+ */
 function fillEmptyValue(
   view: SourceView,
   fm: Frontmatter,
   pair: KeyedPair,
   formattedValue: string
 ): TextEdit {
+  const range = pair.value?.range
+  if (range && range[1] > range[0]) {
+    return { start: fm.abs(range[0]), end: fm.abs(range[1]), insert: formattedValue }
+  }
   const colon = view.text.indexOf(':', fm.abs(pair.key.range![1]))
   return { start: colon + 1, end: colon + 1, insert: ` ${formattedValue}` }
 }
