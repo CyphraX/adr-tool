@@ -87,6 +87,60 @@ function fillEmptyValue(
   return { start: colon + 1, end: colon + 1, insert: ` ${formattedValue}` }
 }
 
+export interface CorrectionEntry {
+  readonly date: string
+  readonly author?: string
+  readonly note?: string
+}
+
+/**
+ * Append an entry to `corrections`. The tool writes this list in block style; a list that
+ * is already there keeps the style and the indentation it has.
+ */
+export function appendCorrection(view: SourceView, entry: CorrectionEntry): TextEdit[] {
+  const fm = readFrontmatter(view)
+  const fields = (
+    [
+      ['date', entry.date],
+      ['author', entry.author],
+      ['note', entry.note]
+    ] as const
+  ).flatMap(([name, value]) => (value ? [`${name}: ${formatScalar(value)}`] : []))
+  const asBlock = (indent: string): string[] =>
+    fields.map((field, position) => indent + (position === 0 ? '- ' : '  ') + field)
+
+  const pair = fm.find('corrections')
+  const node = pair?.value ?? null
+  if (!pair) return [fm.insertKey('corrections', '', asBlock('  '))]
+  if (node === null || (isScalar(node) && scalarText(node) === undefined)) {
+    return [...removeKey(view, 'corrections'), fm.insertKey('corrections', '', asBlock('  '))]
+  }
+  if (!isSeq(node)) throw new MetadataNotWritableError('"corrections" is not a list')
+
+  const last = node.items.at(-1) as Scalar | YAMLMap | undefined
+  if (node.flow) {
+    const at = last ? fm.abs(last.range![1]) : fm.abs(node.range![0]) + 1
+    return [{ start: at, end: at, insert: `${last ? ', ' : ''}{${fields.join(', ')}}` }]
+  }
+  if (!last) throw new MetadataNotWritableError('"corrections" is an empty block list')
+
+  const dash = view.text.lastIndexOf('-', fm.abs(last.range![0]))
+  const indent = view.text.slice(lineStart(view.text, dash), dash)
+  const at = fm.abs(last.range![2])
+  const lead = view.text[at - 1] === '\n' ? '' : view.eol
+  return [
+    {
+      start: at,
+      end: at,
+      insert:
+        lead +
+        asBlock(indent)
+          .map((line) => line + view.eol)
+          .join('')
+    }
+  ]
+}
+
 /** Remove a Metadata key with its value. Comments above it belong to the author and stay. */
 export function removeKey(view: SourceView, key: MetadataKey): TextEdit[] {
   const fm = readFrontmatter(view)
@@ -103,7 +157,19 @@ interface Frontmatter {
   /** Translate an offset inside the YAML text into an offset inside the file. */
   abs(offset: number): number
   find(key: MetadataKey): KeyedPair | undefined
-  insertKey(key: MetadataKey, formattedValue: string): TextEdit
+  /** Insert `key: value`, or `key:` followed by the lines of a block when `block` is given. */
+  insertKey(key: MetadataKey, formattedValue: string, block?: readonly string[]): TextEdit
+}
+
+/** The lines a new key takes up in the file. */
+function keyLines(
+  key: MetadataKey,
+  value: string,
+  block: readonly string[] | undefined,
+  eol: string
+): string {
+  if (!block) return `${key}: ${value}${eol}`
+  return [`${key}:`, ...block].map((line) => line + eol).join('')
 }
 
 function readFrontmatter(view: SourceView): Frontmatter {
@@ -118,10 +184,10 @@ function readFrontmatter(view: SourceView): Frontmatter {
     return {
       abs: (offset) => offset,
       find: () => undefined,
-      insertKey: (key, value) => ({
+      insertKey: (key, value, block) => ({
         start: at,
         end: at,
-        insert: `---${eol}${key}: ${value}${eol}---${eol}`
+        insert: `---${eol}${keyLines(key, value, block, eol)}---${eol}`
       })
     }
   }
@@ -144,7 +210,7 @@ function readFrontmatter(view: SourceView): Frontmatter {
   return {
     abs,
     find,
-    insertKey(key, value) {
+    insertKey(key, value, block) {
       // After the last of the tool's keys that precedes this one in canonical order,
       // or at the top when there is none. Existing keys never move.
       const rank = METADATA_KEYS.indexOf(key)
@@ -155,7 +221,7 @@ function readFrontmatter(view: SourceView): Frontmatter {
       const anchor = before.at(-1)
       const at = anchor ? abs((anchor.value ?? anchor.key).range![2]) : span.start
       const lead = at > span.start && text[at - 1] !== '\n' ? eol : ''
-      return { start: at, end: at, insert: `${lead}${key}: ${value}${eol}` }
+      return { start: at, end: at, insert: lead + keyLines(key, value, block, eol) }
     }
   }
 }
