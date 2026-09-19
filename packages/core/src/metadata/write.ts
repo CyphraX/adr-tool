@@ -24,41 +24,66 @@ export function setScalar(view: SourceView, key: MetadataKey, value: string): Te
     }
     return [fillEmptyValue(view, fm, pair, formatScalar(value))]
   }
+  requireInline(key, node as Scalar)
   const [start, end] = [fm.abs(node.range![0]), fm.abs(node.range![1])]
   return [{ start, end, insert: formatScalar(value, (node as Scalar).type) }]
 }
 
-/** Add an item to a list-valued Metadata key, keeping the style the list already has. */
-export function addToList(view: SourceView, key: MetadataKey, item: string): TextEdit[] {
+/**
+ * A block scalar (`key: |`) reaches over its own line break and says with its indentation
+ * where it ends: nothing the tool could replace where it stands.
+ */
+function requireInline(key: string, node: Scalar): void {
+  if (node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED') {
+    throw new MetadataNotWritableError(
+      `"${key}" is written as a block of several lines, which the tool cannot change where it stands. Write it on one line in an editor.`
+    )
+  }
+}
+
+/**
+ * Add an item, or several, to a list-valued Metadata key, keeping the style the list
+ * already has. What is in the list already is not added again.
+ */
+export function addToList(
+  view: SourceView,
+  key: MetadataKey,
+  item: string | readonly string[]
+): TextEdit[] {
   const fm = readFrontmatter(view)
   const pair = fm.find(key)
-  if (!pair) return [fm.insertKey(key, `[${formatScalar(item)}]`)]
+  const node = pair?.value ?? null
+  if (node !== null && !isScalar(node) && !isSeq(node)) {
+    throw new MetadataNotWritableError(`"${key}" is not a list`)
+  }
 
-  const node = pair.value
+  const there = isSeq(node)
+    ? node.items.map((existing) => scalarText(existing))
+    : [scalarText(node)]
+  const added = [...new Set([item].flat())].filter((one) => !there.includes(one))
+  if (added.length === 0) return []
+  const formatted = added.map((one) => formatScalar(one))
+
+  if (!pair) return [fm.insertKey(key, `[${formatted.join(', ')}]`)]
   if (node === null || isScalar(node)) {
-    const only = scalarText(node)
-    if (only === item) return []
-    if (node === null || only === undefined) {
-      return [fillEmptyValue(view, fm, pair, `[${formatScalar(item)}]`)]
+    if (node === null || scalarText(node) === undefined) {
+      return [fillEmptyValue(view, fm, pair, `[${formatted.join(', ')}]`)]
     }
     // A single value where a list is expected reads as a list of one; appending makes it a real list.
+    requireInline(key, node)
     const [start, end] = [fm.abs(node.range![0]), fm.abs(node.range![1])]
     const existing = view.text.slice(start, end)
-    return [{ start, end, insert: `[${existing}, ${formatScalar(item)}]` }]
+    return [{ start, end, insert: `[${existing}, ${formatted.join(', ')}]` }]
   }
-  if (!isSeq(node)) throw new MetadataNotWritableError(`"${key}" is not a list`)
 
-  const items = (node as YAMLSeq<Scalar>).items
-  if (items.some((existing) => scalarText(existing) === item)) return []
-  const last = items.at(-1)
-
+  const last = (node as YAMLSeq<Scalar>).items.at(-1)
   if (node.flow) {
     if (!last) {
       const open = fm.abs(node.range![0]) + 1
-      return [{ start: open, end: open, insert: formatScalar(item) }]
+      return [{ start: open, end: open, insert: formatted.join(', ') }]
     }
     const end = fm.abs(last.range![1])
-    return [{ start: end, end, insert: `, ${formatScalar(item)}` }]
+    return [{ start: end, end, insert: formatted.map((one) => `, ${one}`).join('') }]
   }
 
   if (!last) throw new MetadataNotWritableError(`"${key}" is an empty block list`)
@@ -66,7 +91,8 @@ export function addToList(view: SourceView, key: MetadataKey, item: string): Tex
   const indent = view.text.slice(lineStart(view.text, dash), dash)
   const at = fm.abs(last.range![2])
   const lead = view.text[at - 1] === '\n' ? '' : view.eol
-  return [{ start: at, end: at, insert: `${lead}${indent}- ${formatScalar(item)}${view.eol}` }]
+  const lines = formatted.map((one) => `${indent}- ${one}${view.eol}`).join('')
+  return [{ start: at, end: at, insert: lead + lines }]
 }
 
 /**

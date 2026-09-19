@@ -412,7 +412,8 @@ describe('values of MADR in shapes nobody expects', () => {
     ).toEqual([
       [undefined, 'accepted', []],
       [undefined, 'accepted', []],
-      ['madr', 'accepted', ['C']],
+      // A list with anything but single values in it is a foreign key, like the mapping.
+      [undefined, 'accepted', []],
       ['madr', 'superseded', []],
       // A thematic break is no list, and the template's comments are no Status.
       ['madr', 'rejected', []],

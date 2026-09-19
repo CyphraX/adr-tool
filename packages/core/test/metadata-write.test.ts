@@ -318,7 +318,8 @@ describe("this repository's own ADRs", () => {
     expect(adrs.length).toBeGreaterThanOrEqual(3)
     for (const { name, text } of adrs) {
       const result = write(text, (view) => setScalar(view, 'status', 'deprecated'))
-      expect(result.removed, name).toEqual(['status: accepted\n'])
+      // Whatever the Status is: an ADR of ours may be proposed for a while.
+      expect(result.removed, name).toEqual([expect.stringMatching(/^status: [a-z]+\n$/)])
       expect(result.added, name).toEqual(['status: deprecated\n'])
     }
   })
