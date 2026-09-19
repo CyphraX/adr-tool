@@ -23,7 +23,12 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [2, '0002-never-reserialize-markdown', 'accepted'],
     [3, '0003-on-disk-contract', 'accepted'],
     [4, '0004-operations-return-change-sets', 'accepted'],
-    [5, '0005-foreign-formats-are-read-never-written', 'proposed']
+    // Written as proposed; accepting it in the app must not break the build.
+    [
+      5,
+      '0005-foreign-formats-are-read-never-written',
+      expect.stringMatching(/^(proposed|accepted)$/)
+    ]
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -44,7 +49,7 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       to: '0002-never-reserialize-markdown',
       state: 'in-effect'
     },
-    // ADR-0005 is proposed: what it depends on is pending until it is accepted.
+    // What ADR-0005 depends on is pending until it is accepted.
     ...[
       '0002-never-reserialize-markdown',
       '0003-on-disk-contract',
@@ -53,7 +58,7 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       type: 'depends-on',
       from: '0005-foreign-formats-are-read-never-written',
       to,
-      state: 'pending'
+      state: log.adrs[4]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
     }))
   ])
 })
