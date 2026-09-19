@@ -46,6 +46,15 @@ export type Repair =
  * file. Several: any one of them is a step, and the person says which.
  */
 export function repairsOf(log: DecisionLog, problem: Problem): Repair[] {
+  // Renumber renames a file; every other Repair writes into one, and a file in a foreign
+  // format is only written by Migration.
+  const foreign = new Set(log.adrs.filter((adr) => adr.foreign).map((adr) => adr.id))
+  return candidatesOf(log, problem).filter(
+    (repair) => repair.kind === 'renumber' || !foreign.has(repair.adr)
+  )
+}
+
+function candidatesOf(log: DecisionLog, problem: Problem): Repair[] {
   switch (problem.kind) {
     case 'status-not-lowercase':
       return [{ kind: 'lowercase-status', adr: problem.adr }]

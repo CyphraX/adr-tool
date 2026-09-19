@@ -1,4 +1,4 @@
-import type { Adr } from '../adr/adr'
+import type { Adr, ForeignFormat } from '../adr/adr'
 import type { DecisionLog } from '../log/load'
 import type { Status } from '../status'
 import { Refusal } from './draft'
@@ -18,7 +18,18 @@ export function writable(log: DecisionLog, id: string, because?: string): Adr {
       `The frontmatter of ${id} cannot be read. Fix it before the tool writes to it.`
     )
   }
+  requireOwnFormat(adr)
   return adr
+}
+
+const FORMAT_NAMES: Record<ForeignFormat, string> = { 'adr-tools': 'adr-tools' }
+
+/** The tool reads a foreign format and never writes it (docs/file-format.md, section 8). */
+export function requireOwnFormat(adr: Adr): void {
+  if (!adr.foreign) return
+  throw new Refusal(
+    `${adr.id} is written in the format of ${FORMAT_NAMES[adr.foreign]}. The tool reads that format and never writes it.`
+  )
 }
 
 export function requireStatus(adr: Adr, allowed: readonly Status[], rule: string): void {
