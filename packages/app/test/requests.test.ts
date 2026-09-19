@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { metadataEditRequest, repairRequest } from '../src/main/requests'
+import { metadataEditRequest, migrationRequest, repairRequest } from '../src/main/requests'
 
 const valid = {
   repositoryId: 'r1',
@@ -83,5 +83,29 @@ describe('a repair as the renderer sends it', () => {
     expect(
       repairRequest({ repositoryId: 'r1', repair: { kind: 'renumber', adr: 'a' } })
     ).toBeUndefined()
+  })
+})
+
+describe('a request for a Migration from the renderer', () => {
+  it('names one ADR, or none for the whole Decision Log, and carries nothing else', () => {
+    const request = { repositoryId: 'r1', logPath: 'doc/adr' }
+    expect(migrationRequest({ ...request, adrId: '0001-a', path: '/etc/passwd' })).toEqual({
+      ...request,
+      adrId: '0001-a'
+    })
+    expect(migrationRequest(request)).toEqual(request)
+  })
+
+  it('is turned down when it is not what it should be', () => {
+    for (const request of [
+      undefined,
+      'doc/adr',
+      { logPath: 'doc/adr' },
+      { repositoryId: 'r1' },
+      { repositoryId: 'r1', logPath: 'doc/adr', adrId: 7 },
+      { repositoryId: 'r1', logPath: 'doc/adr', adrId: null }
+    ]) {
+      expect(migrationRequest(request)).toBeUndefined()
+    }
   })
 })

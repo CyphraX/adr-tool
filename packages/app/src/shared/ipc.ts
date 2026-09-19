@@ -118,6 +118,13 @@ export interface RepairRequest {
   readonly repair: Repair
 }
 
+/** Migration of one ADR in a foreign format, or of every such ADR of the log when `adrId` is left out. */
+export interface MigrationRequest {
+  readonly repositoryId: string
+  readonly logPath: string
+  readonly adrId?: string
+}
+
 export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
   | { readonly ok: false; readonly reason: string }
@@ -151,6 +158,7 @@ export interface Api {
   planBodyEdit(request: BodyEditRequest): Promise<PlanResult>
   /** Plan the repair of a Problem; a Renumber is one. Nothing is written until the change is applied. */
   planRepair(request: RepairRequest): Promise<PlanResult>
+  planMigration(request: MigrationRequest): Promise<PlanResult>
   /** Plan an edit of the Metadata lists. Nothing is written until the change is applied. */
   planMetadataEdit(request: MetadataEditRequest): Promise<PlanResult>
   /** The history of an ADR's file, newest first, through renames. Empty without git. */
@@ -181,6 +189,7 @@ export const CHANNEL = {
   planBodyEdit: 'change:plan-body-edit',
   planMetadataEdit: 'change:plan-metadata-edit',
   planRepair: 'change:plan-repair',
+  planMigration: 'change:plan-migration',
   planCreate: 'change:plan-create',
   listTemplates: 'templates:list',
   history: 'git:history',

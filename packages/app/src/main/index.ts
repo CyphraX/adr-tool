@@ -11,7 +11,7 @@ import {
   type Session
 } from '../shared/ipc'
 import { Repositories } from './repositories'
-import { metadataEditRequest, repairRequest } from './requests'
+import { metadataEditRequest, migrationRequest, repairRequest } from './requests'
 import { readSession, writeSession } from './session-store'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
@@ -138,6 +138,12 @@ function registerIpc(): void {
     const repair = repairRequest(request)
     if (!repair) return { ok: false, reason: 'This request cannot be understood.' }
     return repositories.planRepair(repair)
+  })
+
+  ipcMain.handle(CHANNEL.planMigration, (_, request: unknown) => {
+    const migration = migrationRequest(request)
+    if (!migration) return { ok: false, reason: 'This request cannot be understood.' }
+    return repositories.planMigration(migration)
   })
 
   ipcMain.handle(CHANNEL.history, (_, ...ids: unknown[]) =>

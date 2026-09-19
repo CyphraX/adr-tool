@@ -125,6 +125,9 @@
           <button onclick={() => app.edit()}>Edit</button>
           <button onclick={() => app.editMetadata()}>Metadata</button>
         {/if}
+        {#if adr.foreign}
+          <button class="primary" onclick={() => app.migrate('adr')}>Migrate</button>
+        {/if}
         {#if git}<button onclick={() => app.showHistory()}>History</button>{/if}
       </div>
     {/if}

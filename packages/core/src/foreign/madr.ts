@@ -29,12 +29,7 @@ export function readMadr(
   own: Reading,
   byNumber: ByNumber
 ): { reading: Reading; successor?: string } | undefined {
-  const keys = frontmatterOf(view)
-  const written = keys.get('status')
-  const inFrontmatter = written !== undefined && SUPERSEDED_BY.test(written.text)
-  const listed = keys.has('status') ? undefined : listedStatus(view)
-  const named = keys.has('decision-makers') ? [] : (keys.get('deciders')?.items ?? [])
-  const deciders = named.length > 0 ? named : undefined
+  const { written, inFrontmatter, listed, deciders } = signsOf(view)
   if (!inFrontmatter && listed === undefined && !deciders) return undefined
 
   let { metadata } = own
@@ -43,7 +38,7 @@ export function readMadr(
 
   let successor: string | undefined
 
-  const text = inFrontmatter ? written.text : listed
+  const text = inFrontmatter ? written?.text : listed
   if (text !== undefined) {
     const status = readStatus(text, byNumber)
     successor = status.supersededBy[0]
@@ -71,6 +66,35 @@ export function readMadr(
     }
   }
   return { reading: { metadata, problems }, ...(successor !== undefined && { successor }) }
+}
+
+/** What makes a file MADR's: each of the things the tool's own format cannot say. */
+function signsOf(view: SourceView): {
+  written: Key | undefined
+  /** `status: superseded by …` in the frontmatter. */
+  inFrontmatter: boolean
+  /** The Status in the list under the title, where MADR 2 keeps it. */
+  listed: string | undefined
+  /** `deciders` that names somebody, and no `decision-makers`. */
+  deciders: readonly string[] | undefined
+} {
+  const keys = frontmatterOf(view)
+  const written = keys.get('status')
+  const inFrontmatter = written !== undefined && SUPERSEDED_BY.test(written.text)
+  const listed = keys.has('status') ? undefined : listedStatus(view)
+  const named = keys.has('decision-makers') ? [] : (keys.get('deciders')?.items ?? [])
+  return { written, inFrontmatter, listed, deciders: named.length > 0 ? named : undefined }
+}
+
+/** What Migration has to do to a file of MADR (docs/file-format.md, section 8, "Migration"). */
+export function migrationOfMadr(view: SourceView): {
+  status: boolean
+  deciders: boolean
+  /** There is no Migration for the Status in the list under the title yet. */
+  listed: boolean
+} {
+  const { inFrontmatter, listed, deciders } = signsOf(view)
+  return { status: inFrontmatter, deciders: deciders !== undefined, listed: listed !== undefined }
 }
 
 function withoutRawStatus(metadata: Metadata): Omit<Metadata, 'rawStatus'> {
