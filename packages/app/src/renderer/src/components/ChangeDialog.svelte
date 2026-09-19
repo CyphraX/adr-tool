@@ -24,9 +24,17 @@
 
     {#if review.kind === 'change'}
       {@const files = review.change.changeSet.files}
+      {@const created = files.filter((file) => file.creates).length}
+      {@const changed = files.length - created}
       <p class="summary">
-        {files.length === 1 ? 'This changes one file.' : `This changes ${files.length} files.`}
-        Nothing else in {files.length === 1 ? 'it' : 'them'} is touched.
+        {#if created > 0}
+          This creates {created === 1 ? 'one file' : `${created} files`}{changed > 0 ? ',' : '.'}
+        {/if}
+        {#if changed > 0}
+          {created > 0 ? 'and changes' : 'This changes'}
+          {changed === 1 ? 'one file' : `${changed} files`}. Nothing else in
+          {changed === 1 ? 'it' : 'them'} is touched.
+        {/if}
       </p>
 
       {#if review.change.warnings.length > 0}
@@ -47,7 +55,7 @@
       <div class="files">
         {#each files as file (file.path)}
           <section>
-            <h2>{file.path}</h2>
+            <h2>{file.path}{file.creates ? ' — new file' : ''}</h2>
             <div class="diff">
               {#each diffLines(file) as line, position (position)}
                 <span class={line.kind}>{SIGN[line.kind]} {line.text}</span>
