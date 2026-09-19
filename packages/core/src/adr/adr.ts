@@ -8,6 +8,9 @@ import { titleOf } from '../text/title'
 /** A format the tool reads and never writes (docs/file-format.md, section 8). */
 export type ForeignFormat = 'adr-tools'
 
+/** What each foreign format is called, in a sentence. */
+export const FOREIGN_FORMAT_NAMES: Record<ForeignFormat, string> = { 'adr-tools': 'adr-tools' }
+
 /** An ADR as read from its file. */
 export interface Adr {
   /** The file name without `.md`; unique within the Decision Log. */

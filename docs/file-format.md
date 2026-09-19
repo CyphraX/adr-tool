@@ -44,12 +44,12 @@ Text …
 ```
 
 - Frontmatter is present if the very first line is `---`. It ends at the next line that is `---`. Trailing spaces or tabs on these two lines are tolerated.
-- Everything after the closing line is the body. A file without frontmatter is all body — and still a valid ADR.
+- Everything after the closing line is the body. A file without frontmatter is all body — and still a valid ADR. (A file without frontmatter that keeps its Status in a `## Status` section is read as adr-tools wrote it: section 8.)
 - The frontmatter must be a YAML mapping without duplicate keys. If it is not, or if the closing `---` is missing, that is a Problem: the ADR is still listed and its text shown, but the tool refuses to write Metadata to the file until a person has fixed it.
 
 ## 3. Metadata
 
-No key is required. A file with no Metadata at all is an `accepted` ADR with no Relations.
+No key is required. A file with no Metadata at all is an `accepted` ADR with no Relations — unless it is read as a foreign format, which keeps its Metadata elsewhere (section 8).
 
 | Key               | Value                                        | Written by                          |
 | ----------------- | -------------------------------------------- | ----------------------------------- |
@@ -80,7 +80,7 @@ Rules:
 ## 4. Body
 
 - The body is the author's. The tool changes it in exactly one situation: Migration of a foreign ADR may remove a `## Status` section whose content was captured completely in the Metadata, and shows the diff first.
-- The **title** is the text of the first level-one ATX heading (`# …`) in the body that is not inside a code block. An ADR without one is shown under its ID. A leading number that repeats the ADR's own (`# 3. Title` in `0003-….md`, as adr-tools writes it) is not part of the title; the heading itself stays as it is.
+- The **title** is the text of the first level-one ATX heading (`# …`) in the body that is not inside a code block. An ADR without one is shown under its ID. A leading number that repeats the ADR's own (`# 3. Title` in `0003-….md`, as adr-tools writes it) is not part of the title; the heading itself stays as it is. The price: a title that really begins with the ADR's own number and a dot — "3. Normalform reicht aus" in `0003-….md` — is shown without it. That takes a coincidence, nothing is written, and the text below the header still shows the heading in full.
 - A new ADR gets its body from a Template (section 7).
 
 ## 5. What each operation writes
@@ -111,7 +111,8 @@ Two branches that each added "the next ADR" leave a `sequential` Decision Log wi
 - The new number is the highest number of the log plus one, written as wide as a new ADR's would be (section 7). The rest of the file name — the slug, as it was written — stays.
 - Wherever an ADR of the log names the old ID in `supersedes`, `amends`, `depends-on`, `relates-to`, `superseded-by` or `amended-by`, the item is rewritten where it stands: its position, its quoting and everything around it stay.
 - The body of an ADR is its author's (section 4), also here. Text that mentions the old ID — a Markdown link to the old file name, say — is not changed; the tool names the ADRs that have such text, and correcting a dead link is what a Correction is for.
-- Renumber is refused when the ADR names itself in a Relation, and when an ADR whose frontmatter cannot be read mentions the old ID: the tool cannot tell what it would leave behind.
+- Renumber is refused when the ADR names itself in a Relation, and when an ADR whose frontmatter cannot be read, or one in a foreign format (section 8), mentions the old ID anywhere in its file: the tool cannot tell what it would leave behind, or may not write it.
+- A heading that carries the old number (`# 3. Title`) stays as it is, like all text; the tool says so, and the title is shown with that number from then on.
 
 ### Consistency — what counts as a Problem
 
@@ -183,16 +184,17 @@ A new ADR:
 
 ADRs written by adr-tools and in MADR 3/4 are recognized and read tolerantly — Status in a `## Status` section or a `status:` key in other spellings, "superseded by" in its various forms, unknown Status values shown as written. What is known about the formats is in [the survey](research/adr-format-survey.md).
 
-- **The tool never writes these formats.** An ADR in a foreign format is listed, shown, searched and drawn like any other. Every operation that would write to its file — a lifecycle step, a Correction, Edit Metadata, a Repair, a Renumber that would have to rewrite a reference in it — is refused and points to Migration, which is the one operation that writes to such a file.
+- **The tool never writes these formats.** An ADR in a foreign format is listed, shown, searched and drawn like any other. Every operation that would write to its file — a lifecycle step, a Correction, Edit Metadata, a Repair, a Renumber of an ADR that the file mentions — is refused, and so is one that could only be completed by writing to it: a new ADR, or a Relation of a `proposed` one, that would supersede or amend it. Migration is the one operation that writes to such a file.
+- "Foreign format" is about the file as a whole. It has nothing to do with the foreign keys of section 3, which live in a frontmatter of the tool's own format.
 - **Recognition is conservative.** A file is foreign only when it carries something the format above cannot say. Everything else is an ADR in the tool's own format, whoever wrote it: a MADR file with `status: accepted`, a `date` and Jekyll's `nav_order` is a valid ADR with two foreign keys (section 3), and there is nothing to migrate.
 - **What is read is what Migration writes.** The Metadata the tool shows for a foreign ADR is exactly the Metadata its Migration puts into the frontmatter. Nothing is guessed for display that would not be written.
-- The mapping for MADR 3/4 is specified here when its reader is built.
+- The mapping for adr-tools follows. The one for MADR 3/4 is specified here when its reader is built; until then such a file is read as the tool's own format reads it.
 
 ### adr-tools
 
-A file is read as adr-tools' when it has **no frontmatter** and its body has a level-two heading `Status` (`## Status`, any case, outside a code block). The **Status section** runs from that heading to the next heading of level one or two, or to the end of the file.
+A file is read as adr-tools' when it has **no frontmatter** and its body has a level-two ATX heading `Status` (`## Status`, any case, outside a code block). The **Status section** runs from that heading to the next ATX heading of any level, or to the end of the file — as adr-tools itself reads it.
 
-Every non-blank line of the section is either a **link line** — `<words> [<label>](<target>)` and nothing else — or a line of **Status text**.
+Every non-blank line of the section is either a **link line** — `<words> [<label>](<target>)` and nothing else: one link per line, no list marker; the label may contain brackets — or a line of **Status text**. Several lines of Status text are one text, joined by a space.
 
 | In the file | Read as |
 | ----------- | ------- |
@@ -203,9 +205,9 @@ Every non-blank line of the section is either a **link line** — `<words> [<lab
 | `Superseded by […](0002-y.md)`, also spelled `Superceded by` | `superseded-by: [0002-y]`, and the Status is `superseded` whatever the Status text says |
 | `Amends […](…)`, `Amended by […](…)` | `amends`, `amended-by` |
 | a link line with other words (`Clarifies […](…)`) | not a Relation the format above has; stays in the body |
-| `Date: 2016-02-12` on a line of its own before the first level-two heading | `created`, when it is a calendar date |
+| `Date: 2016-02-12` on a line of its own before the first level-two heading — the first such line | `created`, when it is a calendar date. Anything else after `Date:` stays what it is, text of the body, and is no Problem |
 
-- The words of a link line are compared without regard to case. Its target names an ADR when it is a bare file name ending in `.md` (`0001-x.md`, `./0001-x.md`): the ID is that name without `.md`. A path, a URL or an anchor names nothing; such a line stays in the body like one with other words.
+- The words of a link line are compared without regard to case, and a colon after them is ignored. A target that is named twice counts once. Its target names an ADR when it is a bare file name ending in `.md` (`0001-x.md`, `./0001-x.md`): the ID is that name without `.md`. A path, a URL or an anchor names nothing; such a line stays in the body like one with other words.
 - adr-tools writes the title as `# 1. Title`. The number is not part of the title (section 4).
 - A Status in a case other than lowercase is not a Problem here: that is how adr-tools writes it.
 - `Date:` is the day the ADR was created; adr-tools never changes it.

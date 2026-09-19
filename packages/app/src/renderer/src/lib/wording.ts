@@ -1,4 +1,5 @@
 import {
+  FOREIGN_FORMAT_NAMES,
   nextPrefix,
   type Adr,
   type DecisionLog,
@@ -92,17 +93,19 @@ export function repairLabel(repair: Repair, log: DecisionLog): string {
   }
 }
 
-/** What a foreign format is called. */
-export const FORMAT_LABEL: Record<ForeignFormat, string> = { 'adr-tools': 'adr-tools' }
+/** What tells the tool that a file is in a foreign format. */
+const FOREIGN_SIGN: Record<ForeignFormat, string> = {
+  'adr-tools': 'no frontmatter, and a Status section in its text'
+}
 
 /** In the header of an ADR that is written in a foreign format. */
 export function describeForeign(format: ForeignFormat): string {
-  return `Written in the format of ${FORMAT_LABEL[format]}. The tool reads that format and never writes it: Status, Relations and the date are taken from the text below, and nothing here changes the file.`
+  return `Read as a file of ${FOREIGN_FORMAT_NAMES[format]}: ${FOREIGN_SIGN[format]}. Its Status, its Relations and Back-references and the day it was created are taken from there. The tool never writes this format, so nothing here changes what the file says.`
 }
 
 /** Under a Problem without a Repair, when it is reported on an ADR in a foreign format. */
 export function noRepairIn(format: ForeignFormat): string {
-  return `The tool reads the format of ${FORMAT_LABEL[format]} and never writes it. Fix the file in an editor; the view follows.`
+  return `The tool reads the format of ${FOREIGN_FORMAT_NAMES[format]} and never writes it. Fix the file in an editor; the view follows.`
 }
 
 /** Under a Problem that has no Repair. */
