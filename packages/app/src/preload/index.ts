@@ -9,6 +9,10 @@ const api: Api = {
   openRepository: () => ipcRenderer.invoke(CHANNEL.openRepository),
   closeRepository: (id) => ipcRenderer.invoke(CHANNEL.closeRepository, id),
   setActiveRepository: (id) => ipcRenderer.invoke(CHANNEL.setActiveRepository, id),
+  planDecision: (repositoryId, logPath, adrId, decision) =>
+    ipcRenderer.invoke(CHANNEL.planDecision, repositoryId, logPath, adrId, decision),
+  applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
+  discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),
   openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url),
   onRepositoryChanged: (listener) => {
     const handler = (_: unknown, repository: OpenRepository): void => listener(repository)

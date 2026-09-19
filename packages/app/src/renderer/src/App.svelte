@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
+  import ChangeDialog from './components/ChangeDialog.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import { app } from './lib/state.svelte'
@@ -52,6 +53,7 @@
       </div>
     {/if}
   </div>
+  <ChangeDialog />
 {/if}
 
 <style>

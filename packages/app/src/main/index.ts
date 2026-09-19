@@ -2,7 +2,7 @@ import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { CHANNEL, type OpenRepository, type Session } from '../shared/ipc'
+import { CHANNEL, type Decision, type OpenRepository, type Session } from '../shared/ipc'
 import { Repositories } from './repositories'
 import { readSession, writeSession } from './session-store'
 
@@ -71,6 +71,32 @@ function registerIpc(): void {
   ipcMain.handle(CHANNEL.setActiveRepository, async (_, id: unknown) => {
     activeRoot = typeof id === 'string' ? repositories.rootOf(id) : undefined
     await saveSession()
+  })
+
+  ipcMain.handle(
+    CHANNEL.planDecision,
+    (_, repositoryId: unknown, logPath: unknown, adrId: unknown, decision: unknown) => {
+      const known = decision === 'accept' || decision === 'reject' || decision === 'deprecate'
+      if (![repositoryId, logPath, adrId].every((value) => typeof value === 'string') || !known) {
+        return { ok: false, reason: 'This request cannot be understood.' }
+      }
+      return repositories.planDecision(
+        repositoryId as string,
+        logPath as string,
+        adrId as string,
+        decision as Decision
+      )
+    }
+  )
+
+  ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
+    typeof changeId === 'string'
+      ? repositories.applyChange(changeId)
+      : { applied: false, reason: 'This request cannot be understood.' }
+  )
+
+  ipcMain.handle(CHANNEL.discardChange, (_, changeId: unknown) => {
+    if (typeof changeId === 'string') repositories.discardChange(changeId)
   })
 
   ipcMain.handle(CHANNEL.openExternal, async (_, url: unknown) => {
