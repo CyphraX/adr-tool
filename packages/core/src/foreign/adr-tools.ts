@@ -49,18 +49,20 @@ export function parseAdrTools(view: SourceView): AdrToolsFile | undefined {
   if (heading === -1) return undefined
 
   const lists = new Map<ListKey, string[]>()
-  const statusText: string[] = []
-  let uncaptured: string | undefined
+  const statusText: ProseLine[] = []
+  // What the Metadata does not hold, with where it stands: the first of them is named.
+  const kept: { at: number; what: string }[] = []
   let end = view.text.length
   let previous = lines[heading]!
-  for (const line of lines.slice(heading + 1)) {
+  const rest = lines.slice(heading + 1)
+  for (const line of rest) {
     // Lines that are missing between two prose lines are a code block.
-    if (line.start !== previous.next) uncaptured ??= 'a code block'
+    if (line.start !== previous.next) kept.push({ at: previous.next, what: 'a code block' })
     const next = headingOf(line.content)
     if (next) {
       end = line.start
       // What stands under a deeper heading would change its place in the document.
-      if (next.level > 2) uncaptured ??= line.content.trim()
+      if (next.level > 2) kept.push({ at: line.start, what: line.content.trim() })
       break
     }
     previous = line
@@ -69,28 +71,37 @@ export function parseAdrTools(view: SourceView): AdrToolsFile | undefined {
     if (!content) continue
     const link = linkLine(content)
     if (!link) {
-      statusText.push(content)
+      statusText.push(line)
       continue
     }
     const key = LINK_WORDS.get(link.words.replace(/\s+/g, ' ').toLowerCase())
     const target = targetOf(link.target)
     if (!key || !target) {
-      uncaptured ??= content
+      kept.push({ at: line.start, what: content })
       continue
     }
     const list = lists.get(key) ?? []
     if (!list.includes(target)) lists.set(key, [...list, target])
   }
-  if (end === view.text.length && previous.next !== end) uncaptured ??= 'a code block'
+  if (end === view.text.length && previous.next !== end) {
+    kept.push({ at: previous.next, what: 'a code block' })
+  }
+  // Only the first Status section is read. With a second one left in the text, the file
+  // would say two things about its Status after Migration.
+  const second = rest.find((line) => line.start >= end && isStatusHeading(line.content))
+  if (second) kept.push({ at: second.start, what: 'a second Status section' })
 
-  const written = statusText.join(' ')
+  const written = statusText.map((line) => line.content.trim()).join(' ')
   const known = isStatus(written.toLowerCase()) ? (written.toLowerCase() as Status) : undefined
   const status: Status | undefined = lists.has('superseded-by')
     ? 'superseded'
     : (known ?? (written ? undefined : 'accepted'))
   const rawStatus = status === undefined ? written : undefined
   // Status text that a "superseded by" line overruled, or that the tool does not know, stays.
-  if (written && (known === undefined || known !== status)) uncaptured = statusText[0]
+  if (written && (known === undefined || known !== status)) {
+    kept.push({ at: statusText[0]!.start, what: statusText[0]!.content.trim() })
+  }
+  const uncaptured = kept.sort((one, other) => one.at - other.at)[0]?.what
 
   const created = createdOn(lines.slice(0, heading))
   return {

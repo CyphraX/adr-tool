@@ -108,13 +108,21 @@ export const MIGRATE_LOG_HINT =
 export const IMPLIED_NOTE = 'recorded in that file, not in this one'
 
 /** In the header of an ADR that is written in a foreign format. */
-export function describeForeign(format: ForeignFormat): string {
-  return `Read as a file of ${FOREIGN_FORMAT_NAMES[format]}: ${FOREIGN_SIGN[format]}. The tool never writes this format: Migration rewrites the file into the tool's own, and shows the change first.`
+export function describeForeign(adr: Adr): string {
+  if (!adr.foreign) return ''
+  const read = `Read as a file of ${FOREIGN_FORMAT_NAMES[adr.foreign]}: ${FOREIGN_SIGN[adr.foreign]}. The tool never writes this format.`
+  return adr.noMigration === undefined
+    ? `${read} Migration rewrites the file into the tool's own, and shows the change first.`
+    : `${read} This one ${adr.noMigration}`
 }
 
 /** Under a Problem without a Repair, when it is reported on an ADR in a foreign format. */
-export function noRepairIn(format: ForeignFormat): string {
-  return `The tool reads the format of ${FOREIGN_FORMAT_NAMES[format]} and never writes it. Migrate the ADR, and look again: what is still a Problem then has its Repair.`
+export function noRepairIn(adr: Adr): string {
+  if (!adr.foreign) return NO_REPAIR
+  const never = `The tool reads the format of ${FOREIGN_FORMAT_NAMES[adr.foreign]} and never writes it.`
+  return adr.noMigration === undefined
+    ? `${never} Migrate the ADR and look again: a Problem that has a Repair is offered one then. What the tool cannot know — a Status that is none of the five — is put right by hand, before or afterwards.`
+    : `${never} Fix the file in an editor; the view follows.`
 }
 
 /** Under a Problem that has no Repair. */

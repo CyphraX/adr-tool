@@ -19,7 +19,9 @@
   })
 
   // The ADRs of the log in view that are read and never written, until they are migrated.
-  const foreign = $derived((app.log?.adrs ?? []).filter((adr) => adr.foreign).length)
+  const foreign = $derived(
+    (app.log?.adrs ?? []).filter((adr) => adr.foreign && adr.noMigration === undefined).length
+  )
 
   // An ADR whose Status cannot be read is rare; its filter only appears when there is one.
   const filters = $derived<StatusFilter[]>([
@@ -93,7 +95,12 @@
     </button>
     {#if foreign > 0}
       <!-- Every ADR the tool reads and does not write, in one change to look at. -->
-      <button class="row" onclick={() => app.migrate('log')} title={MIGRATE_LOG_HINT}>
+      <button
+        class="row"
+        disabled={app.editing !== undefined}
+        onclick={() => app.migrate('log')}
+        title={MIGRATE_LOG_HINT}
+      >
         <span class="label all">Migrate</span>
         <span class="count">{foreign}</span>
       </button>

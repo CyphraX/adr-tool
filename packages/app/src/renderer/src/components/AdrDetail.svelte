@@ -105,7 +105,7 @@
     </div>
 
     {#if adr.foreign}
-      <p class="foreign">{describeForeign(adr.foreign)}</p>
+      <p class="foreign">{describeForeign(adr)}</p>
     {/if}
 
     {#if !editing}
@@ -125,7 +125,7 @@
           <button onclick={() => app.edit()}>Edit</button>
           <button onclick={() => app.editMetadata()}>Metadata</button>
         {/if}
-        {#if adr.foreign}
+        {#if adr.foreign && adr.noMigration === undefined}
           <button class="primary" onclick={() => app.migrate('adr')}>Migrate</button>
         {/if}
         {#if git}<button onclick={() => app.showHistory()}>History</button>{/if}
