@@ -7,6 +7,12 @@
   const selectedId = $derived(app.selected?.id)
   const changed = $derived(app.active?.repository.git?.changed ?? [])
 
+  // Wherever the selection came from — a search, a Relation, a Problem — the list shows it.
+  $effect(() => {
+    if (selectedId)
+      document.getElementById(`adr-${selectedId}`)?.scrollIntoView({ block: 'nearest' })
+  })
+
   function onkeydown(event: KeyboardEvent): void {
     const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
     if (step === 0 || app.adrs.length === 0) return
@@ -15,7 +21,6 @@
     const next = app.adrs[Math.max(0, Math.min(app.adrs.length - 1, position + step))]
     if (!next) return
     app.select(next.id)
-    document.getElementById(`adr-${next.id}`)?.scrollIntoView({ block: 'nearest' })
   }
 </script>
 

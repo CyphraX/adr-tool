@@ -17,11 +17,16 @@
 
   const repository = $derived(app.active?.repository.repository)
 
-  // Ctrl+K, or Cmd+K on a Mac: search from anywhere — but not over another dialog.
+  // Ctrl+K, or Cmd+K on a Mac: search from anywhere — but not over another dialog. Exactly
+  // that chord: on a Mac Ctrl+K deletes to the end of the line in the editor, and with
+  // Shift it deletes the line everywhere. AltGr is Ctrl+Alt on Windows.
   function onkeydown(event: KeyboardEvent): void {
-    if (event.key.toLowerCase() !== 'k' || !(event.ctrlKey || event.metaKey) || event.altKey) return
+    const mac = window.api.platform === 'darwin'
+    const chord = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
+    if (event.key.toLowerCase() !== 'k' || !chord || event.altKey || event.shiftKey) return
+    if (event.defaultPrevented || document.querySelector('dialog[open]')) return
     event.preventDefault()
-    if (!document.querySelector('dialog[open]')) app.startSearching()
+    app.startSearching()
   }
 </script>
 

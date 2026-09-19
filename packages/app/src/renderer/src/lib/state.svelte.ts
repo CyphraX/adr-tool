@@ -290,18 +290,21 @@ class AppState {
   /** Go to an ADR of any Decision Log of the repository in front, from wherever the view is. */
   jumpTo(logPath: string, id: string): void {
     this.searching = undefined
-    if (logPath === this.log?.path && id === this.active?.selectedId) return
-    this.leaveEditor(() => {
+    const arrive = (): void => {
       const tab = this.active
       if (!tab) return
       tab.logPath = logPath
       tab.selectedId = id
-      // A filter that hides the ADR would hide where the jump went.
+      // The list of ADRs shows where the jump went — unless a filter hides the ADR.
+      tab.view = 'adrs'
       const adr = this.log?.adrs.find((candidate) => candidate.id === id)
       if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
         tab.statusFilter = 'all'
       }
-    })
+    }
+    // The ADR that is open already stays open, editor and all; only the list follows.
+    if (logPath === this.log?.path && id === this.active?.selectedId) arrive()
+    else this.leaveEditor(arrive)
   }
 
   /** Select an ADR of the log in view by its file name, as a link inside an ADR names it. */
