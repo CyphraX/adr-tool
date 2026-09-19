@@ -1,11 +1,20 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import { CHANNEL, type Api, type OpenRepository } from '../shared/ipc'
 
 // The typed bridge between the main process and the sandboxed renderer.
-// It grows with the features; the renderer never gets more than what is listed here.
-const api = {
-  platform: process.platform
-} as const
-
-export type Api = typeof api
+// The renderer never gets more than what is listed here.
+const api: Api = {
+  platform: process.platform,
+  restoreSession: () => ipcRenderer.invoke(CHANNEL.restoreSession),
+  openRepository: () => ipcRenderer.invoke(CHANNEL.openRepository),
+  closeRepository: (id) => ipcRenderer.invoke(CHANNEL.closeRepository, id),
+  setActiveRepository: (id) => ipcRenderer.invoke(CHANNEL.setActiveRepository, id),
+  openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url),
+  onRepositoryChanged: (listener) => {
+    const handler = (_: unknown, repository: OpenRepository): void => listener(repository)
+    ipcRenderer.on(CHANNEL.repositoryChanged, handler)
+    return () => ipcRenderer.removeListener(CHANNEL.repositoryChanged, handler)
+  }
+}
 
 contextBridge.exposeInMainWorld('api', api)

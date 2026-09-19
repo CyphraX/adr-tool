@@ -1,5 +1,6 @@
 {
   "name": "@adr-tool/app",
+  "productName": "ADR Tool",
   "version": "0.0.0",
   "private": true,
   "description": "The ADR Tool desktop app",
@@ -8,24 +9,36 @@
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "build": "electron-vite build",
+    "test": "vitest run",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "svelte-check --tsconfig ./tsconfig.json",
     "typecheck": "pnpm typecheck:node && pnpm typecheck:web",
     "postinstall": "install-electron"
   },
   "dependencies": {
-    "@electron-toolkit/utils": "^4.0.0"
+    "@electron-toolkit/utils": "^4.0.0",
+    "chokidar": "^5.0.0"
   },
   "devDependencies": {
     "@adr-tool/core": "workspace:*",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-serif": "^5.3.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@types/node": "^24.13.5",
     "electron": "^44.4.1",
     "electron-vite": "^5.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
     "typescript": "^5.9.3",
-    "vite": "^7.3.6"
+    "unified": "^11.0.5",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.1"
   }
 }
