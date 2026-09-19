@@ -3,19 +3,24 @@ import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
 import {
+  DEFAULT_LOG_PATHS,
   applyChangeSet,
   openRepository,
+  listTemplates,
   planAccept,
+  planCreate,
   planDeprecate,
   planEditBody,
   planReject,
   type ChangeSet,
   type DecisionLog,
-  type Plan
+  type Plan,
+  type Templates
 } from '@adr-tool/core'
 import type {
   ApplyResult,
   BodyEditRequest,
+  CreateRequest,
   Decision,
   OpenRepository,
   PlanResult
@@ -24,6 +29,15 @@ import { nodeFileSystem } from './node-file-system'
 import { watchPaths } from './watch-paths'
 
 const RELOAD_DELAY_MS = 150
+
+/** Where the first ADR of a repository goes: a well-known directory, found again without configuration. */
+const FIRST_LOG: DecisionLog = {
+  path: DEFAULT_LOG_PATHS[0]!,
+  naming: 'sequential',
+  adrs: [],
+  relations: [],
+  problems: []
+}
 
 interface Entry {
   readonly id: string
@@ -102,17 +116,42 @@ export class Repositories {
     )
   }
 
-  /** Read the log afresh, let `core` plan against it, and hold the result for the renderer. */
+  async listTemplates(repositoryId: string): Promise<Templates> {
+    const root = this.rootOf(repositoryId)
+    if (root === undefined) return { templates: [], defaultName: '' }
+    return listTemplates(nodeFileSystem(root))
+  }
+
+  /** Plan a new ADR. In a repository without a Decision Log it starts the first one. */
+  async planCreate(request: CreateRequest): Promise<PlanResult> {
+    return this.plan(request.repositoryId, request.logPath, (fs, log) =>
+      planCreate(fs, log, {
+        title: request.title,
+        template: request.template,
+        today: localDate(),
+        ...(request.relation && { relation: request.relation })
+      })
+    )
+  }
+
+  /**
+   * Read the log afresh, let `core` plan against it, and hold the result for the renderer.
+   * Without a `logPath` the repository has no Decision Log yet, and the plan starts one.
+   */
   private async plan(
     repositoryId: string,
-    logPath: string,
+    logPath: string | undefined,
     build: (fs: ReturnType<typeof nodeFileSystem>, log: DecisionLog) => Promise<Plan>
   ): Promise<PlanResult> {
     const entry = this.entries.get(repositoryId)
     if (!entry) return { ok: false, reason: 'This repository is no longer open.' }
 
     const fs = nodeFileSystem(entry.root)
-    const log = (await openRepository(fs)).logs.find((candidate) => candidate.path === logPath)
+    const logs = (await openRepository(fs)).logs
+    const log =
+      logPath === undefined && logs.length === 0
+        ? FIRST_LOG
+        : logs.find((candidate) => candidate.path === (logPath ?? logs[0]?.path))
     if (!log) return { ok: false, reason: `There is no Decision Log at ${logPath} any more.` }
 
     const plan = await build(fs, log)
@@ -121,7 +160,16 @@ export class Repositories {
     const changeId = randomUUID()
     this.planned.set(changeId, { repositoryId, changeSet: plan.changeSet })
     const warnings = plan.warnings ?? []
-    return { ok: true, change: { changeId, changeSet: plan.changeSet, warnings } }
+    const createdId = plan.created?.id
+    return {
+      ok: true,
+      change: {
+        changeId,
+        changeSet: plan.changeSet,
+        warnings,
+        ...(createdId !== undefined && { createdId })
+      }
+    }
   }
 
   async applyChange(changeId: string): Promise<ApplyResult> {

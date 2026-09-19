@@ -5,6 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   CHANNEL,
   type BodyEditRequest,
+  type CreateRequest,
   type Decision,
   type OpenRepository,
   type Session
@@ -94,6 +95,28 @@ function registerIpc(): void {
       )
     }
   )
+
+  ipcMain.handle(CHANNEL.listTemplates, (_, repositoryId: unknown) =>
+    repositories.listTemplates(typeof repositoryId === 'string' ? repositoryId : '')
+  )
+
+  ipcMain.handle(CHANNEL.planCreate, (_, request: unknown) => {
+    const given = (typeof request === 'object' && request !== null ? request : {}) as Record<
+      string,
+      unknown
+    >
+    const relation = given['relation'] as Record<string, unknown> | undefined
+    const valid =
+      typeof given['repositoryId'] === 'string' &&
+      (given['logPath'] === undefined || typeof given['logPath'] === 'string') &&
+      typeof given['title'] === 'string' &&
+      typeof given['template'] === 'string' &&
+      (relation === undefined ||
+        ((relation['type'] === 'supersedes' || relation['type'] === 'amends') &&
+          typeof relation['target'] === 'string'))
+    if (!valid) return { ok: false, reason: 'This request cannot be understood.' }
+    return repositories.planCreate(given as unknown as CreateRequest)
+  })
 
   ipcMain.handle(CHANNEL.planBodyEdit, (_, request: unknown) => {
     const fields = ['repositoryId', 'logPath', 'adrId', 'base', 'body', 'note'] as const

@@ -1,7 +1,7 @@
 import { numberOf, type AdrFileName, type NamingScheme } from '../log/naming'
 import { readMetadata, type Metadata } from '../metadata/read'
 import type { Problem } from '../problems/problem'
-import { viewSource } from '../text/source'
+import { viewSource, type Eol } from '../text/source'
 import { titleOf } from '../text/title'
 
 /** An ADR as read from its file. */
@@ -16,6 +16,8 @@ export interface Adr {
   readonly title?: string
   /** The Markdown after the frontmatter, exactly as it is in the file. */
   readonly body: string
+  /** The file's line ending: that of its first line break. */
+  readonly eol: Eol
   readonly metadata: Metadata
   /** `false` when the tool must not write Metadata into this file until a person has fixed it. */
   readonly metadataWritable: boolean
@@ -38,6 +40,7 @@ export function readAdr(
     ...(number !== undefined && { number }),
     ...(title !== undefined && { title }),
     body,
+    eol: view.eol,
     metadata,
     metadataWritable: writable
   }
