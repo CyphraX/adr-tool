@@ -2,7 +2,7 @@
 status: accepted
 created: 2025-06-01
 decided: 2025-06-08
-amends: [0001-foundation]
+amends: [0001-foundation, 0003-new-database]
 ---
 
 # Notifications run on their own

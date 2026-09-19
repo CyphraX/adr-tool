@@ -75,7 +75,7 @@ export function prefixOf(adr: Adr): string {
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
 }
 
-/** What a repair is called on its button, and again on the button that confirms it. */
+/** What a Repair is called on its button: what it writes, in a few words. */
 export function repairLabel(repair: Repair, log: DecisionLog): string {
   switch (repair.kind) {
     case 'lowercase-status':
@@ -91,7 +91,7 @@ export function repairLabel(repair: Repair, log: DecisionLog): string {
   }
 }
 
-/** Under a Problem that has no repair. */
+/** Under a Problem that has no Repair. */
 export const NO_REPAIR =
   'The tool cannot know what was meant here. Fix the frontmatter of the file in an editor; the view follows.'
 
