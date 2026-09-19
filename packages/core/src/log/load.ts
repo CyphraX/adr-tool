@@ -4,7 +4,7 @@ import { checkConsistency } from '../problems/check'
 import type { Problem } from '../problems/problem'
 import { relationsOf, type Relation } from '../relations/graph'
 import { discoverLogs, type Discovery, type LogLocation } from './discover'
-import { detectNamingScheme, parseAdrFileName, type NamingScheme } from './naming'
+import { detectNamingScheme, numberOf, parseAdrFileName, type NamingScheme } from './naming'
 
 /** A Decision Log as read from its directory. */
 export interface DecisionLog {
@@ -54,7 +54,13 @@ export async function loadDecisionLog(
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   const naming = location.naming ?? detectNamingScheme(names)
 
-  const adrs: Adr[] = []
+  // "ADR-0005" in a file of MADR 4 names the one ADR with that number, if there is exactly one.
+  const byNumber = (number: number): string | undefined => {
+    const named = names.filter((name) => numberOf(name, naming) === number)
+    return named.length === 1 ? named[0]!.id : undefined
+  }
+
+  const read: Adr[] = []
   const problems: Problem[] = []
   const texts = await Promise.all(
     names.map((name) => fs.readText(joinPath(location.path, `${name.id}.md`)))
@@ -62,12 +68,36 @@ export async function loadDecisionLog(
   names.forEach((name, position) => {
     const text = texts[position]
     if (text === undefined) return // deleted between listing and reading
-    const read = readAdr(name, joinPath(location.path, `${name.id}.md`), text, naming)
-    adrs.push(read.adr)
-    problems.push(...read.problems)
+    const one = readAdr(name, joinPath(location.path, `${name.id}.md`), text, naming, byNumber)
+    read.push(one.adr)
+    problems.push(...one.problems)
   })
 
+  const adrs = withSupersessionsOfMadr(read)
   const graph = relationsOf(adrs)
   problems.push(...graph.problems, ...checkConsistency(adrs, graph.relations, naming))
   return { path: location.path, naming, adrs, relations: graph.relations, problems }
+}
+
+/**
+ * MADR records a supersession on the superseded ADR only. The Relation is what counts here,
+ * so the successor a file of MADR names is read as superseding it (docs/file-format.md,
+ * section 8). In memory: the successor's file says nothing of it until Migration writes it.
+ */
+function withSupersessionsOfMadr(adrs: readonly Adr[]): Adr[] {
+  const superseded = new Map<string, string[]>()
+  for (const adr of adrs) {
+    if (adr.foreign !== 'madr') continue
+    for (const successor of adr.metadata.backReferences['superseded-by']) {
+      if (successor !== adr.id)
+        superseded.set(successor, [...(superseded.get(successor) ?? []), adr.id])
+    }
+  }
+  return adrs.map((adr) => {
+    const known = adr.metadata.relations.supersedes
+    const read = (superseded.get(adr.id) ?? []).filter((id) => !known.includes(id))
+    if (read.length === 0) return adr
+    const relations = { ...adr.metadata.relations, supersedes: [...known, ...read] }
+    return { ...adr, metadata: { ...adr.metadata, relations } }
+  })
 }

@@ -1,4 +1,5 @@
 import { readAdrTools } from '../foreign/adr-tools'
+import { readMadr, type ByNumber } from '../foreign/madr'
 import { numberOf, type AdrFileName, type NamingScheme } from '../log/naming'
 import { readMetadata, type Metadata } from '../metadata/read'
 import type { Problem } from '../problems/problem'
@@ -6,10 +7,13 @@ import { viewSource, type Eol } from '../text/source'
 import { titleOf } from '../text/title'
 
 /** A format the tool reads and never writes (docs/file-format.md, section 8). */
-export type ForeignFormat = 'adr-tools'
+export type ForeignFormat = 'adr-tools' | 'madr'
 
 /** What each foreign format is called, in a sentence. */
-export const FOREIGN_FORMAT_NAMES: Record<ForeignFormat, string> = { 'adr-tools': 'adr-tools' }
+export const FOREIGN_FORMAT_NAMES: Record<ForeignFormat, string> = {
+  'adr-tools': 'adr-tools',
+  madr: 'MADR'
+}
 
 /** An ADR as read from its file. */
 export interface Adr {
@@ -39,12 +43,16 @@ export function readAdr(
   name: AdrFileName,
   path: string,
   text: string,
-  scheme: NamingScheme
+  scheme: NamingScheme,
+  byNumber: ByNumber = () => undefined
 ): { adr: Adr; problems: readonly Problem[] } {
   const view = viewSource(text)
   const own = readMetadata(view, name.id)
   const adrTools = readAdrTools(view, name.id, own.metadata)
-  const { metadata, problems } = adrTools ?? own
+  // A file whose frontmatter cannot be read is nobody's format yet.
+  const madr = adrTools || !own.writable ? undefined : readMadr(view, name.id, own, byNumber)
+  const foreign: ForeignFormat | undefined = adrTools ? 'adr-tools' : madr ? 'madr' : undefined
+  const { metadata, problems } = adrTools ?? madr ?? own
   const number = numberOf(name, scheme)
   const body = text.slice(view.bodyStart)
   const title = titleOf(body, number)
@@ -55,7 +63,7 @@ export function readAdr(
     ...(title !== undefined && { title }),
     body,
     eol: view.eol,
-    ...(adrTools && { foreign: 'adr-tools' as const }),
+    ...(foreign && { foreign }),
     metadata,
     metadataWritable: own.writable
   }

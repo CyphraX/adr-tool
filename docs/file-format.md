@@ -188,7 +188,7 @@ ADRs written by adr-tools and in MADR 3/4 are recognized and read tolerantly —
 - "Foreign format" is about the file as a whole. It has nothing to do with the foreign keys of section 3, which live in a frontmatter of the tool's own format.
 - **Recognition is conservative.** A file is foreign only when it carries something the format above cannot say. Everything else is an ADR in the tool's own format, whoever wrote it: a MADR file with `status: accepted`, a `date` and Jekyll's `nav_order` is a valid ADR with two foreign keys (section 3), and there is nothing to migrate.
 - **What is read is what Migration writes.** The Metadata the tool shows for a foreign ADR is exactly the Metadata its Migration puts into the frontmatter. Nothing is guessed for display that would not be written.
-- The mapping for adr-tools follows. The one for MADR 3/4 is specified here when its reader is built; until then such a file is read as the tool's own format reads it.
+- The two mappings follow.
 
 ### adr-tools
 
@@ -211,6 +211,28 @@ Every non-blank line of the section is either a **link line** — `<words> [<lab
 - adr-tools writes the title as `# 1. Title`. The number is not part of the title (section 4).
 - A Status in a case other than lowercase is not a Problem here: that is how adr-tools writes it.
 - `Date:` is the day the ADR was created; adr-tools never changes it.
+
+### MADR
+
+MADR 3 and 4 keep their metadata in YAML frontmatter, as the format above does, and most of what they write is valid as it stands: `status: accepted`, `decision-makers`, and keys the tool does not know. A file is read as MADR's only when it says one of the two things the format above cannot:
+
+- its `status` begins with `superseded by` (in any case, also spelled `superceded by`), or
+- it has a `deciders` key and no `decision-makers` key — MADR 3's name for the same people.
+
+A file **without a `status` key in its frontmatter** — or without frontmatter — is also read as MADR's when the first list of its body, before the first level-two heading, has an item `Status: …`: that is where MADR 2 keeps it, and log4brains after it. Only the Status is read from there. The other items of that list — `Deciders`, `Date`, `Tags` — are not: MADR 2 and log4brains come after v1. (A file with a `## Status` section and no frontmatter is adr-tools', whatever else it has.)
+
+| In the file | Read as |
+| ----------- | ------- |
+| `status: superseded by [ADR-0005](0005-x.md)` — MADR 3, a Markdown link | `status: superseded`, `superseded-by: [0005-x]`; the target as in a link line of adr-tools |
+| `status: "superseded by ADR-0005"` — MADR 4, an identifier | the same, when exactly one ADR of the Decision Log has the number 5. The identifier may be written `ADR-0005`, `ADR 5`, `0005`, `5` or `#5` |
+| a "superseded by" whose target names no ADR, or a number that two ADRs share | `status: superseded`, and the target in `superseded-by` as it is written: a Problem, as any ID that is not in the Decision Log |
+| `* Status: rejected` in the first list of the body | that Status, read like the Status text of adr-tools: any case; `superseded by …` as above; anything else shown as written, and a Problem |
+| `deciders: Kim Becker, Alex Roth` | `decision-makers`, the value as it stands — a single value is a list of one, and the tool does not split what a person wrote |
+| `date`, `consulted`, `informed`, `parent`, `nav_order`, … | foreign keys (section 3), untouched. MADR's `date` is the day the ADR was last updated: neither `created` nor `decided` |
+| any other `status` — `on hold`, the placeholder of the template | as in the format above: shown as written, and a Problem |
+
+- **MADR records a supersession on the superseded ADR only**; it has no `supersedes`. The format above takes the Relation as authoritative, so while an ADR is read as MADR's and names its successor, the successor is read as superseding it — in memory; its file is not touched. Migration writes `supersedes` into the successor.
+- `adr-template.md` in the directory is no ADR: its name follows no naming scheme (section 1).
 
 ## 9. Examples
 
