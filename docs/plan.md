@@ -18,8 +18,8 @@ The milestones are ordered from the tightest constraint outward. The tightest co
 ```
 adr-tool/
 ├── .editorconfig
-├── .gitattributes              # *.md text eol=lf, but fixtures are "-text": git must not normalize them
-├── .prettierignore             # docs/adr/ and the fixtures: nothing may reformat ADRs, not even our own tooling
+├── .gitattributes              # text files are LF everywhere, but fixtures are "-text": git must not normalize them
+├── .prettierignore             # all Markdown and the fixtures: nothing may reformat ADRs, not even our own tooling
 ├── .github/workflows/ci.yml    # lint + typecheck + test on windows, macos, ubuntu
 ├── CONTEXT.md
 ├── package.json                # private workspace root
@@ -62,7 +62,7 @@ Two shaping rules for `core`:
 
 pnpm workspace with `core` and `app`, strict TypeScript, Vitest, ESLint and Prettier, `.gitattributes`, `.editorconfig`, the CI matrix. `app` starts from electron-vite's official `svelte-ts` template and shows an empty window; check that the template is on Svelte 5 and upgrade it if not.
 
-Two guards protect ADR-0002 inside this repository. `packages/core/test/fixtures/**` is marked `-text` in `.gitattributes`, otherwise git would turn the CRLF fixtures into LF on checkout and the line-ending tests would pass without testing anything. And Prettier never formats `docs/adr/` or the fixtures, because reformatting Markdown is exactly the normalization the tool forbids.
+Two guards protect ADR-0002 inside this repository. `packages/core/test/fixtures/**` is marked `-text` in `.gitattributes`, otherwise git would turn the CRLF fixtures into LF on checkout and the line-ending tests would pass without testing anything. And Prettier formats code only, never Markdown and never the fixtures, because reformatting Markdown is exactly the normalization the tool forbids.
 
 *Done when:* CI is green on all three platforms and `pnpm dev` opens the window.
 

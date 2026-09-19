@@ -1,0 +1,6 @@
+# This repository's own text files are LF on every machine.
+* text=auto eol=lf
+
+# Fixtures are test data for ADR-0002 (byte-identical round trips): git must
+# never normalize their line endings, or the CRLF cases test nothing.
+packages/core/test/fixtures/** -text

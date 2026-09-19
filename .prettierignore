@@ -1,0 +1,9 @@
+out
+dist
+coverage
+pnpm-lock.yaml
+
+# Prettier formats code, never Markdown: reformatting Markdown is exactly the
+# normalization ADR-0002 forbids, and this repository's ADRs are test data too.
+*.md
+packages/core/test/fixtures/
