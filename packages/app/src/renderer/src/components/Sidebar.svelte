@@ -5,6 +5,7 @@
   import StatusMark from './StatusMark.svelte'
 
   const logs = $derived(app.active?.repository.repository.logs ?? [])
+  const view = $derived(app.active?.view ?? 'adrs')
   const filter = $derived(app.active?.statusFilter ?? 'all')
 
   const counts = $derived.by(() => {
@@ -45,8 +46,8 @@
     {#each filters as candidate (candidate)}
       <button
         class="row"
-        class:current={candidate === filter}
-        aria-pressed={candidate === filter}
+        class:current={view === 'adrs' && candidate === filter}
+        aria-pressed={view === 'adrs' && candidate === filter}
         onclick={() => app.filterBy(candidate)}
       >
         {#if candidate === 'all'}
@@ -58,6 +59,21 @@
         <span class="count">{counts[candidate] ?? 0}</span>
       </button>
     {/each}
+  </section>
+
+  <section>
+    <h2>Check</h2>
+    <button
+      class="row"
+      class:current={view === 'problems'}
+      aria-pressed={view === 'problems'}
+      onclick={() => app.show('problems')}
+    >
+      <span class="label all">Problems</span>
+      <span class="count" class:some={app.problemGroups.length > 0}>
+        {app.problemGroups.length}
+      </span>
+    </button>
   </section>
 </nav>
 
@@ -109,5 +125,17 @@
 
   .count {
     color: var(--ink-faint);
+  }
+
+  .count.some {
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--problem);
+    color: var(--paper);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
   }
 </style>
