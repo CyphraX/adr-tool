@@ -5,6 +5,7 @@
   import StatusMark from './StatusMark.svelte'
 
   const selectedId = $derived(app.selected?.id)
+  const changed = $derived(app.active?.repository.git?.changed ?? [])
 
   function onkeydown(event: KeyboardEvent): void {
     const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
@@ -61,6 +62,10 @@
           <span class="prefix">{prefixOf(adr)}</span>
           <span class="title">
             <span class="text" title={adr.title ?? adr.id}>{adr.title ?? adr.id}</span>
+            {#if changed.includes(adr.path)}
+              <span class="uncommitted" title="Uncommitted changes" aria-label="Uncommitted changes"
+              ></span>
+            {/if}
             {#if problems > 0}
               <span class="problems" title="{problems} {problems === 1 ? 'Problem' : 'Problems'}">
                 {problems}
@@ -195,6 +200,14 @@
   .row.superseded .text {
     text-decoration: line-through;
     text-decoration-color: var(--line-strong);
+  }
+
+  .uncommitted {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--proposed);
   }
 
   .problems {
