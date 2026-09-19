@@ -67,16 +67,13 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
         if (namesNumber(other, number)) {
           requireOwnFormat(
             other,
-            ` It names its successor by the number ${number}, which would mean another ADR afterwards. Change that in the file first.`
+            ` It names its successor by the number ${number}, which would mean another ADR afterwards. Migrate it first.`
           )
         }
       }
       const mentions = namingKeys(other, id).length > 0
       if (other.foreign && (mentions || (await fs.readText(other.path))?.includes(id))) {
-        requireOwnFormat(
-          other,
-          ` It mentions ${id}: renumber the other ADR, or change the file by hand.`
-        )
+        requireOwnFormat(other, ` It mentions ${id}: migrate it first, or renumber the other ADR.`)
       }
       for (const key of namingKeys(other, id)) {
         await drafts.write(other.path, (view) => replaceInList(view, key, id, to))

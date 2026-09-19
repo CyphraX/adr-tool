@@ -227,7 +227,7 @@ describe('recognizing a file of adr-tools', () => {
       '0001-a': ['# A', '', '## Context', '', 'Date: 2020-01-02', '', '## Status', ''].join('\n'),
       '0002-b': ['# B', 'Date: 2020-02-30', 'Date: 2020-03-01', '## Status', ''].join('\n'),
       '0003-c': [
-        '﻿# C',
+        '\uFEFF# C',
         'Date: 2020-03-01',
         '~~~',
         '## Status',

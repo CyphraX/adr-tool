@@ -2,8 +2,8 @@ import { isCalendarDate, type Metadata, type MetadataReading } from '../metadata
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import type { RelationType } from '../relation'
 import { STATUSES, isStatus, type Status } from '../status'
-import { headingOf, proseLines } from '../text/prose'
-import type { SourceView } from '../text/source'
+import { headingOf, proseLinesIn, type ProseLine } from '../text/prose'
+import type { SourceView, Span } from '../text/source'
 import { linkLine, targetOf } from './links'
 
 const DATE_LINE = /^Date:[ \t]*(\S+)[ \t]*$/
@@ -20,29 +20,52 @@ const LINK_WORDS = new Map<string, ListKey>([
   ['amended by', 'amended-by']
 ])
 
+/** A file of adr-tools taken apart: what its Status section and its `Date:` line say. */
+export interface AdrToolsFile {
+  readonly status: Status | undefined
+  /** The Status text as written, when it is none of the five values. */
+  readonly rawStatus?: string
+  readonly created?: string
+  readonly lists: ReadonlyMap<ListKey, readonly string[]>
+  /** The Status section, from its heading to the next heading or the end of the file. */
+  readonly section: Span
+  /**
+   * The first thing in the section that the Metadata does not hold, as it is written.
+   * `undefined`: the Metadata holds all of it, and Migration takes the section out.
+   */
+  readonly keeps?: string
+}
+
 /**
- * Read a file the way adr-tools wrote it (docs/file-format.md, section 8): no frontmatter,
- * the Status and the links to other ADRs in a `## Status` section, the day it was created
- * on a `Date:` line. `undefined` when the file is not one of adr-tools'.
- *
- * `defaults` is the Metadata of a file that says nothing; what is read here is laid over it.
+ * Take a file apart the way adr-tools wrote it (docs/file-format.md, section 8): no
+ * frontmatter, the Status and the links to other ADRs in a `## Status` section, the day it
+ * was created on a `Date:` line. `undefined` when the file is not one of adr-tools'.
  * Like every reader it never throws, whatever the file says.
  */
-export function readAdrTools(
-  view: SourceView,
-  adr: string,
-  defaults: Metadata
-): Pick<MetadataReading, 'metadata' | 'problems'> | undefined {
+export function parseAdrTools(view: SourceView): AdrToolsFile | undefined {
   if (view.frontmatter || view.unterminatedFrontmatter) return undefined
-  const lines = proseLines(view.text, view.bodyStart)
-  const heading = lines.findIndex(isStatusHeading)
+  const lines = proseLinesIn(view.text, view.bodyStart)
+  const heading = lines.findIndex((line) => isStatusHeading(line.content))
   if (heading === -1) return undefined
 
   const lists = new Map<ListKey, string[]>()
   const statusText: string[] = []
+  let uncaptured: string | undefined
+  let end = view.text.length
+  let previous = lines[heading]!
   for (const line of lines.slice(heading + 1)) {
-    if (headingOf(line)) break
-    const content = line.trim()
+    // Lines that are missing between two prose lines are a code block.
+    if (line.start !== previous.next) uncaptured ??= 'a code block'
+    const next = headingOf(line.content)
+    if (next) {
+      end = line.start
+      // What stands under a deeper heading would change its place in the document.
+      if (next.level > 2) uncaptured ??= line.content.trim()
+      break
+    }
+    previous = line
+
+    const content = line.content.trim()
     if (!content) continue
     const link = linkLine(content)
     if (!link) {
@@ -51,39 +74,66 @@ export function readAdrTools(
     }
     const key = LINK_WORDS.get(link.words.replace(/\s+/g, ' ').toLowerCase())
     const target = targetOf(link.target)
-    if (!key || !target) continue
+    if (!key || !target) {
+      uncaptured ??= content
+      continue
+    }
     const list = lists.get(key) ?? []
     if (!list.includes(target)) lists.set(key, [...list, target])
   }
+  if (end === view.text.length && previous.next !== end) uncaptured ??= 'a code block'
 
-  const problems: Problem[] = []
   const written = statusText.join(' ')
-  let status: Status | undefined = 'accepted'
-  let rawStatus: string | undefined
-  if (lists.has('superseded-by')) status = 'superseded'
-  else if (isStatus(written.toLowerCase())) status = written.toLowerCase() as Status
-  else if (written) {
-    status = undefined
-    rawStatus = written
-    const detail = `"${written}" is not one of ${STATUSES.join(', ')}`
-    problems.push({ kind: 'invalid-metadata', adr, key: 'status', detail })
-  }
+  const known = isStatus(written.toLowerCase()) ? (written.toLowerCase() as Status) : undefined
+  const status: Status | undefined = lists.has('superseded-by')
+    ? 'superseded'
+    : (known ?? (written ? undefined : 'accepted'))
+  const rawStatus = status === undefined ? written : undefined
+  // Status text that a "superseded by" line overruled, or that the tool does not know, stays.
+  if (written && (known === undefined || known !== status)) uncaptured = statusText[0]
 
   const created = createdOn(lines.slice(0, heading))
   return {
+    status,
+    ...(rawStatus !== undefined && { rawStatus }),
+    ...(created !== undefined && { created }),
+    lists,
+    section: { start: lines[heading]!.start, end },
+    ...(uncaptured !== undefined && { keeps: uncaptured })
+  }
+}
+
+/**
+ * The Metadata of a file of adr-tools. `defaults` is the Metadata of a file that says
+ * nothing; what is read here is laid over it.
+ */
+export function readAdrTools(
+  view: SourceView,
+  adr: string,
+  defaults: Metadata
+): Pick<MetadataReading, 'metadata' | 'problems'> | undefined {
+  const file = parseAdrTools(view)
+  if (!file) return undefined
+
+  const problems: Problem[] = []
+  if (file.rawStatus !== undefined) {
+    const detail = `"${file.rawStatus}" is not one of ${STATUSES.join(', ')}`
+    problems.push({ kind: 'invalid-metadata', adr, key: 'status', detail })
+  }
+  return {
     metadata: {
       ...defaults,
-      status,
-      ...(rawStatus !== undefined && { rawStatus }),
-      ...(created !== undefined && { created }),
+      status: file.status,
+      ...(file.rawStatus !== undefined && { rawStatus: file.rawStatus }),
+      ...(file.created !== undefined && { created: file.created }),
       relations: {
         ...defaults.relations,
-        supersedes: lists.get('supersedes') ?? [],
-        amends: lists.get('amends') ?? []
+        supersedes: file.lists.get('supersedes') ?? [],
+        amends: file.lists.get('amends') ?? []
       },
       backReferences: {
-        'superseded-by': lists.get('superseded-by') ?? [],
-        'amended-by': lists.get('amended-by') ?? []
+        'superseded-by': file.lists.get('superseded-by') ?? [],
+        'amended-by': file.lists.get('amended-by') ?? []
       }
     },
     problems
@@ -96,10 +146,10 @@ function isStatusHeading(line: string): boolean {
 }
 
 /** The first `Date: 2016-02-12` on a line of its own before the first level-two heading. */
-function createdOn(lines: readonly string[]): string | undefined {
+function createdOn(lines: readonly ProseLine[]): string | undefined {
   for (const line of lines) {
-    if (headingOf(line)?.level === 2) return undefined
-    const date = DATE_LINE.exec(line)?.[1]
+    if (headingOf(line.content)?.level === 2) return undefined
+    const date = DATE_LINE.exec(line.content)?.[1]
     if (date !== undefined) return isCalendarDate(date) ? date : undefined
   }
   return undefined
