@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM lib and no ambient types: reaching for `document`, `process` or
+    // `fs` in core fails the type check. That is what keeps it UI-free.
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src/**/*"]
+}
