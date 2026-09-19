@@ -35,6 +35,8 @@ export interface PlannedChange {
   readonly warnings: readonly string[]
   /** The ID of the ADR the change creates. */
   readonly createdId?: string
+  /** The new ID of the ADR the change renumbers. */
+  readonly renamedId?: string
 }
 
 /** A new ADR as the dialog describes it. Its ID and path are `core`'s business. */
@@ -106,6 +108,8 @@ export interface Api {
   planCreate(request: CreateRequest): Promise<PlanResult>
   /** Plan saving an edited body. Nothing is written until the change is applied. */
   planBodyEdit(request: BodyEditRequest): Promise<PlanResult>
+  /** Plan a Renumber of an ADR that shares its number. Nothing is written until the change is applied. */
+  planRenumber(repositoryId: string, logPath: string, adrId: string): Promise<PlanResult>
   /** Plan an edit of the Metadata lists. Nothing is written until the change is applied. */
   planMetadataEdit(request: MetadataEditRequest): Promise<PlanResult>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
@@ -126,6 +130,7 @@ export const CHANNEL = {
   planDecision: 'change:plan-decision',
   planBodyEdit: 'change:plan-body-edit',
   planMetadataEdit: 'change:plan-metadata-edit',
+  planRenumber: 'change:plan-renumber',
   planCreate: 'change:plan-create',
   listTemplates: 'templates:list',
   applyChange: 'change:apply',

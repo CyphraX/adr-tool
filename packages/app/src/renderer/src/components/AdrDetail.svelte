@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Adr, DecisionLog, Relation } from '@adr-tool/core'
+  import { nextPrefix, type Adr, type DecisionLog, type Relation } from '@adr-tool/core'
   import type { Decision } from '../../../shared/ipc'
   import { DECISION_LABEL, app, problemsOf, statusKey } from '../lib/state.svelte'
   import { STATUS_LABEL, describeProblem, prefixOf, relationLabel } from '../lib/wording'
@@ -126,7 +126,13 @@
     {#if problems.length > 0}
       <ul class="problems" aria-label="Problems">
         {#each problems as problem, position (position)}
-          <li>{describeProblem(problem)}</li>
+          <li>
+            {describeProblem(problem)}
+            {#if problem.kind === 'duplicate-number' && !editing}
+              <!-- The repair of this Problem: one of the two moves, and the person says which. -->
+              <button onclick={() => app.renumber()}>Renumber to {nextPrefix(log, '')}</button>
+            {/if}
+          </li>
         {/each}
       </ul>
     {/if}
@@ -276,6 +282,18 @@
 
   .note {
     color: var(--ink-faint);
+  }
+
+  .problems button {
+    margin-left: 8px;
+    padding: 1px 9px;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: var(--paper);
+  }
+
+  .problems button:hover {
+    background: var(--hover);
   }
 
   .problems li {
