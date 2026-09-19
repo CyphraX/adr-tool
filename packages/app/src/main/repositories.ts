@@ -13,6 +13,7 @@ import {
   planEditBody,
   planEditMetadata,
   planReject,
+  planRenumber,
   type ChangeSet,
   type DecisionLog,
   type Plan,
@@ -129,6 +130,11 @@ export class Repositories {
     )
   }
 
+  /** Plan giving an ADR that shares its number the next one of its Decision Log. */
+  async planRenumber(repositoryId: string, logPath: string, adrId: string): Promise<PlanResult> {
+    return this.plan(repositoryId, logPath, (fs, log) => planRenumber(fs, log, adrId))
+  }
+
   async listTemplates(repositoryId: string): Promise<Templates> {
     const root = this.rootOf(repositoryId)
     if (root === undefined) return { templates: [], defaultName: '' }
@@ -174,13 +180,15 @@ export class Repositories {
     this.planned.set(changeId, { repositoryId, changeSet: plan.changeSet })
     const warnings = plan.warnings ?? []
     const createdId = plan.created?.id
+    const renamedId = plan.renamed?.to
     return {
       ok: true,
       change: {
         changeId,
         changeSet: plan.changeSet,
         warnings,
-        ...(createdId !== undefined && { createdId })
+        ...(createdId !== undefined && { createdId }),
+        ...(renamedId !== undefined && { renamedId })
       }
     }
   }

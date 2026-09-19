@@ -95,13 +95,23 @@ Rules:
 | Deprecate  | `status: deprecated`                                | nothing |
 | Correction | the author's edit of the body, plus one entry appended to `corrections` | nothing |
 | Edit Metadata | items added to or removed from `decision-makers`, `tags`, `depends-on`, `relates-to` — and, while the ADR is `proposed`, `supersedes` and `amends` | nothing |
-| Renumber   | the file is renamed                                 | every Relation and Back-reference that names the old ID is rewritten |
+| Renumber   | the file is renamed; its bytes do not change        | every Relation and Back-reference that names the old ID names the new one |
 
 - Supersede may target an ADR that is `accepted` or `deprecated`; Amend only one that is `accepted`.
 - `supersedes` and `amends` are fixed once an ADR is no longer `proposed`: they took effect when it was accepted, or never will. `decision-makers`, `tags`, `depends-on` and `relates-to` can be edited at any Status. Such an edit is not a Correction and leaves no entry in `corrections`: a Correction is about the text of the decision, and these keys are filing, not text. git still shows who changed them.
 - An item that is added must be valid — an ID of another ADR in the same Decision Log, and for `supersedes` and `amends` one that may be superseded or amended. An item that is already there can be removed wherever the list may be edited, valid or not: that is how a `depends-on` or `relates-to` Relation to an ADR that does not exist is repaired. A broken `supersedes` or `amends` on an ADR that is no longer `proposed` is not edited here; it is a Problem, and repairing it belongs to the Problems view.
 - A Relation on an ADR that is `proposed` or `rejected` has no effect on its target. The app may show it as pending; nothing is written.
 - An effect stays when the ADR that caused it is later deprecated or superseded itself.
+
+### Renumber
+
+Two branches that each added "the next ADR" leave a `sequential` Decision Log with two ADRs of one number. Renumber moves one of them; which one is the person's choice.
+
+- Renumber is for an ADR that shares its number with another one, in a `sequential` log. Every other ID stays frozen: tickets, commit messages and wikis point to it.
+- The new number is the highest number of the log plus one, written as wide as a new ADR's would be (section 7). The rest of the file name — the slug, as it was written — stays.
+- Wherever an ADR of the log names the old ID in `supersedes`, `amends`, `depends-on`, `relates-to`, `superseded-by` or `amended-by`, the item is rewritten where it stands: its position, its quoting and everything around it stay.
+- The body of an ADR is its author's (section 4), also here. Text that mentions the old ID — a Markdown link to the old file name, say — is not changed; the tool names the ADRs that have such text, and correcting a dead link is what a Correction is for.
+- Renumber is refused when the ADR names itself in a Relation, and when an ADR whose frontmatter cannot be read mentions the old ID: the tool cannot tell what it would leave behind.
 
 ### Consistency — what counts as a Problem
 

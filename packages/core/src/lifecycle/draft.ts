@@ -4,6 +4,13 @@ import { MetadataNotWritableError } from '../metadata/write'
 import { applyEdits, type TextEdit } from '../text/edit'
 import { viewSource, type SourceView } from '../text/source'
 
+interface Draft {
+  before: string
+  after: string
+  creates?: true
+  renameTo?: string
+}
+
 /** Why an operation cannot be done, in words for the person who asked for it. */
 export class Refusal extends Error {}
 
@@ -13,7 +20,7 @@ export class Refusal extends Error {}
  * write touches stays byte for byte what was read (ADR-0002).
  */
 export class Drafts {
-  private readonly texts = new Map<string, { before: string; after: string; creates?: true }>()
+  private readonly texts = new Map<string, Draft>()
 
   constructor(private readonly fs: FileSystem) {}
 
@@ -23,6 +30,16 @@ export class Drafts {
       throw new Refusal(`${path} already exists.`)
     }
     this.texts.set(path, { before: '', after: text, creates: true })
+  }
+
+  /** Move a file. Refused when something is in the way. Later writes still name the file by its old path. */
+  async rename(path: string, to: string): Promise<void> {
+    const taken = [...this.texts.values()].some((draft) => draft.renameTo === to)
+    if (taken || this.texts.has(to) || (await this.fs.readText(to)) !== undefined) {
+      throw new Refusal(`${to} already exists.`)
+    }
+    const draft = await this.draft(path)
+    draft.renameTo = to
   }
 
   /** The text of a file as the operation has it so far. */
@@ -35,7 +52,7 @@ export class Drafts {
     draft.after = applyEdits(draft.after, edit(viewSource(draft.after)))
   }
 
-  private async draft(path: string): Promise<{ before: string; after: string; creates?: true }> {
+  private async draft(path: string): Promise<Draft> {
     let draft = this.texts.get(path)
     if (!draft) {
       const before = await this.fs.readText(path)
@@ -48,7 +65,7 @@ export class Drafts {
 
   changeSet(): ChangeSet {
     const files = [...this.texts]
-      .filter(([, draft]) => draft.after !== draft.before)
+      .filter(([, draft]) => draft.after !== draft.before || draft.renameTo !== undefined)
       .map(([path, draft]) => ({ path, ...draft }))
     return { files }
   }
