@@ -24,6 +24,10 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [3, '0003-on-disk-contract', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
+  expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
+    true
+  )
+  expect(JSON.parse(JSON.stringify(repository))).toEqual(repository)
   expect(log.adrs[0]!.metadata.decisionMakers).toHaveLength(1)
   expect(log.relations).toEqual([
     {

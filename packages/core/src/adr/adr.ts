@@ -14,6 +14,8 @@ export interface Adr {
   readonly number?: number
   /** The first level-one heading of the body. An ADR without one is shown under its ID. */
   readonly title?: string
+  /** The Markdown after the frontmatter, exactly as it is in the file. */
+  readonly body: string
   readonly metadata: Metadata
   /** `false` when the tool must not write Metadata into this file until a person has fixed it. */
   readonly metadataWritable: boolean
@@ -28,12 +30,14 @@ export function readAdr(
   const view = viewSource(text)
   const { metadata, problems, writable } = readMetadata(view, name.id)
   const number = numberOf(name, scheme)
-  const title = titleOf(text.slice(view.bodyStart))
+  const body = text.slice(view.bodyStart)
+  const title = titleOf(body)
   const adr: Adr = {
     id: name.id,
     path,
     ...(number !== undefined && { number }),
     ...(title !== undefined && { title }),
+    body,
     metadata,
     metadataWritable: writable
   }
