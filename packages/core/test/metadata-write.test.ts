@@ -5,6 +5,7 @@ import {
   addToList,
   removeFromList,
   removeKey,
+  replaceInList,
   setScalar
 } from '../src/metadata/write'
 import { applyEdits, type TextEdit } from '../src/text/edit'
@@ -234,6 +235,46 @@ describe('removeFromList', () => {
 
   it('reads the number 2024 as the tag "2024"', () => {
     expect(tagsAfter('[2024, api]', '2024')).toBe('tags: [api]\n')
+  })
+})
+
+describe('replaceInList', () => {
+  it('puts the new item where the old one stood, in its quoting, and changes one line', () => {
+    const hostile = fixture('own/0002-hostile-formatting.md')
+    const flow = write(hostile, (view) =>
+      replaceInList(view, 'supersedes', '0001-crlf-and-foreign-keys', '0009-crlf-and-foreign-keys')
+    )
+    expect(flow.removed).toEqual(['supersedes: [ 0001-crlf-and-foreign-keys ]\n'])
+    expect(flow.added).toEqual(['supersedes: [ 0009-crlf-and-foreign-keys ]\n'])
+
+    const block = write(hostile, (view) =>
+      replaceInList(view, 'decision-makers', 'Alex Roth', 'Alex "Lex" Roth')
+    )
+    expect(block.removed).toEqual(['  - "Alex Roth"   # block list, mixed quoting\n'])
+    expect(block.added).toEqual(['  - "Alex \\"Lex\\" Roth"   # block list, mixed quoting\n'])
+
+    const crlf = fixture('own/0001-crlf-and-foreign-keys.md')
+    const first = write(crlf, (view) => replaceInList(view, 'tags', 'persistence', 'storage'))
+    expect(first.removed).toEqual(['tags: [persistence, "write model"]\r\n'])
+    expect(first.added).toEqual(['tags: [storage, "write model"]\r\n'])
+  })
+
+  it('replaces a single value that stands for a list of one', () => {
+    const text = "---\namends: '0001-a'   # the first\n---\n"
+    const result = write(text, (view) => replaceInList(view, 'amends', '0001-a', '0002-a'))
+    expect(result.after).toBe("---\namends: '0002-a'   # the first\n---\n")
+  })
+
+  it('just takes the old item out when the new one is in the list already', () => {
+    const text = '---\nrelates-to: [0001-a, 0002-b, 0003-c]\n---\n'
+    const result = write(text, (view) => replaceInList(view, 'relates-to', '0002-b', '0003-c'))
+    expect(result.after).toBe('---\nrelates-to: [0001-a, 0003-c]\n---\n')
+  })
+
+  it('does nothing when the item or the key is not there', () => {
+    const text = fixture('own/0001-crlf-and-foreign-keys.md')
+    expect(replaceInList(viewSource(text), 'tags', 'Persistence', 'x')).toEqual([])
+    expect(replaceInList(viewSource(text), 'amends', '0001-a', '0002-a')).toEqual([])
   })
 })
 

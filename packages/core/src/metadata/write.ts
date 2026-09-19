@@ -130,6 +130,33 @@ export function removeFromList(view: SourceView, key: MetadataKey, item: string)
 }
 
 /**
+ * Put one item of a list-valued Metadata key in the place of another: same position, same
+ * quoting. When the new item is in the list already, the old one just leaves.
+ */
+export function replaceInList(
+  view: SourceView,
+  key: MetadataKey,
+  item: string,
+  replacement: string
+): TextEdit[] {
+  const fm = readFrontmatter(view)
+  const node = fm.find(key)?.value ?? null
+  if (node === null) return []
+  const items = isScalar(node) ? [node] : isSeq(node) ? (node.items as unknown[]) : undefined
+  if (!items) throw new MetadataNotWritableError(`"${key}" is not a list`)
+  if (items.some((existing) => scalarText(existing) === replacement)) {
+    return removeFromList(view, key, item)
+  }
+  return items
+    .filter((existing): existing is Scalar => isScalar(existing) && scalarText(existing) === item)
+    .map((existing) => ({
+      start: fm.abs(existing.range![0]),
+      end: fm.abs(existing.range![1]),
+      insert: formatScalar(replacement, existing.type)
+    }))
+}
+
+/**
  * Give a key its first value. `key:` with nothing after it gets the value right behind the
  * colon; an empty value that was spelled out (`key: ~`, `key: null`) is replaced.
  */
