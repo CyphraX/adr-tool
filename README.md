@@ -10,6 +10,7 @@ A desktop application for browsing, writing and relating the Architecture Decisi
 - [docs/adr/](docs/adr/) — the decisions this project rests on, written in the tool's own format.
 - [docs/plan.md](docs/plan.md) — milestones towards v1.
 - [docs/roadmap.md](docs/roadmap.md) — what is in v1 and what comes after.
+- [docs/vision.md](docs/vision.md) — where the project is heading: the ADR tool as the first module of an architect's suite. Its vocabulary is mapped in [CONTEXT-MAP.md](CONTEXT-MAP.md).
 
 ## Development
 
