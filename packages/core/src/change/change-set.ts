@@ -19,7 +19,12 @@ export interface ChangeSet {
 
 /** What planning an operation yields: a change set, or the reason why it cannot be done. */
 export type Plan =
-  | { readonly ok: true; readonly changeSet: ChangeSet }
+  | {
+      readonly ok: true
+      readonly changeSet: ChangeSet
+      /** What the person should look at before confirming. The operation can be done all the same. */
+      readonly warnings?: readonly string[]
+    }
   | { readonly ok: false; readonly reason: string }
 
 export type Applied =

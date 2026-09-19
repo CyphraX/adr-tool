@@ -17,7 +17,17 @@ export class Drafts {
 
   constructor(private readonly fs: FileSystem) {}
 
+  /** The text of a file as the operation has it so far. */
+  async read(path: string): Promise<string> {
+    return (await this.draft(path)).after
+  }
+
   async write(path: string, edit: (view: SourceView) => TextEdit[]): Promise<void> {
+    const draft = await this.draft(path)
+    draft.after = applyEdits(draft.after, edit(viewSource(draft.after)))
+  }
+
+  private async draft(path: string): Promise<{ before: string; after: string }> {
     let draft = this.texts.get(path)
     if (!draft) {
       const before = await this.fs.readText(path)
@@ -25,7 +35,7 @@ export class Drafts {
       draft = { before, after: before }
       this.texts.set(path, draft)
     }
-    draft.after = applyEdits(draft.after, edit(viewSource(draft.after)))
+    return draft
   }
 
   changeSet(): ChangeSet {
