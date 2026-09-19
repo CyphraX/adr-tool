@@ -60,9 +60,9 @@ const TEXT_STAYS: Caution = {
 }
 
 const RELATION_IS_AUTHORITATIVE: Caution = {
-  lead: 'The tool cannot know everything:',
+  lead: 'Before you repair:',
   advice:
-    'A repair takes the Relations of accepted ADRs as true. If a Relation is what is wrong, cancel and fix the file by hand.'
+    'A Repair takes what the ADRs say in supersedes and amends as true. If that is what is wrong, cancel and fix the file by hand.'
 }
 
 /** What a decision is called on its button, and again on the button that confirms it. */
@@ -290,7 +290,11 @@ class AppState {
     const [tab, log] = [this.active, this.log]
     const adr = log?.adrs.find((candidate) => candidate.id === repair.adr)
     if (!tab || !log || !adr) return
-    const renumbers = repair.kind === 'renumber'
+    // A Renumber is known by its own name, and warns about something else.
+    const [verb, caution] =
+      repair.kind === 'renumber'
+        ? (['Renumber', TEXT_STAYS] as const)
+        : (['Repair', RELATION_IS_AUTHORITATIVE] as const)
     const plan = await window.api.planRepair({
       repositoryId: tab.repository.id,
       logPath: log.path,
@@ -299,15 +303,15 @@ class AppState {
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: `${renumbers ? 'Renumber' : 'Repair'} ADR ${prefixOf(adr)}`,
-          action: renumbers ? 'Renumber' : 'Repair',
+          title: `${verb} ADR ${prefixOf(adr)}`,
+          action: verb,
           change: plan.change,
           applying: false,
-          caution: renumbers ? TEXT_STAYS : RELATION_IS_AUTHORITATIVE
+          caution
         }
       : {
           kind: 'refused',
-          title: `Cannot ${renumbers ? 'renumber' : 'repair'} ADR ${prefixOf(adr)}`,
+          title: `Cannot ${verb.toLowerCase()} ADR ${prefixOf(adr)}`,
           reason: plan.reason
         }
   }

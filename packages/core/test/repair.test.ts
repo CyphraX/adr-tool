@@ -105,13 +105,48 @@ describe('the repair of a Problem', () => {
   })
 
   it('takes out a Back-reference that has no Relation in effect behind it', async () => {
-    const { changes } = await repairOnly({
+    const { plan, changes } = await repairOnly({
       '0001-base': adr('status: accepted', 'amended-by: [0002-more]'),
       '0002-more': adr('status: proposed', 'amends: [0001-base]')
     })
     expect(changes).toEqual({
       '0001-base.md': { removed: ['amended-by: [0002-more]\n'], added: [] }
     })
+    expect(plan.ok && plan.warnings).toEqual([
+      '0002-more is still proposed. When it is accepted, the Back-reference is written again.'
+    ])
+  })
+
+  it('says why the Back-reference has nothing behind it, so that a broken successor is noticed', async () => {
+    const premise = async (...successor: string[]): Promise<readonly string[] | undefined> => {
+      const { fs, log } = await repository({
+        '0001-base': adr('status: accepted', 'amended-by: [0002-more]'),
+        '0002-more': adr(...successor)
+      })
+      const problem = log.problems.find(({ kind }) => kind === 'unfounded-back-reference')!
+      const plan = await planRepair(fs, log, repairsOf(log, problem)[0]!)
+      return plan.ok ? plan.warnings : [plan.reason]
+    }
+    expect(await premise('status: rejected', 'amends: [0001-base]')).toEqual([
+      '0002-more was rejected: its Relations never take effect.'
+    ])
+    expect(await premise('status: acepted', 'amends: [0001-base]')).toEqual([
+      'The Status of 0002-more cannot be read ("acepted"). If that ADR has been accepted, cancel and fix its Status instead: the Back-reference is right then.'
+    ])
+    expect(await premise('status: accepted')).toEqual([
+      '0002-more does not name 0001-base in amends. If it should, cancel and add it to 0002-more by hand: the Back-reference is right then.'
+    ])
+  })
+
+  it('does not mark an ADR as superseded whose Status is not one that can be superseded', async () => {
+    for (const status of ['proposed', 'rejected', 'acepted']) {
+      const { log } = await repository({
+        '0001-old': adr(`status: ${status}`, 'superseded-by: [0002-new]'),
+        '0002-new': adr('status: accepted', 'supersedes: [0001-old]')
+      })
+      const problem = log.problems.find(({ kind }) => kind === 'not-marked-superseded')!
+      expect(repairsOf(log, problem)).toEqual([])
+    }
   })
 
   it('marks the target of a supersedes Relation in effect as superseded', async () => {
@@ -254,13 +289,40 @@ describe('a deliberately broken Decision Log', () => {
       'unfounded-back-reference',
       'unknown-target'
     ])
-    // The bodies, and everything the repairs were not about, are what they were.
-    for (const name of names.filter((name) => !name.startsWith('0006-'))) {
-      const [before, after] = [
-        fixture(`broken/docs/adr/${name}`),
-        await fs.readText(`docs/adr/${name}`)
-      ]
-      expect(after!.slice(after!.indexOf('\n---'))).toBe(before.slice(before.indexOf('\n---')))
+    // Byte for byte: every file is what it was, but for the lines the repairs were about.
+    const rewritten: Record<string, [from: string, to: string][]> = {
+      '0001-foundation.md': [
+        ['tags: [structure]\n', 'tags: [structure]\namended-by: [0005-split-module]\n']
+      ],
+      '0002-old-database.md': [
+        ['status: accepted # nobody updated this\n', 'status: superseded # nobody updated this\n']
+      ],
+      // The file with CRLF line endings and a foreign key: a line changed, a line inserted.
+      '0003-new-database.md': [
+        [
+          "depends-on: [0001-foundation, '0042-never-written']\r\n",
+          'depends-on: [0001-foundation]\r\namended-by: [0005-split-module]\r\n'
+        ]
+      ],
+      '0004-api-style.md': [
+        ['status: "Rejected"\n', 'status: "rejected"\n'],
+        ['relates-to:\n  - 0004-api-style\n', '']
+      ],
+      '0007-caching.md': [
+        ['status: superseded\n', 'status: accepted\n'],
+        ['superseded-by: [0008-no-caching]\n', '']
+      ],
+      '0009-queue.md': [['supersedes: [0010-cron]\n', '']]
     }
+    for (const name of names) {
+      let expected = fixture(`broken/docs/adr/${name}`)
+      for (const [from, to] of rewritten[name] ?? []) {
+        expect(expected).toContain(from)
+        expected = expected.replace(from, to)
+      }
+      const now = name === '0006-export.md' ? '0011-export.md' : name
+      expect(await fs.readText(`docs/adr/${now}`), name).toBe(expected)
+    }
+    expect(await fs.readText('docs/adr/0006-export.md')).toBeUndefined()
   })
 })
