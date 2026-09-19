@@ -1,4 +1,4 @@
-import type { Repository } from '@adr-tool/core'
+import type { ChangeSet, Repository } from '@adr-tool/core'
 
 /**
  * The contract between the main process and the sandboxed renderer.
@@ -20,6 +20,27 @@ export interface Session {
   readonly activeId?: string
 }
 
+/** The operations that decide an ADR or end its life. Each of them only changes Metadata. */
+export type Decision = 'accept' | 'reject' | 'deprecate'
+
+/**
+ * A change the main process has planned and is holding. The renderer shows it and then
+ * applies or discards it by its id — it never sends text or paths back, so it cannot
+ * make the main process write anything `core` did not plan.
+ */
+export interface PlannedChange {
+  readonly changeId: string
+  readonly changeSet: ChangeSet
+}
+
+export type PlanResult =
+  | { readonly ok: true; readonly change: PlannedChange }
+  | { readonly ok: false; readonly reason: string }
+
+export type ApplyResult =
+  | { readonly applied: true; readonly repository: OpenRepository }
+  | { readonly applied: false; readonly reason: string }
+
 export interface Api {
   /** `win32`, `darwin` or `linux`. */
   readonly platform: string
@@ -30,6 +51,16 @@ export interface Api {
   closeRepository(id: string): Promise<void>
   /** Remember which tab is in front, for the next start. */
   setActiveRepository(id: string | undefined): Promise<void>
+  /** Plan a decision on an ADR. Nothing is written until the change is applied. */
+  planDecision(
+    repositoryId: string,
+    logPath: string,
+    adrId: string,
+    decision: Decision
+  ): Promise<PlanResult>
+  /** Write a planned change, unless a file it touches changed on disk in the meantime. */
+  applyChange(changeId: string): Promise<ApplyResult>
+  discardChange(changeId: string): Promise<void>
   /** Open a web link in the system browser. Anything but http and https is ignored. */
   openExternal(url: string): Promise<void>
   /** Called whenever files of an open repository changed on disk. Returns a function that stops listening. */
@@ -42,5 +73,8 @@ export const CHANNEL = {
   closeRepository: 'repository:close',
   setActiveRepository: 'repository:set-active',
   repositoryChanged: 'repository:changed',
+  planDecision: 'change:plan-decision',
+  applyChange: 'change:apply',
+  discardChange: 'change:discard',
   openExternal: 'shell:open-external'
 } as const

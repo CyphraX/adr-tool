@@ -27,6 +27,7 @@
     "@fontsource/ibm-plex-serif": "^5.3.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@types/node": "^24.13.5",
+    "diff": "^9.0.0",
     "electron": "^44.4.1",
     "electron-vite": "^5.0.0",
     "rehype-sanitize": "^6.0.0",
