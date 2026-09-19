@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { parseDocument } from 'yaml'
-import { MetadataNotWritableError, addToList, removeKey, setScalar } from '../src/metadata/write'
+import {
+  MetadataNotWritableError,
+  addToList,
+  removeFromList,
+  removeKey,
+  setScalar
+} from '../src/metadata/write'
 import { applyEdits, type TextEdit } from '../src/text/edit'
 import { viewSource, type SourceView } from '../src/text/source'
 import { fixture, lines, ownAdrs } from './fixtures'
@@ -133,6 +139,101 @@ describe('addToList', () => {
     const text = '---\nsupersedes: 0001-a\n---\n'
     const result = write(text, (view) => addToList(view, 'supersedes', '0002-b'))
     expect(result.after).toBe('---\nsupersedes: [0001-a, 0002-b]\n---\n')
+  })
+})
+
+describe('removeFromList', () => {
+  const flow = (list: string) => `---\nstatus: accepted\ntags: ${list}\nnav_order: 3\n---\n# T\n`
+  const tagsAfter = (list: string, item: string) =>
+    lines(write(flow(list), (view) => removeFromList(view, 'tags', item)).after)[2]
+
+  it('takes the first, a middle or the last item out of a flow list, with one comma', () => {
+    expect(tagsAfter('[a, b, c]', 'a')).toBe('tags: [b, c]\n')
+    expect(tagsAfter('[a, b, c]', 'b')).toBe('tags: [a, c]\n')
+    expect(tagsAfter('[a, b, c]', 'c')).toBe('tags: [a, b]\n')
+  })
+
+  it('leaves the spacing and quoting of the items that stay', () => {
+    expect(tagsAfter('[ a ,  "b: c" ,\'d\' ]', 'a')).toBe('tags: [ "b: c" ,\'d\' ]\n')
+    expect(tagsAfter('[ a ,  "b: c" ,\'d\' ]', 'b: c')).toBe("tags: [ a ,  'd' ]\n")
+    expect(tagsAfter('[ a ,  "b: c" ,\'d\' ]', 'd')).toBe('tags: [ a ,  "b: c" ]\n')
+    expect(tagsAfter('[a, b,]', 'b')).toBe('tags: [a,]\n')
+  })
+
+  it('takes every occurrence of an item that is written more than once', () => {
+    expect(tagsAfter('[a, a, b]', 'a')).toBe('tags: [b]\n')
+    expect(tagsAfter('[b, a, a]', 'a')).toBe('tags: [b]\n')
+    expect(tagsAfter('[a, b, a, c, a]', 'a')).toBe('tags: [b, c]\n')
+  })
+
+  it('takes an item out of a flow list that spans lines', () => {
+    const text = '---\ntags: [\n  a,\n  b,\n  c\n]\n---\n'
+    const after = (item: string) => write(text, (view) => removeFromList(view, 'tags', item)).after
+    expect(after('a')).toBe('---\ntags: [\n  b,\n  c\n]\n---\n')
+    expect(after('b')).toBe('---\ntags: [\n  a,\n  c\n]\n---\n')
+    expect(after('c')).toBe('---\ntags: [\n  a,\n  b\n]\n---\n')
+  })
+
+  it('refuses a flow list with a comment next to the item, and takes out an item elsewhere', () => {
+    const text = '---\ntags: [\n  a, # the first\n  b,\n  c\n]\n---\n'
+    const remove = (item: string) => write(text, (view) => removeFromList(view, 'tags', item))
+    expect(() => remove('a')).toThrow(MetadataNotWritableError)
+    expect(() => remove('a')).toThrow('Remove "a" in an editor.')
+    expect(remove('c').after).toBe('---\ntags: [\n  a, # the first\n  b\n]\n---\n')
+  })
+
+  it('removes one line of a block list: the item with its trailing comment', () => {
+    const text = fixture('own/0002-hostile-formatting.md')
+    const quoted = write(text, (view) => removeFromList(view, 'decision-makers', 'Alex Roth'))
+    expect(quoted.added).toEqual([])
+    expect(quoted.removed).toEqual(['  - "Alex Roth"   # block list, mixed quoting\n'])
+    const plain = write(text, (view) => removeFromList(view, 'decision-makers', 'Kim Becker'))
+    expect(plain.added).toEqual([])
+    expect(plain.removed).toEqual(['  - Kim Becker\n'])
+    expect(plain.metadata['decision-makers']).toEqual(['Alex Roth'])
+  })
+
+  it('leaves blank lines and comments between block items to the author', () => {
+    const text = '---\ntags:\r\n- a-b\r\n\r\n# about c\r\n- c\r\n- d\r\n---\r\n'
+    const result = write(text, (view) => removeFromList(view, 'tags', 'c'))
+    expect(result.after).toBe('---\ntags:\r\n- a-b\r\n\r\n# about c\r\n- d\r\n---\r\n')
+    const first = write(text, (view) => removeFromList(view, 'tags', 'a-b'))
+    expect(first.after).toBe('---\ntags:\r\n\r\n# about c\r\n- c\r\n- d\r\n---\r\n')
+  })
+
+  it('removes the key with the last item, never leaving an empty list', () => {
+    const crlf = fixture('own/0001-crlf-and-foreign-keys.md')
+    const once = applyEdits(crlf, removeFromList(viewSource(crlf), 'tags', 'persistence'))
+    const result = write(once, (view) => removeFromList(view, 'tags', 'write model'))
+    expect(result.added).toEqual([])
+    expect(result.removed).toEqual(['tags: ["write model"]\r\n'])
+
+    const hostile = fixture('own/0002-hostile-formatting.md')
+    const flowList = write(hostile, (view) =>
+      removeFromList(view, 'supersedes', '0001-crlf-and-foreign-keys')
+    )
+    expect(flowList.removed).toEqual(['supersedes: [ 0001-crlf-and-foreign-keys ]\n'])
+    expect(flowList.added).toEqual([])
+  })
+
+  it('removes the key of a single value that stands for a list of one', () => {
+    const text = '---\nsupersedes: 0001-a\nstatus: proposed\n---\n'
+    const result = write(text, (view) => removeFromList(view, 'supersedes', '0001-a'))
+    expect(result.after).toBe('---\nstatus: proposed\n---\n')
+    expect(removeFromList(viewSource(text), 'supersedes', '0002-b')).toEqual([])
+  })
+
+  it('does nothing when the item or the key is not there', () => {
+    const text = fixture('own/0001-crlf-and-foreign-keys.md')
+    expect(removeFromList(viewSource(text), 'tags', 'Persistence')).toEqual([])
+    expect(removeFromList(viewSource(text), 'relates-to', '0002-hostile-formatting')).toEqual([])
+    expect(removeFromList(viewSource(fixture('own/0003-no-frontmatter.md')), 'tags', 'a')).toEqual(
+      []
+    )
+  })
+
+  it('reads the number 2024 as the tag "2024"', () => {
+    expect(tagsAfter('[2024, api]', '2024')).toBe('tags: [api]\n')
   })
 })
 
