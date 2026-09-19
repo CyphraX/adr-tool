@@ -54,6 +54,9 @@ export class Repositories {
     const entry = this.entries.get(id)
     if (!entry) return
     this.entries.delete(id)
+    for (const [changeId, planned] of this.planned) {
+      if (planned.repositoryId === id) this.planned.delete(changeId)
+    }
     clearTimeout(entry.reload)
     await entry.watcher?.close()
   }
