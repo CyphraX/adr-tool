@@ -1,4 +1,11 @@
-import type { ChangeSet, RelationType, Repair, Repository, Templates } from '@adr-tool/core'
+import type {
+  ChangeSet,
+  FileChange,
+  RelationType,
+  Repair,
+  Repository,
+  Templates
+} from '@adr-tool/core'
 
 /**
  * The contract between the main process and the sandboxed renderer.
@@ -13,6 +20,32 @@ export interface OpenRepository {
   /** The last part of `root`: the label of the repository's tab. */
   readonly name: string
   readonly repository: Repository
+  /** What git says about the directory. Absent without git, or outside a git repository. */
+  readonly git?: GitState
+}
+
+export interface GitState {
+  /** The branch that is checked out; `undefined` on a detached HEAD. */
+  readonly branch: string | undefined
+  /** The ADR files with uncommitted changes, new ones included, as `Adr.path` names them. Sorted. */
+  readonly changed: readonly string[]
+}
+
+/** What is on disk and not committed yet, as an entry of a file's history. */
+export const WORKING_TREE = 'working-tree'
+
+/** One step in the history of one ADR: a commit, or what is not committed yet. */
+export interface HistoryEntry {
+  /** The commit's hash, or `WORKING_TREE`. */
+  readonly id: string
+  readonly subject: string
+  readonly author?: string
+  /** The author date, ISO 8601. */
+  readonly date?: string
+  /** The file's name before this commit, when the commit renamed it: a Renumber. */
+  readonly renamedFrom?: string
+  /** How many Corrections the file records at this point. The first entry with more than `n` recorded Correction `n`. */
+  readonly corrections: number
 }
 
 export interface Session {
@@ -119,6 +152,15 @@ export interface Api {
   planRepair(request: RepairRequest): Promise<PlanResult>
   /** Plan an edit of the Metadata lists. Nothing is written until the change is applied. */
   planMetadataEdit(request: MetadataEditRequest): Promise<PlanResult>
+  /** The history of an ADR's file, newest first, through renames. Empty without git. */
+  history(repositoryId: string, logPath: string, adrId: string): Promise<readonly HistoryEntry[]>
+  /** What one entry of that history did to the file. */
+  historyChange(
+    repositoryId: string,
+    logPath: string,
+    adrId: string,
+    entryId: string
+  ): Promise<FileChange | undefined>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
   applyChange(changeId: string): Promise<ApplyResult>
   discardChange(changeId: string): Promise<void>
@@ -140,6 +182,8 @@ export const CHANNEL = {
   planRepair: 'change:plan-repair',
   planCreate: 'change:plan-create',
   listTemplates: 'templates:list',
+  history: 'git:history',
+  historyChange: 'git:history-change',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
   openExternal: 'shell:open-external'

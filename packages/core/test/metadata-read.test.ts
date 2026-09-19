@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readMetadata } from '../src/metadata/read'
+import { correctionsIn, readMetadata } from '../src/metadata/read'
 import { viewSource } from '../src/text/source'
 import { fixture } from './fixtures'
 
@@ -140,5 +140,21 @@ describe('readMetadata', () => {
       expect(writable).toBe(false)
       expect(metadata.status).toBe('accepted')
     }
+  })
+})
+
+describe('the Corrections of a file as some revision has it', () => {
+  it('are read from the text alone, and tolerantly', () => {
+    const text = [
+      '---',
+      'corrections:',
+      '  - date: 2026-09-19',
+      '    note: Spelling',
+      '---',
+      ''
+    ].join('\n')
+    expect(correctionsIn(text)).toEqual([{ date: '2026-09-19', note: 'Spelling' }])
+    expect(correctionsIn('# No frontmatter\n')).toEqual([])
+    expect(correctionsIn('---\nstatus: [broken\n---\n')).toEqual([])
   })
 })
