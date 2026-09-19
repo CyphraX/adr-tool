@@ -1,4 +1,4 @@
-import type { ChangeSet, Repository } from '@adr-tool/core'
+import type { ChangeSet, Repository, Templates } from '@adr-tool/core'
 
 /**
  * The contract between the main process and the sandboxed renderer.
@@ -33,6 +33,18 @@ export interface PlannedChange {
   readonly changeSet: ChangeSet
   /** What the person should look at before confirming. */
   readonly warnings: readonly string[]
+  /** The ID of the ADR the change creates. */
+  readonly createdId?: string
+}
+
+/** A new ADR as the dialog describes it. Its ID and path are `core`'s business. */
+export interface CreateRequest {
+  readonly repositoryId: string
+  /** The Decision Log to create it in; `undefined` in a repository that has none yet. */
+  readonly logPath: string | undefined
+  readonly title: string
+  readonly template: string
+  readonly relation?: { readonly type: 'supersedes' | 'amends'; readonly target: string }
 }
 
 /**
@@ -75,6 +87,10 @@ export interface Api {
     adrId: string,
     decision: Decision
   ): Promise<PlanResult>
+  /** The Templates a new ADR of this repository can start from. */
+  listTemplates(repositoryId: string): Promise<Templates>
+  /** Plan a new ADR. Nothing is written until the change is applied. */
+  planCreate(request: CreateRequest): Promise<PlanResult>
   /** Plan saving an edited body. Nothing is written until the change is applied. */
   planBodyEdit(request: BodyEditRequest): Promise<PlanResult>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
@@ -94,6 +110,8 @@ export const CHANNEL = {
   repositoryChanged: 'repository:changed',
   planDecision: 'change:plan-decision',
   planBodyEdit: 'change:plan-body-edit',
+  planCreate: 'change:plan-create',
+  listTemplates: 'templates:list',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
   openExternal: 'shell:open-external'

@@ -41,6 +41,10 @@
     status === 'proposed' ? ['accept', 'reject'] : status === 'accepted' ? ['deprecate'] : []
   )
 
+  // A decision that has been taken changes through a new ADR, never in place.
+  const canBeSuperseded = $derived(status === 'accepted' || status === 'deprecated')
+  const canBeAmended = $derived(status === 'accepted')
+
   const facts = $derived(
     [
       ['Created', adr.metadata.created],
@@ -68,6 +72,12 @@
             {DECISION_LABEL[decision]}
           </button>
         {/each}
+        {#if canBeSuperseded}
+          <button onclick={() => app.startCreating('supersedes')}>Supersede</button>
+        {/if}
+        {#if canBeAmended}
+          <button onclick={() => app.startCreating('amends')}>Amend</button>
+        {/if}
         <button onclick={() => app.edit()}>Edit</button>
       </div>
     {/if}
