@@ -41,7 +41,9 @@ export function relationsOf(adrs: readonly Adr[]): {
   for (const adr of adrs) {
     const state = stateOf(adr.metadata.status)
     for (const type of RELATION_TYPES) {
-      for (const target of adr.metadata.relations[type]) {
+      // What another file says this ADR supersedes counts like what its own file says.
+      const implied = type === 'supersedes' ? (adr.impliedSupersedes ?? []) : []
+      for (const target of [...adr.metadata.relations[type], ...implied]) {
         if (target === adr.id) problems.push({ kind: 'self-reference', adr: adr.id, key: type })
         else if (!ids.has(target)) {
           problems.push({ kind: 'unknown-target', adr: adr.id, key: type, target })

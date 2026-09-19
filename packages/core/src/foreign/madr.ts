@@ -1,4 +1,5 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
+import type { Adr } from '../adr/adr'
 import type { Metadata, MetadataReading } from '../metadata/read'
 import { scalarText } from '../metadata/scalar'
 import type { Problem } from '../problems/problem'
@@ -14,7 +15,8 @@ export type ByNumber = (number: number) => string | undefined
 
 const SUPERSEDED_BY = /^super[sc]eded[ \t]+by(?![^\s:])/i
 const STATUS_ITEM = /^ {0,3}[*+-][ \t]+status[ \t]*:/i
-const LIST_ITEM = /^ {0,3}(?:[*+-]|\d{1,9}[.)])(?:[ \t]|$)/
+const LIST_ITEM = /^ {0,3}[*+-](?:[ \t]|$)/
+const THEMATIC_BREAK = /^(?:\*{3,}|-{3,}|_{3,})$/
 
 /**
  * Read a file the way MADR wrote it (docs/file-format.md, section 8), laid over what the
@@ -26,21 +28,25 @@ export function readMadr(
   adr: string,
   own: Reading,
   byNumber: ByNumber
-): Reading | undefined {
+): { reading: Reading; successor?: string } | undefined {
   const keys = frontmatterOf(view)
   const written = keys.get('status')
   const inFrontmatter = written !== undefined && SUPERSEDED_BY.test(written.text)
   const listed = keys.has('status') ? undefined : listedStatus(view)
-  const deciders = keys.has('decision-makers') ? undefined : keys.get('deciders')
+  const named = keys.has('decision-makers') ? [] : (keys.get('deciders')?.items ?? [])
+  const deciders = named.length > 0 ? named : undefined
   if (!inFrontmatter && listed === undefined && !deciders) return undefined
 
   let { metadata } = own
   let problems = own.problems
-  if (deciders) metadata = { ...metadata, decisionMakers: deciders.items }
+  if (deciders) metadata = { ...metadata, decisionMakers: deciders }
+
+  let successor: string | undefined
 
   const text = inFrontmatter ? written.text : listed
   if (text !== undefined) {
     const status = readStatus(text, byNumber)
+    successor = status.supersededBy[0]
     // What the own reader said about a Status it could not know is said again here, or not at all.
     problems = problems.filter(
       (problem) => !(problem.kind === 'invalid-metadata' && problem.key === 'status')
@@ -64,7 +70,7 @@ export function readMadr(
       problems = [...problems, { kind: 'invalid-metadata', adr, key: 'status', detail } as Problem]
     }
   }
-  return { metadata, problems }
+  return { reading: { metadata, problems }, ...(successor !== undefined && { successor }) }
 }
 
 function withoutRawStatus(metadata: Metadata): Omit<Metadata, 'rawStatus'> {
@@ -75,7 +81,7 @@ function withoutRawStatus(metadata: Metadata): Omit<Metadata, 'rawStatus'> {
 
 /** The number an identifier names: `ADR-0005`, `ADR 5`, `0005`, `5`, `#5`. */
 export function numberNamedBy(identifier: string): number | undefined {
-  const match = /^(?:adr[ \t_-]?|#)?(\d{1,9})\.?$/i.exec(identifier.trim())
+  const match = /^(?:adr[ \t-]?|#)?(\d{1,9})$/i.exec(identifier.trim())
   return match ? Number(match[1]) : undefined
 }
 
@@ -88,7 +94,8 @@ function readStatus(
   const phrase = SUPERSEDED_BY.exec(text)
   if (!phrase) return { status: undefined, rawStatus: text, supersededBy: [] }
 
-  let target = text.slice(phrase[0].length).trim()
+  // A value of several lines is one text, as YAML folds it.
+  let target = text.slice(phrase[0].length).replace(/\s+/g, ' ').trim()
   if (target.startsWith(':')) target = target.slice(1).trim()
   if (!target) return { status: 'superseded', supersededBy: [] }
   const link = linkLine(`superseded by ${target}`)
@@ -115,10 +122,11 @@ function frontmatterOf(view: SourceView): Map<string, Key> {
     const key = scalarText(pair.key)
     if (key !== 'status' && key !== 'deciders' && key !== 'decision-makers') continue
     const value = pair.value
-    const items = isSeq(value)
-      ? value.items.flatMap((item) => scalarText(item) ?? [])
-      : (scalarText(value) ?? [])
-    keys.set(key, { text: isScalar(value) ? (scalarText(value) ?? '') : '', items: [items].flat() })
+    const items = isSeq(value) ? value.items.map((item) => scalarText(item)) : [scalarText(value)]
+    keys.set(key, {
+      text: isScalar(value) ? (scalarText(value) ?? '') : '',
+      items: [...new Set(items.filter((item) => item !== undefined))]
+    })
   }
   return keys
 }
@@ -131,15 +139,31 @@ function listedStatus(view: SourceView): string | undefined {
   let inList = false
   for (const line of proseLines(view.text, view.bodyStart)) {
     if (headingOf(line)?.level === 2) return undefined
-    if (LIST_ITEM.test(line)) {
+    if (LIST_ITEM.test(line) && !THEMATIC_BREAK.test(line.replace(/[ \t]/g, ''))) {
       inList = true
       if (!STATUS_ITEM.test(line)) continue
-      const value = line.slice(line.indexOf(':') + 1)
-      const comment = value.indexOf('<!--')
-      return (comment === -1 ? value : value.slice(0, comment)).trim() || undefined
+      return withoutComments(line.slice(line.indexOf(':') + 1)).trim() || undefined
     }
     // A list ends with the first line that is neither an item, nor blank, nor indented under one.
     if (inList && line.trim() !== '' && !/^[ \t]/.test(line)) return undefined
   }
   return undefined
+}
+
+/** `<!-- optional -->`: what the template says about a value is not the value. */
+function withoutComments(value: string): string {
+  let rest = value
+  for (let open = rest.indexOf('<!--'); open !== -1; open = rest.indexOf('<!--')) {
+    const close = rest.indexOf('-->', open + 4)
+    rest = rest.slice(0, open) + (close === -1 ? '' : rest.slice(close + 3))
+  }
+  return rest
+}
+
+/** Whether a file of MADR names this number as its successor without naming an ADR by it (yet). */
+export function namesNumber(adr: Adr, number: number | undefined): boolean {
+  if (adr.foreign !== 'madr' || number === undefined) return false
+  return adr.metadata.backReferences['superseded-by'].some(
+    (written) => numberNamedBy(written) === number
+  )
 }

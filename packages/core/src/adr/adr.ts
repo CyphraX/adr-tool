@@ -34,6 +34,12 @@ export interface Adr {
    * what Migration would write, and no operation but Migration writes to the file.
    */
   readonly foreign?: ForeignFormat
+  /**
+   * The ADRs this one supersedes because their files say so and its own does not: MADR
+   * records a supersession on the superseded ADR only. Not part of the Metadata, which is
+   * what the file says; Migration of those ADRs writes it there.
+   */
+  readonly impliedSupersedes?: readonly string[]
   readonly metadata: Metadata
   /** `false` when the tool must not write Metadata into this file until a person has fixed it. */
   readonly metadataWritable: boolean
@@ -45,14 +51,14 @@ export function readAdr(
   text: string,
   scheme: NamingScheme,
   byNumber: ByNumber = () => undefined
-): { adr: Adr; problems: readonly Problem[] } {
+): { adr: Adr; problems: readonly Problem[]; successor?: string } {
   const view = viewSource(text)
   const own = readMetadata(view, name.id)
   const adrTools = readAdrTools(view, name.id, own.metadata)
   // A file whose frontmatter cannot be read is nobody's format yet.
   const madr = adrTools || !own.writable ? undefined : readMadr(view, name.id, own, byNumber)
   const foreign: ForeignFormat | undefined = adrTools ? 'adr-tools' : madr ? 'madr' : undefined
-  const { metadata, problems } = adrTools ?? madr ?? own
+  const { metadata, problems } = adrTools ?? madr?.reading ?? own
   const number = numberOf(name, scheme)
   const body = text.slice(view.bodyStart)
   const title = titleOf(body, number)
@@ -67,5 +73,5 @@ export function readAdr(
     metadata,
     metadataWritable: own.writable
   }
-  return { adr, problems }
+  return { adr, problems, ...(madr?.successor !== undefined && { successor: madr.successor }) }
 }

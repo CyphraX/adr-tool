@@ -1,6 +1,6 @@
 import type { Adr } from '../adr/adr'
 import type { Plan } from '../change/change-set'
-import { numberNamedBy } from '../foreign/madr'
+import { namesNumber } from '../foreign/madr'
 import { joinPath, type FileSystem } from '../fs/port'
 import type { DecisionLog } from '../log/load'
 import { nextPrefix } from '../log/new-id'
@@ -62,11 +62,16 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
         continue
       }
       // A foreign file keeps its Relations in its text, and the tool does not write that.
-      // MADR 4 names an ADR by its number, which is what is about to change.
-      const byNumber = other.metadata.backReferences['superseded-by'].some(
-        (written) => numberNamedBy(written) === adr.number
-      )
-      const mentions = byNumber || namingKeys(other, id).length > 0
+      // MADR 4 names an ADR by its number: the one that is about to be free, or to be taken.
+      for (const number of [adr.number, Number(/^\d+/.exec(to)![0])]) {
+        if (namesNumber(other, number)) {
+          requireOwnFormat(
+            other,
+            ` It names its successor by the number ${number}, which would mean another ADR afterwards. Change that in the file first.`
+          )
+        }
+      }
+      const mentions = namingKeys(other, id).length > 0
       if (other.foreign && (mentions || (await fs.readText(other.path))?.includes(id))) {
         requireOwnFormat(
           other,

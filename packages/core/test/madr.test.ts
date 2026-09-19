@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
   memoryFileSystem,
   openRepository,
+  planAccept,
+  planCreate,
   planDeprecate,
   planEditMetadata,
   planRenumber,
+  planRepair,
+  repairsOf,
   type DecisionLog
 } from '../src'
 import { nodeFileSystem } from './node-file-system'
@@ -114,7 +118,7 @@ describe('recognizing a file of MADR', () => {
   })
 
   it('resolves an identifier in every way people write it', async () => {
-    const written = ['ADR-0009', 'adr 9', '0009', '9', '#9', 'ADR-9.', '[ADR-0009](0009-new.md)']
+    const written = ['ADR-0009', 'adr 9', '0009', '9', '#9', 'ADR9', '[ADR-0009](0009-new.md)']
     const log = await logOf({
       ...Object.fromEntries(
         written.map((target, position) => [
@@ -272,5 +276,151 @@ describe('a file of MADR and the operations', () => {
         reason: expect.stringContaining('MADR')
       })
     }
+  })
+})
+
+describe('a supersession that only the superseded ADR records', () => {
+  const open = async (
+    files: Record<string, string>
+  ): Promise<[ReturnType<typeof memoryFileSystem>, DecisionLog]> => {
+    const fs = memoryFileSystem(
+      Object.fromEntries(
+        Object.entries(files).map(([name, text]) => [`docs/decisions/${name}.md`, text])
+      )
+    )
+    return [fs, (await openRepository(fs)).logs[0]!]
+  }
+
+  it('is kept next to the Metadata of the successor, which stays what its file says', async () => {
+    const [, log] = await open({
+      '0001-old': madr(['status: superseded by ADR-0002']),
+      '0002-new': madr(['status: accepted'])
+    })
+    expect(log.adrs[1]).toMatchObject({
+      impliedSupersedes: ['0001-old'],
+      metadata: { relations: { supersedes: [] } }
+    })
+    expect(log.adrs[1]!.foreign).toBeUndefined()
+    expect(log.problems).toEqual([])
+  })
+
+  it('comes from the Status alone, not from a Back-reference the file has as well', async () => {
+    const [, log] = await open({
+      '0001-old': madr(['status: accepted', 'deciders: A', 'superseded-by: [0002-new]']),
+      '0002-new': madr(['status: accepted'])
+    })
+    expect(log.adrs[0]!.foreign).toBe('madr')
+    expect(log.relations).toEqual([])
+    expect(log.problems).toMatchObject([{ kind: 'unfounded-back-reference', adr: '0001-old' }])
+  })
+
+  it('does not keep a proposed successor from being accepted', async () => {
+    const [fs, log] = await open({
+      '0001-old': madr(['status: superseded by ADR-0002']),
+      '0002-new': madr(['status: proposed'])
+    })
+    const plan = await planAccept(fs, log, '0002-new', { today: '2026-09-19' })
+    // The superseded ADR says all there is to say already; nothing is written to it.
+    expect(plan.ok && plan.changeSet.files.map((file) => file.path)).toEqual([
+      'docs/decisions/0002-new.md'
+    ])
+  })
+
+  it('is not offered for editing, or for a Repair, where it is not written', async () => {
+    const [fs, log] = await open({
+      '0001-old': madr(['status: superseded by ADR-0002', 'supersedes: [0002-new]']),
+      '0002-new': madr(['status: accepted'])
+    })
+    const cycle = log.problems.find((problem) => problem.kind === 'supersedes-cycle')!
+    expect(cycle).toBeDefined()
+    // One edge of the circle is in a file of MADR, the other in no file at all.
+    expect(repairsOf(log, cycle)).toEqual([])
+    expect(
+      await planRepair(fs, log, {
+        kind: 'remove-item',
+        adr: '0002-new',
+        key: 'supersedes',
+        item: '0001-old'
+      })
+    ).toMatchObject({ ok: false })
+  })
+
+  it('reaches a successor in any format', async () => {
+    const [, log] = await open({
+      '0001-old': madr(['status: superseded by ADR-0002']),
+      '0002-new': '# 2. New\n\n## Status\n\nAccepted\n',
+      '0003-older': madr(['status: superseded by ADR-0004']),
+      '0004-newer': madr(['status: accepted', 'deciders: A'])
+    })
+    expect(log.relations.map(({ from, to }) => [from, to])).toEqual([
+      ['0002-new', '0001-old'],
+      ['0004-newer', '0003-older']
+    ])
+    expect(log.problems).toEqual([])
+  })
+
+  it('lets the superseded ADR be renumbered whatever the format of its successor', async () => {
+    const [fs, log] = await open({
+      '0001-old': madr(['status: superseded by ADR-0002']),
+      '0001-twin': madr(['status: accepted']),
+      '0002-new': madr(['status: accepted', 'deciders: A'])
+    })
+    expect(await planRenumber(fs, log, '0001-old')).toMatchObject({
+      ok: true,
+      renamed: { to: '0003-old' }
+    })
+  })
+
+  it('keeps an ADR from taking a number that a file of MADR names in vain', async () => {
+    const [fs, log] = await open({
+      '0001-old': madr(['status: superseded by ADR-0004']),
+      '0002-new': madr(['status: accepted']),
+      '0002-twin': madr(['status: accepted']),
+      '0003-x': madr(['status: accepted'])
+    })
+    expect(await planRenumber(fs, log, '0002-twin')).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('the number 4')
+    })
+    // A new ADR gets that number too. It is a person's to say whether it is the successor.
+    const plan = await planCreate(fs, log, {
+      today: '2026-09-19',
+      title: 'Next',
+      template: 'minimal'
+    })
+    expect(plan).toMatchObject({
+      ok: true,
+      created: { id: '0004-next' },
+      warnings: [expect.stringContaining('0001-old')]
+    })
+  })
+})
+
+describe('values of MADR in shapes nobody expects', () => {
+  it('are read, or left alone, and never guessed at', async () => {
+    const log = await logOf({
+      '0001-a': madr(['status: accepted', 'deciders:']),
+      '0002-b': madr(['status: accepted', 'deciders: { list: everyone }']),
+      '0003-c': madr(['status: accepted', 'deciders: [[A, B], C, C, ~]']),
+      '0004-d': madr(['status: |', '  superseded by', '  ADR-0001']),
+      '0005-e': '# E\n\n* * *\n\nText.\n\n* Status: <!-- pick one --> rejected <!-- optional -->\n',
+      '0006-f': '# F\n\n1. Status: rejected\n',
+      '0007-g': madr(['status: {proposed | rejected | superseded by [ADR-0005](0005-x.md)}'])
+    })
+    expect(
+      log.adrs.map((adr) => [adr.foreign, adr.metadata.status, adr.metadata.decisionMakers])
+    ).toEqual([
+      [undefined, 'accepted', []],
+      [undefined, 'accepted', []],
+      ['madr', 'accepted', ['C']],
+      ['madr', 'superseded', []],
+      // A thematic break is no list, and the template's comments are no Status.
+      ['madr', 'rejected', []],
+      [undefined, 'accepted', []],
+      // MADR 3's placeholder without quotes is not YAML: a Problem of its own kind.
+      [undefined, 'accepted', []]
+    ])
+    expect(log.adrs[3]!.metadata.backReferences['superseded-by']).toEqual(['0001-a'])
+    expect(log.problems.map((problem) => problem.kind)).toEqual(['invalid-frontmatter'])
   })
 })
