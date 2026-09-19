@@ -17,6 +17,14 @@ const RELATION_WORDING: Record<RelationType, { from: string; to: string }> = {
   'relates-to': { from: 'Relates to', to: 'Related from' }
 }
 
+/** What a Relation type is called where Relations are edited. */
+export const RELATION_TYPE_LABEL: Record<RelationType, string> = {
+  supersedes: RELATION_WORDING.supersedes.from,
+  amends: RELATION_WORDING.amends.from,
+  'depends-on': RELATION_WORDING['depends-on'].from,
+  'relates-to': RELATION_WORDING['relates-to'].from
+}
+
 /** A Relation of a proposed ADR has not happened yet, and one of a rejected ADR never will. */
 const PENDING_WORDING: Partial<Record<RelationType, { from: string; to: string }>> = {
   supersedes: { from: 'Proposes to supersede', to: 'Supersede proposed by' },

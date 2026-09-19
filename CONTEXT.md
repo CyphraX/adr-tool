@@ -43,7 +43,7 @@ _Avoid_: Retire, archive, delete
 ### Changing an ADR that is no longer proposed
 
 **Correction**:
-A meaning-preserving editorial change — spelling, grammar, formatting, a dead link — to an ADR that is no longer `proposed`. It is recorded in the Metadata and visibly marked, and it never changes what a reader would understand to have been decided.
+A meaning-preserving editorial change — spelling, grammar, formatting, a dead link — to an ADR that is no longer `proposed`. It is recorded in the Metadata and visibly marked, and it never changes what a reader would understand to have been decided. A Correction is about the body: changing decision-makers, tags or Relations is not a Correction.
 _Avoid_: Revision, minor edit, update
 
 **Amend**:

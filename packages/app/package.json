@@ -11,7 +11,7 @@
     "build": "electron-vite build",
     "test": "vitest run",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
-    "typecheck:web": "svelte-check --tsconfig ./tsconfig.json",
+    "typecheck:web": "svelte-check --tsconfig ./tsconfig.web.json",
     "typecheck": "pnpm typecheck:node && pnpm typecheck:web",
     "postinstall": "install-electron"
   },

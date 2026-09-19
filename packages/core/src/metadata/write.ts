@@ -70,6 +70,66 @@ export function addToList(view: SourceView, key: MetadataKey, item: string): Tex
 }
 
 /**
+ * Take an item out of a list-valued Metadata key, where it stands; the other items do not
+ * move. The last item takes the key with it: the tool never leaves an empty list behind.
+ */
+export function removeFromList(view: SourceView, key: MetadataKey, item: string): TextEdit[] {
+  const fm = readFrontmatter(view)
+  const pair = fm.find(key)
+  const node = pair?.value ?? null
+  if (!pair || node === null) return []
+  if (isScalar(node)) return scalarText(node) === item ? removeKey(view, key) : []
+  if (!isSeq(node)) throw new MetadataNotWritableError(`"${key}" is not a list`)
+
+  const items = node.items as (Scalar | YAMLMap | YAMLSeq)[]
+  const leaves = (existing: Scalar | YAMLMap | YAMLSeq): boolean => scalarText(existing) === item
+  if (!items.some(leaves)) return []
+  if (items.every(leaves)) return removeKey(view, key)
+
+  const byHand = new MetadataNotWritableError(
+    `"${key}" is written in a way the tool cannot take an item out of. Remove "${item}" in an editor.`
+  )
+  const span = (
+    existing: Scalar | YAMLMap | YAMLSeq
+  ): [start: number, end: number, next: number] => {
+    if (!existing.range) throw byHand
+    return [fm.abs(existing.range[0]), fm.abs(existing.range[1]), fm.abs(existing.range[2])]
+  }
+
+  if (!node.flow) {
+    // One line per item: the line goes, from its indentation to its line break.
+    return items.filter(leaves).map((existing) => {
+      const [valueStart, , next] = span(existing)
+      const dash = view.text.lastIndexOf('-', valueStart)
+      const start = lineStart(view.text, dash)
+      const lead = view.text.slice(start, dash) + view.text.slice(dash + 1, valueStart)
+      if (dash < start || lead.trim() !== '' || view.text[next - 1] !== '\n') throw byHand
+      return { start, end: next, insert: '' }
+    })
+  }
+
+  // In a flow list an item leaves together with one comma: the one behind it, or, at the end
+  // of the list, the one in front. Anything else between two items, a comment say, is
+  // nothing the tool could assign to either of them.
+  const separator = (left: number, right: number): void => {
+    const between = view.text.slice(span(items[left]!)[1], span(items[right]!)[0])
+    if (!/^\s*,\s*$/.test(between)) throw byHand
+  }
+  const lastStaying = items.findLastIndex((existing) => !leaves(existing))
+  const edits: TextEdit[] = []
+  items.forEach((existing, position) => {
+    if (!leaves(existing) || position > lastStaying) return
+    separator(position, position + 1)
+    edits.push({ start: span(existing)[0], end: span(items[position + 1]!)[0], insert: '' })
+  })
+  if (lastStaying < items.length - 1) {
+    for (let left = lastStaying; left < items.length - 1; left++) separator(left, left + 1)
+    edits.push({ start: span(items[lastStaying]!)[1], end: span(items.at(-1)!)[1], insert: '' })
+  }
+  return edits
+}
+
+/**
  * Give a key its first value. `key:` with nothing after it gets the value right behind the
  * colon; an empty value that was spelled out (`key: ~`, `key: null`) is replaced.
  */
@@ -241,5 +301,10 @@ function formatScalar(value: string, like?: Scalar['type']): string {
   const readBack = plain.errors.length === 0 && isSeq(plain.contents) ? plain.contents.items : []
   const first = readBack[0]
   const safe = readBack.length === 1 && isScalar(first) && first.value === value
-  return safe && value === value.trim() ? value : JSON.stringify(value)
+  return safe && value === value.trim() && !YAML_1_1_BOOLEAN.test(value)
+    ? value
+    : JSON.stringify(value)
 }
+
+/** Other tools that read the frontmatter, Jekyll for one, still take these words for booleans. */
+const YAML_1_1_BOOLEAN = /^(y|n|yes|no|on|off)$/i

@@ -11,6 +11,7 @@ import {
   type Session
 } from '../shared/ipc'
 import { Repositories } from './repositories'
+import { metadataEditRequest } from './requests'
 import { readSession, writeSession } from './session-store'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
@@ -125,6 +126,12 @@ function registerIpc(): void {
       return { ok: false, reason: 'This request cannot be understood.' }
     }
     return repositories.planBodyEdit(given as BodyEditRequest)
+  })
+
+  ipcMain.handle(CHANNEL.planMetadataEdit, (_, request: unknown) => {
+    const edit = metadataEditRequest(request)
+    if (!edit) return { ok: false, reason: 'This request cannot be understood.' }
+    return repositories.planMetadataEdit(edit)
   })
 
   ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>

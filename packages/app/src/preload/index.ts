@@ -14,6 +14,7 @@ const api: Api = {
   listTemplates: (repositoryId) => ipcRenderer.invoke(CHANNEL.listTemplates, repositoryId),
   planCreate: (request) => ipcRenderer.invoke(CHANNEL.planCreate, request),
   planBodyEdit: (request) => ipcRenderer.invoke(CHANNEL.planBodyEdit, request),
+  planMetadataEdit: (request) => ipcRenderer.invoke(CHANNEL.planMetadataEdit, request),
   applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
   discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),
   openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url),
