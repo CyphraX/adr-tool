@@ -110,7 +110,12 @@ describe.each([
     it('has nothing left to do the second time', async () => {
       const [fs, log] = await open(tree(`${name}-migrated`))
       const again = await planMigration(fs, log)
-      expect(again.ok).toBe(false)
+      expect(again).toMatchObject({
+        ok: false,
+        reason: expect.stringContaining(
+          stillForeign.length > 0 ? 'Nothing can be migrated' : 'no ADR in a foreign format'
+        )
+      })
     })
   }
 )
@@ -294,4 +299,125 @@ describe('asking for a Migration', () => {
       '---\nstatus: accepted\ndecided: 2026-09-19\n---\n\n# 1. A\n'
     )
   })
+})
+
+describe('what Migration does not do', () => {
+  const madr = (...frontmatter: string[]): string =>
+    ['---', ...frontmatter, '---', '', '# Title', ''].join('\n')
+  const reopened = async (fs: Files): Promise<DecisionLog> => (await openRepository(fs)).logs[0]!
+
+  it('does not write a Status that would be read as something else afterwards', async () => {
+    const [fs, log] = await open(
+      inLog({
+        '0001-a': '# 1. A\n\n## Status\n\nSuperseded by ADR 2\n',
+        '0002-b': '# B\n',
+        '0003-c': '# 3. C\n\n## Status\n\nRejected\n'
+      })
+    )
+    expect(log.adrs[0]!.noMigration).toContain('names its successor in its Status text')
+    expect(await planMigration(fs, log, '0001-a')).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('Make it a link line by hand')
+    })
+    // The rest of the log is migrated, and the preview names what was left out.
+    const plan = await planMigration(fs, log)
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.changeSet.files.map((file) => file.path)).toEqual(['docs/adr/0003-c.md'])
+    expect(plan.warnings).toEqual([expect.stringContaining('0001-a names its successor')])
+  })
+
+  it('does not touch a value it cannot replace where it stands, and says which file has it', async () => {
+    const [fs, log] = await open(
+      inLog({
+        '0001-a': madr('status: |', '  superseded by', 'nav_order: 1'),
+        '0002-b': madr('status: superseded by ADR-0003'),
+        '0003-c': madr('status: accepted', 'supersedes: { a: b }'),
+        '0004-d': madr('status: accepted', 'deciders: D')
+      })
+    )
+    const plan = await planMigration(fs, log)
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.changeSet.files.map((file) => file.path)).toEqual(['docs/adr/0004-d.md'])
+    expect(plan.warnings).toEqual([
+      expect.stringMatching(/^0001-a cannot be migrated: "status" is written as a block/),
+      expect.stringMatching(/^0002-b cannot be migrated: "supersedes" is not a list/)
+    ])
+    await applyChangeSet(fs, plan.changeSet)
+    expect((await reopened(fs)).problems).toEqual(log.problems)
+  })
+
+  it('does not make a Problem of deciders that are nobody’s business', async () => {
+    const [fs, log] = await open(inLog({ '0001-a': madr('deciders: [A, { b: c }]') }))
+    expect(log.adrs[0]!.foreign).toBeUndefined()
+    expect(log.problems).toEqual([])
+    expect(await planMigration(fs, log)).toMatchObject({ ok: false })
+  })
+
+  it('does not take the end of a line of text with the blank lines it removes', async () => {
+    const text = '# 1. A\r\n\r\nText.  \r\n  \r\n\r\n## Status\r\n\r\nAccepted\r\n'
+    const [fs, log] = await open(inLog({ '0001-a': text }))
+    const plan = await planMigration(fs, log, '0001-a')
+    expect(plan.ok && plan.changeSet.files[0]!.after).toBe(
+      '---\r\nstatus: accepted\r\n---\r\n\r\n# 1. A\r\n\r\nText.  \r\n'
+    )
+  })
+
+  it('does not leave a blank line behind as the whole text of a file', async () => {
+    const [fs, log] = await open(inLog({ '0001-a': '## Status\n\nAccepted\n' }))
+    const plan = await planMigration(fs, log, '0001-a')
+    expect(plan.ok && plan.changeSet.files[0]!.after).toBe('---\nstatus: accepted\n---\n')
+  })
+
+  it('does not take one of two Status sections out', async () => {
+    const text = '# 1. A\n\n## Status\n\nAccepted\n\n## Context\n\n## Status\n\nRejected\n'
+    const [fs, log] = await open(inLog({ '0001-a': text }))
+    const plan = await planMigration(fs, log, '0001-a')
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.warnings).toEqual([expect.stringContaining('a second Status section')])
+    expect(plan.changeSet.files[0]!.after).toBe(`---\nstatus: accepted\n---\n\n${text}`)
+  })
+
+  it('names the first line that keeps a Status section, not the first kind of line', async () => {
+    const [fs, log] = await open(
+      inLog({
+        '0001-a': '# 1. A\n\n## Status\n\nClarifies [2. B](0002-b.md)\n\nDraft\n',
+        '0002-b': '# B\n'
+      })
+    )
+    const plan = await planMigration(fs, log, '0001-a')
+    expect(plan.ok && plan.warnings).toEqual([expect.stringContaining('"Clarifies [2. B]')])
+  })
+
+  it('does not speak of a foreign format where the frontmatter cannot be read', async () => {
+    const [fs, log] = await open(inLog({ '0001-a': '---\nstatus: [x\n---\n\n## Status\n' }))
+    expect(await planMigration(fs, log, '0001-a')).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('cannot be read')
+    })
+  })
+
+  it('costs no more than the size of the log', async () => {
+    const links = Array.from(
+      { length: 3000 },
+      (_, n) => `Amends [${n}. X](${String(n + 2).padStart(4, '0')}-x.md)`
+    )
+    const chain = Object.fromEntries(
+      Array.from({ length: 2000 }, (_, n) => [
+        `${String(n + 2000).padStart(4, '0')}-m`,
+        madr(`status: superseded by ADR-${n + 2001}`)
+      ])
+    )
+    const [fs, log] = await open(
+      inLog({
+        '0001-a': ['# 1. A', '', '## Status', '', 'Accepted', '', ...links, ''].join('\n'),
+        ...chain,
+        '4000-m': '# End\n\n* Status: accepted\n'
+      })
+    )
+    const started = performance.now()
+    const plan = await planMigration(fs, log)
+    expect(plan.ok && plan.changeSet.files).toHaveLength(1)
+    expect(plan.ok && plan.warnings).toHaveLength(2001)
+    expect(performance.now() - started).toBeLessThan(5000)
+  }, 30_000)
 })

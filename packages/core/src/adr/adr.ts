@@ -1,5 +1,5 @@
 import { readAdrTools } from '../foreign/adr-tools'
-import { readMadr, type ByNumber } from '../foreign/madr'
+import { namesSuccessor, readMadr, type ByNumber } from '../foreign/madr'
 import { numberOf, type AdrFileName, type NamingScheme } from '../log/naming'
 import { readMetadata, type Metadata } from '../metadata/read'
 import type { Problem } from '../problems/problem'
@@ -35,6 +35,11 @@ export interface Adr {
    */
   readonly foreign?: ForeignFormat
   /**
+   * Why this foreign ADR has no Migration, as the rest of a sentence that begins with its ID.
+   * It stays read-only until a person has changed the file by hand.
+   */
+  readonly noMigration?: string
+  /**
    * The ADRs this one supersedes because their files say so and its own does not: MADR
    * records a supersession on the superseded ADR only. Not part of the Metadata, which is
    * what the file says; Migration of those ADRs writes it there.
@@ -43,6 +48,13 @@ export interface Adr {
   readonly metadata: Metadata
   /** `false` when the tool must not write Metadata into this file until a person has fixed it. */
   readonly metadataWritable: boolean
+}
+
+const NO_MIGRATION = {
+  listed:
+    "keeps its Status in the list under its title, as MADR 2 does, and there is no Migration for that yet. Give it a `status` key in a frontmatter by hand, and it is one of the tool's own.",
+  successorInText:
+    'names its successor in its Status text, where adr-tools writes a link. As a `status` that would be read the way MADR means it, and say something else than it says now. Make it a link line by hand — Superseded by [2. Title](0002-title.md) — and it can be migrated.'
 }
 
 export function readAdr(
@@ -59,6 +71,11 @@ export function readAdr(
   const madr = adrTools || !own.writable ? undefined : readMadr(view, name.id, own, byNumber)
   const foreign: ForeignFormat | undefined = adrTools ? 'adr-tools' : madr ? 'madr' : undefined
   const { metadata, problems } = adrTools ?? madr?.reading ?? own
+  const noMigration = madr?.listed
+    ? NO_MIGRATION.listed
+    : adrTools && metadata.rawStatus !== undefined && namesSuccessor(metadata.rawStatus)
+      ? NO_MIGRATION.successorInText
+      : undefined
   const number = numberOf(name, scheme)
   const body = text.slice(view.bodyStart)
   const title = titleOf(body, number)
@@ -70,6 +87,7 @@ export function readAdr(
     body,
     eol: view.eol,
     ...(foreign && { foreign }),
+    ...(noMigration !== undefined && { noMigration }),
     metadata,
     metadataWritable: own.writable
   }

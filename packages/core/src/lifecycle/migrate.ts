@@ -4,16 +4,13 @@ import { parseAdrTools } from '../foreign/adr-tools'
 import { migrationOfMadr } from '../foreign/madr'
 import type { FileSystem } from '../fs/port'
 import type { DecisionLog } from '../log/load'
-import { addToList, renameKey, setScalar } from '../metadata/write'
+import { MetadataNotWritableError, addToList, renameKey, setScalar } from '../metadata/write'
 import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
 import type { TextEdit } from '../text/edit'
 import { viewSource, type SourceView, type Span } from '../text/source'
-import { Refusal, plan, type Drafts } from './draft'
+import { Drafts, Refusal, plan } from './draft'
 
 const LIST_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
-
-/** Why an ADR cannot be migrated right now; for a whole Decision Log it is left out, with these words. */
-class NotYet extends Error {}
 
 /**
  * Migration (docs/file-format.md, section 8): rewrite one ADR in a foreign format, or every
@@ -25,6 +22,11 @@ export function planMigration(fs: FileSystem, log: DecisionLog, id?: string): Pr
   const planned = plan(fs, async (drafts) => {
     const asked = id === undefined ? undefined : log.adrs.find((adr) => adr.id === id)
     if (id !== undefined && !asked) throw new Refusal(`There is no ADR ${id} in this Decision Log.`)
+    if (asked && !asked.metadataWritable) {
+      throw new Refusal(
+        `The frontmatter of ${asked.id} cannot be read, so nobody can tell which format it is in. Fix it first.`
+      )
+    }
     if (asked && !asked.foreign) {
       throw new Refusal(`${asked.id} is in the tool's own format already.`)
     }
@@ -33,84 +35,91 @@ export function planMigration(fs: FileSystem, log: DecisionLog, id?: string): Pr
       throw new Refusal('There is no ADR in a foreign format in this Decision Log.')
     }
 
+    // MADR names a successor on the superseded ADR only; Migration writes it into both files.
+    const successors = new Map<string, Adr>()
+    for (const successor of log.adrs) {
+      for (const superseded of successor.impliedSupersedes ?? []) {
+        if (superseded !== successor.id) successors.set(superseded, successor)
+      }
+    }
+
     // An ADR and the successor it names go together, or not at all: a Back-reference without
     // the Relation behind it would be a Problem that Migration made.
     const leftOut = new Map<string, string>()
     for (const adr of foreign) {
-      try {
-        await requireMigratable(fs, log, adr, asked === undefined)
-      } catch (error) {
-        if (!(error instanceof NotYet)) throw error
-        if (asked) throw new Refusal(error.message)
-        leftOut.set(adr.id, error.message)
-      }
+      const reason = await whyNot(fs, adr, successors.get(adr.id), asked === undefined)
+      if (reason === undefined) continue
+      if (asked) throw new Refusal(reason)
+      leftOut.set(adr.id, reason)
     }
-    // Leaving one out can leave the one that names it as its successor without it, and so on.
+    // Leaving one out leaves out the one that names it as its successor, and so on.
     for (let settled = false; !settled;) {
       settled = true
       for (const adr of foreign) {
-        const successor = successorOf(log, adr)
+        const successor = successors.get(adr.id)
         if (leftOut.has(adr.id) || !successor || !leftOut.has(successor.id)) continue
         leftOut.set(adr.id, `${adr.id} waits for its successor ${successor.id}.`)
         settled = false
       }
     }
-    warnings.push(...leftOut.values())
 
     const migrated = foreign.filter((adr) => !leftOut.has(adr.id))
-    if (migrated.length === 0)
-      throw new Refusal(['Nothing can be migrated.', ...warnings].join(' '))
+    if (migrated.length === 0) {
+      throw new Refusal(['Nothing can be migrated.', ...leftOut.values()].join(' '))
+    }
+    warnings.push(...leftOut.values())
     for (const adr of migrated) await migrate(drafts, log, adr, warnings)
     // The successors last: by now each of them has the frontmatter its own Migration gave it.
-    for (const adr of migrated) {
-      const successor = successorOf(log, adr)
-      if (successor?.impliedSupersedes?.includes(adr.id)) {
-        await drafts.write(successor.path, (view) => addToList(view, 'supersedes', adr.id))
-      }
-    }
+    for (const adr of migrated) await writeSuccessor(drafts, adr, successors.get(adr.id))
   })
   return planned.then((result) =>
     result.ok && warnings.length > 0 ? { ...result, warnings } : result
   )
 }
 
-/** The ADR that a file of MADR names as its successor, when the log has it. */
-function successorOf(log: DecisionLog, adr: Adr): Adr | undefined {
-  return log.adrs.find(
-    (candidate) => candidate.id !== adr.id && candidate.impliedSupersedes?.includes(adr.id)
-  )
-}
-
-async function requireMigratable(
+/**
+ * Why an ADR cannot be migrated right now, in words that name it; `undefined` when it can.
+ * Asked for a whole Decision Log, such an ADR is left out, with these words.
+ */
+async function whyNot(
   fs: FileSystem,
-  log: DecisionLog,
   adr: Adr,
+  successor: Adr | undefined,
   wholeLog: boolean
-): Promise<void> {
-  const text = await fs.readText(adr.path)
-  if (text === undefined) throw new Refusal(`${adr.path} no longer exists.`)
-  if (adr.foreign === 'madr' && migrationOfMadr(viewSource(text)).listed) {
-    throw new NotYet(
-      `${adr.id} keeps its Status in the list under its title, as MADR 2 does. There is no Migration for that yet; it stays as it is.`
-    )
+): Promise<string | undefined> {
+  if (adr.noMigration !== undefined) return `${adr.id} ${adr.noMigration}`
+  if (successor && !successor.metadataWritable) {
+    return `${adr.id} is superseded by ${successor.id}, whose frontmatter cannot be read. Fix that file first.`
   }
-  const successor = successorOf(log, adr)
-  if (!successor) return
-  if (!successor.metadataWritable) {
-    throw new NotYet(
-      `${adr.id} is superseded by ${successor.id}, whose frontmatter cannot be read. Fix that file first.`
-    )
+  if (successor?.noMigration !== undefined) return undefined // the settling takes care of it
+  if (successor?.foreign && !wholeLog) {
+    return `${adr.id} is superseded by ${successor.id}, which is written in the format of ${FOREIGN_FORMAT_NAMES[successor.foreign]} itself. Migrate ${successor.id} first, or the whole Decision Log.`
   }
-  if (successor.foreign && !wholeLog) {
-    throw new NotYet(
-      `${adr.id} is superseded by ${successor.id}, which is written in the format of ${FOREIGN_FORMAT_NAMES[successor.foreign]} itself. Migrate ${successor.id} first, or the whole Decision Log.`
-    )
+
+  // Try it on its own first: a file the writer cannot write is named, and does not take the
+  // Migration of all the others down with it.
+  try {
+    const trial = new Drafts(fs)
+    await migrate(trial, undefined, adr, [])
+    await writeSuccessor(trial, adr, successor)
+    return undefined
+  } catch (error) {
+    if (error instanceof Refusal || error instanceof MetadataNotWritableError) {
+      return `${adr.id} cannot be migrated: ${error.message}`
+    }
+    throw error
   }
 }
 
+async function writeSuccessor(drafts: Drafts, adr: Adr, successor: Adr | undefined): Promise<void> {
+  if (!successor) return
+  await drafts.write(successor.path, (view) => addToList(view, 'supersedes', adr.id))
+}
+
+/** `log` is left out for a trial, which collects no warnings that anybody reads. */
 async function migrate(
   drafts: Drafts,
-  log: DecisionLog,
+  log: DecisionLog | undefined,
   adr: Adr,
   warnings: string[]
 ): Promise<void> {
@@ -123,11 +132,10 @@ async function migrate(
         warnings.push(
           `The Status section of ${adr.id} stays in its text: the Metadata does not hold "${file.keeps}".`
         )
+        return [emptyFrontmatter(view, view.bodyStart)]
       }
-      return [
-        ...(file.keeps === undefined ? [withoutSection(view, file.section)] : []),
-        emptyFrontmatter(view)
-      ]
+      const removed = withoutSection(view, file.section)
+      return [removed, emptyFrontmatter(view, removed.start === view.bodyStart ? removed.end : 0)]
     })
     // Always a Status, also `accepted`: it is what makes the file one of the tool's own.
     const status = metadata.status ?? metadata.rawStatus ?? 'accepted'
@@ -147,12 +155,12 @@ async function migrate(
 
   const lists = { ...metadata.relations, ...metadata.backReferences }
   for (const key of LIST_KEYS) {
-    for (const item of lists[key]) {
-      await drafts.write(adr.path, (view) => addToList(view, key, item))
+    if (lists[key].length > 0) {
+      await drafts.write(adr.path, (view) => addToList(view, key, lists[key]))
     }
   }
   for (const written of metadata.backReferences['superseded-by']) {
-    if (adr.foreign === 'madr' && !log.adrs.some((other) => other.id === written)) {
+    if (adr.foreign === 'madr' && log && !log.adrs.some((other) => other.id === written)) {
       warnings.push(
         `${adr.id} names "${written}" as its successor, which is no ADR of this Decision Log. It is written as it is, and stays a Problem.`
       )
@@ -160,23 +168,30 @@ async function migrate(
   }
 }
 
-/** The two fence lines of a frontmatter that has no key yet, and a blank line between it and the text. */
-function emptyFrontmatter(view: SourceView): TextEdit {
+/**
+ * The two fence lines of a frontmatter that has no key yet, and a blank line between it and
+ * the text — unless the text begins with one, or there is no text. `textAt` is where the
+ * text begins once the Status section is gone.
+ */
+function emptyFrontmatter(view: SourceView, textAt: number): TextEdit {
   const { text, eol, bodyStart: at } = view
-  const blank = text.startsWith('\n', at) || text.startsWith('\r\n', at)
+  const from = Math.max(textAt, at)
+  const blank = from >= text.length || text.startsWith('\n', from) || text.startsWith('\r\n', from)
   return { start: at, end: at, insert: `---${eol}---${eol}${blank ? '' : eol}` }
 }
 
 /**
  * Take the Status section out, from its heading to the next heading. At the end of the file
- * the blank lines in front of it go as well: the file ends where its text ends.
+ * the blank lines in front of it go as well — whole lines, never the end of a line of text.
  */
 function withoutSection(view: SourceView, section: Span): TextEdit {
-  const { text } = view
+  const { text, bodyStart } = view
   let start = section.start
-  if (section.end === text.length) {
-    while (start > view.bodyStart && ' \t\r\n'.includes(text[start - 1]!)) start--
-    start += text.startsWith('\r\n', start) ? 2 : text[start] === '\n' ? 1 : 0
+  while (section.end === text.length && start > bodyStart) {
+    const before = start < 2 ? -1 : text.lastIndexOf('\n', start - 2)
+    const line = Math.max(before + 1, bodyStart)
+    if (text.slice(line, start).trim() !== '') break
+    start = line
   }
   return { start, end: section.end, insert: '' }
 }

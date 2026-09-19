@@ -28,7 +28,7 @@ export function readMadr(
   adr: string,
   own: Reading,
   byNumber: ByNumber
-): { reading: Reading; successor?: string } | undefined {
+): { reading: Reading; successor?: string; listed: boolean } | undefined {
   const { written, inFrontmatter, listed, deciders } = signsOf(view)
   if (!inFrontmatter && listed === undefined && !deciders) return undefined
 
@@ -65,7 +65,11 @@ export function readMadr(
       problems = [...problems, { kind: 'invalid-metadata', adr, key: 'status', detail } as Problem]
     }
   }
-  return { reading: { metadata, problems }, ...(successor !== undefined && { successor }) }
+  return {
+    reading: { metadata, problems },
+    ...(successor !== undefined && { successor }),
+    listed: listed !== undefined
+  }
 }
 
 /** What makes a file MADR's: each of the things the tool's own format cannot say. */
@@ -101,6 +105,11 @@ function withoutRawStatus(metadata: Metadata): Omit<Metadata, 'rawStatus'> {
   const copy: { -readonly [K in keyof Metadata]: Metadata[K] } = { ...metadata }
   delete copy.rawStatus
   return copy
+}
+
+/** Whether a Status says "superseded by …", the way MADR names a successor in it. */
+export function namesSuccessor(status: string): boolean {
+  return SUPERSEDED_BY.test(status)
 }
 
 /** The number an identifier names: `ADR-0005`, `ADR 5`, `0005`, `5`, `#5`. */
@@ -147,9 +156,11 @@ function frontmatterOf(view: SourceView): Map<string, Key> {
     if (key !== 'status' && key !== 'deciders' && key !== 'decision-makers') continue
     const value = pair.value
     const items = isSeq(value) ? value.items.map((item) => scalarText(item)) : [scalarText(value)]
+    const plain = isSeq(value) ? items.every((item) => item !== undefined) : isScalar(value)
     keys.set(key, {
       text: isScalar(value) ? (scalarText(value) ?? '') : '',
-      items: [...new Set(items.filter((item) => item !== undefined))]
+      // A list with anything but single values in it is somebody's own business: a foreign key.
+      items: plain ? [...new Set(items.filter((item) => item !== undefined))] : []
     })
   }
   return keys
