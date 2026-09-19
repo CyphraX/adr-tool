@@ -5,6 +5,7 @@ export { joinPath, type DirectoryEntry, type FileSystem } from './fs/port'
 export { memoryFileSystem } from './fs/memory'
 
 export { openRepository, type DecisionLog, type Repository } from './log/load'
+export { DEFAULT_LOG_PATHS } from './log/discover'
 export type { NamingScheme } from './log/naming'
 export type { Adr } from './adr/adr'
 export type { Correction, Metadata } from './metadata/read'

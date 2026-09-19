@@ -1,6 +1,82 @@
-import { app, shell, BrowserWindow } from 'electron'
-import { join } from 'path'
+import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
+import { stat } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { CHANNEL, type OpenRepository, type Session } from '../shared/ipc'
+import { Repositories } from './repositories'
+import { readSession, writeSession } from './session-store'
+
+const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
+
+const repositories = new Repositories((repository) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(CHANNEL.repositoryChanged, repository)
+  }
+})
+let activeRoot: string | undefined
+
+const sessionFile = (): string => join(app.getPath('userData'), 'session.json')
+const saveSession = (): Promise<void> =>
+  writeSession(sessionFile(), {
+    roots: repositories.roots,
+    ...(activeRoot !== undefined && { activeRoot })
+  }).catch((error) => console.error(error))
+
+async function isDirectory(path: string): Promise<boolean> {
+  return stat(path).then(
+    (stats) => stats.isDirectory(),
+    () => false
+  )
+}
+
+/** Reopen the repositories of the last run. `ADR_TOOL_REPO` adds one from the command line, for development. */
+async function restoreSession(): Promise<Session> {
+  const stored = await readSession(sessionFile())
+  const fromEnvironment = process.env['ADR_TOOL_REPO']
+  const roots = [...stored.roots, ...(fromEnvironment ? [resolve(fromEnvironment)] : [])]
+
+  const opened: OpenRepository[] = []
+  for (const root of new Set(roots)) {
+    if (await isDirectory(root)) opened.push(await repositories.open(root))
+  }
+  const wanted = fromEnvironment ? resolve(fromEnvironment) : stored.activeRoot
+  const active = opened.find((repository) => repository.root === wanted) ?? opened[0]
+  activeRoot = active?.root
+  return { repositories: opened, ...(active && { activeId: active.id }) }
+}
+
+function registerIpc(): void {
+  ipcMain.handle(CHANNEL.restoreSession, () => restoreSession())
+
+  ipcMain.handle(CHANNEL.openRepository, async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options = { title: 'Open repository', properties: ['openDirectory' as const] }
+    const picked = await (window
+      ? dialog.showOpenDialog(window, options)
+      : dialog.showOpenDialog(options))
+    const root = picked.filePaths[0]
+    if (picked.canceled || root === undefined) return undefined
+    const opened = await repositories.open(root)
+    activeRoot = opened.root
+    await saveSession()
+    return opened
+  })
+
+  ipcMain.handle(CHANNEL.closeRepository, async (_, id: unknown) => {
+    if (typeof id !== 'string') return
+    await repositories.close(id)
+    await saveSession()
+  })
+
+  ipcMain.handle(CHANNEL.setActiveRepository, async (_, id: unknown) => {
+    activeRoot = typeof id === 'string' ? repositories.rootOf(id) : undefined
+    await saveSession()
+  })
+
+  ipcMain.handle(CHANNEL.openExternal, async (_, url: unknown) => {
+    if (typeof url === 'string' && isWebLink(url)) await shell.openExternal(url)
+  })
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -25,10 +101,10 @@ function createWindow(): void {
     mainWindow.show()
   })
 
-  // Links never open inside the app: web links go to the system browser,
-  // everything else is dropped.
+  // Nothing ever opens or navigates inside the app: web links go to the system
+  // browser, everything else is dropped.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+    if (isWebLink(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
   mainWindow.webContents.on('will-navigate', (event) => {
@@ -52,6 +128,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  registerIpc()
   createWindow()
 
   app.on('activate', () => {
@@ -64,4 +141,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('will-quit', () => {
+  void repositories.closeAll()
 })

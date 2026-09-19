@@ -1,24 +1,66 @@
+/*
+ * Two voices. The tool speaks in a quiet, cool sans; the ADR is a document and reads as
+ * one, in a serif on paper. The only loud thing on screen is the Status.
+ */
 :root {
   color-scheme: light dark;
-  --bg: #ffffff;
-  --text: #1c1d21;
-  --text-muted: #6b6f7b;
 
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+  --paper: #fcfcfd;
+  --panel: #eef1f5;
+  --panel-raised: #f7f8fa;
+  --line: #dde2ea;
+  --line-strong: #c5ccd8;
+
+  --ink: #1c2230;
+  --ink-soft: #566075;
+  --ink-faint: #8891a3;
+
+  --selected: #dbe4f3;
+  --hover: #e6eaf1;
+  --focus: #3d5a80;
+
+  --proposed: #a2650f;
+  --accepted: #25764a;
+  --rejected: #b0382f;
+  --deprecated: #787063;
+  --superseded: #586789;
+  --unknown: #6b7385;
+  --problem: #b0382f;
+
+  --ui: 'IBM Plex Sans', system-ui, sans-serif;
+  --document: 'IBM Plex Serif', Georgia, serif;
+  --code: 'IBM Plex Mono', ui-monospace, monospace;
+
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1c20;
-    --text: #e6e7eb;
-    --text-muted: #9397a3;
+    --paper: #181a20;
+    --panel: #1f222a;
+    --panel-raised: #1b1e25;
+    --line: #2c313c;
+    --line-strong: #3b4251;
+
+    --ink: #e4e7ee;
+    --ink-soft: #a5aec0;
+    --ink-faint: #737d91;
+
+    --selected: #2a3754;
+    --hover: #262a34;
+    --focus: #8fb0e0;
+
+    --proposed: #e2aa4f;
+    --accepted: #62c088;
+    --rejected: #f08378;
+    --deprecated: #a9a194;
+    --superseded: #96a7cb;
+    --unknown: #98a1b3;
+    --problem: #f08378;
   }
 }
 
@@ -36,6 +78,35 @@ body,
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--panel);
+  color: var(--ink);
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 2px solid transparent;
+  border-radius: 5px;
+  background-clip: content-box;
 }

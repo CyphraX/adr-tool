@@ -89,6 +89,8 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 *Done when:* the app shows this repository's three ADRs, and editing one of them in another editor updates the view.
 
+*Status (2026-09-19):* built. Both parts of the done-when were checked in the running app over its debugging port: the list shows this repository's three ADRs, and a title edited on disk — and reverted with git — reaches the list within two seconds while the selection stays. The renderer never names a path; it refers to a repository by an id the main process hands out. Known gaps: images with relative paths in an ADR do not load, because the renderer has no file access; panes cannot be resized yet.
+
 ### M3 — Write path
 
 - `core`: new ADR from a Template; Accept, Reject, Deprecate; Amend and Supersede with their effect at acceptance; Correction with its record in the Metadata; Renumber. Built-in Templates: Minimal, Nygard, MADR.
@@ -100,6 +102,8 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 ### M4 — Finding and seeing
 
 Relations graph (supersede chains, amendments, dependencies), full-text search with quick jump, Problems view with repair actions, git read-only: history, author, date and diff per ADR, uncommitted-changes indicator, current branch. A folder without git still opens, without history.
+
+The wording of Problems lives in the app for now (`lib/wording.ts`). It moves into `core` when `adr lint` arrives, so that the app and the CLI say the same thing.
 
 One broken file must not drown the view: when an ADR's frontmatter cannot be read, the consistency Problems it causes on other ADRs (an unfounded Back-reference, say) are shown under that root cause rather than as separate Problems.
 

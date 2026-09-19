@@ -26,9 +26,9 @@ describe('a Decision Log', () => {
       })
     )
     const [only] = repository.logs
-    expect(only!.adrs.map((adr) => [adr.id, adr.number, adr.title, adr.path])).toEqual([
-      ['0001-a', 1, 'A', 'docs/adr/0001-a.md'],
-      ['0002-b', 2, 'B', 'docs/adr/0002-b.md']
+    expect(only!.adrs.map((adr) => [adr.id, adr.number, adr.title, adr.path, adr.body])).toEqual([
+      ['0001-a', 1, 'A', 'docs/adr/0001-a.md', '# A\n'],
+      ['0002-b', 2, 'B', 'docs/adr/0002-b.md', '# B\n']
     ])
     expect(only!.problems).toEqual([])
   })
