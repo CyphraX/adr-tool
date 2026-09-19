@@ -173,6 +173,8 @@ class AppState {
   creating = $state<Creating | undefined>(undefined)
   editingMetadata = $state<EditingMetadata | undefined>(undefined)
   history = $state<History | undefined>(undefined)
+  /** The search palette, while it is open. */
+  searching = $state<{ query: string } | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -275,6 +277,34 @@ class AppState {
     this.leaveEditor(() => {
       if (this.active) this.active.selectedId = id
     })
+  }
+
+  startSearching(): void {
+    if (this.active) this.searching = { query: '' }
+  }
+
+  stopSearching(): void {
+    this.searching = undefined
+  }
+
+  /** Go to an ADR of any Decision Log of the repository in front, from wherever the view is. */
+  jumpTo(logPath: string, id: string): void {
+    this.searching = undefined
+    const arrive = (): void => {
+      const tab = this.active
+      if (!tab) return
+      tab.logPath = logPath
+      tab.selectedId = id
+      // The list of ADRs shows where the jump went — unless a filter hides the ADR.
+      tab.view = 'adrs'
+      const adr = this.log?.adrs.find((candidate) => candidate.id === id)
+      if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
+        tab.statusFilter = 'all'
+      }
+    }
+    // The ADR that is open already stays open, editor and all; only the list follows.
+    if (logPath === this.log?.path && id === this.active?.selectedId) arrive()
+    else this.leaveEditor(arrive)
   }
 
   /** Select an ADR of the log in view by its file name, as a link inside an ADR names it. */

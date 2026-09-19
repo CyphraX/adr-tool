@@ -7,6 +7,7 @@
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
   import ProblemsList from './components/ProblemsList.svelte'
+  import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import { app } from './lib/state.svelte'
@@ -15,7 +16,21 @@
   onMount(() => void app.start())
 
   const repository = $derived(app.active?.repository.repository)
+
+  // Ctrl+K, or Cmd+K on a Mac: search from anywhere — but not over another dialog. Exactly
+  // that chord: on a Mac Ctrl+K deletes to the end of the line in the editor, and with
+  // Shift it deletes the line everywhere. AltGr is Ctrl+Alt on Windows.
+  function onkeydown(event: KeyboardEvent): void {
+    const mac = window.api.platform === 'darwin'
+    const chord = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
+    if (event.key.toLowerCase() !== 'k' || !chord || event.altKey || event.shiftKey) return
+    if (event.defaultPrevented || document.querySelector('dialog[open]')) return
+    event.preventDefault()
+    app.startSearching()
+  }
 </script>
+
+<svelte:window {onkeydown} />
 
 {#if app.ready}
   <div class="window">
@@ -70,6 +85,7 @@
   <NewAdrDialog />
   <MetadataDialog />
   <HistoryDialog />
+  <SearchPalette />
   <ChangeDialog />
 {/if}
 
