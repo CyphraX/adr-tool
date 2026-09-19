@@ -117,6 +117,10 @@ One broken file must not drown the view: when an ADR's frontmatter cannot be rea
 
 *Done when:* a Correction's diff can be opened from its marker, and a deliberately broken fixture repository can be repaired entirely from the Problems view.
 
+*Status (2026-09-19):* in progress, in five parts: the Problems view, its repairs, git read-only, search, the Relations graph.
+
+Part 1: the Problems view. The sidebar counts the Problems of the Decision Log in view; the view lists each one with the ADRs it is reported on, and the one repair that exists so far — Renumber — sits next to the ADR it would move. Root causes are `core`'s business (`groupProblems`): an ADR whose frontmatter cannot be read is read as if it had none, so a missing or unfounded Back-reference, a `superseded` Status without a successor or one that is not set, reported between it and another ADR, is shown under the unreadable file and not counted. The other ADR's detail still shows such a Problem, and says which file it follows from. A duplicate number is never a consequence: the file name carries the number.
+
 ### M5 — Foreign formats
 
 Tolerant readers for MADR 3/4 and adr-tools, driven by fixtures built from [the format survey](research/adr-format-survey.md): three Status locations, four spellings of "superseded by", unknown Status values shown verbatim, a missing Status read as `accepted`. Migration per file or per Decision Log, always as a previewed change set.

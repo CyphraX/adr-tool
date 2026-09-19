@@ -1,8 +1,8 @@
 import {
   RELATION_TYPES,
+  groupProblems,
   type Adr,
   type DecisionLog,
-  type Problem,
   type RelationType,
   type Status,
   type TemplateInfo
@@ -13,9 +13,13 @@ import { prefixOf } from './wording'
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
 
+/** What the middle pane lists: the ADRs of the log in view, or its Problems. */
+export type ListView = 'adrs' | 'problems'
+
 interface Tab {
   repository: OpenRepository
   logPath: string | undefined
+  view: ListView
   statusFilter: StatusFilter
   selectedId: string | undefined
 }
@@ -166,6 +170,9 @@ class AppState {
 
   readonly selected = $derived(this.log?.adrs.find((adr) => adr.id === this.active?.selectedId))
 
+  /** The Problems of the log in view: each root cause once, with what follows from it. */
+  readonly problemGroups = $derived(this.log ? groupProblems(this.log) : [])
+
   /** Whether the editor holds text that is not on disk. */
   readonly dirty = $derived(
     this.editing !== undefined && this.editing.text !== withLf(this.editing.base)
@@ -229,8 +236,15 @@ class AppState {
     })
   }
 
+  /** Filtering is about ADRs: it leads back to their list. */
   filterBy(filter: StatusFilter): void {
-    if (this.active) this.active.statusFilter = filter
+    if (!this.active) return
+    this.active.statusFilter = filter
+    this.active.view = 'adrs'
+  }
+
+  show(view: ListView): void {
+    if (this.active) this.active.view = view
   }
 
   select(id: string): void {
@@ -264,9 +278,10 @@ class AppState {
         }
   }
 
-  /** Ask to give the selected ADR, which shares its number, the next number of the log. */
-  async renumber(): Promise<void> {
-    const [tab, log, adr] = [this.active, this.log, this.selected]
+  /** Ask to give an ADR that shares its number — the selected one, unless named — the next number of the log. */
+  async renumber(id = this.selected?.id): Promise<void> {
+    const [tab, log] = [this.active, this.log]
+    const adr = log?.adrs.find((candidate) => candidate.id === id)
     if (!tab || !log || !adr) return
     const plan = await window.api.planRenumber(tab.repository.id, log.path, adr.id)
     this.review = plan.ok
@@ -565,19 +580,17 @@ function rebase(now: string[], was: string[], onDisk: string[]): string[] {
 }
 
 function newTab(repository: OpenRepository): Tab {
-  return { repository, logPath: undefined, statusFilter: 'all', selectedId: undefined }
+  return {
+    repository,
+    logPath: undefined,
+    view: 'adrs',
+    statusFilter: 'all',
+    selectedId: undefined
+  }
 }
 
 export function statusKey(adr: Adr): Status | 'unknown' {
   return adr.metadata.status ?? 'unknown'
-}
-
-/** The Problems that name this ADR, whichever role it plays in them. */
-export function problemsOf(log: DecisionLog, id: string): Problem[] {
-  return log.problems.filter(
-    (problem) =>
-      ('adr' in problem && problem.adr === id) || ('adrs' in problem && problem.adrs.includes(id))
-  )
 }
 
 export const app = new AppState()
