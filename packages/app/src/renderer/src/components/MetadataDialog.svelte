@@ -39,6 +39,8 @@
     return adrs.filter((candidate) => {
       if (candidate.id === editing?.adrId || chosen.includes(candidate.id)) return false
       const status = statusKey(candidate)
+      // Accepting such a Relation writes to its target, and a foreign file is never written.
+      if ((type === 'supersedes' || type === 'amends') && candidate.foreign) return false
       if (type === 'supersedes') return status === 'accepted' || status === 'deprecated'
       if (type === 'amends') return status === 'accepted'
       return true

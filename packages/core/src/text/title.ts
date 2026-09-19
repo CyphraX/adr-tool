@@ -9,7 +9,7 @@ import { headingOf, proseLines } from './prose'
  */
 export function titleOf(body: string, number?: number): string | undefined {
   for (const line of proseLines(body)) {
-    const heading = headingOf(line.content)
+    const heading = headingOf(line)
     if (heading?.level !== 1 || !heading.text) continue
     const numbered = /^(\d+)\.[ \t]+(.+)$/.exec(heading.text)
     return numbered && Number(numbered[1]) === number ? numbered[2]! : heading.text

@@ -2,24 +2,24 @@ import { isCalendarDate, type Metadata, type MetadataReading } from '../metadata
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import type { RelationType } from '../relation'
 import { STATUSES, isStatus, type Status } from '../status'
+import { headingOf, proseLines } from '../text/prose'
 import type { SourceView } from '../text/source'
-import { headingOf, proseLines, type ProseLine } from '../text/prose'
 
-/** `<words> [<label>](<target>)` and nothing else: how adr-tools writes a link to another ADR. */
-const LINK_LINE = /^([^[\]]+?)[ \t]*\[.*\]\([ \t]*([^()\s]+)[ \t]*\)[ \t]*$/
 /** A bare file name in the same directory. A path, a URL or an anchor names no ADR. */
 const ADR_FILE = /^(?:\.\/)?([^/\\#?:]+)\.md$/
 const DATE_LINE = /^Date:[ \t]*(\S+)[ \t]*$/
 
+type ListKey = RelationType | BackReferenceKey
+
 /** What the words of a link line mean; adr-tools itself spells both directions with a "c". */
-const LINK_WORDS: Record<string, RelationType | BackReferenceKey> = {
-  supersedes: 'supersedes',
-  supercedes: 'supersedes',
-  'superseded by': 'superseded-by',
-  'superceded by': 'superseded-by',
-  amends: 'amends',
-  'amended by': 'amended-by'
-}
+const LINK_WORDS = new Map<string, ListKey>([
+  ['supersedes', 'supersedes'],
+  ['supercedes', 'supersedes'],
+  ['superseded by', 'superseded-by'],
+  ['superceded by', 'superseded-by'],
+  ['amends', 'amends'],
+  ['amended by', 'amended-by']
+])
 
 /**
  * Read a file the way adr-tools wrote it (docs/file-format.md, section 8): no frontmatter,
@@ -27,6 +27,7 @@ const LINK_WORDS: Record<string, RelationType | BackReferenceKey> = {
  * on a `Date:` line. `undefined` when the file is not one of adr-tools'.
  *
  * `defaults` is the Metadata of a file that says nothing; what is read here is laid over it.
+ * Like every reader it never throws, whatever the file says.
  */
 export function readAdrTools(
   view: SourceView,
@@ -35,37 +36,32 @@ export function readAdrTools(
 ): Pick<MetadataReading, 'metadata' | 'problems'> | undefined {
   if (view.frontmatter || view.unterminatedFrontmatter) return undefined
   const lines = proseLines(view.text, view.bodyStart)
-  const heading = lines.findIndex((line) => isStatusHeading(line))
+  const heading = lines.findIndex(isStatusHeading)
   if (heading === -1) return undefined
 
-  const lists: Record<RelationType | BackReferenceKey, string[]> = {
-    supersedes: [],
-    amends: [],
-    'depends-on': [],
-    'relates-to': [],
-    'superseded-by': [],
-    'amended-by': []
-  }
+  const lists = new Map<ListKey, string[]>()
   const statusText: string[] = []
   for (const line of lines.slice(heading + 1)) {
-    if ((headingOf(line.content)?.level ?? 3) <= 2) break
-    const content = line.content.trim()
+    if (headingOf(line)) break
+    const content = line.trim()
     if (!content) continue
-    const link = LINK_LINE.exec(content)
+    const link = linkLine(content)
     if (!link) {
       statusText.push(content)
       continue
     }
-    const key = LINK_WORDS[link[1]!.replace(/\s+/g, ' ').replace(/ ?:$/, '').toLowerCase()]
-    const target = ADR_FILE.exec(link[2]!)?.[1]
-    if (key && target && !lists[key].includes(target)) lists[key].push(target)
+    const key = LINK_WORDS.get(link.words.replace(/\s+/g, ' ').toLowerCase())
+    const target = ADR_FILE.exec(link.target)?.[1]
+    if (!key || !target) continue
+    const list = lists.get(key) ?? []
+    if (!list.includes(target)) lists.set(key, [...list, target])
   }
 
   const problems: Problem[] = []
   const written = statusText.join(' ')
   let status: Status | undefined = 'accepted'
   let rawStatus: string | undefined
-  if (lists['superseded-by'].length > 0) status = 'superseded'
+  if (lists.has('superseded-by')) status = 'superseded'
   else if (isStatus(written.toLowerCase())) status = written.toLowerCase() as Status
   else if (written) {
     status = undefined
@@ -82,30 +78,48 @@ export function readAdrTools(
       ...(rawStatus !== undefined && { rawStatus }),
       ...(created !== undefined && { created }),
       relations: {
-        supersedes: lists.supersedes,
-        amends: lists.amends,
-        'depends-on': [],
-        'relates-to': []
+        ...defaults.relations,
+        supersedes: lists.get('supersedes') ?? [],
+        amends: lists.get('amends') ?? []
       },
       backReferences: {
-        'superseded-by': lists['superseded-by'],
-        'amended-by': lists['amended-by']
+        'superseded-by': lists.get('superseded-by') ?? [],
+        'amended-by': lists.get('amended-by') ?? []
       }
     },
     problems
   }
 }
 
-function isStatusHeading(line: ProseLine): boolean {
-  const heading = headingOf(line.content)
+function isStatusHeading(line: string): boolean {
+  const heading = headingOf(line)
   return heading?.level === 2 && heading.text.toLowerCase() === 'status'
 }
 
-/** `Date: 2016-02-12` on a line of its own before the first level-two heading. */
-function createdOn(lines: readonly ProseLine[]): string | undefined {
+/**
+ * `<words> [<label>](<target>)` and nothing else: how adr-tools writes a link to another
+ * ADR. One link per line; the label may contain brackets. Taken apart by hand, so that a
+ * long line costs no more than its length.
+ */
+function linkLine(content: string): { words: string; target: string } | undefined {
+  const open = content.indexOf('[')
+  const close = content.lastIndexOf('](')
+  if (open <= 0 || close < open || !content.endsWith(')')) return undefined
+  let words = content.slice(0, open).trimEnd()
+  if (words.endsWith(':')) words = words.slice(0, -1).trimEnd()
+  const label = content.slice(open + 1, close)
+  const target = content.slice(close + 2, -1).trim()
+  if (!words || words.includes(']') || label.includes('](') || /[\s()]/.test(target)) {
+    return undefined
+  }
+  return { words, target }
+}
+
+/** The first `Date: 2016-02-12` on a line of its own before the first level-two heading. */
+function createdOn(lines: readonly string[]): string | undefined {
   for (const line of lines) {
-    if (headingOf(line.content)?.level === 2) return undefined
-    const date = DATE_LINE.exec(line.content)?.[1]
+    if (headingOf(line)?.level === 2) return undefined
+    const date = DATE_LINE.exec(line)?.[1]
     if (date !== undefined) return isCalendarDate(date) ? date : undefined
   }
   return undefined

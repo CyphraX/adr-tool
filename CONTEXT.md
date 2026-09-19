@@ -78,6 +78,10 @@ _Avoid_: Fix, quick fix, auto-fix
 To give an ADR a new number after two ADRs in one Decision Log ended up with the same one, renaming its file and rewriting every Relation and Back-reference that points to it.
 _Avoid_: Rename, re-index
 
+**Foreign format**:
+A way of writing ADR files that the tool reads and never writes: adr-tools' (Nygard's template, the Status in a `## Status` section) and MADR's. An ADR in a foreign format is shown like any other; the only operation that writes to its file is Migration. Not to be confused with a foreign key, which is a frontmatter key of someone else's in a file of the tool's own format.
+_Avoid_: Legacy format, external format
+
 **Migration**:
 The one-time conversion of an ADR from a foreign format (adr-tools/Nygard, MADR) into the tool's own format, offered the first time the tool is asked to modify that ADR.
 _Avoid_: Import, conversion, upgrade
