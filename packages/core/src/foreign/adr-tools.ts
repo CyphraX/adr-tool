@@ -4,9 +4,8 @@ import type { RelationType } from '../relation'
 import { STATUSES, isStatus, type Status } from '../status'
 import { headingOf, proseLines } from '../text/prose'
 import type { SourceView } from '../text/source'
+import { linkLine, targetOf } from './links'
 
-/** A bare file name in the same directory. A path, a URL or an anchor names no ADR. */
-const ADR_FILE = /^(?:\.\/)?([^/\\#?:]+)\.md$/
 const DATE_LINE = /^Date:[ \t]*(\S+)[ \t]*$/
 
 type ListKey = RelationType | BackReferenceKey
@@ -51,7 +50,7 @@ export function readAdrTools(
       continue
     }
     const key = LINK_WORDS.get(link.words.replace(/\s+/g, ' ').toLowerCase())
-    const target = ADR_FILE.exec(link.target)?.[1]
+    const target = targetOf(link.target)
     if (!key || !target) continue
     const list = lists.get(key) ?? []
     if (!list.includes(target)) lists.set(key, [...list, target])
@@ -94,25 +93,6 @@ export function readAdrTools(
 function isStatusHeading(line: string): boolean {
   const heading = headingOf(line)
   return heading?.level === 2 && heading.text.toLowerCase() === 'status'
-}
-
-/**
- * `<words> [<label>](<target>)` and nothing else: how adr-tools writes a link to another
- * ADR. One link per line; the label may contain brackets. Taken apart by hand, so that a
- * long line costs no more than its length.
- */
-function linkLine(content: string): { words: string; target: string } | undefined {
-  const open = content.indexOf('[')
-  const close = content.lastIndexOf('](')
-  if (open <= 0 || close < open || !content.endsWith(')')) return undefined
-  let words = content.slice(0, open).trimEnd()
-  if (words.endsWith(':')) words = words.slice(0, -1).trimEnd()
-  const label = content.slice(open + 1, close)
-  const target = content.slice(close + 2, -1).trim()
-  if (!words || words.includes(']') || label.includes('](') || /[\s()]/.test(target)) {
-    return undefined
-  }
-  return { words, target }
 }
 
 /** The first `Date: 2016-02-12` on a line of its own before the first level-two heading. */
