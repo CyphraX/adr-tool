@@ -16,6 +16,7 @@ const api: Api = {
   planBodyEdit: (request) => ipcRenderer.invoke(CHANNEL.planBodyEdit, request),
   planMetadataEdit: (request) => ipcRenderer.invoke(CHANNEL.planMetadataEdit, request),
   planRepair: (request) => ipcRenderer.invoke(CHANNEL.planRepair, request),
+  planMigration: (request) => ipcRenderer.invoke(CHANNEL.planMigration, request),
   history: (repositoryId, logPath, adrId) =>
     ipcRenderer.invoke(CHANNEL.history, repositoryId, logPath, adrId),
   historyChange: (repositoryId, logPath, adrId, entryId) =>

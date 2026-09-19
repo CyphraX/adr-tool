@@ -1,5 +1,5 @@
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
-import type { MetadataEditRequest, RepairRequest } from '../shared/ipc'
+import type { MetadataEditRequest, MigrationRequest, RepairRequest } from '../shared/ipc'
 
 /**
  * What the renderer sends is untrusted until it has been looked at: the renderer shows ADRs
@@ -37,6 +37,14 @@ export function repairRequest(request: unknown): RepairRequest | undefined {
     return undefined
   }
   return { repositoryId: given['repositoryId'], logPath: given['logPath'], repair }
+}
+
+/** Which ADR, or none for the whole Decision Log. Whether there is anything to migrate is `core`'s question. */
+export function migrationRequest(request: unknown): MigrationRequest | undefined {
+  const { repositoryId, logPath, adrId } = record(request)
+  if (typeof repositoryId !== 'string' || typeof logPath !== 'string') return undefined
+  if (adrId !== undefined && typeof adrId !== 'string') return undefined
+  return { repositoryId, logPath, ...(adrId !== undefined && { adrId }) }
 }
 
 function repairOf(given: Record<string, unknown>): Repair | undefined {

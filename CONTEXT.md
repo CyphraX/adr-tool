@@ -83,5 +83,5 @@ A way of writing ADR files that the tool reads and never writes: adr-tools' (Nyg
 _Avoid_: Legacy format, external format
 
 **Migration**:
-The one-time conversion of an ADR from a foreign format (adr-tools/Nygard, MADR) into the tool's own format, offered the first time the tool is asked to modify that ADR.
+The one-time conversion of an ADR from a foreign format (adr-tools/Nygard, MADR) into the tool's own format, offered for every ADR in a foreign format and for a whole Decision Log, and previewed like every other operation. It writes what the tool read, nothing it guessed.
 _Avoid_: Import, conversion, upgrade

@@ -23,7 +23,7 @@ export function writable(log: DecisionLog, id: string, because?: string): Adr {
 }
 
 /** The tool reads a foreign format and never writes it (docs/file-format.md, section 8). */
-export function requireOwnFormat(adr: Adr, and = ''): void {
+export function requireOwnFormat(adr: Adr, and = ' Migrate it first.'): void {
   if (!adr.foreign) return
   throw new Refusal(
     `${adr.id} is written in the format of ${FOREIGN_FORMAT_NAMES[adr.foreign]}. The tool reads that format and never writes it.${and}`

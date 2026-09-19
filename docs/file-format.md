@@ -66,6 +66,8 @@ No key is required. A file with no Metadata at all is an `accepted` ADR with no 
 | `amended-by`      | list of IDs — a Back-reference               | Accept of the amending ADR          |
 | `corrections`     | list of `{ date, author, note }`; `date` is required, `author` and `note` are optional | Correction |
 
+Migration (section 8) writes `status`, `created`, `decision-makers` and the six keys that hold IDs, with the values it read from the foreign format.
+
 Rules:
 
 - **Absent means default.** A missing `status` is `accepted` — in a file that does not keep its Status in its text (section 8). A missing list is empty. The tool removes a key rather than leaving an empty list behind.
@@ -79,7 +81,7 @@ Rules:
 
 ## 4. Body
 
-- The body is the author's. The tool changes it in exactly one situation: Migration of a foreign ADR may remove a `## Status` section whose content was captured completely in the Metadata, and shows the diff first.
+- The body is the author's. The tool changes it in exactly one situation: Migration of a foreign ADR may remove a `## Status` section whose content was captured completely in the Metadata, and shows the diff first (section 8, "Migration").
 - The **title** is the text of the first level-one ATX heading (`# …`) in the body that is not inside a code block. An ADR without one is shown under its ID. A leading number that repeats the ADR's own (`# 3. Title` in `0003-….md`, as adr-tools writes it) is not part of the title; the heading itself stays as it is. The price: a title that really begins with the ADR's own number and a dot — "3. Normalform reicht aus" in `0003-….md` — is shown without it. That takes a coincidence, nothing is written, and the text below the header still shows the heading in full.
 - A new ADR gets its body from a Template (section 7).
 
@@ -96,9 +98,10 @@ Rules:
 | Correction | the author's edit of the body, plus one entry appended to `corrections` | nothing |
 | Edit Metadata | items added to or removed from `decision-makers`, `tags`, `depends-on`, `relates-to` — and, while the ADR is `proposed`, `supersedes` and `amends` | nothing |
 | Renumber   | the file is renamed; its bytes do not change        | every Relation and Back-reference that names the old ID names the new one |
+| Migration  | the Metadata as it was read from the foreign format; a `## Status` section that the Metadata holds completely is taken out (section 8) | the successor of a superseded MADR ADR: this ID added to `supersedes` |
 
 - Supersede may target an ADR that is `accepted` or `deprecated`; Amend only one that is `accepted`.
-- `supersedes` and `amends` are fixed once an ADR is no longer `proposed`: they took effect when it was accepted, or never will. `decision-makers`, `tags`, `depends-on` and `relates-to` can be edited at any Status. Such an edit is not a Correction and leaves no entry in `corrections`: a Correction is about the text of the decision, and these keys are filing, not text. git still shows who changed them.
+- `supersedes` and `amends` are fixed once an ADR is no longer `proposed`: they took effect when it was accepted, or never will. (Migration writes them as the foreign format had them, which changes no Relation: section 8.) `decision-makers`, `tags`, `depends-on` and `relates-to` can be edited at any Status. Such an edit is not a Correction and leaves no entry in `corrections`: a Correction is about the text of the decision, and these keys are filing, not text. git still shows who changed them.
 - An item that is added must be valid — an ID of another ADR in the same Decision Log, and for `supersedes` and `amends` one that may be superseded or amended. An item that is already there can be removed wherever the list may be edited, valid or not: that is how a `depends-on` or `relates-to` Relation to an ADR that does not exist is repaired. A broken `supersedes` or `amends` on an ADR that is no longer `proposed` is not edited here; it is a Problem, and repairing it belongs to the Problems view.
 - A Relation on an ADR that is `proposed` or `rejected` has no effect on its target. The app may show it as pending; nothing is written.
 - An effect stays when the ADR that caused it is later deprecated or superseded itself.
@@ -184,7 +187,7 @@ A new ADR:
 
 ADRs written by adr-tools and in MADR 3/4 are recognized and read tolerantly — Status in a `## Status` section, in the list under the title or in a `status:` key in other spellings, "superseded by" in its various forms, unknown Status values shown as written. What is known about the formats is in [the survey](research/adr-format-survey.md).
 
-- **The tool never writes these formats.** An ADR in a foreign format is listed, shown, searched and drawn like any other. Every operation that would write to its file — a lifecycle step, a Correction, Edit Metadata, a Repair, a Renumber of an ADR that the file mentions — is refused, and so is one that could only be completed by writing to it: a new ADR, or a Relation of a `proposed` one, that would supersede or amend it. Migration is the one operation that writes to such a file.
+- **The tool never writes these formats.** An ADR in a foreign format is listed, shown, searched and drawn like any other. Every operation that would write to its file — a lifecycle step, a Correction, Edit Metadata, a Repair, a Renumber of an ADR that the file mentions — is refused and points to Migration, and so is one that could only be completed by writing to it: a new ADR, or a Relation of a `proposed` one, that would supersede or amend it. Migration (below) is the one operation that writes to such a file.
 - "Foreign format" is about the file as a whole. It has nothing to do with the foreign keys of section 3, which live in a frontmatter of the tool's own format.
 - **Recognition is conservative.** A file is foreign only when it carries something the format above cannot say — with one sign that is weaker than the others, the list under the title (see MADR below): a file of the tool's own format that has no `status` key and happens to have `* Status: …` in its first list is taken for MADR 2's, and is not written until a person gives it a `status` key. Everything else is an ADR in the tool's own format, whoever wrote it: a MADR file with `status: accepted`, a `date` and Jekyll's `nav_order` is a valid ADR with two foreign keys (section 3), and there is nothing to migrate.
 - **What is read is what Migration writes.** The Metadata the tool shows for a foreign ADR is exactly the Metadata its Migration puts into the frontmatter. Nothing is guessed for display that would not be written — and what cannot be resolved is written as it is read, as the Problem it is, for a person to correct. The one exception is a file that keeps its Status in the list under its title: it is read, and has no Migration before the rest of MADR 2 is read too (after v1).
@@ -243,6 +246,25 @@ A file **without a `status` key in its frontmatter** — or without frontmatter 
 - Only the successor that the `status` names is read this way. A `superseded-by` key in the same file is a Back-reference like any other, and needs a Relation behind it.
 - A number that a file of MADR names and that no ADR has (`superseded by ADR-0042`) is waiting for one. Renumber does not move an ADR onto such a number, and a new ADR that gets it says so in its preview: it will be read as the successor.
 - `adr-template.md` in the directory is no ADR: its name follows no naming scheme (section 1).
+
+### Migration
+
+Migration rewrites an ADR in a foreign format into the format above: once, as a change set that is previewed like every other, for one ADR or for every foreign ADR of a Decision Log. Afterwards the file is one of the tool's own, and everything works on it.
+
+**What is read is what is written.** Migration puts the Metadata the tool shows for the ADR into its frontmatter, with the writer every other operation uses: new keys in the order of section 3, in the file's line ending, existing keys and foreign keys untouched. Reading the migrated log gives the same Status, the same Relations and Back-references and the same Problems as before — a Problem that is a person's to solve is not made to disappear, and none is added.
+
+| Format | Migration writes |
+| ------ | ---------------- |
+| adr-tools | a frontmatter in front of the text, and a blank line after it: `status` — always, also `accepted` —, `created` when the `Date:` line gave one, and `supersedes`, `amends`, `superseded-by`, `amended-by` as the link lines say. The `## Status` section is taken out when the Metadata holds all of it (below) |
+| MADR, `status: superseded by …` | `status: superseded` in the place and the quoting of the old value, and `superseded-by` with the successor — or with the identifier as it is written, when it names no ADR. In the successor's file: this ID added to `supersedes` |
+| MADR, `deciders` | the key is renamed to `decision-makers` where it stands; its value stays as it is written |
+| MADR, the Status in the list under the title | nothing: there is no Migration for such a file before the rest of MADR 2 is read (after v1). Migration of a Decision Log leaves it out and says so; asked for that ADR alone, it is refused |
+
+- A Status the tool does not know is written as it is read (`status: On hold until the partner programme starts`), quoted where YAML asks for it. It was a Problem before and is the same Problem afterwards; leaving it out would make the ADR `accepted` without anybody having said so.
+- **The Status section** of a file of adr-tools is removed — from its heading to the next heading — when every line of it is in the Metadata afterwards: its Status text is empty or, whatever its case, the Status that was read, and every other line is a link line that became a Relation or a Back-reference. Otherwise the whole section stays, and the preview names the first line that keeps it: Status text that a "superseded by" line overruled (`Proposed`), Status text the tool does not know, a link with other words (`Clarifies`), a link that names no ADR. A section that is followed by a heading of level three or deeper stays too: what stands under that heading would change its place in the document. This is the one edit the tool makes in a body on its own (section 4). It is not a Correction and leaves no entry in `corrections`: no sentence of the decision changes.
+- The `Date:` line of adr-tools, the number in its title and everything else in the body stay as they are.
+- **The successor.** MADR's supersession moves to where this format keeps it: `supersedes` of the successor, although that ADR is no longer `proposed` — the Relation is not new. Migration of one ADR therefore writes to two files. When the successor is itself in a foreign format, Migration of the one ADR is refused: the successor, or the whole Decision Log, is migrated first. Migration of a Decision Log migrates both.
+- An ADR whose frontmatter cannot be read is nobody's format, and is not migrated. A Decision Log without any ADR in a foreign format: there is nothing to migrate, and the tool says so.
 
 ## 9. Examples
 
