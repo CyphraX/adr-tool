@@ -28,5 +28,6 @@ export { planEditBody, recordsCorrection, type BodyEdit } from './lifecycle/edit
 export { planCreate, type NewAdr } from './lifecycle/create'
 export { planEditMetadata, type MetadataEdit } from './lifecycle/edit-metadata'
 export { planRenumber } from './lifecycle/renumber'
+export { planRepair, repairsOf, type Repair } from './lifecycle/repair'
 export { nextPrefix } from './log/new-id'
 export { listTemplates, type TemplateInfo, type Templates } from './templates/templates'

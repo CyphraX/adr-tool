@@ -4,7 +4,7 @@ export type BackReferenceKey = 'superseded-by' | 'amended-by'
 
 /**
  * A Problem: an inconsistency in a Decision Log that the tool detects and names
- * (docs/file-format.md, "Consistency"). Detection only; repairs come with the Problems view.
+ * (docs/file-format.md, "Consistency"). What repairs one is in `lifecycle/repair.ts`.
  */
 export type Problem =
   /** The file opens frontmatter with `---` and never closes it. */
