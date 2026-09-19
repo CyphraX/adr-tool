@@ -1,7 +1,7 @@
 <script lang="ts">
   import { STATUSES } from '@adr-tool/core'
   import { app, statusKey, type StatusFilter } from '../lib/state.svelte'
-  import { STATUS_LABEL } from '../lib/wording'
+  import { MIGRATE_LOG_HINT, STATUS_LABEL } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   const logs = $derived(app.active?.repository.repository.logs ?? [])
@@ -17,6 +17,9 @@
     }
     return result
   })
+
+  // The ADRs of the log in view that are read and never written, until they are migrated.
+  const foreign = $derived((app.log?.adrs ?? []).filter((adr) => adr.foreign).length)
 
   // An ADR whose Status cannot be read is rare; its filter only appears when there is one.
   const filters = $derived<StatusFilter[]>([
@@ -88,6 +91,13 @@
         {app.problemGroups.length}
       </span>
     </button>
+    {#if foreign > 0}
+      <!-- Every ADR the tool reads and does not write, in one change to look at. -->
+      <button class="row" onclick={() => app.migrate('log')} title={MIGRATE_LOG_HINT}>
+        <span class="label all">Migrate</span>
+        <span class="count">{foreign}</span>
+      </button>
+    {/if}
   </section>
 
   {#if git}

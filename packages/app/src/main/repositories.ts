@@ -12,6 +12,7 @@ import {
   planEditBody,
   planEditMetadata,
   planReject,
+  planMigration,
   planRepair,
   type ChangeSet,
   type DecisionLog,
@@ -28,6 +29,7 @@ import type {
   MetadataEditRequest,
   OpenRepository,
   PlanResult,
+  MigrationRequest,
   RepairRequest
 } from '../shared/ipc'
 import { gitIn } from './git'
@@ -140,6 +142,13 @@ export class Repositories {
   async planRepair(request: RepairRequest): Promise<PlanResult> {
     return this.plan(request.repositoryId, request.logPath, (fs, log) =>
       planRepair(fs, log, request.repair)
+    )
+  }
+
+  /** Plan the Migration of one foreign ADR, or of every foreign ADR of the log. */
+  async planMigration(request: MigrationRequest): Promise<PlanResult> {
+    return this.plan(request.repositoryId, request.logPath, (fs, log) =>
+      planMigration(fs, log, request.adrId)
     )
   }
 
