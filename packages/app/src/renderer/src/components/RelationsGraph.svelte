@@ -1,6 +1,7 @@
 <script lang="ts">
   import { RELATION_TYPES, type DecisionLog } from '@adr-tool/core'
-  import { NODE, layoutGraph, type GraphEdge } from '../lib/graph-layout'
+  import { NODE, SAME_LAYER_REACH, layoutGraph, type GraphEdge } from '../lib/graph-layout'
+  import { problemsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
   import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
@@ -17,6 +18,8 @@
     )
   )
   const adrOf = $derived(new Map(log.adrs.map((adr) => [adr.id, adr])))
+  // The keyboard goes through the drawing as the eye does: column by column, top to bottom.
+  const nodes = $derived(layout.nodes.toSorted((a, b) => a.layer - b.layer || a.y - b.y))
   const selectedId = $derived(app.selected?.id)
 
   // Wherever the selection came from, the drawing shows it.
@@ -37,7 +40,9 @@
     if (!start) return ''
     if (sameLayer) {
       const end = rest[0]!
-      return `M${start.x} ${start.y}C${start.x + BEND * 1.5} ${start.y} ${end.x + BEND * 1.5} ${end.y} ${end.x} ${end.y}`
+      // A curve reaches three quarters as far as its control points.
+      const reach = (SAME_LAYER_REACH * 4) / 3 - 4
+      return `M${start.x} ${start.y}C${start.x + reach} ${start.y} ${end.x + reach} ${end.y} ${end.x} ${end.y}`
     }
     const direction = Math.sign(rest.at(-1)!.x - start.x)
     let path = `M${start.x} ${start.y}`
@@ -82,23 +87,26 @@
               markerHeight="7"
               orient="auto-start-reverse"
             >
-              <path class="head" d="M0 0.5L7.5 4L0 7.5z" />
+              <path class="arrowhead" d="M0 0.5L7.5 4L0 7.5z" />
             </marker>
           </defs>
           {#each layout.edges as edge, position (position)}
             <path
               class="{edge.relation.type} {edge.relation.state}"
-              class:touching={edge.from === selectedId || edge.to === selectedId}
+              class:touching={edge.relation.from === selectedId || edge.relation.to === selectedId}
               d={pathOf(edge)}
               marker-end={edge.relation.type === 'relates-to' ? undefined : 'url(#arrow)'}
             />
           {/each}
         </svg>
 
-        {#each layout.nodes as node (node.id)}
+        {#each nodes as node (node.id)}
           {@const adr = adrOf.get(node.id)}
           {#if adr}
             {@const status = statusKey(adr)}
+            {@const problems = problemsOf(app.problemGroups, adr.id).filter(
+              (own) => !own.cause
+            ).length}
             <button
               id="node-{node.id}"
               class="node {status}"
@@ -108,11 +116,17 @@
               style:width="{NODE.width}px"
               style:height="{NODE.height}px"
               title={adr.title ?? adr.id}
+              aria-current={node.id === selectedId}
               onclick={() => app.select(node.id)}
             >
               <StatusMark {status} />
               <span class="prefix">{prefixOf(adr)}</span>
               <span class="title">{adr.title ?? adr.id}</span>
+              {#if problems > 0}
+                <span class="problems" title="{problems} {problems === 1 ? 'Problem' : 'Problems'}">
+                  {problems}
+                </span>
+              {/if}
             </button>
           {/if}
         {/each}
@@ -120,6 +134,10 @@
     </div>
 
     <footer>
+      <p class="reading">
+        Read it from left to right: an ADR stands to the right of what it supersedes, amends or
+        depends on, and its arrow points there.
+      </p>
       <ul class="legend" aria-label="What the lines mean">
         {#each RELATION_TYPES as type (type)}
           <li>
@@ -224,7 +242,7 @@
   }
 
   /* An arrowhead is filled with the colour of its line. */
-  path.head {
+  path.arrowhead {
     fill: context-stroke;
     stroke: none;
   }
@@ -253,12 +271,17 @@
   }
 
   .void {
-    stroke: var(--line-strong);
+    stroke: var(--ink-faint);
+    opacity: 0.45;
   }
 
+  /* The Relations of the ADR that is open stand out — and still say whether they took effect. */
   .touching {
+    stroke-width: 2.6;
+  }
+
+  .touching.in-effect {
     stroke: var(--focus);
-    stroke-width: 2.4;
   }
 
   .node {
@@ -337,6 +360,25 @@
   footer p {
     margin-top: 4px;
     color: var(--ink-faint);
+  }
+
+  footer .reading {
+    margin: 0 0 6px;
+    color: var(--ink-soft);
+  }
+
+  .problems {
+    flex: none;
+    min-width: 16px;
+    margin-left: auto;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--problem);
+    color: var(--paper);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
   }
 
   .empty {

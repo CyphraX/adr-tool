@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { Relation, RelationType } from '@adr-tool/core'
-import { NODE, layoutGraph, type GraphLayout } from '../src/renderer/src/lib/graph-layout'
+import {
+  NODE,
+  SAME_LAYER_REACH,
+  layoutGraph,
+  type GraphLayout
+} from '../src/renderer/src/lib/graph-layout'
 
 const relation = (from: string, type: RelationType, to: string): Relation => ({
   from,
@@ -45,8 +50,8 @@ describe('the layout of the Relations graph', () => {
         relation('3', 'depends-on', '1')
       ]
     )
-    const long = layout.edges.find((edge) => edge.from === '3' && edge.to === '1')!
-    const short = layout.edges.find((edge) => edge.from === '3' && edge.to === '2')!
+    const long = layout.edges.find(({ relation }) => relation.from === '3' && relation.to === '1')!
+    const short = layout.edges.find(({ relation }) => relation.from === '3' && relation.to === '2')!
     expect(short.points).toHaveLength(2)
     expect(long.points).toHaveLength(3)
     // Its waypoint has a place of its own in the middle layer: not where ADR 2 is.
@@ -59,6 +64,48 @@ describe('the layout of the Relations graph', () => {
     const layout = layoutGraph(['1', '2'], [relation('2', 'relates-to', '1')])
     expect(layout.nodes.map((node) => node.layer)).toEqual([0, 0])
     expect(layout.edges).toHaveLength(1)
+    // The line between two ADRs of one layer reaches out to the right: there is room for it.
+    expect(layout.width).toBe(NODE.padding * 2 + NODE.width + SAME_LAYER_REACH)
+  })
+
+  it('draws every edge from the ADR that carries the Relation to its target', () => {
+    const layout = layoutGraph(
+      ['1', '2', '3'],
+      [
+        relation('2', 'supersedes', '1'),
+        relation('3', 'depends-on', '2'),
+        relation('1', 'relates-to', '3'),
+        relation('3', 'relates-to', '1')
+      ]
+    )
+    for (const { relation: drawn, points } of layout.edges) {
+      const [from, to] = [at(layout, drawn.from), at(layout, drawn.to)]
+      const near = (point: { x: number }, node: { x: number }): boolean =>
+        point.x >= node.x && point.x <= node.x + NODE.width
+      expect(near(points[0]!, from), `${drawn.from} → ${drawn.to} leaves`).toBe(true)
+      expect(near(points.at(-1)!, to), `${drawn.from} → ${drawn.to} arrives`).toBe(true)
+    }
+  })
+
+  it('draws two Relations between the same two ADRs side by side, not on top of each other', () => {
+    const layout = layoutGraph(
+      ['1', '2'],
+      [
+        relation('2', 'supersedes', '1'),
+        relation('2', 'depends-on', '1'),
+        relation('1', 'relates-to', '2')
+      ]
+    )
+    const starts = layout.edges.map(({ points, relation: drawn }) =>
+      drawn.from === '2' ? points[0]!.y : points.at(-1)!.y
+    )
+    expect(new Set(starts).size).toBe(3)
+  })
+
+  it('takes a chain as long as a Decision Log can be, whichever end it starts at', () => {
+    const ids = Array.from({ length: 6000 }, (_, index) => String(index))
+    const chain = ids.slice(1).map((id, index) => relation(ids[index]!, 'depends-on', id))
+    expect(layoutGraph(ids, chain).nodes).toHaveLength(6000)
   })
 
   it('survives Relations that go in a circle', () => {
