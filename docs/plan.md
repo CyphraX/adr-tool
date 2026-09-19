@@ -103,6 +103,8 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 Relations graph (supersede chains, amendments, dependencies), full-text search with quick jump, Problems view with repair actions, git read-only: history, author, date and diff per ADR, uncommitted-changes indicator, current branch. A folder without git still opens, without history.
 
+The wording of Problems lives in the app for now (`lib/wording.ts`). It moves into `core` when `adr lint` arrives, so that the app and the CLI say the same thing.
+
 One broken file must not drown the view: when an ADR's frontmatter cannot be read, the consistency Problems it causes on other ADRs (an unfounded Back-reference, say) are shown under that root cause rather than as separate Problems.
 
 *Done when:* a Correction's diff can be opened from its marker, and a deliberately broken fixture repository can be repaired entirely from the Problems view.
