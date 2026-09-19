@@ -29,6 +29,10 @@
   const editing = $derived(app.editing?.adrId === adr.id)
   const problems = $derived(problemsOf(app.problemGroups, adr.id))
 
+  // What git says: absent without git, and then there is no history to offer either.
+  const git = $derived(app.active?.repository.git)
+  const uncommitted = $derived(git?.changed.includes(adr.path) ?? false)
+
   // Both directions: what this ADR says about others, and what others say about it.
   const relations = $derived.by((): Line[] => {
     const line = (relation: Relation, side: 'from' | 'to'): Line | undefined => {
@@ -69,6 +73,11 @@
       <p class="id">
         ADR <span class="prefix">{prefixOf(adr)}</span>
         <span class="path">{adr.path}</span>
+        {#if uncommitted}
+          <span class="uncommitted" title="This file has changes that are not committed yet">
+            uncommitted changes
+          </span>
+        {/if}
       </p>
       <StatusStamp {status} label={adr.metadata.rawStatus ?? STATUS_LABEL[status]} />
     </div>
@@ -88,6 +97,7 @@
         {/if}
         <button onclick={() => app.edit()}>Edit</button>
         <button onclick={() => app.editMetadata()}>Metadata</button>
+        {#if git}<button onclick={() => app.showHistory()}>History</button>{/if}
       </div>
     {/if}
 
@@ -126,6 +136,10 @@
             {correction.date}{correction.author ? ` by ${correction.author}` : ''}{correction.note
               ? `: ${correction.note}`
               : ''}
+            {#if git}
+              <!-- The marker of a Correction leads to what it changed. -->
+              <button onclick={() => app.showHistory(position)}>Show the change</button>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -204,6 +218,30 @@
     font-size: 12px;
     font-weight: 400;
     color: var(--ink-faint);
+  }
+
+  .uncommitted {
+    margin-left: 10px;
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--proposed);
+    background: color-mix(in srgb, var(--proposed) 14%, transparent);
+  }
+
+  .corrections button {
+    margin-left: 8px;
+    white-space: nowrap;
+    color: var(--ink-soft);
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+  }
+
+  .corrections button:hover {
+    color: var(--ink);
+    text-decoration-color: currentColor;
   }
 
   .actions {

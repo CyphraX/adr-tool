@@ -6,6 +6,7 @@
 
   const logs = $derived(app.active?.repository.repository.logs ?? [])
   const view = $derived(app.active?.view ?? 'adrs')
+  const git = $derived(app.active?.repository.git)
   const filter = $derived(app.active?.statusFilter ?? 'all')
 
   const counts = $derived.by(() => {
@@ -75,10 +76,22 @@
       </span>
     </button>
   </section>
+
+  {#if git}
+    <footer title="The branch that is checked out, and the ADR files with uncommitted changes">
+      <span>Branch</span>
+      <span class="branch">{git.branch ?? 'detached HEAD'}</span>
+      {#if git.changed.length > 0}
+        <span class="changed">{git.changed.length} uncommitted</span>
+      {/if}
+    </footer>
+  {/if}
 </nav>
 
 <style>
   nav {
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     padding: 6px 0 12px;
     background: var(--panel);
@@ -125,6 +138,28 @@
 
   .count {
     color: var(--ink-faint);
+  }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 6px;
+    margin-top: auto;
+    padding: 14px 14px 0;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .branch {
+    font-family: var(--code);
+    font-size: 11.5px;
+    overflow-wrap: anywhere;
+  }
+
+  .changed {
+    margin-left: auto;
+    color: var(--proposed);
   }
 
   .count.some {

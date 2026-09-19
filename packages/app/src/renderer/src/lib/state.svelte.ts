@@ -3,12 +3,14 @@ import {
   groupProblems,
   type Adr,
   type DecisionLog,
+  type FileChange,
   type RelationType,
   type Repair,
   type Status,
   type TemplateInfo
 } from '@adr-tool/core'
-import type { Decision, OpenRepository, PlannedChange } from '../../../shared/ipc'
+import type { Decision, HistoryEntry, OpenRepository, PlannedChange } from '../../../shared/ipc'
+import { recordedIn } from './history'
 import { prefixOf } from './wording'
 
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
@@ -95,6 +97,19 @@ interface Editing {
   missing: boolean
 }
 
+/** The history of one ADR's file, as git has it, and the entry being looked at. */
+interface History {
+  adrId: string
+  title: string
+  /** `undefined` while git is being asked. */
+  entries: readonly HistoryEntry[] | undefined
+  selectedId: string | undefined
+  /** `undefined` while it is being read; `null` when git could not say. */
+  change: FileChange | null | undefined
+  /** Set when the history was opened from a Correction that no entry recorded. */
+  notFound: boolean
+}
+
 /** A new ADR being described in the dialog. */
 interface Creating {
   repositoryId: string
@@ -157,6 +172,7 @@ class AppState {
   editing = $state<Editing | undefined>(undefined)
   creating = $state<Creating | undefined>(undefined)
   editingMetadata = $state<EditingMetadata | undefined>(undefined)
+  history = $state<History | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -283,6 +299,51 @@ class AppState {
           title: `Cannot ${action.toLowerCase()} ADR ${prefixOf(adr)}`,
           reason: plan.reason
         }
+  }
+
+  /**
+   * Open the history of the selected ADR; from the marker of a Correction — its position
+   * in the ADR's list — at the entry that recorded it.
+   */
+  async showHistory(correction?: number): Promise<void> {
+    const [tab, log, adr] = [this.active, this.log, this.selected]
+    if (!tab || !log || !adr) return
+    const history: History = {
+      adrId: adr.id,
+      title: `History of ADR ${prefixOf(adr)}`,
+      entries: undefined,
+      selectedId: undefined,
+      change: undefined,
+      notFound: false
+    }
+    this.history = history
+    const entries = await window.api.history(tab.repository.id, log.path, adr.id)
+    // The dialog may have been closed, or opened for another ADR, in the meantime.
+    if (this.history?.adrId !== adr.id) return
+    const recorded =
+      correction === undefined
+        ? undefined
+        : recordedIn(entries, adr.metadata.corrections, correction)
+    this.history.entries = entries
+    this.history.notFound = correction !== undefined && !recorded
+    await this.showHistoryEntry((recorded ?? entries[0])?.id)
+  }
+
+  async showHistoryEntry(id: string | undefined): Promise<void> {
+    const [tab, log, history] = [this.active, this.log, this.history]
+    if (!tab || !log || !history || id === undefined) return
+    history.selectedId = id
+    history.change = undefined
+    const change = await window.api
+      .historyChange(tab.repository.id, log.path, history.adrId, id)
+      .catch(() => undefined)
+    if (this.history?.adrId === history.adrId && this.history.selectedId === id) {
+      this.history.change = change ?? null
+    }
+  }
+
+  closeHistory(): void {
+    this.history = undefined
   }
 
   /** Ask for one of the repairs of a Problem. The main process plans it; nothing is written yet. */

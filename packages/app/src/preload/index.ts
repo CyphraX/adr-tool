@@ -16,6 +16,10 @@ const api: Api = {
   planBodyEdit: (request) => ipcRenderer.invoke(CHANNEL.planBodyEdit, request),
   planMetadataEdit: (request) => ipcRenderer.invoke(CHANNEL.planMetadataEdit, request),
   planRepair: (request) => ipcRenderer.invoke(CHANNEL.planRepair, request),
+  history: (repositoryId, logPath, adrId) =>
+    ipcRenderer.invoke(CHANNEL.history, repositoryId, logPath, adrId),
+  historyChange: (repositoryId, logPath, adrId, entryId) =>
+    ipcRenderer.invoke(CHANNEL.historyChange, repositoryId, logPath, adrId, entryId),
   applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
   discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),
   openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url),

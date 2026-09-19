@@ -3,7 +3,7 @@ import type { YAMLMap } from 'yaml'
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import { RELATION_TYPES, type RelationType } from '../relation'
 import { STATUSES, isStatus, type Status } from '../status'
-import type { SourceView } from '../text/source'
+import { viewSource, type SourceView } from '../text/source'
 import { METADATA_KEYS, type MetadataKey } from './keys'
 import { scalarText } from './scalar'
 
@@ -184,4 +184,9 @@ function isCalendarDate(value: string): boolean {
   return (
     date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
   )
+}
+
+/** The Corrections a file records, from its text alone: for a revision of an ADR that is not the one on disk. */
+export function correctionsIn(text: string): readonly Correction[] {
+  return readMetadata(viewSource(text), '').metadata.corrections
 }
