@@ -99,6 +99,8 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 *Done when:* the full lifecycle of an ADR can be clicked through in the app, and every resulting diff in git contains exactly the intended lines.
 
+*Status (2026-09-19):* in parts. Part 1: change sets, Accept, Reject and Deprecate with a preview. Part 2: the editor — source, and source with live preview — writing the body line by line and recording Corrections. Still to come: creating ADRs (Templates, Supersede, Amend), the Metadata controls for Relations, tags and decision-makers, Renumber. Known gap of the editor: closing the window does not ask about unsaved text yet.
+
 ### M4 — Finding and seeing
 
 Relations graph (supersede chains, amendments, dependencies), full-text search with quick jump, Problems view with repair actions, git read-only: history, author, date and diff per ADR, uncommitted-changes indicator, current branch. A folder without git still opens, without history.

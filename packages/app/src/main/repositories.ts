@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
@@ -6,10 +7,19 @@ import {
   openRepository,
   planAccept,
   planDeprecate,
+  planEditBody,
   planReject,
-  type ChangeSet
+  type ChangeSet,
+  type DecisionLog,
+  type Plan
 } from '@adr-tool/core'
-import type { ApplyResult, Decision, OpenRepository, PlanResult } from '../shared/ipc'
+import type {
+  ApplyResult,
+  BodyEditRequest,
+  Decision,
+  OpenRepository,
+  PlanResult
+} from '../shared/ipc'
 import { nodeFileSystem } from './node-file-system'
 import { watchPaths } from './watch-paths'
 
@@ -68,6 +78,36 @@ export class Repositories {
     adrId: string,
     decision: Decision
   ): Promise<PlanResult> {
+    return this.plan(repositoryId, logPath, (fs, log) =>
+      decision === 'accept'
+        ? planAccept(fs, log, adrId, { today: localDate() })
+        : decision === 'reject'
+          ? planReject(fs, log, adrId, { today: localDate() })
+          : planDeprecate(fs, log, adrId)
+    )
+  }
+
+  /** Plan saving an edited body. The author of a Correction is who git says the user is. */
+  async planBodyEdit(request: BodyEditRequest): Promise<PlanResult> {
+    const root = this.rootOf(request.repositoryId)
+    const author = root === undefined ? undefined : await gitUserName(root)
+    return this.plan(request.repositoryId, request.logPath, (fs, log) =>
+      planEditBody(fs, log, request.adrId, {
+        base: request.base,
+        body: request.body,
+        today: localDate(),
+        note: request.note.trim(),
+        ...(author !== undefined && { author })
+      })
+    )
+  }
+
+  /** Read the log afresh, let `core` plan against it, and hold the result for the renderer. */
+  private async plan(
+    repositoryId: string,
+    logPath: string,
+    build: (fs: ReturnType<typeof nodeFileSystem>, log: DecisionLog) => Promise<Plan>
+  ): Promise<PlanResult> {
     const entry = this.entries.get(repositoryId)
     if (!entry) return { ok: false, reason: 'This repository is no longer open.' }
 
@@ -75,17 +115,13 @@ export class Repositories {
     const log = (await openRepository(fs)).logs.find((candidate) => candidate.path === logPath)
     if (!log) return { ok: false, reason: `There is no Decision Log at ${logPath} any more.` }
 
-    const plan =
-      decision === 'accept'
-        ? await planAccept(fs, log, adrId, { today: localDate() })
-        : decision === 'reject'
-          ? await planReject(fs, log, adrId, { today: localDate() })
-          : await planDeprecate(fs, log, adrId)
+    const plan = await build(fs, log)
     if (!plan.ok) return plan
 
     const changeId = randomUUID()
     this.planned.set(changeId, { repositoryId, changeSet: plan.changeSet })
-    return { ok: true, change: { changeId, changeSet: plan.changeSet } }
+    const warnings = plan.warnings ?? []
+    return { ok: true, change: { changeId, changeSet: plan.changeSet, warnings } }
   }
 
   async applyChange(changeId: string): Promise<ApplyResult> {
@@ -139,4 +175,14 @@ export class Repositories {
 function localDate(now = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+/** `user.name` from git's configuration for this repository, if git is there and knows one. */
+function gitUserName(root: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile('git', ['config', 'user.name'], { cwd: root, timeout: 3000 }, (error, stdout) => {
+      const name = stdout.trim()
+      resolve(error || name === '' ? undefined : name)
+    })
+  })
 }

@@ -40,7 +40,7 @@
         {/if}
       </main>
     {:else}
-      <div class="panes">
+      <div class="panes" class:wide-editor={app.editing?.mode === 'split'}>
         <Sidebar />
         <AdrList />
         {#if app.selected && app.log}
@@ -67,6 +67,15 @@
     display: grid;
     grid-template-columns: 210px minmax(340px, 1fr) minmax(0, 1.4fr);
     min-height: 0;
+  }
+
+  /* Source and preview side by side need room; the list steps aside while they are open. */
+  .panes.wide-editor {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .panes.wide-editor > :global(.list) {
+    display: none;
   }
 
   .message {

@@ -2,7 +2,13 @@ import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { CHANNEL, type Decision, type OpenRepository, type Session } from '../shared/ipc'
+import {
+  CHANNEL,
+  type BodyEditRequest,
+  type Decision,
+  type OpenRepository,
+  type Session
+} from '../shared/ipc'
 import { Repositories } from './repositories'
 import { readSession, writeSession } from './session-store'
 
@@ -88,6 +94,15 @@ function registerIpc(): void {
       )
     }
   )
+
+  ipcMain.handle(CHANNEL.planBodyEdit, (_, request: unknown) => {
+    const fields = ['repositoryId', 'logPath', 'adrId', 'base', 'body', 'note'] as const
+    const given = typeof request === 'object' && request !== null ? request : {}
+    if (!fields.every((field) => typeof (given as Record<string, unknown>)[field] === 'string')) {
+      return { ok: false, reason: 'This request cannot be understood.' }
+    }
+    return repositories.planBodyEdit(given as BodyEditRequest)
+  })
 
   ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
     typeof changeId === 'string'
