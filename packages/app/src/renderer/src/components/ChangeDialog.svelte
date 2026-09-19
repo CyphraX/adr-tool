@@ -1,6 +1,7 @@
 <script lang="ts">
   import { diffLines } from '../lib/diff'
   import { app } from '../lib/state.svelte'
+  import { summarizeChange } from '../lib/wording'
 
   // One dialog for the three things that can follow a click on an action: the change to
   // review, the reason it cannot be done, or the reason it could not be written.
@@ -24,41 +25,33 @@
 
     {#if review.kind === 'change'}
       {@const files = review.change.changeSet.files}
-      {@const created = files.filter((file) => file.creates).length}
-      {@const changed = files.length - created}
-      <p class="summary">
-        {#if created > 0}
-          This creates {created === 1 ? 'one file' : `${created} files`}{changed > 0 ? ',' : '.'}
-        {/if}
-        {#if changed > 0}
-          {created > 0 ? 'and changes' : 'This changes'}
-          {changed === 1 ? 'one file' : `${changed} files`}. Nothing else in
-          {changed === 1 ? 'it' : 'them'} is touched.
-        {/if}
-      </p>
+      <p class="summary">{summarizeChange(files)}</p>
 
       {#if review.change.warnings.length > 0}
         <div class="warnings">
-          <p>This looks like more than a Correction:</p>
+          {#if review.caution}<p>{review.caution.lead}</p>{/if}
           <ul>
             {#each review.change.warnings as warning (warning)}
               <li>{warning}</li>
             {/each}
           </ul>
-          <p>
-            If it changes what was decided, cancel and write a new ADR that amends or supersedes
-            this one. If it does not, save.
-          </p>
+          {#if review.caution}<p>{review.caution.advice}</p>{/if}
         </div>
       {/if}
 
       <div class="files">
         {#each files as file (file.path)}
+          {@const lines = diffLines(file)}
           <section>
-            <h2>{file.path}{file.creates ? ' — new file' : ''}</h2>
+            <h2>
+              {file.path}{file.creates ? ' — new file' : ''}
+              {#if file.renameTo !== undefined}<span class="to">→ {file.renameTo}</span>{/if}
+            </h2>
             <div class="diff">
-              {#each diffLines(file) as line, position (position)}
+              {#each lines as line, position (position)}
                 <span class={line.kind}>{SIGN[line.kind]} {line.text}</span>
+              {:else}
+                <span class="unchanged">The file is renamed. Its text does not change.</span>
               {/each}
             </div>
           </section>
@@ -194,6 +187,17 @@
 
   .context {
     color: var(--ink-soft);
+  }
+
+  .diff .unchanged {
+    color: var(--ink-soft);
+    font-family: var(--ui);
+    font-size: 13px;
+  }
+
+  .to {
+    margin-left: 4px;
+    color: var(--ink);
   }
 
   .gap {

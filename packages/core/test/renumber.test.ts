@@ -147,8 +147,8 @@ describe('Renumber', () => {
     const plan = await planRenumber(fs, log, '0002-caching')
     if (!plan.ok) throw new Error(plan.reason)
     expect(plan.changeSet.files.map((file) => file.path)).toEqual([
-      'docs/adr/0002-logging.md',
-      'docs/adr/0002-caching.md'
+      'docs/adr/0002-caching.md',
+      'docs/adr/0002-logging.md'
     ])
     expect(plan.warnings).toEqual([
       '0001-a mentions 0002-caching in its text.',

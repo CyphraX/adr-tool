@@ -45,6 +45,7 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
 
     const digits = /^\d+/.exec(id)![0]
     const to = nextPrefix(log, '') + id.slice(digits.length)
+    await drafts.rename(adr.path, joinPath(log.path, `${to}.md`))
 
     for (const other of log.adrs) {
       if (other.id === id) continue
@@ -61,7 +62,6 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
         await drafts.write(other.path, (view) => replaceInList(view, key, id, to))
       }
     }
-    await drafts.rename(adr.path, joinPath(log.path, `${to}.md`))
 
     for (const candidate of log.adrs) {
       if (candidate.body.includes(id)) warnings.push(`${candidate.id} mentions ${id} in its text.`)

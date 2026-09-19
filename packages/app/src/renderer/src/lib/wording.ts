@@ -1,4 +1,4 @@
-import type { Adr, Problem, Relation, RelationType, Status } from '@adr-tool/core'
+import type { Adr, FileChange, Problem, Relation, RelationType, Status } from '@adr-tool/core'
 
 export const STATUS_LABEL: Record<Status | 'unknown', string> = {
   proposed: 'Proposed',
@@ -34,6 +34,28 @@ const PENDING_WORDING: Partial<Record<RelationType, { from: string; to: string }
 export function relationLabel(relation: Relation, side: 'from' | 'to'): string {
   const pending = relation.state === 'pending' ? PENDING_WORDING[relation.type] : undefined
   return (pending ?? RELATION_WORDING[relation.type])[side]
+}
+
+const count = (files: number): string => (files === 1 ? 'one file' : `${files} files`)
+
+/** What a change does to how many files, in one sentence: "This renames one file and changes 3 files." */
+export function summarizeChange(files: readonly FileChange[]): string {
+  const renamed = files.filter((file) => file.renameTo !== undefined).length
+  const created = files.filter((file) => file.creates).length
+  const changed = files.filter(
+    (file) => !file.creates && file.renameTo === undefined && file.after !== file.before
+  ).length
+  const parts = [
+    ...(renamed > 0 ? [`renames ${count(renamed)}`] : []),
+    ...(created > 0 ? [`creates ${count(created)}`] : []),
+    ...(changed > 0 ? [`changes ${count(changed)}`] : [])
+  ]
+  if (parts.length === 0) return 'This changes nothing.'
+  const last = parts.pop()
+  const sentence = parts.length > 0 ? `${parts.join(', ')} and ${last}` : last
+  const untouched =
+    changed > 0 ? ` Nothing else in ${changed === 1 ? 'it' : 'them'} is touched.` : ''
+  return `This ${sentence}.${untouched}`
 }
 
 /** What the list and the header show in front of an ADR: its number as written, or its date. */
