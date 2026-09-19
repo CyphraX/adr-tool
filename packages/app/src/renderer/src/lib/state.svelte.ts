@@ -1,4 +1,12 @@
-import type { Adr, DecisionLog, Problem, Status, TemplateInfo } from '@adr-tool/core'
+import {
+  RELATION_TYPES,
+  type Adr,
+  type DecisionLog,
+  type Problem,
+  type RelationType,
+  type Status,
+  type TemplateInfo
+} from '@adr-tool/core'
 import type { Decision, OpenRepository, PlannedChange } from '../../../shared/ipc'
 import { prefixOf } from './wording'
 
@@ -61,6 +69,47 @@ interface Creating {
   relation: { type: 'supersedes' | 'amends'; target: string } | undefined
 }
 
+/** The lists of an ADR's Metadata that a person maintains. */
+export interface MetadataLists {
+  decisionMakers: string[]
+  tags: string[]
+  relations: Record<RelationType, string[]>
+}
+
+/**
+ * The Metadata lists of one ADR being edited in the dialog. `base` is what the file said when
+ * the dialog last looked; the difference between the two is what the author wants changed.
+ */
+interface EditingMetadata extends MetadataLists {
+  repositoryId: string
+  logPath: string
+  adrId: string
+  base: MetadataLists
+}
+
+function listsOf(adr: Adr): MetadataLists {
+  return {
+    decisionMakers: [...adr.metadata.decisionMakers],
+    tags: [...adr.metadata.tags],
+    relations: Object.fromEntries(
+      RELATION_TYPES.map((type) => [type, [...adr.metadata.relations[type]]])
+    ) as Record<RelationType, string[]>
+  }
+}
+
+/** Every list of the two, side by side. */
+function pairs(a: MetadataLists, b: MetadataLists): [string[], string[]][] {
+  return [
+    [a.decisionMakers, b.decisionMakers],
+    [a.tags, b.tags],
+    ...RELATION_TYPES.map((type): [string[], string[]] => [a.relations[type], b.relations[type]])
+  ]
+}
+
+/** Lists are sets here: the order of a list is the file's business. */
+const sameItems = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((item) => b.includes(item))
+
 const withLf = (text: string): string => text.replaceAll('\r\n', '\n')
 
 /** Everything the window shows: the open repositories as tabs, and per tab what is selected. */
@@ -71,6 +120,7 @@ class AppState {
   review = $state<Review | undefined>(undefined)
   editing = $state<Editing | undefined>(undefined)
   creating = $state<Creating | undefined>(undefined)
+  editingMetadata = $state<EditingMetadata | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -94,6 +144,14 @@ class AppState {
   /** Whether the editor holds text that is not on disk. */
   readonly dirty = $derived(
     this.editing !== undefined && this.editing.text !== withLf(this.editing.base)
+  )
+
+  /** Whether the Metadata dialog asks for anything the file does not say already. */
+  readonly metadataDirty = $derived(
+    this.editingMetadata !== undefined &&
+      pairs(this.editingMetadata, this.editingMetadata.base).some(
+        ([now, was]) => !sameItems(now, was)
+      )
   )
 
   async start(): Promise<void> {
@@ -226,6 +284,62 @@ class AppState {
       : { kind: 'refused', title: 'The ADR cannot be created', reason: plan.reason }
   }
 
+  /** Open the dialog for the Metadata lists of the selected ADR. */
+  editMetadata(): void {
+    const [tab, log, adr] = [this.active, this.log, this.selected]
+    if (!tab || !log || !adr) return
+    if (!adr.metadataWritable) {
+      this.review = {
+        kind: 'refused',
+        title: `Cannot edit the Metadata of ADR ${prefixOf(adr)}`,
+        reason: `The frontmatter of ${adr.id} cannot be read. Fix it before the tool writes to it.`
+      }
+      return
+    }
+    this.editingMetadata = {
+      repositoryId: tab.repository.id,
+      logPath: log.path,
+      adrId: adr.id,
+      ...listsOf(adr),
+      base: listsOf(adr)
+    }
+  }
+
+  cancelEditingMetadata(): void {
+    this.editingMetadata = undefined
+  }
+
+  /** Plan the edit. The dialog stays open underneath: cancelling the preview leads back to it. */
+  async saveMetadata(): Promise<void> {
+    const editing = this.editingMetadata
+    const adr = this.selected
+    if (!editing || !adr || !this.metadataDirty) return
+    // A reactive proxy cannot cross the process boundary; send a plain copy.
+    const { repositoryId, logPath, adrId, decisionMakers, tags, relations } =
+      $state.snapshot(editing)
+    const plan = await window.api.planMetadataEdit({
+      repositoryId,
+      logPath,
+      adrId,
+      decisionMakers,
+      tags,
+      relations
+    })
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: `Change the Metadata of ADR ${prefixOf(adr)}`,
+          action: 'Save',
+          change: plan.change,
+          applying: false
+        }
+      : {
+          kind: 'refused',
+          title: `Cannot change the Metadata of ADR ${prefixOf(adr)}`,
+          reason: plan.reason
+        }
+  }
+
   /** Start editing the body of the selected ADR. */
   edit(): void {
     const [tab, log, adr] = [this.active, this.log, this.selected]
@@ -295,8 +409,11 @@ class AppState {
     review.applying = true
     const result = await window.api.applyChange(review.change.changeId)
     if (result.applied) {
-      // What was saved is on disk now; the editor has nothing left to lose.
-      if (review.action === 'Save') this.editing = undefined
+      // What was saved is on disk now; the editor and the Metadata dialog have nothing left to lose.
+      if (review.action === 'Save') {
+        this.editing = undefined
+        this.editingMetadata = undefined
+      }
       this.replace(result.repository)
       this.review = undefined
       // A new ADR is an empty Template until somebody writes it: go straight to its body.
@@ -339,11 +456,44 @@ class AppState {
     }
   }
 
+  /**
+   * The ADR changed on disk while its Metadata dialog is open: what the author added and
+   * removed so far is carried over to the lists as they are now.
+   */
+  private rebaseMetadata(repository: OpenRepository): void {
+    const editing = this.editingMetadata
+    if (editing?.repositoryId !== repository.id) return
+    const adr = repository.repository.logs
+      .find((log) => log.path === editing.logPath)
+      ?.adrs.find((candidate) => candidate.id === editing.adrId)
+    if (!adr) {
+      this.editingMetadata = undefined
+      return
+    }
+    const onDisk = listsOf(adr)
+    if (pairs(onDisk, editing.base).every(([now, was]) => sameItems(now, was))) return
+    editing.decisionMakers = rebase(
+      editing.decisionMakers,
+      editing.base.decisionMakers,
+      onDisk.decisionMakers
+    )
+    editing.tags = rebase(editing.tags, editing.base.tags, onDisk.tags)
+    for (const type of RELATION_TYPES) {
+      editing.relations[type] = rebase(
+        editing.relations[type],
+        editing.base.relations[type],
+        onDisk.relations[type]
+      )
+    }
+    editing.base = onDisk
+  }
+
   /** The files changed on disk: take the new reading, keep what the user was looking at. */
   private replace(repository: OpenRepository): void {
     const tab = this.tabs.find((candidate) => candidate.repository.id === repository.id)
     if (!tab) return
     tab.repository = repository
+    this.rebaseMetadata(repository)
 
     const editing = this.editing
     if (editing?.repositoryId !== repository.id) return
@@ -360,6 +510,12 @@ class AppState {
       editing.text = withLf(onDisk)
     }
   }
+}
+
+function rebase(now: string[], was: string[], onDisk: string[]): string[] {
+  const added = now.filter((item) => !was.includes(item))
+  const kept = onDisk.filter((item) => !was.includes(item) || now.includes(item))
+  return [...kept, ...added.filter((item) => !kept.includes(item))]
 }
 
 function newTab(repository: OpenRepository): Tab {

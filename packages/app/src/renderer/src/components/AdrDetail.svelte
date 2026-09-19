@@ -79,6 +79,7 @@
           <button onclick={() => app.startCreating('amends')}>Amend</button>
         {/if}
         <button onclick={() => app.edit()}>Edit</button>
+        <button onclick={() => app.editMetadata()}>Metadata</button>
       </div>
     {/if}
 

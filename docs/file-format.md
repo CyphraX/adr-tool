@@ -56,12 +56,12 @@ No key is required. A file with no Metadata at all is an `accepted` ADR with no 
 | `status`          | `proposed`, `accepted`, `rejected`, `deprecated` or `superseded`, lowercase | create, Accept, Reject, Deprecate, and Accept of a superseding ADR |
 | `created`         | date                                         | create                              |
 | `decided`         | date                                         | Accept, Reject                      |
-| `decision-makers` | list of free-text strings                    | the author, through the app         |
-| `tags`            | list of free-text strings, compared exactly  | the author, through the app         |
-| `supersedes`      | list of IDs                                  | Supersede                           |
-| `amends`          | list of IDs                                  | Amend                               |
-| `depends-on`      | list of IDs                                  | the author, through the app         |
-| `relates-to`      | list of IDs                                  | the author, through the app         |
+| `decision-makers` | list of free-text strings                    | Edit Metadata                       |
+| `tags`            | list of free-text strings, compared exactly  | Edit Metadata                       |
+| `supersedes`      | list of IDs                                  | Supersede; Edit Metadata while `proposed` |
+| `amends`          | list of IDs                                  | Amend; Edit Metadata while `proposed` |
+| `depends-on`      | list of IDs                                  | Edit Metadata                       |
+| `relates-to`      | list of IDs                                  | Edit Metadata                       |
 | `superseded-by`   | list of IDs — a Back-reference               | Accept of the superseding ADR       |
 | `amended-by`      | list of IDs — a Back-reference               | Accept of the amending ADR          |
 | `corrections`     | list of `{ date, author, note }`; `date` is required, `author` and `note` are optional | Correction |
@@ -72,7 +72,7 @@ Rules:
 - **Dates** are calendar dates, `YYYY-MM-DD`, written unquoted. Quoted dates are read too. There are no times.
 - `decided` must not be present while the Status is `proposed`.
 - **IDs in Relations** are bare IDs of ADRs in the same Decision Log — `0003-postgres-write-model`, not `ADR-3`, not a path, not a Markdown link.
-- **Lists** may be written in flow style (`[a, b]`) or block style; both are read, and a single value where a list is expected is read as a list of one. The tool keeps the style a list already has. It writes new lists in flow style, and `corrections` in block style.
+- **Lists** may be written in flow style (`[a, b]`) or block style; both are read, and a single value where a list is expected is read as a list of one. The tool keeps the style a list already has. It writes new lists in flow style, and `corrections` in block style. It adds an item at the end and takes an item out where it stands; it never reorders a list. A comment inside a flow list, next to the item to take out, belongs to nobody the tool could name: it refuses, and a person removes the item.
 - **New keys** are inserted in the order of the table above, relative to the tool's keys that are already there. Existing keys are never reordered.
 - **Foreign keys** — any key not in the table — belong to whoever wrote them. They are preserved byte for byte, together with their comments and blank lines, and never moved.
 - `corrections` is in chronological order; the tool appends.
@@ -94,9 +94,12 @@ Rules:
 | Reject     | `status: rejected`, `decided`                       | nothing |
 | Deprecate  | `status: deprecated`                                | nothing |
 | Correction | the author's edit of the body, plus one entry appended to `corrections` | nothing |
+| Edit Metadata | items added to or removed from `decision-makers`, `tags`, `depends-on`, `relates-to` — and, while the ADR is `proposed`, `supersedes` and `amends` | nothing |
 | Renumber   | the file is renamed                                 | every Relation and Back-reference that names the old ID is rewritten |
 
 - Supersede may target an ADR that is `accepted` or `deprecated`; Amend only one that is `accepted`.
+- `supersedes` and `amends` are fixed once an ADR is no longer `proposed`: they took effect when it was accepted, or never will. `decision-makers`, `tags`, `depends-on` and `relates-to` can be edited at any Status. Such an edit is not a Correction and leaves no entry in `corrections`: a Correction is about the text of the decision, and these keys are filing, not text. git still shows who changed them.
+- An item that is added must be valid — an ID of another ADR in the same Decision Log, and for `supersedes` and `amends` one that may be superseded or amended. An item that is already there can be removed wherever the list may be edited, valid or not: that is how a `depends-on` or `relates-to` Relation to an ADR that does not exist is repaired. A broken `supersedes` or `amends` on an ADR that is no longer `proposed` is not edited here; it is a Problem, and repairing it belongs to the Problems view.
 - A Relation on an ADR that is `proposed` or `rejected` has no effect on its target. The app may show it as pending; nothing is written.
 - An effect stays when the ADR that caused it is later deprecated or superseded itself.
 

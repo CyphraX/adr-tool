@@ -2,11 +2,11 @@ import type { Plan } from '../change/change-set'
 import { joinPath, type FileSystem } from '../fs/port'
 import type { DecisionLog } from '../log/load'
 import { nextPrefix, slugify } from '../log/new-id'
-import type { Status } from '../status'
 import { fillTemplate, loadTemplate } from '../templates/templates'
 import type { Eol } from '../text/source'
 import type { Today } from './decide'
 import { Refusal, plan } from './draft'
+import { requireTarget } from './rules'
 
 export interface NewAdr extends Today {
   readonly title: string
@@ -14,14 +14,6 @@ export interface NewAdr extends Today {
   readonly template: string
   /** The new ADR is written to supersede or amend this one. Nothing is written there until it is accepted. */
   readonly relation?: { readonly type: 'supersedes' | 'amends'; readonly target: string }
-}
-
-const TARGET_STATUS: Record<'supersedes' | 'amends', { allowed: Status[]; rule: string }> = {
-  supersedes: {
-    allowed: ['accepted', 'deprecated'],
-    rule: 'Only an accepted or deprecated ADR can be superseded.'
-  },
-  amends: { allowed: ['accepted'], rule: 'Only an accepted ADR can be amended.' }
 }
 
 /**
@@ -40,11 +32,7 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
     if (relation) {
       const target = log.adrs.find((candidate) => candidate.id === relation.target)
       if (!target) throw new Refusal(`There is no ADR ${relation.target} in this Decision Log.`)
-      const { allowed, rule } = TARGET_STATUS[relation.type]
-      const status = target.metadata.status
-      if (status === undefined || !allowed.includes(status)) {
-        throw new Refusal(`${rule} ${target.id} is ${target.metadata.rawStatus ?? status}.`)
-      }
+      requireTarget(relation.type, target)
     }
 
     const template = await loadTemplate(fs, adr.template)

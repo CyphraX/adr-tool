@@ -1,4 +1,4 @@
-import type { ChangeSet, Repository, Templates } from '@adr-tool/core'
+import type { ChangeSet, RelationType, Repository, Templates } from '@adr-tool/core'
 
 /**
  * The contract between the main process and the sandboxed renderer.
@@ -62,6 +62,19 @@ export interface BodyEditRequest {
   readonly note: string
 }
 
+/**
+ * The lists of an ADR's Metadata as the dialog leaves them. `core` works out which items
+ * were added and which removed, and only those reach the file.
+ */
+export interface MetadataEditRequest {
+  readonly repositoryId: string
+  readonly logPath: string
+  readonly adrId: string
+  readonly decisionMakers: readonly string[]
+  readonly tags: readonly string[]
+  readonly relations: Readonly<Record<RelationType, readonly string[]>>
+}
+
 export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
   | { readonly ok: false; readonly reason: string }
@@ -93,6 +106,8 @@ export interface Api {
   planCreate(request: CreateRequest): Promise<PlanResult>
   /** Plan saving an edited body. Nothing is written until the change is applied. */
   planBodyEdit(request: BodyEditRequest): Promise<PlanResult>
+  /** Plan an edit of the Metadata lists. Nothing is written until the change is applied. */
+  planMetadataEdit(request: MetadataEditRequest): Promise<PlanResult>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
   applyChange(changeId: string): Promise<ApplyResult>
   discardChange(changeId: string): Promise<void>
@@ -110,6 +125,7 @@ export const CHANNEL = {
   repositoryChanged: 'repository:changed',
   planDecision: 'change:plan-decision',
   planBodyEdit: 'change:plan-body-edit',
+  planMetadataEdit: 'change:plan-metadata-edit',
   planCreate: 'change:plan-create',
   listTemplates: 'templates:list',
   applyChange: 'change:apply',

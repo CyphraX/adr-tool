@@ -99,7 +99,9 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 *Done when:* the full lifecycle of an ADR can be clicked through in the app, and every resulting diff in git contains exactly the intended lines.
 
-*Status (2026-09-19):* in parts. Part 1: change sets, Accept, Reject and Deprecate with a preview. Part 2: the editor — source, and source with live preview — writing the body line by line and recording Corrections. Part 3: creating ADRs from Templates, also to supersede or amend another one. Still to come: the Metadata controls for Relations, tags and decision-makers, and Renumber. Known gap of the editor: closing the window does not ask about unsaved text yet.
+*Status (2026-09-19):* in parts. Part 1: change sets, Accept, Reject and Deprecate with a preview. Part 2: the editor — source, and source with live preview — writing the body line by line and recording Corrections. Part 3: creating ADRs from Templates, also to supersede or amend another one. Part 4: the Metadata dialog — decision-makers and tags as free text with suggestions from the log, Relations through a picker with search — writing single items into and out of the lists; an edit of these lists is not a Correction (file-format.md, section 5). Still to come: Renumber. Known gaps: closing the window does not ask about unsaved text yet; a Metadata dialog with very many Relations can grow taller than the window.
+
+A finding of part 4: the app's type check had been pointed at the solution-style `tsconfig.json`, where `svelte-check` sees the components but none of the renderer's plain TypeScript files. A missing function in `state.svelte.ts` passed the check and only failed in the running app. It now checks against `tsconfig.web.json`, which covers both.
 
 ### M4 — Finding and seeing
 

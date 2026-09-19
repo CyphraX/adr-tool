@@ -1,10 +1,9 @@
-import type { Adr } from '../adr/adr'
 import type { Plan } from '../change/change-set'
 import type { FileSystem } from '../fs/port'
 import type { DecisionLog } from '../log/load'
 import { addToList, setScalar } from '../metadata/write'
-import type { Status } from '../status'
-import { Refusal, plan } from './draft'
+import { plan } from './draft'
+import { requireStatus, requireTarget, writable } from './rules'
 
 export interface Today {
   /** The date to record, `YYYY-MM-DD`, in the user's own time zone. */
@@ -28,16 +27,12 @@ export function planAccept(
 
     const superseded = adr.metadata.relations.supersedes.map((target) => {
       const old = writable(log, target, `${id} supersedes ${target}`)
-      requireStatus(
-        old,
-        ['accepted', 'deprecated'],
-        'Only an accepted or deprecated ADR can be superseded.'
-      )
+      requireTarget('supersedes', old)
       return old
     })
     const amended = adr.metadata.relations.amends.map((target) => {
       const base = writable(log, target, `${id} amends ${target}`)
-      requireStatus(base, ['accepted'], 'Only an accepted ADR can be amended.')
+      requireTarget('amends', base)
       return base
     })
 
@@ -75,31 +70,6 @@ export function planDeprecate(fs: FileSystem, log: DecisionLog, id: string): Pro
     requireStatus(adr, ['accepted'], 'Only an accepted ADR can be deprecated.')
     await drafts.write(adr.path, (view) => setScalar(view, 'status', 'deprecated'))
   })
-}
-
-/** The ADR `id` of the log, if the tool may write its Metadata. `because` says who is asking for it. */
-function writable(log: DecisionLog, id: string, because?: string): Adr {
-  const adr = log.adrs.find((candidate) => candidate.id === id)
-  if (!adr) {
-    throw new Refusal(
-      because
-        ? `${because}, which is not in this Decision Log.`
-        : `There is no ADR ${id} in this Decision Log.`
-    )
-  }
-  if (!adr.metadataWritable) {
-    throw new Refusal(
-      `The frontmatter of ${id} cannot be read. Fix it before the tool writes to it.`
-    )
-  }
-  return adr
-}
-
-function requireStatus(adr: Adr, allowed: readonly Status[], rule: string): void {
-  const status = adr.metadata.status
-  if (status !== undefined && allowed.includes(status)) return
-  const is = adr.metadata.rawStatus ? `"${adr.metadata.rawStatus}"` : status
-  throw new Refusal(`${rule} ${adr.id} is ${is}.`)
 }
 
 function date(when: Today): string {

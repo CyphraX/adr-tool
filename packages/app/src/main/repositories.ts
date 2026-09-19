@@ -11,6 +11,7 @@ import {
   planCreate,
   planDeprecate,
   planEditBody,
+  planEditMetadata,
   planReject,
   type ChangeSet,
   type DecisionLog,
@@ -22,6 +23,7 @@ import type {
   BodyEditRequest,
   CreateRequest,
   Decision,
+  MetadataEditRequest,
   OpenRepository,
   PlanResult
 } from '../shared/ipc'
@@ -112,6 +114,17 @@ export class Repositories {
         today: localDate(),
         note: request.note.trim(),
         ...(author !== undefined && { author })
+      })
+    )
+  }
+
+  /** Plan an edit of the Metadata lists a person maintains: what was added, what was removed. */
+  async planMetadataEdit(request: MetadataEditRequest): Promise<PlanResult> {
+    return this.plan(request.repositoryId, request.logPath, (fs, log) =>
+      planEditMetadata(fs, log, request.adrId, {
+        decisionMakers: request.decisionMakers,
+        tags: request.tags,
+        relations: request.relations
       })
     )
   }
