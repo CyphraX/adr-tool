@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { app, problemsOf, statusKey } from '../lib/state.svelte'
+  import { problemsOf } from '../lib/problems'
+  import { app, statusKey } from '../lib/state.svelte'
   import { STATUS_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
@@ -45,7 +46,7 @@
     >
       {#each app.adrs as adr (adr.id)}
         {@const status = statusKey(adr)}
-        {@const problems = app.log ? problemsOf(app.log, adr.id).length : 0}
+        {@const problems = problemsOf(app.problemGroups, adr.id).filter((own) => !own.cause).length}
         <!-- The keyboard is handled by the listbox around the rows. -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div

@@ -45,7 +45,8 @@ export function readMetadata(view: SourceView, adr: string): MetadataReading {
 
   const doc = parseDocument(view.text.slice(view.frontmatter.start, view.frontmatter.end))
   if (doc.errors.length > 0) {
-    const detail = doc.errors[0]!.message.split('\n')[0]!
+    // The first line of the message ends in a colon: the library quotes the source after it.
+    const detail = doc.errors[0]!.message.split('\n')[0]!.replace(/:$/, '')
     return unreadable({ kind: 'invalid-frontmatter', adr, detail })
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
