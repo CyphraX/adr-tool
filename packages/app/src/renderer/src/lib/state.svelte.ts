@@ -12,10 +12,14 @@ interface Tab {
   selectedId: string | undefined
 }
 
-/** What the dialog shows after an action was asked for: the change to review, or why there is none. */
+/** What the dialog shows after an action was asked for. */
 export type Review =
+  /** A planned change to look at and confirm. */
   | { kind: 'change'; title: string; action: string; change: PlannedChange; applying: boolean }
+  /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
+  /** A question before something is lost. */
+  | { kind: 'confirm'; title: string; reason: string; action: string; proceed: () => void }
 
 /** What a decision is called on its button, and again on the button that confirms it. */
 export const DECISION_LABEL: Record<Decision, string> = {
@@ -24,12 +28,38 @@ export const DECISION_LABEL: Record<Decision, string> = {
   deprecate: 'Deprecate'
 }
 
+export type EditorMode = 'source' | 'split'
+
+/**
+ * The body of one ADR being edited. The editor has its own text; what is on disk reaches
+ * it only when the author has nothing to lose, or says so.
+ */
+interface Editing {
+  repositoryId: string
+  logPath: string
+  adrId: string
+  /** The body the edit started from, exactly as it was read. Saving is planned against it. */
+  base: string
+  /** The editor's text. Line breaks are LF here; `core` gives each line the file's own again. */
+  text: string
+  mode: EditorMode
+  /** What was corrected, for an ADR that is no longer proposed. */
+  note: string
+  /** The body on disk, when it changed while the author has unsaved text. */
+  changedOnDisk: string | undefined
+  /** The ADR's file is gone. */
+  missing: boolean
+}
+
+const withLf = (text: string): string => text.replaceAll('\r\n', '\n')
+
 /** Everything the window shows: the open repositories as tabs, and per tab what is selected. */
 class AppState {
   tabs = $state<Tab[]>([])
   activeId = $state<string | undefined>(undefined)
   ready = $state(false)
   review = $state<Review | undefined>(undefined)
+  editing = $state<Editing | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -50,6 +80,11 @@ class AppState {
 
   readonly selected = $derived(this.log?.adrs.find((adr) => adr.id === this.active?.selectedId))
 
+  /** Whether the editor holds text that is not on disk. */
+  readonly dirty = $derived(
+    this.editing !== undefined && this.editing.text !== withLf(this.editing.base)
+  )
+
   async start(): Promise<void> {
     window.api.onRepositoryChanged((repository) => this.replace(repository))
     const session = await window.api.restoreSession()
@@ -61,31 +96,43 @@ class AppState {
   async open(): Promise<void> {
     const repository = await window.api.openRepository()
     if (!repository) return
-    if (!this.tabs.some((tab) => tab.repository.id === repository.id)) {
-      this.tabs.push(newTab(repository))
-    }
-    this.activeId = repository.id
+    this.leaveEditor(() => {
+      if (!this.tabs.some((tab) => tab.repository.id === repository.id)) {
+        this.tabs.push(newTab(repository))
+      }
+      this.activeId = repository.id
+    })
   }
 
-  async close(id: string): Promise<void> {
-    const position = this.tabs.findIndex((tab) => tab.repository.id === id)
-    if (position === -1) return
-    this.tabs.splice(position, 1)
-    if (this.activeId === id) {
-      this.activate((this.tabs[position] ?? this.tabs[position - 1])?.repository.id)
+  close(id: string): void {
+    const closes = (): void => {
+      const position = this.tabs.findIndex((tab) => tab.repository.id === id)
+      if (position === -1) return
+      this.tabs.splice(position, 1)
+      if (this.activeId === id) {
+        this.activate((this.tabs[position] ?? this.tabs[position - 1])?.repository.id)
+      }
+      void window.api.closeRepository(id)
     }
-    await window.api.closeRepository(id)
+    if (this.editing?.repositoryId === id) this.leaveEditor(closes)
+    else closes()
   }
 
   activate(id: string | undefined): void {
-    this.activeId = id
-    void window.api.setActiveRepository(id)
+    if (id === this.activeId) return
+    this.leaveEditor(() => {
+      this.activeId = id
+      void window.api.setActiveRepository(id)
+    })
   }
 
   showLog(path: string): void {
-    if (!this.active) return
-    this.active.logPath = path
-    this.active.selectedId = undefined
+    if (path === this.log?.path) return
+    this.leaveEditor(() => {
+      if (!this.active) return
+      this.active.logPath = path
+      this.active.selectedId = undefined
+    })
   }
 
   filterBy(filter: StatusFilter): void {
@@ -93,7 +140,10 @@ class AppState {
   }
 
   select(id: string): void {
-    if (this.active) this.active.selectedId = id
+    if (id === this.active?.selectedId) return
+    this.leaveEditor(() => {
+      if (this.active) this.active.selectedId = id
+    })
   }
 
   /** Select an ADR of the log in view by its file name, as a link inside an ADR names it. */
@@ -120,12 +170,77 @@ class AppState {
         }
   }
 
+  /** Start editing the body of the selected ADR. */
+  edit(): void {
+    const [tab, log, adr] = [this.active, this.log, this.selected]
+    if (!tab || !log || !adr) return
+    this.editing = {
+      repositoryId: tab.repository.id,
+      logPath: log.path,
+      adrId: adr.id,
+      base: adr.body,
+      text: withLf(adr.body),
+      mode: this.editing?.mode ?? 'source',
+      note: '',
+      changedOnDisk: undefined,
+      missing: false
+    }
+  }
+
+  /** Plan saving the editor's text. The main process hands back the change to review. */
+  async save(): Promise<void> {
+    const editing = this.editing
+    const adr = this.selected
+    if (!editing || !adr || !this.dirty || editing.changedOnDisk !== undefined) return
+    const plan = await window.api.planBodyEdit({
+      repositoryId: editing.repositoryId,
+      logPath: editing.logPath,
+      adrId: editing.adrId,
+      base: editing.base,
+      body: editing.text,
+      note: editing.note
+    })
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: `Save ADR ${prefixOf(adr)}`,
+          action: 'Save',
+          change: plan.change,
+          applying: false
+        }
+      : { kind: 'refused', title: `Cannot save ADR ${prefixOf(adr)}`, reason: plan.reason }
+  }
+
+  /** Leave the editor without saving; asks first when there is text to lose. */
+  discardEdit(): void {
+    this.leaveEditor(() => {})
+  }
+
+  /** The file changed on disk while the author has unsaved text: they keep theirs … */
+  keepMine(): void {
+    const editing = this.editing
+    if (editing?.changedOnDisk === undefined) return
+    editing.base = editing.changedOnDisk
+    editing.changedOnDisk = undefined
+  }
+
+  /** … or take what is on disk. */
+  loadFromDisk(): void {
+    const editing = this.editing
+    if (editing?.changedOnDisk === undefined) return
+    editing.base = editing.changedOnDisk
+    editing.text = withLf(editing.changedOnDisk)
+    editing.changedOnDisk = undefined
+  }
+
   async applyReview(): Promise<void> {
     const review = this.review
     if (review?.kind !== 'change' || review.applying) return
     review.applying = true
     const result = await window.api.applyChange(review.change.changeId)
     if (result.applied) {
+      // What was saved is on disk now; the editor has nothing left to lose.
+      if (review.action === 'Save') this.editing = undefined
       this.replace(result.repository)
       this.review = undefined
     } else {
@@ -133,15 +248,54 @@ class AppState {
     }
   }
 
+  confirmReview(): void {
+    const review = this.review
+    if (review?.kind !== 'confirm') return
+    this.review = undefined
+    review.proceed()
+  }
+
   dismissReview(): void {
     if (this.review?.kind === 'change') void window.api.discardChange(this.review.change.changeId)
     this.review = undefined
   }
 
+  /** Do something that takes the editor away. With unsaved text the author is asked first. */
+  private leaveEditor(then: () => void): void {
+    const proceed = (): void => {
+      this.editing = undefined
+      then()
+    }
+    if (!this.dirty) return proceed()
+    this.review = {
+      kind: 'confirm',
+      title: 'Discard your changes?',
+      reason: 'The text in the editor has not been saved. Leaving the editor now loses it.',
+      action: 'Discard changes',
+      proceed
+    }
+  }
+
   /** The files changed on disk: take the new reading, keep what the user was looking at. */
   private replace(repository: OpenRepository): void {
     const tab = this.tabs.find((candidate) => candidate.repository.id === repository.id)
-    if (tab) tab.repository = repository
+    if (!tab) return
+    tab.repository = repository
+
+    const editing = this.editing
+    if (editing?.repositoryId !== repository.id) return
+    const onDisk = repository.repository.logs
+      .find((log) => log.path === editing.logPath)
+      ?.adrs.find((adr) => adr.id === editing.adrId)?.body
+    editing.missing = onDisk === undefined
+    if (onDisk === undefined || onDisk === editing.base) return
+    if (this.dirty) {
+      // Never overwrite what the author typed. They decide: keep theirs, or load the file.
+      editing.changedOnDisk = onDisk
+    } else {
+      editing.base = onDisk
+      editing.text = withLf(onDisk)
+    }
   }
 }
 

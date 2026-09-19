@@ -11,6 +11,7 @@ const api: Api = {
   setActiveRepository: (id) => ipcRenderer.invoke(CHANNEL.setActiveRepository, id),
   planDecision: (repositoryId, logPath, adrId, decision) =>
     ipcRenderer.invoke(CHANNEL.planDecision, repositoryId, logPath, adrId, decision),
+  planBodyEdit: (request) => ipcRenderer.invoke(CHANNEL.planBodyEdit, request),
   applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
   discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),
   openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url),
