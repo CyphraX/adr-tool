@@ -134,6 +134,16 @@ function registerIpc(): void {
     return repositories.planMetadataEdit(edit)
   })
 
+  ipcMain.handle(
+    CHANNEL.planRenumber,
+    (_, repositoryId: unknown, logPath: unknown, adrId: unknown) => {
+      if (![repositoryId, logPath, adrId].every((value) => typeof value === 'string')) {
+        return { ok: false, reason: 'This request cannot be understood.' }
+      }
+      return repositories.planRenumber(repositoryId as string, logPath as string, adrId as string)
+    }
+  )
+
   ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
     typeof changeId === 'string'
       ? repositories.applyChange(changeId)

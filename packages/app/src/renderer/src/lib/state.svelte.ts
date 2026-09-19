@@ -23,11 +23,36 @@ interface Tab {
 /** What the dialog shows after an action was asked for. */
 export type Review =
   /** A planned change to look at and confirm. */
-  | { kind: 'change'; title: string; action: string; change: PlannedChange; applying: boolean }
+  | {
+      kind: 'change'
+      title: string
+      action: string
+      change: PlannedChange
+      applying: boolean
+      /** How the warnings of the change are introduced, and what to do about them. */
+      caution?: Caution
+    }
   /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
   /** A question before something is lost. */
   | { kind: 'confirm'; title: string; reason: string; action: string; proceed: () => void }
+
+export interface Caution {
+  lead: string
+  advice: string
+}
+
+const MORE_THAN_A_CORRECTION: Caution = {
+  lead: 'This looks like more than a Correction:',
+  advice:
+    'If it changes what was decided, cancel and write a new ADR that amends or supersedes this one. If it does not, save.'
+}
+
+const TEXT_STAYS: Caution = {
+  lead: 'The tool does not change the text of an ADR:',
+  advice:
+    'A link in the text that points to the old file name has to be changed by hand, after the Renumber.'
+}
 
 /** What a decision is called on its button, and again on the button that confirms it. */
 export const DECISION_LABEL: Record<Decision, string> = {
@@ -239,6 +264,23 @@ class AppState {
         }
   }
 
+  /** Ask to give the selected ADR, which shares its number, the next number of the log. */
+  async renumber(): Promise<void> {
+    const [tab, log, adr] = [this.active, this.log, this.selected]
+    if (!tab || !log || !adr) return
+    const plan = await window.api.planRenumber(tab.repository.id, log.path, adr.id)
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: `Renumber ADR ${prefixOf(adr)}`,
+          action: 'Renumber',
+          change: plan.change,
+          applying: false,
+          caution: TEXT_STAYS
+        }
+      : { kind: 'refused', title: `Cannot renumber ADR ${prefixOf(adr)}`, reason: plan.reason }
+  }
+
   /** Open the dialog for a new ADR; with a Relation, one that supersedes or amends the selected ADR. */
   startCreating(type?: 'supersedes' | 'amends'): void {
     const tab = this.active
@@ -376,7 +418,8 @@ class AppState {
           title: `Save ADR ${prefixOf(adr)}`,
           action: 'Save',
           change: plan.change,
-          applying: false
+          applying: false,
+          caution: MORE_THAN_A_CORRECTION
         }
       : { kind: 'refused', title: `Cannot save ADR ${prefixOf(adr)}`, reason: plan.reason }
   }
@@ -416,6 +459,9 @@ class AppState {
       }
       this.replace(result.repository)
       this.review = undefined
+      // A renumbered ADR has a new ID: stay with it.
+      const renamedId = review.change.renamedId
+      if (renamedId !== undefined && this.active) this.active.selectedId = renamedId
       // A new ADR is an empty Template until somebody writes it: go straight to its body.
       const createdId = review.change.createdId
       if (createdId !== undefined && this.active) {
