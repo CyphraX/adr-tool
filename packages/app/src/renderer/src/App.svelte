@@ -7,6 +7,7 @@
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
   import ProblemsList from './components/ProblemsList.svelte'
+  import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import { app } from './lib/state.svelte'
@@ -15,7 +16,16 @@
   onMount(() => void app.start())
 
   const repository = $derived(app.active?.repository.repository)
+
+  // Ctrl+K, or Cmd+K on a Mac: search from anywhere — but not over another dialog.
+  function onkeydown(event: KeyboardEvent): void {
+    if (event.key.toLowerCase() !== 'k' || !(event.ctrlKey || event.metaKey) || event.altKey) return
+    event.preventDefault()
+    if (!document.querySelector('dialog[open]')) app.startSearching()
+  }
 </script>
+
+<svelte:window {onkeydown} />
 
 {#if app.ready}
   <div class="window">
@@ -70,6 +80,7 @@
   <NewAdrDialog />
   <MetadataDialog />
   <HistoryDialog />
+  <SearchPalette />
   <ChangeDialog />
 {/if}
 

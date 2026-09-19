@@ -173,6 +173,8 @@ class AppState {
   creating = $state<Creating | undefined>(undefined)
   editingMetadata = $state<EditingMetadata | undefined>(undefined)
   history = $state<History | undefined>(undefined)
+  /** The search palette, while it is open. */
+  searching = $state<{ query: string } | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -274,6 +276,31 @@ class AppState {
     if (id === this.active?.selectedId) return
     this.leaveEditor(() => {
       if (this.active) this.active.selectedId = id
+    })
+  }
+
+  startSearching(): void {
+    if (this.active) this.searching = { query: '' }
+  }
+
+  stopSearching(): void {
+    this.searching = undefined
+  }
+
+  /** Go to an ADR of any Decision Log of the repository in front, from wherever the view is. */
+  jumpTo(logPath: string, id: string): void {
+    this.searching = undefined
+    if (logPath === this.log?.path && id === this.active?.selectedId) return
+    this.leaveEditor(() => {
+      const tab = this.active
+      if (!tab) return
+      tab.logPath = logPath
+      tab.selectedId = id
+      // A filter that hides the ADR would hide where the jump went.
+      const adr = this.log?.adrs.find((candidate) => candidate.id === id)
+      if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
+        tab.statusFilter = 'all'
+      }
     })
   }
 

@@ -21,6 +21,9 @@
 
 <div class="list">
   <div class="tools">
+    <button class="search" onclick={() => app.startSearching()}>
+      Search <kbd>{window.api.platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
+    </button>
     <button onclick={() => app.startCreating()}>New ADR</button>
   </div>
   <div class="head" aria-hidden="true">
@@ -96,6 +99,7 @@
   .tools {
     display: flex;
     justify-content: flex-end;
+    gap: 8px;
     flex: none;
     padding: 6px 14px;
     border-bottom: 1px solid var(--line);
@@ -106,6 +110,18 @@
     border: 1px solid var(--line-strong);
     border-radius: 4px;
     background: var(--paper);
+  }
+
+  .tools .search {
+    margin-right: auto;
+    color: var(--ink-soft);
+  }
+
+  kbd {
+    margin-left: 6px;
+    font-family: var(--ui);
+    font-size: 11px;
+    color: var(--ink-faint);
   }
 
   .tools button:hover {
