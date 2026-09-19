@@ -1,26 +1,18 @@
-const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/
-const HEADING_1 = /^ {0,3}#(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/
+import { headingOf, proseLines } from './prose'
 
 /**
  * The title of an ADR: the text of the first level-one ATX heading in its body that is
  * not inside a fenced code block. `undefined` when there is none.
+ *
+ * A leading number that repeats the ADR's own — `# 3. Title`, as adr-tools writes it — is
+ * not part of the title (docs/file-format.md, section 4).
  */
-export function titleOf(body: string): string | undefined {
-  let fence: string | undefined
-  for (const line of body.split(/\r?\n/)) {
-    const open = FENCE_OPEN.exec(line)?.[1]
-    if (fence) {
-      // A fence closes with the same character, at least as long, and nothing else on the line.
-      const closes = open !== undefined && open[0] === fence[0] && open.length >= fence.length
-      if (closes && line.trim() === open) fence = undefined
-      continue
-    }
-    if (open) {
-      fence = open
-      continue
-    }
-    const title = HEADING_1.exec(line)?.[1]?.trim()
-    if (title) return title
+export function titleOf(body: string, number?: number): string | undefined {
+  for (const line of proseLines(body)) {
+    const heading = headingOf(line.content)
+    if (heading?.level !== 1 || !heading.text) continue
+    const numbered = /^(\d+)\.[ \t]+(.+)$/.exec(heading.text)
+    return numbered && Number(numbered[1]) === number ? numbered[2]! : heading.text
   }
   return undefined
 }

@@ -6,6 +6,7 @@ import { nextPrefix } from '../log/new-id'
 import { replaceInList } from '../metadata/write'
 import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
 import { Refusal, plan } from './draft'
+import { requireOwnFormat } from './rules'
 
 /** Every Metadata key whose items are IDs of other ADRs. */
 const NAMING_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
@@ -58,6 +59,8 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
         }
         continue
       }
+      // A foreign file names the ADR in its text, which the tool does not write.
+      if (namingKeys(other, id).length > 0) requireOwnFormat(other)
       for (const key of namingKeys(other, id)) {
         await drafts.write(other.path, (view) => replaceInList(view, key, id, to))
       }
