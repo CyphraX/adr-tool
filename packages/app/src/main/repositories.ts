@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
-import { openRepository } from '@adr-tool/core'
-import type { OpenRepository } from '../shared/ipc'
+import {
+  applyChangeSet,
+  openRepository,
+  planAccept,
+  planDeprecate,
+  planReject,
+  type ChangeSet
+} from '@adr-tool/core'
+import type { ApplyResult, Decision, OpenRepository, PlanResult } from '../shared/ipc'
 import { nodeFileSystem } from './node-file-system'
 import { watchPaths } from './watch-paths'
 
@@ -22,6 +29,8 @@ interface Entry {
  */
 export class Repositories {
   private readonly entries = new Map<string, Entry>()
+  /** Changes that were planned and shown, and wait to be applied or discarded. */
+  private readonly planned = new Map<string, { repositoryId: string; changeSet: ChangeSet }>()
 
   constructor(private readonly onChanged: (repository: OpenRepository) => void) {}
 
@@ -49,6 +58,54 @@ export class Repositories {
     await entry.watcher?.close()
   }
 
+  /** Plan a decision against the files as they are on disk right now. Nothing is written. */
+  async planDecision(
+    repositoryId: string,
+    logPath: string,
+    adrId: string,
+    decision: Decision
+  ): Promise<PlanResult> {
+    const entry = this.entries.get(repositoryId)
+    if (!entry) return { ok: false, reason: 'This repository is no longer open.' }
+
+    const fs = nodeFileSystem(entry.root)
+    const log = (await openRepository(fs)).logs.find((candidate) => candidate.path === logPath)
+    if (!log) return { ok: false, reason: `There is no Decision Log at ${logPath} any more.` }
+
+    const plan =
+      decision === 'accept'
+        ? await planAccept(fs, log, adrId, { today: localDate() })
+        : decision === 'reject'
+          ? await planReject(fs, log, adrId, { today: localDate() })
+          : await planDeprecate(fs, log, adrId)
+    if (!plan.ok) return plan
+
+    const changeId = randomUUID()
+    this.planned.set(changeId, { repositoryId, changeSet: plan.changeSet })
+    return { ok: true, change: { changeId, changeSet: plan.changeSet } }
+  }
+
+  async applyChange(changeId: string): Promise<ApplyResult> {
+    const planned = this.planned.get(changeId)
+    const entry = planned && this.entries.get(planned.repositoryId)
+    this.planned.delete(changeId)
+    if (!planned || !entry) return { applied: false, reason: 'This change is no longer available.' }
+
+    const result = await applyChangeSet(nodeFileSystem(entry.root), planned.changeSet)
+    if (!result.applied) {
+      const files = result.conflicts.join(', ')
+      return {
+        applied: false,
+        reason: `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`
+      }
+    }
+    return { applied: true, repository: await this.load(entry) }
+  }
+
+  discardChange(changeId: string): void {
+    this.planned.delete(changeId)
+  }
+
   async closeAll(): Promise<void> {
     await Promise.all([...this.entries.keys()].map((id) => this.close(id)))
   }
@@ -73,4 +130,10 @@ export class Repositories {
       }, RELOAD_DELAY_MS)
     })
   }
+}
+
+/** Today's date as the user sees it on their calendar, not in UTC. */
+function localDate(now = new Date()): string {
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }

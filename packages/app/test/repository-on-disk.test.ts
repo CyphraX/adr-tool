@@ -21,6 +21,7 @@ describe('a repository on disk', () => {
       'accepted',
       'accepted',
       'deprecated',
+      'proposed',
       'proposed'
     ])
     // The showcase carries one Problem on purpose, so that the app has one to show.

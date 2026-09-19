@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Adr, DecisionLog, Relation } from '@adr-tool/core'
   import { renderMarkdown } from '../lib/markdown'
-  import { app, problemsOf, statusKey } from '../lib/state.svelte'
+  import type { Decision } from '../../../shared/ipc'
+  import { DECISION_LABEL, app, problemsOf, statusKey } from '../lib/state.svelte'
   import { STATUS_LABEL, describeProblem, prefixOf, relationLabel } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
   import StatusStamp from './StatusStamp.svelte'
@@ -34,6 +35,11 @@
     ].filter((entry) => entry !== undefined)
   })
 
+  // What can be decided depends on where the ADR stands. `superseded` is never set by hand.
+  const decisions = $derived<Decision[]>(
+    status === 'proposed' ? ['accept', 'reject'] : status === 'accepted' ? ['deprecate'] : []
+  )
+
   const facts = $derived(
     [
       ['Created', adr.metadata.created],
@@ -64,6 +70,16 @@
       </p>
       <StatusStamp {status} label={adr.metadata.rawStatus ?? STATUS_LABEL[status]} />
     </div>
+
+    {#if decisions.length > 0}
+      <div class="actions">
+        {#each decisions as decision (decision)}
+          <button class:primary={decision === 'accept'} onclick={() => app.decide(decision)}>
+            {DECISION_LABEL[decision]}
+          </button>
+        {/each}
+      </div>
+    {/if}
 
     {#if facts.length > 0}
       <dl>
@@ -152,6 +168,35 @@
     font-size: 12px;
     font-weight: 400;
     color: var(--ink-faint);
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .actions button {
+    min-width: 76px;
+    padding: 4px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: var(--paper);
+  }
+
+  .actions button:hover {
+    background: var(--hover);
+  }
+
+  .actions .primary {
+    border-color: var(--accepted);
+    background: var(--accepted);
+    color: var(--paper);
+    font-weight: 500;
+  }
+
+  .actions .primary:hover {
+    background: color-mix(in srgb, var(--accepted) 86%, var(--ink));
   }
 
   dl {
