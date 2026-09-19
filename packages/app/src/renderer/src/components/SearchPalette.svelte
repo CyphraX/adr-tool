@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { search, type SearchHit } from '../lib/search'
+  import { searchLogs } from '../lib/search'
   import { app, statusKey } from '../lib/state.svelte'
   import { STATUS_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
@@ -9,31 +9,16 @@
   const LIMIT = 12
 
   let dialog = $state<HTMLDialogElement>()
-  let input = $state<HTMLInputElement>()
-  let position = $state(0)
+  let chosen = $state(0)
 
   const logs = $derived(app.active?.repository.repository.logs ?? [])
-
-  interface Found extends SearchHit {
-    logPath: string
-  }
-
-  const found = $derived.by((): Found[] => {
-    const query = app.searching?.query ?? ''
-    // The log in view first: that is where the person is looking.
-    const ordered = [...logs].sort(
-      (a, b) => Number(b.path === app.log?.path) - Number(a.path === app.log?.path)
-    )
-    return ordered
-      .flatMap((log) => search(log.adrs, query).map((hit) => ({ ...hit, logPath: log.path })))
-      .slice(0, LIMIT)
-  })
+  const all = $derived(searchLogs(logs, app.searching?.query ?? '', app.log?.path))
+  const found = $derived(all.slice(0, LIMIT))
+  // The files can change under an open palette, and the list with them.
+  const position = $derived(Math.min(chosen, found.length - 1))
 
   $effect(() => {
-    if (app.searching && !dialog?.open) {
-      dialog?.showModal()
-      input?.select()
-    }
+    if (app.searching && !dialog?.open) dialog?.showModal()
     if (!app.searching && dialog?.open) dialog.close()
   })
 
@@ -47,24 +32,24 @@
     const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
     if (step === 0 || found.length === 0) return
     event.preventDefault()
-    position = (position + step + found.length) % found.length
-    document.getElementById(`hit-${position}`)?.scrollIntoView({ block: 'nearest' })
+    chosen = (position + step + found.length) % found.length
+    document.getElementById(`hit-${chosen}`)?.scrollIntoView({ block: 'nearest' })
   }
 </script>
 
 <dialog bind:this={dialog} oncancel={() => app.stopSearching()} aria-label="Search the ADRs">
   {#if app.searching}
     <input
-      bind:this={input}
       bind:value={app.searching.query}
-      oninput={() => (position = 0)}
+      oninput={() => (chosen = 0)}
       {onkeydown}
       type="search"
       placeholder="Search titles, text, tags, people — or type a number"
       spellcheck="false"
       role="combobox"
+      aria-autocomplete="list"
       aria-expanded={found.length > 0}
-      aria-controls="hits"
+      aria-controls={found.length > 0 ? 'hits' : undefined}
       aria-activedescendant={found.length > 0 ? `hit-${position}` : undefined}
     />
 
@@ -82,7 +67,7 @@
             tabindex="-1"
             aria-selected={index === position}
             onclick={() => app.jumpTo(hit.logPath, hit.adr.id)}
-            onmousemove={() => (position = index)}
+            onmousemove={() => (chosen = index)}
           >
             <span class="line">
               <StatusMark {status} />
@@ -102,6 +87,9 @@
           </div>
         {/each}
       </div>
+      {#if all.length > found.length}
+        <p class="more">The best {found.length} of {all.length}. Another word narrows it down.</p>
+      {/if}
     {:else if app.searching.query.trim() !== ''}
       <p class="none">No ADR has all of these words.</p>
     {/if}
@@ -208,6 +196,14 @@
     border-radius: 2px;
     background: color-mix(in srgb, var(--proposed) 30%, transparent);
     color: var(--ink);
+  }
+
+  .more {
+    flex: none;
+    padding: 6px 18px 8px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-faint);
   }
 
   .none {
