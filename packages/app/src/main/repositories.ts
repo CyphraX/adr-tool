@@ -1,6 +1,5 @@
-import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { basename } from 'node:path'
+import { basename, join } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
 import {
   DEFAULT_LOG_PATHS,
@@ -16,6 +15,7 @@ import {
   planRepair,
   type ChangeSet,
   type DecisionLog,
+  type FileChange,
   type Plan,
   type Templates
 } from '@adr-tool/core'
@@ -24,11 +24,14 @@ import type {
   BodyEditRequest,
   CreateRequest,
   Decision,
+  HistoryEntry,
   MetadataEditRequest,
   OpenRepository,
   PlanResult,
   RepairRequest
 } from '../shared/ipc'
+import { gitIn } from './git'
+import { historyChangeOf, historyOf } from './history'
 import { nodeFileSystem } from './node-file-system'
 import { watchPaths } from './watch-paths'
 
@@ -46,6 +49,8 @@ const FIRST_LOG: DecisionLog = {
 interface Entry {
   readonly id: string
   readonly root: string
+  /** Where git keeps HEAD and the index. Asked once per repository; `null`: git would not say. */
+  gitDirectory?: string | null
   watcher?: FSWatcher
   watched: string[]
   reload?: NodeJS.Timeout
@@ -108,7 +113,7 @@ export class Repositories {
   /** Plan saving an edited body. The author of a Correction is who git says the user is. */
   async planBodyEdit(request: BodyEditRequest): Promise<PlanResult> {
     const root = this.rootOf(request.repositoryId)
-    const author = root === undefined ? undefined : await gitUserName(root)
+    const author = root === undefined ? undefined : await gitIn(root).userName()
     return this.plan(request.repositoryId, request.logPath, (fs, log) =>
       planEditBody(fs, log, request.adrId, {
         base: request.base,
@@ -196,6 +201,36 @@ export class Repositories {
     }
   }
 
+  /** The history of an ADR's file. The path is never the renderer's: it is looked up in the log. */
+  async history(repositoryId: string, logPath: string, adrId: string): Promise<HistoryEntry[]> {
+    const found = await this.adrOnDisk(repositoryId, logPath, adrId)
+    return found ? historyOf(gitIn(found.root), found.path, found.text) : []
+  }
+
+  async historyChange(
+    repositoryId: string,
+    logPath: string,
+    adrId: string,
+    entryId: string
+  ): Promise<FileChange | undefined> {
+    const found = await this.adrOnDisk(repositoryId, logPath, adrId)
+    return found && historyChangeOf(gitIn(found.root), found.path, found.text, entryId)
+  }
+
+  private async adrOnDisk(
+    repositoryId: string,
+    logPath: string,
+    adrId: string
+  ): Promise<{ root: string; path: string; text: string | undefined } | undefined> {
+    const entry = this.entries.get(repositoryId)
+    if (!entry) return undefined
+    const fs = nodeFileSystem(entry.root)
+    const adr = (await openRepository(fs)).logs
+      .find((log) => log.path === logPath)
+      ?.adrs.find((candidate) => candidate.id === adrId)
+    return adr && { root: entry.root, path: adr.path, text: await fs.readText(adr.path) }
+  }
+
   async applyChange(changeId: string): Promise<ApplyResult> {
     const planned = this.planned.get(changeId)
     const entry = planned && this.entries.get(planned.repositoryId)
@@ -222,9 +257,28 @@ export class Repositories {
   }
 
   private async load(entry: Entry): Promise<OpenRepository> {
-    const repository = await openRepository(nodeFileSystem(entry.root))
-    this.watch(entry, watchPaths(entry.root, repository))
-    return { id: entry.id, root: entry.root, name: basename(entry.root), repository }
+    const git = gitIn(entry.root)
+    const [repository, tree] = await Promise.all([
+      openRepository(nodeFileSystem(entry.root)),
+      git.workingTree()
+    ])
+    entry.gitDirectory ??= tree ? ((await git.directory()) ?? null) : undefined
+    // A commit, a checkout, a reset or `git add` changes no ADR, and still changes what is uncommitted.
+    const gitPaths = entry.gitDirectory
+      ? ['HEAD', 'index', 'logs/HEAD'].map((file) => join(entry.gitDirectory!, file))
+      : []
+    this.watch(entry, [...watchPaths(entry.root, repository), ...gitPaths])
+
+    const adrPaths = new Set(repository.logs.flatMap((log) => log.adrs.map((adr) => adr.path)))
+    return {
+      id: entry.id,
+      root: entry.root,
+      name: basename(entry.root),
+      repository,
+      ...(tree && {
+        git: { branch: tree.branch, changed: tree.changed.filter((path) => adrPaths.has(path)) }
+      })
+    }
   }
 
   /** (Re)start the watcher when the set of paths changed, e.g. after a Decision Log was configured. */
@@ -247,14 +301,4 @@ export class Repositories {
 function localDate(now = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-}
-
-/** `user.name` from git's configuration for this repository, if git is there and knows one. */
-function gitUserName(root: string): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    execFile('git', ['config', 'user.name'], { cwd: root, timeout: 3000 }, (error, stdout) => {
-      const name = stdout.trim()
-      resolve(error || name === '' ? undefined : name)
-    })
-  })
 }
