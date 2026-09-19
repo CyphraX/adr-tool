@@ -135,6 +135,8 @@ describe('readMetadata', () => {
     for (const lines of [['status: [unclosed'], ['status: a', 'status: b'], ['- a list']]) {
       const { problems, writable, metadata } = read(frontmatter(...lines))
       expect(problems).toMatchObject([{ kind: 'invalid-frontmatter' }])
+      // One sentence that stands on its own; the library's quote of the source is left out.
+      expect(problems[0]).toHaveProperty('detail', expect.stringMatching(/[^:\n]$/))
       expect(writable).toBe(false)
       expect(metadata.status).toBe('accepted')
     }
