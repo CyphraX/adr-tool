@@ -1,0 +1,30 @@
+{
+  "name": "adr-tool",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Desktop app for browsing, writing and relating Architecture Decision Records",
+  "type": "module",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @adr-tool/app dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint --cache .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@electron-toolkit/eslint-config-prettier": "^3.0.0",
+    "@electron-toolkit/eslint-config-ts": "^3.1.0",
+    "eslint": "~10.10.0",
+    "eslint-plugin-svelte": "^3.13.1",
+    "prettier": "^3.7.4",
+    "prettier-plugin-svelte": "^3.4.0",
+    "svelte": "^5.45.6",
+    "typescript": "^5.9.3"
+  }
+}

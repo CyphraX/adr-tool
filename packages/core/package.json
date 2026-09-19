@@ -1,0 +1,19 @@
+{
+  "name": "@adr-tool/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The UI-free domain core of ADR Tool: no Electron, no DOM, no disk access of its own",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

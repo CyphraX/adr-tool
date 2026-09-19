@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+
+# pnpm 11 runs a dependency's install scripts only when it is listed here.
+allowBuilds:
+  electron: true
+  esbuild: true
