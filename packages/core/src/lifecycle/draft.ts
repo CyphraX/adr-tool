@@ -13,9 +13,17 @@ export class Refusal extends Error {}
  * write touches stays byte for byte what was read (ADR-0002).
  */
 export class Drafts {
-  private readonly texts = new Map<string, { before: string; after: string }>()
+  private readonly texts = new Map<string, { before: string; after: string; creates?: true }>()
 
   constructor(private readonly fs: FileSystem) {}
+
+  /** A file that does not exist yet. Refused when it does. */
+  async create(path: string, text: string): Promise<void> {
+    if (this.texts.has(path) || (await this.fs.readText(path)) !== undefined) {
+      throw new Refusal(`${path} already exists.`)
+    }
+    this.texts.set(path, { before: '', after: text, creates: true })
+  }
 
   /** The text of a file as the operation has it so far. */
   async read(path: string): Promise<string> {
@@ -27,7 +35,7 @@ export class Drafts {
     draft.after = applyEdits(draft.after, edit(viewSource(draft.after)))
   }
 
-  private async draft(path: string): Promise<{ before: string; after: string }> {
+  private async draft(path: string): Promise<{ before: string; after: string; creates?: true }> {
     let draft = this.texts.get(path)
     if (!draft) {
       const before = await this.fs.readText(path)

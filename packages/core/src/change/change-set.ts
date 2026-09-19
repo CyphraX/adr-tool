@@ -4,8 +4,11 @@ import type { WritableFileSystem } from '../fs/port'
 export interface FileChange {
   /** Relative to the repository root. */
   readonly path: string
+  /** The text the change was planned against; empty for a file that is being created. */
   readonly before: string
   readonly after: string
+  /** The file does not exist yet. It must still not exist when the change is applied. */
+  readonly creates?: true
 }
 
 /**
@@ -22,6 +25,8 @@ export type Plan =
   | {
       readonly ok: true
       readonly changeSet: ChangeSet
+      /** The ADR the operation creates, so that the caller can show it afterwards. */
+      readonly created?: { readonly id: string; readonly path: string }
       /** What the person should look at before confirming. The operation can be done all the same. */
       readonly warnings?: readonly string[]
     }
@@ -42,7 +47,9 @@ export async function applyChangeSet(
 ): Promise<Applied> {
   const current = await Promise.all(changeSet.files.map((file) => fs.readText(file.path)))
   const conflicts = changeSet.files
-    .filter((file, position) => current[position] !== file.before)
+    .filter((file, position) =>
+      file.creates ? current[position] !== undefined : current[position] !== file.before
+    )
     .map((file) => file.path)
   if (conflicts.length > 0) return { applied: false, conflicts }
 
