@@ -1,7 +1,7 @@
 export { STATUSES, isStatus, type Status } from './status'
 export { RELATION_TYPES, BACK_REFERENCE_KEYS, isRelationType, type RelationType } from './relation'
 
-export { joinPath, type DirectoryEntry, type FileSystem } from './fs/port'
+export { joinPath, type DirectoryEntry, type FileSystem, type WritableFileSystem } from './fs/port'
 export { memoryFileSystem } from './fs/memory'
 
 export { openRepository, type DecisionLog, type Repository } from './log/load'
@@ -14,3 +14,12 @@ export { hasBeenAccepted, type Relation, type RelationState } from './relations/
 export type { BackReferenceKey, Problem } from './problems/problem'
 
 export { applyEdits, type TextEdit } from './text/edit'
+
+export {
+  applyChangeSet,
+  type Applied,
+  type ChangeSet,
+  type FileChange,
+  type Plan
+} from './change/change-set'
+export { planAccept, planDeprecate, planReject, type Today } from './lifecycle/decide'
