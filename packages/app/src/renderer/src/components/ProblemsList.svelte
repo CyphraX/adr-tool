@@ -30,7 +30,10 @@
 <div class="list">
   <div class="head">
     <h2>Problems</h2>
-    <button onclick={() => app.show('adrs')}>Back to the ADRs</button>
+    <span class="tools">
+      <button onclick={() => app.startSearching()}>Search</button>
+      <button onclick={() => app.show('adrs')}>Back to the ADRs</button>
+    </span>
   </div>
 
   {#if app.problemGroups.length === 0}
@@ -110,6 +113,11 @@
     flex: none;
     padding: 6px 14px;
     border-bottom: 1px solid var(--line);
+  }
+
+  .tools {
+    display: flex;
+    gap: 8px;
   }
 
   h2 {
