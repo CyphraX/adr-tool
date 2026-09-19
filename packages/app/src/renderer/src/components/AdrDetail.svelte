@@ -3,7 +3,13 @@
   import type { Decision } from '../../../shared/ipc'
   import { problemsOf } from '../lib/problems'
   import { DECISION_LABEL, app, statusKey } from '../lib/state.svelte'
-  import { STATUS_LABEL, describeProblem, prefixOf, relationLabel } from '../lib/wording'
+  import {
+    STATUS_LABEL,
+    describeCause,
+    describeProblem,
+    prefixOf,
+    relationLabel
+  } from '../lib/wording'
   import BodyEditor from './BodyEditor.svelte'
   import MarkdownDocument from './MarkdownDocument.svelte'
   import StatusMark from './StatusMark.svelte'
@@ -130,10 +136,8 @@
           <li class:follows={cause !== undefined}>
             {describeProblem(problem)}
             {#if cause !== undefined}
-              <span class="cause">
-                Reported only because the frontmatter of
-                <button onclick={() => app.select(cause)}>{cause}</button> cannot be read.
-              </span>
+              <button class="cause" onclick={() => app.select(cause)}>{describeCause(cause)}</button
+              >
             {/if}
             {#if problem.kind === 'duplicate-number' && !editing}
               <!-- The repair of this Problem: one of the two moves, and the person says which. -->
@@ -309,8 +313,10 @@
     color: var(--ink-soft);
   }
 
-  .problems .cause button {
+  .problems .cause {
+    display: inline;
     margin: 0;
+    text-align: left;
     padding: 0;
     border: 0;
     background: none;
