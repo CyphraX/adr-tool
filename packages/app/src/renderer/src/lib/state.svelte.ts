@@ -1,5 +1,6 @@
 import type { Adr, DecisionLog, Problem, Status } from '@adr-tool/core'
-import type { OpenRepository } from '../../../shared/ipc'
+import type { Decision, OpenRepository, PlannedChange } from '../../../shared/ipc'
+import { prefixOf } from './wording'
 
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
@@ -11,11 +12,24 @@ interface Tab {
   selectedId: string | undefined
 }
 
+/** What the dialog shows after an action was asked for: the change to review, or why there is none. */
+export type Review =
+  | { kind: 'change'; title: string; action: string; change: PlannedChange; applying: boolean }
+  | { kind: 'refused'; title: string; reason: string }
+
+/** What a decision is called on its button, and again on the button that confirms it. */
+export const DECISION_LABEL: Record<Decision, string> = {
+  accept: 'Accept',
+  reject: 'Reject',
+  deprecate: 'Deprecate'
+}
+
 /** Everything the window shows: the open repositories as tabs, and per tab what is selected. */
 class AppState {
   tabs = $state<Tab[]>([])
   activeId = $state<string | undefined>(undefined)
   ready = $state(false)
+  review = $state<Review | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -88,6 +102,40 @@ class AppState {
     const found = this.log?.adrs.some((adr) => adr.id === id) ?? false
     if (found) this.select(id)
     return found
+  }
+
+  /** Ask for a decision on the selected ADR. The main process plans it; nothing is written yet. */
+  async decide(decision: Decision): Promise<void> {
+    const [tab, log, adr] = [this.active, this.log, this.selected]
+    if (!tab || !log || !adr) return
+    const action = DECISION_LABEL[decision]
+    const title = `${action} ADR ${prefixOf(adr)}`
+    const plan = await window.api.planDecision(tab.repository.id, log.path, adr.id, decision)
+    this.review = plan.ok
+      ? { kind: 'change', title, action, change: plan.change, applying: false }
+      : {
+          kind: 'refused',
+          title: `Cannot ${action.toLowerCase()} ADR ${prefixOf(adr)}`,
+          reason: plan.reason
+        }
+  }
+
+  async applyReview(): Promise<void> {
+    const review = this.review
+    if (review?.kind !== 'change' || review.applying) return
+    review.applying = true
+    const result = await window.api.applyChange(review.change.changeId)
+    if (result.applied) {
+      this.replace(result.repository)
+      this.review = undefined
+    } else {
+      this.review = { kind: 'refused', title: 'The change was not written', reason: result.reason }
+    }
+  }
+
+  dismissReview(): void {
+    if (this.review?.kind === 'change') void window.api.discardChange(this.review.change.changeId)
+    this.review = undefined
   }
 
   /** The files changed on disk: take the new reading, keep what the user was looking at. */

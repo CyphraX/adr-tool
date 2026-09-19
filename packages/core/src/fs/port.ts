@@ -12,6 +12,16 @@ export interface FileSystem {
   list(path: string): Promise<DirectoryEntry[] | undefined>
 }
 
+/**
+ * A file system that can be written to. Reading a repository only ever takes a
+ * `FileSystem`, so that it cannot write; applying a change set takes this.
+ */
+export interface WritableFileSystem extends FileSystem {
+  /** Write a file, creating it and its directories when they do not exist. */
+  writeText(path: string, text: string): Promise<void>
+  rename(from: string, to: string): Promise<void>
+}
+
 export interface DirectoryEntry {
   readonly name: string
   readonly kind: 'file' | 'directory'

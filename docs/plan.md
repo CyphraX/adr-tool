@@ -7,7 +7,7 @@ The milestones are ordered from the tightest constraint outward. The tightest co
 
 ## Working mode
 
-- One branch and one pull request per milestone. `main` stays green.
+- One branch and one pull request per milestone; a large milestone comes in parts, each its own pull request that leaves `main` working. `main` stays green.
 - CI runs lint, type check and tests on Windows, macOS and Linux from M0 on. Path handling, line endings and file watching differ per platform, and we want to find that out early.
 - `core` is built test-first. The first test is the round trip from ADR-0002: open a file, save it unchanged, get identical bytes.
 - Hard-to-reverse decisions get an ADR in `docs/adr/`. New domain terms go into CONTEXT.md the moment they are settled.
@@ -129,7 +129,7 @@ Each has a recommendation and a way to verify it. None blocks M0.
 4. **Migration and the body.** In adr-tools the Status lives in a `## Status` section of the body. After Migration the Status is in the Metadata; if the section stays, the file can later contradict itself. **Decided (2026-09-19):** Migration removes the section when it holds nothing but the Status word and supersession lines that were fully captured; otherwise it leaves the section and reports it. Either way the user sees the diff first. This is the one place where the tool edits body text on its own.
 5. **Graph rendering.** Decide in M4 with a throwaway prototype, not now.
 6. **Line endings.** The tool keeps whatever line ending a file has and uses the Decision Log's prevailing one for new files. `.gitattributes` pins this repository's own Markdown to LF and exempts the fixtures from any normalization, so the round-trip tests see the same bytes on every machine.
-7. **Change sets as architecture.** If the change-set shape of `core` survives M1, it gets its own ADR.
+7. **Change sets as architecture.** Recorded as [ADR-0004](adr/0004-operations-return-change-sets.md) once Accept, Reject and Deprecate and the app's preview were built on it. The ADR was written as `proposed` and accepted through the app itself.
 
 ## Risks
 

@@ -21,7 +21,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
   expect(log.adrs.map((adr) => [adr.number, adr.id, adr.metadata.status])).toEqual([
     [1, '0001-electron-svelte-typescript-throughout', 'accepted'],
     [2, '0002-never-reserialize-markdown', 'accepted'],
-    [3, '0003-on-disk-contract', 'accepted']
+    [3, '0003-on-disk-contract', 'accepted'],
+    [4, '0004-operations-return-change-sets', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -33,6 +34,12 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     {
       type: 'relates-to',
       from: '0003-on-disk-contract',
+      to: '0002-never-reserialize-markdown',
+      state: 'in-effect'
+    },
+    {
+      type: 'depends-on',
+      from: '0004-operations-return-change-sets',
       to: '0002-never-reserialize-markdown',
       state: 'in-effect'
     }
