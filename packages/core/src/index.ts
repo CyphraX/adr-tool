@@ -12,6 +12,7 @@ export type { Correction, Metadata } from './metadata/read'
 export { METADATA_KEYS, type MetadataKey } from './metadata/keys'
 export { hasBeenAccepted, type Relation, type RelationState } from './relations/graph'
 export type { BackReferenceKey, Problem } from './problems/problem'
+export { groupProblems, type ProblemGroup } from './problems/group'
 
 export { applyEdits, type TextEdit } from './text/edit'
 
