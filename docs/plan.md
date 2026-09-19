@@ -79,6 +79,8 @@ Fixtures: this repository's own `docs/adr` is the first one.
 
 *Done when:* `core` loads this repository, reports three ADRs, one Relation and no problems, and the round-trip and single-key-edit tests pass on all three platforms.
 
+*Status (2026-09-19):* built. The done-when is `packages/core/test/own-repository.test.ts`. Pending effects (step 5) are the Relations whose state is `pending`. Repairs for Problems, change sets and everything that writes stay in M3 and M4 as planned; the metadata writer from the spike is in `core` but not yet part of its public interface.
+
 ### M2 — App shell, read-only
 
 Open a repository, one tab per repository, three columns (sidebar with Decision Logs and Status filters, ADR list, detail with rendered body and Relations panel). File watching, so changes made by git, an editor or an agent show up immediately.
@@ -99,6 +101,8 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 Relations graph (supersede chains, amendments, dependencies), full-text search with quick jump, Problems view with repair actions, git read-only: history, author, date and diff per ADR, uncommitted-changes indicator, current branch. A folder without git still opens, without history.
 
+One broken file must not drown the view: when an ADR's frontmatter cannot be read, the consistency Problems it causes on other ADRs (an unfounded Back-reference, say) are shown under that root cause rather than as separate Problems.
+
 *Done when:* a Correction's diff can be opened from its marker, and a deliberately broken fixture repository can be repaired entirely from the Problems view.
 
 ### M5 — Foreign formats
@@ -115,7 +119,7 @@ As listed in the roadmap: the live editor in its light form, licence, distributi
 
 Each has a recommendation and a way to verify it. None blocks M0.
 
-1. **The metadata writer.** Checked against the documentation of `yaml` 2.x: its Document API keeps comments, blank lines and key order, but `toString()` re-stringifies — quoting and flow-versus-block style are chosen on output, not preserved. That rules it out for writing. The same library's lower layer retains every character of the input, and parsed nodes carry source offsets (`range`: start, value end, node end). **Recommendation:** parse with `yaml` to read and to locate nodes, write by splicing the original text at those offsets, never by stringifying. **Verify in M1** with hostile fixtures: comments, mixed quoting, flow and block lists, CRLF, foreign keys, keys in unusual order. **Fallback:** a small hand-written editor for the tool's own keys — the schema is tiny and tool-owned.
+1. **The metadata writer.** Checked against the documentation of `yaml` 2.x: its Document API keeps comments, blank lines and key order, but `toString()` re-stringifies — quoting and flow-versus-block style are chosen on output, not preserved. That rules it out for writing. The same library's lower layer retains every character of the input, and parsed nodes carry source offsets (`range`: start, value end, node end). **Recommendation:** parse with `yaml` to read and to locate nodes, write by splicing the original text at those offsets, never by stringifying. **Verify in M1** with hostile fixtures: comments, mixed quoting, flow and block lists, CRLF, foreign keys, keys in unusual order. **Fallback:** a small hand-written editor for the tool's own keys — the schema is tiny and tool-owned. **Verified (2026-09-19):** the spike in `packages/core/src/metadata/write.ts` sets scalars, extends flow and block lists, inserts and removes keys by splicing at `yaml`'s node offsets. On the hostile fixtures every write changes exactly the intended lines; quoting, spacing, comments, foreign keys, CRLF and a byte order mark survive. The fallback is not needed.
 2. **git access.** Shell out to the system `git` behind a thin wrapper, rather than a JavaScript reimplementation. Users have git by definition, and its behaviour is the reference. Verify in M4; degrade to "no history" when git is absent.
 3. **Packaging.** electron-vite for development and build is settled by M0 (official `svelte-ts` template; needs Node 20.19+ or 22.12+, Node 24 is installed). The packaging tool — electron-builder or Electron Forge — is decided with distribution, before the first public release. Leaning towards electron-builder.
 4. **Migration and the body.** In adr-tools the Status lives in a `## Status` section of the body. After Migration the Status is in the Metadata; if the section stays, the file can later contradict itself. **Decided (2026-09-19):** Migration removes the section when it holds nothing but the Status word and supersession lines that were fully captured; otherwise it leaves the section and reports it. Either way the user sees the diff first. This is the one place where the tool edits body text on its own.
