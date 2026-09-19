@@ -1,14 +1,25 @@
+import type { Correction } from '@adr-tool/core'
 import type { HistoryEntry } from '../../../shared/ipc'
 
+const same = (a: Correction, b: Correction): boolean =>
+  a.date === b.date && a.author === b.author && a.note === b.note
+
 /**
- * The entry that recorded Correction number `correction` of a file (counted from 0): the
- * oldest one at which the file records more Corrections than that. Entries are newest first.
+ * The entry that recorded a Correction of a file: the oldest one at which the file records
+ * it. Entries are newest first. `corrections` is the file's list as it is now and `index`
+ * the Correction in it; of several that read the same, the n-th is looked for as the n-th.
  */
 export function recordedIn(
   entries: readonly HistoryEntry[],
-  correction: number
+  corrections: readonly Correction[],
+  index: number
 ): HistoryEntry | undefined {
-  return entries.findLast((entry) => entry.corrections > correction)
+  const wanted = corrections[index]
+  if (!wanted) return undefined
+  const nth = corrections.slice(0, index + 1).filter((other) => same(other, wanted)).length
+  return entries.findLast(
+    (entry) => entry.corrections.filter((other) => same(other, wanted)).length >= nth
+  )
 }
 
 /** A commit's date as the person who looks at it reads dates: their own calendar, no seconds. */

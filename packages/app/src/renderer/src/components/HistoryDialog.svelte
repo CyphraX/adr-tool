@@ -39,8 +39,8 @@
     {:else}
       {#if history.notFound}
         <p class="note">
-          No commit recorded this Correction — it may have been written by hand in one step with
-          another one. This is the whole history of the file.
+          No commit of this file records that Correction as it reads now. This is the whole history
+          of the file.
         </p>
       {/if}
       <div class="panes">
@@ -85,8 +85,12 @@
           {#if history.change}
             <FileDiff
               file={history.change}
-              unchanged="This commit renamed the file. Its text did not change."
+              unchanged="The file was renamed. Its text did not change."
             />
+          {:else if history.change === null}
+            <p class="note">
+              git cannot show this change any more. The file or the commit is gone.
+            </p>
           {:else}
             <p class="note">Reading the change …</p>
           {/if}

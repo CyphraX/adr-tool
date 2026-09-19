@@ -104,7 +104,8 @@ interface History {
   /** `undefined` while git is being asked. */
   entries: readonly HistoryEntry[] | undefined
   selectedId: string | undefined
-  change: FileChange | undefined
+  /** `undefined` while it is being read; `null` when git could not say. */
+  change: FileChange | null | undefined
   /** Set when the history was opened from a Correction that no entry recorded. */
   notFound: boolean
 }
@@ -301,8 +302,8 @@ class AppState {
   }
 
   /**
-   * Open the history of the selected ADR; from the marker of a Correction (counted from 0),
-   * at the entry that recorded it.
+   * Open the history of the selected ADR; from the marker of a Correction — its position
+   * in the ADR's list — at the entry that recorded it.
    */
   async showHistory(correction?: number): Promise<void> {
     const [tab, log, adr] = [this.active, this.log, this.selected]
@@ -319,7 +320,10 @@ class AppState {
     const entries = await window.api.history(tab.repository.id, log.path, adr.id)
     // The dialog may have been closed, or opened for another ADR, in the meantime.
     if (this.history?.adrId !== adr.id) return
-    const recorded = correction === undefined ? undefined : recordedIn(entries, correction)
+    const recorded =
+      correction === undefined
+        ? undefined
+        : recordedIn(entries, adr.metadata.corrections, correction)
     this.history.entries = entries
     this.history.notFound = correction !== undefined && !recorded
     await this.showHistoryEntry((recorded ?? entries[0])?.id)
@@ -330,9 +334,11 @@ class AppState {
     if (!tab || !log || !history || id === undefined) return
     history.selectedId = id
     history.change = undefined
-    const change = await window.api.historyChange(tab.repository.id, log.path, history.adrId, id)
+    const change = await window.api
+      .historyChange(tab.repository.id, log.path, history.adrId, id)
+      .catch(() => undefined)
     if (this.history?.adrId === history.adrId && this.history.selectedId === id) {
-      this.history.change = change
+      this.history.change = change ?? null
     }
   }
 
