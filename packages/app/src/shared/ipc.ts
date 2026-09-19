@@ -1,5 +1,6 @@
 import type {
   ChangeSet,
+  Correction,
   FileChange,
   RelationType,
   Repair,
@@ -44,8 +45,8 @@ export interface HistoryEntry {
   readonly date?: string
   /** The file's name before this commit, when the commit renamed it: a Renumber. */
   readonly renamedFrom?: string
-  /** How many Corrections the file records at this point. The first entry with more than `n` recorded Correction `n`. */
-  readonly corrections: number
+  /** The Corrections the file records at this point. The oldest entry that has one recorded it. */
+  readonly corrections: readonly Correction[]
 }
 
 export interface Session {

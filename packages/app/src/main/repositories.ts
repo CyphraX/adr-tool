@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { basename, join } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
@@ -50,7 +49,7 @@ const FIRST_LOG: DecisionLog = {
 interface Entry {
   readonly id: string
   readonly root: string
-  /** Where git keeps HEAD and the index; `null` once it is known that there is none. */
+  /** Where git keeps HEAD and the index. Asked once per repository; `null`: git would not say. */
   gitDirectory?: string | null
   watcher?: FSWatcher
   watched: string[]
@@ -114,7 +113,7 @@ export class Repositories {
   /** Plan saving an edited body. The author of a Correction is who git says the user is. */
   async planBodyEdit(request: BodyEditRequest): Promise<PlanResult> {
     const root = this.rootOf(request.repositoryId)
-    const author = root === undefined ? undefined : await gitUserName(root)
+    const author = root === undefined ? undefined : await gitIn(root).userName()
     return this.plan(request.repositoryId, request.logPath, (fs, log) =>
       planEditBody(fs, log, request.adrId, {
         base: request.base,
@@ -259,14 +258,14 @@ export class Repositories {
 
   private async load(entry: Entry): Promise<OpenRepository> {
     const git = gitIn(entry.root)
-    const [repository, state] = await Promise.all([
+    const [repository, tree] = await Promise.all([
       openRepository(nodeFileSystem(entry.root)),
-      git.state()
+      git.workingTree()
     ])
-    entry.gitDirectory ??= state ? ((await git.directory()) ?? null) : undefined
-    // A commit, a checkout or `git add` changes no ADR, and still changes what is uncommitted.
+    entry.gitDirectory ??= tree ? ((await git.directory()) ?? null) : undefined
+    // A commit, a checkout, a reset or `git add` changes no ADR, and still changes what is uncommitted.
     const gitPaths = entry.gitDirectory
-      ? [join(entry.gitDirectory, 'HEAD'), join(entry.gitDirectory, 'index')]
+      ? ['HEAD', 'index', 'logs/HEAD'].map((file) => join(entry.gitDirectory!, file))
       : []
     this.watch(entry, [...watchPaths(entry.root, repository), ...gitPaths])
 
@@ -276,8 +275,8 @@ export class Repositories {
       root: entry.root,
       name: basename(entry.root),
       repository,
-      ...(state && {
-        git: { branch: state.branch, changed: state.changed.filter((path) => adrPaths.has(path)) }
+      ...(tree && {
+        git: { branch: tree.branch, changed: tree.changed.filter((path) => adrPaths.has(path)) }
       })
     }
   }
@@ -302,14 +301,4 @@ export class Repositories {
 function localDate(now = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-}
-
-/** `user.name` from git's configuration for this repository, if git is there and knows one. */
-function gitUserName(root: string): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    execFile('git', ['config', 'user.name'], { cwd: root, timeout: 3000 }, (error, stdout) => {
-      const name = stdout.trim()
-      resolve(error || name === '' ? undefined : name)
-    })
-  })
 }
