@@ -122,6 +122,26 @@ Two branches that each added "the next ADR" leave a `sequential` Decision Log wi
 - Two ADRs with the same number in a `sequential` log.
 - Metadata that breaks section 2 or 3: invalid YAML, a Status outside the five values, a malformed date, a value of the wrong type, `decided` on a `proposed` ADR.
 
+### Repairs
+
+Some Problems have a repair. A repair is an operation like any other: it is planned, shown as a diff, and writes exactly the lines below. Every repair follows one rule — **the Relation is authoritative**: what an ADR that has been accepted says in `supersedes` and `amends` is taken as true, and Back-references and the `superseded` Status are made to fit it.
+
+| Problem | The repair writes |
+| ------- | ----------------- |
+| The Status is not written in lowercase | the Status in lowercase; its quoting stays |
+| A Relation or Back-reference names an ID that is not in the Decision Log, or the ADR's own ID | the item is taken out of its list, where it stands |
+| A Back-reference is missing | the ID is added to `superseded-by` or `amended-by` of the target |
+| A Back-reference without a Relation in effect behind it | the item is taken out of `superseded-by` or `amended-by` |
+| The target of a `supersedes` Relation in effect is not `superseded` | `status: superseded` on the target |
+| An ADR is `superseded`, but no ADR that has been accepted supersedes it | `status: accepted`. The tool cannot know whether the ADR was `deprecated` before; the preview says so, and Deprecate is one step away |
+| A cycle of `supersedes` Relations | one `supersedes` item of the cycle is taken out; the person says which. What that Relation had caused on its target — the Back-reference, the `superseded` Status — is a Problem of its own afterwards, with its own repair |
+| Two ADRs with the same number | Renumber of one of them; the person says which |
+
+- One repair repairs one Problem and is previewed on its own. There is no "repair everything".
+- When the Relation is what is wrong — the successor forgot its `supersedes`, say — the repair is the wrong tool: `supersedes` and `amends` of an ADR that is no longer `proposed` are changed by hand, in the file.
+- No repair for Metadata that breaks section 2 or 3 otherwise — frontmatter that cannot be read, a malformed date, a Status outside the five values, a value of the wrong type: the tool cannot know what was meant. A person fixes the file.
+- A Problem that is only reported because another ADR's frontmatter cannot be read has no repair: the unreadable file is fixed first. A repair that would write into an ADR whose frontmatter cannot be read is refused.
+
 ## 6. Finding Decision Logs
 
 The tool looks, in this order, and stops at the first step that yields something:
