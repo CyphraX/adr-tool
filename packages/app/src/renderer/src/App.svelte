@@ -3,6 +3,7 @@
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
   import ChangeDialog from './components/ChangeDialog.svelte'
+  import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
@@ -57,6 +58,7 @@
     {/if}
   </div>
   <NewAdrDialog />
+  <MetadataDialog />
   <ChangeDialog />
 {/if}
 
