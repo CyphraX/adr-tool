@@ -8,6 +8,7 @@ import { viewSource } from '../text/source'
 import { correctionWarnings } from './correction'
 import type { Today } from './decide'
 import { Refusal, plan } from './draft'
+import { requireOwnFormat } from './rules'
 
 export interface BodyEdit extends Today {
   /** The body the edit started from, exactly as it was read (`Adr.body`). */
@@ -37,6 +38,7 @@ export function planEditBody(
   const planned = plan(fs, async (drafts) => {
     const adr = log.adrs.find((candidate) => candidate.id === id)
     if (!adr) throw new Refusal(`There is no ADR ${id} in this Decision Log.`)
+    requireOwnFormat(adr)
 
     const current = viewSource(await drafts.read(adr.path))
     if (current.text.slice(current.bodyStart) !== edit.base) {
