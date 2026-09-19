@@ -16,13 +16,13 @@ import { prefixOf } from './wording'
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
 
-/** What the middle pane lists: the ADRs of the log in view, or its Problems. */
-export type ListView = 'adrs' | 'problems'
+/** What the middle pane shows of the log in view: its ADRs, their Relations as a graph, or its Problems. */
+export type MiddleView = 'adrs' | 'graph' | 'problems'
 
 interface Tab {
   repository: OpenRepository
   logPath: string | undefined
-  view: ListView
+  view: MiddleView
   statusFilter: StatusFilter
   selectedId: string | undefined
 }
@@ -268,7 +268,7 @@ class AppState {
     this.active.view = 'adrs'
   }
 
-  show(view: ListView): void {
+  show(view: MiddleView): void {
     if (this.active) this.active.view = view
   }
 
@@ -295,8 +295,10 @@ class AppState {
       if (!tab) return
       tab.logPath = logPath
       tab.selectedId = id
-      // The list of ADRs shows where the jump went — unless a filter hides the ADR.
-      tab.view = 'adrs'
+      // What is in the middle has to show where the jump went: the graph does if it draws
+      // the ADR, the list does unless a filter hides it.
+      const drawn = this.log?.relations.some(({ from, to }) => from === id || to === id)
+      if (!(tab.view === 'graph' && drawn)) tab.view = 'adrs'
       const adr = this.log?.adrs.find((candidate) => candidate.id === id)
       if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
         tab.statusFilter = 'all'
