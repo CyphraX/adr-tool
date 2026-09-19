@@ -5,7 +5,9 @@ import type { DecisionLog } from '../log/load'
 import { nextPrefix } from '../log/new-id'
 import { replaceInList } from '../metadata/write'
 import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
+import { titleOf } from '../text/title'
 import { Refusal, plan } from './draft'
+import { requireOwnFormat } from './rules'
 
 /** Every Metadata key whose items are IDs of other ADRs. */
 const NAMING_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
@@ -58,11 +60,23 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
         }
         continue
       }
+      // A foreign file keeps its Relations in its text, and the tool does not write that.
+      if (other.foreign && (await fs.readText(other.path))?.includes(id)) {
+        requireOwnFormat(
+          other,
+          ` It mentions ${id}: renumber the other ADR, or change the file by hand.`
+        )
+      }
       for (const key of namingKeys(other, id)) {
         await drafts.write(other.path, (view) => replaceInList(view, key, id, to))
       }
     }
 
+    if (titleOf(adr.body) !== titleOf(adr.body, adr.number)) {
+      warnings.push(
+        `The heading of ${id} carries the number ${adr.number}. It stays as it is, and is shown as part of the title from now on.`
+      )
+    }
     for (const candidate of log.adrs) {
       if (candidate.body.includes(id)) warnings.push(`${candidate.id} mentions ${id} in its text.`)
     }

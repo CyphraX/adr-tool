@@ -1,8 +1,15 @@
+import { readAdrTools } from '../foreign/adr-tools'
 import { numberOf, type AdrFileName, type NamingScheme } from '../log/naming'
 import { readMetadata, type Metadata } from '../metadata/read'
 import type { Problem } from '../problems/problem'
 import { viewSource, type Eol } from '../text/source'
 import { titleOf } from '../text/title'
+
+/** A format the tool reads and never writes (docs/file-format.md, section 8). */
+export type ForeignFormat = 'adr-tools'
+
+/** What each foreign format is called, in a sentence. */
+export const FOREIGN_FORMAT_NAMES: Record<ForeignFormat, string> = { 'adr-tools': 'adr-tools' }
 
 /** An ADR as read from its file. */
 export interface Adr {
@@ -18,6 +25,11 @@ export interface Adr {
   readonly body: string
   /** The file's line ending: that of its first line break. */
   readonly eol: Eol
+  /**
+   * The format the file is written in, when it is not the tool's own. Its Metadata is then
+   * what Migration would write, and no operation but Migration writes to the file.
+   */
+  readonly foreign?: ForeignFormat
   readonly metadata: Metadata
   /** `false` when the tool must not write Metadata into this file until a person has fixed it. */
   readonly metadataWritable: boolean
@@ -30,10 +42,12 @@ export function readAdr(
   scheme: NamingScheme
 ): { adr: Adr; problems: readonly Problem[] } {
   const view = viewSource(text)
-  const { metadata, problems, writable } = readMetadata(view, name.id)
+  const own = readMetadata(view, name.id)
+  const adrTools = readAdrTools(view, name.id, own.metadata)
+  const { metadata, problems } = adrTools ?? own
   const number = numberOf(name, scheme)
   const body = text.slice(view.bodyStart)
-  const title = titleOf(body)
+  const title = titleOf(body, number)
   const adr: Adr = {
     id: name.id,
     path,
@@ -41,8 +55,9 @@ export function readAdr(
     ...(title !== undefined && { title }),
     body,
     eol: view.eol,
+    ...(adrTools && { foreign: 'adr-tools' as const }),
     metadata,
-    metadataWritable: writable
+    metadataWritable: own.writable
   }
   return { adr, problems }
 }

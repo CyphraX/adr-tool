@@ -9,7 +9,7 @@ import type { BackReferenceKey, Problem } from '../problems/problem'
 import { BACK_REFERENCE_KEYS } from '../relation'
 import { plan } from './draft'
 import { planRenumber } from './renumber'
-import { writable } from './rules'
+import { requireOwnFormat, writable } from './rules'
 
 /**
  * What repairs a Problem (docs/file-format.md, section 5, "Repairs"). Each one names the ADR
@@ -46,6 +46,15 @@ export type Repair =
  * file. Several: any one of them is a step, and the person says which.
  */
 export function repairsOf(log: DecisionLog, problem: Problem): Repair[] {
+  // Renumber renames a file; every other Repair writes into one, and a file in a foreign
+  // format is only written by Migration.
+  const foreign = new Set(log.adrs.filter((adr) => adr.foreign).map((adr) => adr.id))
+  return candidatesOf(log, problem).filter(
+    (repair) => repair.kind === 'renumber' || !foreign.has(repair.adr)
+  )
+}
+
+function candidatesOf(log: DecisionLog, problem: Problem): Repair[] {
   switch (problem.kind) {
     case 'status-not-lowercase':
       return [{ kind: 'lowercase-status', adr: problem.adr }]
@@ -103,6 +112,12 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
   const groups = groupProblems(log)
   const repair = groups.map(({ problem }) => offered(problem)).find(Boolean)
   if (!repair) {
+    // The Problem is there, and what repairs it is known: it is the file that is not the tool's to write.
+    const foreign = log.adrs.find((adr) => adr.foreign && adr.id === asked.adr)
+    const withheld = log.problems.some((problem) =>
+      candidatesOf(log, problem).some((candidate) => same(candidate, asked))
+    )
+    if (foreign && withheld) return plan(fs, async () => requireOwnFormat(foreign))
     const root = groups.find(({ consequences }) => consequences.some(offered))?.problem
     return {
       ok: false,

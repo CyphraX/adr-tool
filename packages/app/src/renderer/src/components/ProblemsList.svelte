@@ -6,6 +6,7 @@
     CONSEQUENCES_LEAD,
     NO_REPAIR,
     describeProblem,
+    noRepairIn,
     prefixOf,
     repairLabel
   } from '../lib/wording'
@@ -72,7 +73,8 @@
               {repairLabel(repairs[0]!, log)}
             </button>
           {:else if repairs.length === 0}
-            <p class="by-hand">{NO_REPAIR}</p>
+            {@const foreign = subjects(problem).find((adr) => adr.foreign)?.foreign}
+            <p class="by-hand">{foreign ? noRepairIn(foreign) : NO_REPAIR}</p>
           {/if}
 
           {#if consequences.length > 0}

@@ -6,6 +6,7 @@
   import {
     STATUS_LABEL,
     describeCause,
+    describeForeign,
     describeProblem,
     prefixOf,
     relationLabel,
@@ -49,13 +50,22 @@
   })
 
   // What can be decided depends on where the ADR stands. `superseded` is never set by hand.
+  // Nothing is decided on an ADR in a foreign format: that would write to its file.
   const decisions = $derived<Decision[]>(
-    status === 'proposed' ? ['accept', 'reject'] : status === 'accepted' ? ['deprecate'] : []
+    adr.foreign
+      ? []
+      : status === 'proposed'
+        ? ['accept', 'reject']
+        : status === 'accepted'
+          ? ['deprecate']
+          : []
   )
 
   // A decision that has been taken changes through a new ADR, never in place.
-  const canBeSuperseded = $derived(status === 'accepted' || status === 'deprecated')
-  const canBeAmended = $derived(status === 'accepted')
+  const canBeSuperseded = $derived(
+    !adr.foreign && (status === 'accepted' || status === 'deprecated')
+  )
+  const canBeAmended = $derived(!adr.foreign && status === 'accepted')
 
   const facts = $derived(
     [
@@ -82,6 +92,10 @@
       <StatusStamp {status} label={adr.metadata.rawStatus ?? STATUS_LABEL[status]} />
     </div>
 
+    {#if adr.foreign}
+      <p class="foreign">{describeForeign(adr.foreign)}</p>
+    {/if}
+
     {#if !editing}
       <div class="actions">
         {#each decisions as decision (decision)}
@@ -95,8 +109,10 @@
         {#if canBeAmended}
           <button onclick={() => app.startCreating('amends')}>Amend</button>
         {/if}
-        <button onclick={() => app.edit()}>Edit</button>
-        <button onclick={() => app.editMetadata()}>Metadata</button>
+        {#if !adr.foreign}
+          <button onclick={() => app.edit()}>Edit</button>
+          <button onclick={() => app.editMetadata()}>Metadata</button>
+        {/if}
         {#if git}<button onclick={() => app.showHistory()}>History</button>{/if}
       </div>
     {/if}
@@ -255,6 +271,15 @@
   .corrections button:hover {
     color: var(--ink);
     text-decoration-color: currentColor;
+  }
+
+  .foreign {
+    max-width: 72ch;
+    margin-top: 10px;
+    padding-left: 10px;
+    border-left: 2px solid var(--line-strong);
+    font-size: 12.5px;
+    color: var(--ink-soft);
   }
 
   .actions {

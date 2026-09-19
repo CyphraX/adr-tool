@@ -457,7 +457,7 @@ class AppState {
   /** Open the dialog for the Metadata lists of the selected ADR. */
   editMetadata(): void {
     const [tab, log, adr] = [this.active, this.log, this.selected]
-    if (!tab || !log || !adr) return
+    if (!tab || !log || !adr || adr.foreign) return
     if (!adr.metadataWritable) {
       this.review = {
         kind: 'refused',
@@ -513,7 +513,7 @@ class AppState {
   /** Start editing the body of the selected ADR. */
   edit(): void {
     const [tab, log, adr] = [this.active, this.log, this.selected]
-    if (!tab || !log || !adr) return
+    if (!tab || !log || !adr || adr.foreign) return
     this.editing = {
       repositoryId: tab.repository.id,
       logPath: log.path,
