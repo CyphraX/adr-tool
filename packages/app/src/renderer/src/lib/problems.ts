@@ -6,14 +6,14 @@ export function adrsOf(problem: Problem): readonly string[] {
 }
 
 /** A Problem as one ADR shows it. */
-export interface OwnProblem {
+export interface ReportedProblem {
   problem: Problem
   /** The ADR whose unreadable frontmatter is the only reason this is reported. */
   cause?: string
 }
 
 /** The Problems reported on this ADR. What merely follows from another ADR's broken file says so. */
-export function problemsOf(groups: readonly ProblemGroup[], id: string): OwnProblem[] {
+export function problemsOf(groups: readonly ProblemGroup[], id: string): ReportedProblem[] {
   return groups.flatMap(({ problem, consequences }) => {
     const [cause] = adrsOf(problem)
     return [

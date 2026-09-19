@@ -2,7 +2,7 @@
   import { nextPrefix, type Adr, type Problem } from '@adr-tool/core'
   import { adrsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
-  import { describeProblem, prefixOf } from '../lib/wording'
+  import { CONSEQUENCES_LEAD, describeProblem, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   const selectedId = $derived(app.selected?.id)
@@ -36,7 +36,7 @@
           {#each subjects(problem) as adr (adr.id)}
             <div class="subject">
               {@render subject(adr)}
-              {#if problem.kind === 'duplicate-number' && app.log && !app.editing}
+              {#if problem.kind === 'duplicate-number' && app.log && app.editing?.adrId !== adr.id}
                 <!-- Which of them moves is the person's choice. -->
                 <button class="repair" onclick={() => app.renumber(adr.id)}>
                   Renumber to {nextPrefix(app.log, '')}
@@ -48,15 +48,13 @@
 
           {#if consequences.length > 0}
             <div class="consequences">
-              <p>
-                Reported only because this file cannot be read. Fix its frontmatter first: what is
-                still reported afterwards is real.
-              </p>
+              <p>{CONSEQUENCES_LEAD}</p>
               <ul>
                 {#each consequences as consequence, index (index)}
                   <li>
+                    <!-- What is reported on the unreadable ADR itself needs no second heading. -->
                     {#each subjects(consequence) as adr (adr.id)}
-                      {@render subject(adr)}
+                      {#if !adrsOf(problem).includes(adr.id)}{@render subject(adr)}{/if}
                     {/each}
                     <span class="what">{describeProblem(consequence)}</span>
                   </li>

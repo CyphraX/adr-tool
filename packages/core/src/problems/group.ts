@@ -22,28 +22,8 @@ export function groupProblems(log: {
   readonly adrs: readonly Adr[]
   readonly problems: readonly Problem[]
 }): ProblemGroup[] {
-  const unreadable = log.adrs.filter((adr) => !adr.metadataWritable).map((adr) => adr.id)
-  const byId = new Map(log.adrs.map((adr) => [adr.id, adr]))
-
-  const causeOf = (problem: Problem): string | undefined => {
-    switch (problem.kind) {
-      case 'missing-back-reference':
-      case 'not-marked-superseded':
-        // Reported on an ADR whose Back-references and Status could not be read.
-        return unreadable.find((id) => id === problem.adr)
-      case 'unfounded-back-reference':
-        // The Relation behind the Back-reference may well be there, in a file that cannot be read.
-        return unreadable.find((id) => id === problem.source)
-      case 'superseded-without-successor': {
-        const named = byId.get(problem.adr)?.metadata.backReferences['superseded-by'] ?? []
-        return unreadable.find((id) => named.includes(id))
-      }
-      default:
-        return undefined
-    }
-  }
-
   const groups = log.problems.map((problem) => ({ problem, consequences: [] as Problem[] }))
+  // The unreadable ADRs are the ones a root cause is reported on.
   const roots = new Map(
     groups.flatMap((group) =>
       group.problem.kind === 'invalid-frontmatter' ||
@@ -52,10 +32,31 @@ export function groupProblems(log: {
         : []
     )
   )
-  return groups.filter((group) => {
+  const byId = new Map(log.adrs.map((adr) => [adr.id, adr]))
+
+  const causeOf = (problem: Problem): string | undefined => {
+    switch (problem.kind) {
+      case 'missing-back-reference':
+      case 'not-marked-superseded':
+        // Reported on an ADR whose Back-references and Status could not be read.
+        return roots.has(problem.adr) ? problem.adr : undefined
+      case 'unfounded-back-reference':
+        // The Relation behind the Back-reference may well be there, in a file that cannot be read.
+        return roots.has(problem.source) ? problem.source : undefined
+      case 'superseded-without-successor': {
+        const named = byId.get(problem.adr)?.metadata.backReferences['superseded-by'] ?? []
+        return named.find((id) => roots.has(id))
+      }
+      default:
+        return undefined
+    }
+  }
+
+  const shown: ProblemGroup[] = []
+  for (const group of groups) {
     const cause = causeOf(group.problem)
-    const root = cause === undefined ? undefined : roots.get(cause)
-    root?.consequences.push(group.problem)
-    return root === undefined
-  })
+    if (cause === undefined) shown.push(group)
+    else roots.get(cause)!.consequences.push(group.problem)
+  }
+  return shown
 }
