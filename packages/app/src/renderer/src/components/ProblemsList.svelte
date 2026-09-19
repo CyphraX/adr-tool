@@ -73,7 +73,7 @@
               {repairLabel(repairs[0]!, log)}
             </button>
           {:else if repairs.length === 0}
-            {@const foreign = subjects(problem).find((adr) => adr.foreign)?.foreign}
+            {@const foreign = subjects(problem).find((adr) => adr.foreign)}
             <p class="by-hand">{foreign ? noRepairIn(foreign) : NO_REPAIR}</p>
           {/if}
 

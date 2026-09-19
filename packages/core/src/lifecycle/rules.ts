@@ -26,7 +26,7 @@ export function writable(log: DecisionLog, id: string, because?: string): Adr {
 export function requireOwnFormat(adr: Adr, and = ' Migrate it first.'): void {
   if (!adr.foreign) return
   throw new Refusal(
-    `${adr.id} is written in the format of ${FOREIGN_FORMAT_NAMES[adr.foreign]}. The tool reads that format and never writes it.${and}`
+    `${adr.id} is written in the format of ${FOREIGN_FORMAT_NAMES[adr.foreign]}. The tool reads that format and never writes it.${adr.noMigration === undefined ? and : ` It ${adr.noMigration}`}`
   )
 }
 
