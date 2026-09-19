@@ -100,17 +100,21 @@ const FOREIGN_SIGN: Record<ForeignFormat, string> = {
   madr: 'a Status that names a successor, the Status in the list under the title, or "deciders" for the decision-makers. They are read as MADR means them'
 }
 
+/** On the button that migrates every foreign ADR of the Decision Log in view. */
+export const MIGRATE_LOG_HINT =
+  "ADRs in a foreign format, which the tool reads and never writes. Migration rewrites them into the tool's own format, and shows the change first."
+
 /** Next to a Relation that only the other ADR's file records. */
 export const IMPLIED_NOTE = 'recorded in that file, not in this one'
 
 /** In the header of an ADR that is written in a foreign format. */
 export function describeForeign(format: ForeignFormat): string {
-  return `Read as a file of ${FOREIGN_FORMAT_NAMES[format]}: ${FOREIGN_SIGN[format]}. The tool never writes this format, so nothing here changes what the file says.`
+  return `Read as a file of ${FOREIGN_FORMAT_NAMES[format]}: ${FOREIGN_SIGN[format]}. The tool never writes this format: Migration rewrites the file into the tool's own, and shows the change first.`
 }
 
 /** Under a Problem without a Repair, when it is reported on an ADR in a foreign format. */
 export function noRepairIn(format: ForeignFormat): string {
-  return `The tool reads the format of ${FOREIGN_FORMAT_NAMES[format]} and never writes it. Fix the file in an editor; the view follows.`
+  return `The tool reads the format of ${FOREIGN_FORMAT_NAMES[format]} and never writes it. Migrate the ADR, and look again: what is still a Problem then has its Repair.`
 }
 
 /** Under a Problem that has no Repair. */

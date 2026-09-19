@@ -66,6 +66,8 @@ No key is required. A file with no Metadata at all is an `accepted` ADR with no 
 | `amended-by`      | list of IDs — a Back-reference               | Accept of the amending ADR          |
 | `corrections`     | list of `{ date, author, note }`; `date` is required, `author` and `note` are optional | Correction |
 
+Migration (section 8) writes `status`, `created`, `decision-makers` and the six keys that hold IDs, with the values it read from the foreign format.
+
 Rules:
 
 - **Absent means default.** A missing `status` is `accepted` — in a file that does not keep its Status in its text (section 8). A missing list is empty. The tool removes a key rather than leaving an empty list behind.

@@ -67,6 +67,12 @@ const RELATION_IS_AUTHORITATIVE: Caution = {
     'A Repair takes what the ADRs say in supersedes and amends as true. If that is what is wrong, cancel and fix the file by hand.'
 }
 
+const MIGRATION_WRITES_WHAT_WAS_READ: Caution = {
+  lead: 'What Migration leaves as it is:',
+  advice:
+    'Migration writes what the tool read from these files, and nothing it would have to guess. What is named here can be put right by hand, before or afterwards.'
+}
+
 /** What a decision is called on its button, and again on the button that confirms it. */
 export const DECISION_LABEL: Record<Decision, string> = {
   accept: 'Accept',
@@ -407,6 +413,28 @@ class AppState {
           title: `Cannot ${verb.toLowerCase()} ADR ${prefixOf(adr)}`,
           reason: plan.reason
         }
+  }
+
+  /** Plan the Migration of the selected ADR, or of every foreign ADR of the Decision Log in view. */
+  async migrate(scope: 'adr' | 'log'): Promise<void> {
+    const [tab, log, adr] = [this.active, this.log, this.selected]
+    if (!tab || !log || (scope === 'adr' && !adr)) return
+    const what = scope === 'adr' ? `ADR ${prefixOf(adr!)}` : `the ADRs of ${log.path}`
+    const plan = await window.api.planMigration({
+      repositoryId: tab.repository.id,
+      logPath: log.path,
+      ...(scope === 'adr' && { adrId: adr!.id })
+    })
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: `Migrate ${what}`,
+          action: 'Migrate',
+          change: plan.change,
+          applying: false,
+          caution: MIGRATION_WRITES_WHAT_WAS_READ
+        }
+      : { kind: 'refused', title: `Cannot migrate ${what}`, reason: plan.reason }
   }
 
   /** Open the dialog for a new ADR; with a Relation, one that supersedes or amends the selected ADR. */
