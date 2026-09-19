@@ -6,6 +6,7 @@
   import {
     STATUS_LABEL,
     describeCause,
+    IMPLIED_NOTE,
     describeForeign,
     describeProblem,
     prefixOf,
@@ -24,6 +25,8 @@
     other: Adr
     /** A Relation of a rejected ADR never took effect. */
     void: boolean
+    /** Only the other ADR's file records it: MADR notes a supersession on the superseded ADR. */
+    implied: boolean
   }
 
   const status = $derived(statusKey(adr))
@@ -41,7 +44,16 @@
         (candidate) => candidate.id === relation[side === 'from' ? 'to' : 'from']
       )
       if (!other) return undefined
-      return { label: relationLabel(relation, side), other, void: relation.state === 'void' }
+      const successor = side === 'from' ? adr : other
+      const implied =
+        relation.type === 'supersedes' &&
+        (successor.impliedSupersedes?.includes(relation.to) ?? false)
+      return {
+        label: relationLabel(relation, side),
+        other,
+        void: relation.state === 'void',
+        implied: implied && side === 'from'
+      }
     }
     return [
       ...log.relations.filter((relation) => relation.from === adr.id).map((r) => line(r, 'from')),
@@ -139,6 +151,7 @@
               {relation.other.title ?? relation.other.id}
             </button>
             {#if relation.void}<span class="note">never took effect</span>{/if}
+            {#if relation.implied}<span class="note">{IMPLIED_NOTE}</span>{/if}
           </li>
         {/each}
       </ul>

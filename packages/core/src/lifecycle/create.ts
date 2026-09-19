@@ -1,3 +1,4 @@
+import { namesNumber } from '../foreign/madr'
 import type { Plan } from '../change/change-set'
 import { joinPath, type FileSystem } from '../fs/port'
 import type { DecisionLog } from '../log/load'
@@ -23,6 +24,7 @@ export interface NewAdr extends Today {
  */
 export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promise<Plan> {
   let created: { id: string; path: string } | undefined
+  const warnings: string[] = []
   const planned = plan(fs, async (drafts) => {
     const title = adr.title.trim().replace(/\s+/g, ' ')
     const slug = slugify(title)
@@ -44,6 +46,16 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
       throw new Refusal(`${id} already exists in this Decision Log.`)
     }
 
+    // MADR 4 names a successor by its number; one that names this number has been waiting for it.
+    if (log.naming === 'sequential') {
+      for (const other of log.adrs) {
+        if (!namesNumber(other, Number(prefix))) continue
+        warnings.push(
+          `${other.id} says it is superseded by the ADR with the number ${Number(prefix)}, which there was none of so far. The new ADR will be read as that successor.`
+        )
+      }
+    }
+
     const eol = prevailingEol(log)
     const metadata = [
       '---',
@@ -59,7 +71,9 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
     created = { id, path: joinPath(log.path, `${id}.md`) }
     await drafts.create(created.path, lines.join(eol))
   })
-  return planned.then((result) => (result.ok && created ? { ...result, created } : result))
+  return planned.then((result) =>
+    result.ok && created ? { ...result, created, ...(warnings.length > 0 && { warnings }) } : result
+  )
 }
 
 /** The line ending most ADRs of the log use; LF when there are none, or on a tie. */
