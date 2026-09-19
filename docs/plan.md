@@ -79,6 +79,8 @@ Fixtures: this repository's own `docs/adr` is the first one.
 
 *Done when:* `core` loads this repository, reports three ADRs, one Relation and no problems, and the round-trip and single-key-edit tests pass on all three platforms.
 
+*Status (2026-09-19):* built. The done-when is `packages/core/test/own-repository.test.ts`. Pending effects (step 5) are the Relations whose state is `pending`. Repairs for Problems, change sets and everything that writes stay in M3 and M4 as planned; the metadata writer from the spike is in `core` but not yet part of its public interface.
+
 ### M2 — App shell, read-only
 
 Open a repository, one tab per repository, three columns (sidebar with Decision Logs and Status filters, ADR list, detail with rendered body and Relations panel). File watching, so changes made by git, an editor or an agent show up immediately.
