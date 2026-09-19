@@ -2,6 +2,8 @@
 
 A desktop application for browsing, writing and relating the Architecture Decision Records that live in a git repository. Working title; early development.
 
+![ADR Tool showing a Decision Log: the list of ADRs with their Status, and one ADR with its Relations](docs/screenshots/m2-light.png)
+
 ## Documents
 
 - [CONTEXT.md](CONTEXT.md) — the domain language. Code uses these terms.
@@ -20,6 +22,8 @@ pnpm install
 ```bash
 pnpm dev
 ```
+
+The app reopens the repositories of the last run. To see every Status, Relations and a Problem at once, open the showcase Decision Log in `packages/core/test/fixtures/showcase`.
 
 `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm build` are what CI runs on Windows, macOS and Linux.
 

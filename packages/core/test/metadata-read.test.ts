@@ -41,9 +41,17 @@ describe('readMetadata', () => {
       backReferences: { 'superseded-by': [], 'amended-by': ['0009-postgres-for-read-model'] },
       corrections: [{ date: '2026-09-19', author: 'Kim Becker', note: 'Spelling' }]
     })
-    expect([...metadata.present]).not.toContain('nav_order')
-    expect(metadata.present.has('amended-by')).toBe(true)
-    expect(metadata.present.has('amends')).toBe(false)
+    expect(metadata.present).toEqual([
+      'status',
+      'created',
+      'decided',
+      'decision-makers',
+      'tags',
+      'supersedes',
+      'depends-on',
+      'amended-by',
+      'corrections'
+    ])
   })
 
   it('takes a file without Metadata as an accepted ADR without Relations', () => {
@@ -51,7 +59,7 @@ describe('readMetadata', () => {
     expect(problems).toEqual([])
     expect(writable).toBe(true)
     expect(metadata.status).toBe('accepted')
-    expect(metadata.present.size).toBe(0)
+    expect(metadata.present).toEqual([])
   })
 
   it('reads block lists, quoted values, a single value as a list of one, and empty values', () => {
