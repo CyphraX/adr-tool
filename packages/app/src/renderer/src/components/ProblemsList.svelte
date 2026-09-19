@@ -1,8 +1,14 @@
 <script lang="ts">
-  import { nextPrefix, type Adr, type Problem } from '@adr-tool/core'
+  import { repairsOf, type Adr, type Problem } from '@adr-tool/core'
   import { adrsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
-  import { CONSEQUENCES_LEAD, describeProblem, prefixOf } from '../lib/wording'
+  import {
+    CONSEQUENCES_LEAD,
+    NO_REPAIR,
+    describeProblem,
+    prefixOf,
+    repairLabel
+  } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   const selectedId = $derived(app.selected?.id)
@@ -32,19 +38,39 @@
   {:else}
     <ul class="groups" aria-label="Problems">
       {#each app.problemGroups as { problem, consequences }, position (position)}
+        {@const log = app.log}
+        {@const repairs = log ? repairsOf(log, problem) : []}
         <li class="group">
           {#each subjects(problem) as adr (adr.id)}
             <div class="subject">
               {@render subject(adr)}
-              {#if problem.kind === 'duplicate-number' && app.log && app.editing?.adrId !== adr.id}
-                <!-- Which of them moves is the person's choice. -->
-                <button class="repair" onclick={() => app.renumber(adr.id)}>
-                  Renumber to {nextPrefix(app.log, '')}
-                </button>
+              {#if log && repairs.length > 1}
+                <!-- Several repairs: any one of them repairs the Problem, and the person says which. -->
+                {#each repairs.filter((repair) => repair.adr === adr.id) as repair, nth (nth)}
+                  <button
+                    class="repair"
+                    disabled={app.editing?.adrId === adr.id}
+                    onclick={() => app.repair(repair)}
+                  >
+                    {repairLabel(repair, log)}
+                  </button>
+                {/each}
               {/if}
             </div>
           {/each}
           <p class="what">{describeProblem(problem)}</p>
+
+          {#if log && repairs.length === 1}
+            <button
+              class="repair only"
+              disabled={app.editing?.adrId === repairs[0]!.adr}
+              onclick={() => app.repair(repairs[0]!)}
+            >
+              {repairLabel(repairs[0]!, log)}
+            </button>
+          {:else if repairs.length === 0}
+            <p class="by-hand">{NO_REPAIR}</p>
+          {/if}
 
           {#if consequences.length > 0}
             <div class="consequences">
@@ -169,6 +195,25 @@
 
   .repair {
     flex: none;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .repair.only {
+    margin-top: 8px;
+  }
+
+  .repair:disabled {
+    color: var(--ink-faint);
+  }
+
+  .by-hand {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-faint);
   }
 
   .what {
