@@ -26,8 +26,8 @@ export interface Metadata {
   readonly relations: Readonly<Record<RelationType, readonly string[]>>
   readonly backReferences: Readonly<Record<BackReferenceKey, readonly string[]>>
   readonly corrections: readonly Correction[]
-  /** Which of the tool's keys the file actually contains. */
-  readonly present: ReadonlySet<MetadataKey>
+  /** Which of the tool's keys the file actually contains, in the order of `METADATA_KEYS`. */
+  readonly present: readonly MetadataKey[]
 }
 
 export interface MetadataReading {
@@ -171,7 +171,7 @@ function metadataFrom(map: YAMLMap | undefined, adr: string, problems: Problem[]
       'amended-by': list('amended-by')
     },
     corrections: corrections(),
-    present
+    present: METADATA_KEYS.filter((key) => present.has(key))
   }
 }
 
