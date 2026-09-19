@@ -9,6 +9,8 @@ export interface FileChange {
   readonly after: string
   /** The file does not exist yet. It must still not exist when the change is applied. */
   readonly creates?: true
+  /** The file moves here. Nothing may be there when the change is applied. */
+  readonly renameTo?: string
 }
 
 /**
@@ -27,6 +29,8 @@ export type Plan =
       readonly changeSet: ChangeSet
       /** The ADR the operation creates, so that the caller can show it afterwards. */
       readonly created?: { readonly id: string; readonly path: string }
+      /** The ID the operation changes, so that the caller can follow the ADR. */
+      readonly renamed?: { readonly from: string; readonly to: string }
       /** What the person should look at before confirming. The operation can be done all the same. */
       readonly warnings?: readonly string[]
     }
@@ -40,19 +44,32 @@ export type Applied =
 /**
  * Write a change set. Every file is compared with what the change set was planned against
  * first; if git, an editor or an agent changed one in the meantime, nothing is written.
+ *
+ * Renames come before writes. A rename is what another program is most likely to stand in
+ * the way of, an editor holding the file open on Windows, say; when it fails, it fails
+ * before anything was written.
  */
 export async function applyChangeSet(
   fs: WritableFileSystem,
   changeSet: ChangeSet
 ): Promise<Applied> {
-  const current = await Promise.all(changeSet.files.map((file) => fs.readText(file.path)))
-  const conflicts = changeSet.files
-    .filter((file, position) =>
-      file.creates ? current[position] !== undefined : current[position] !== file.before
-    )
-    .map((file) => file.path)
+  const conflicts: string[] = []
+  for (const file of changeSet.files) {
+    const current = await fs.readText(file.path)
+    if (file.creates ? current !== undefined : current !== file.before) conflicts.push(file.path)
+    if (file.renameTo !== undefined && (await fs.readText(file.renameTo)) !== undefined) {
+      conflicts.push(file.renameTo)
+    }
+  }
   if (conflicts.length > 0) return { applied: false, conflicts }
 
-  for (const file of changeSet.files) await fs.writeText(file.path, file.after)
+  for (const file of changeSet.files) {
+    if (file.renameTo !== undefined) await fs.rename(file.path, file.renameTo)
+  }
+  for (const file of changeSet.files) {
+    if (file.creates || file.after !== file.before) {
+      await fs.writeText(file.renameTo ?? file.path, file.after)
+    }
+  }
   return { applied: true }
 }

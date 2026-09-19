@@ -26,4 +26,6 @@ export { planAccept, planDeprecate, planReject, type Today } from './lifecycle/d
 export { planEditBody, recordsCorrection, type BodyEdit } from './lifecycle/edit-body'
 export { planCreate, type NewAdr } from './lifecycle/create'
 export { planEditMetadata, type MetadataEdit } from './lifecycle/edit-metadata'
+export { planRenumber } from './lifecycle/renumber'
+export { nextPrefix } from './log/new-id'
 export { listTemplates, type TemplateInfo, type Templates } from './templates/templates'
