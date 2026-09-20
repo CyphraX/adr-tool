@@ -2,7 +2,7 @@
   import { STATUSES } from '@adr-tool/core'
   import { app, statusKey, type StatusFilter } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { MIGRATE_LOG_HINT, STATUS_LABEL } from '../lib/wording'
+  import { MIGRATE_LOG_HINT, STATUS_LABEL, logName } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   const logs = $derived(app.active?.repository.repository.logs ?? [])
@@ -42,7 +42,7 @@
         aria-current={log.path === app.log?.path}
         onclick={() => app.showLog(log.path)}
       >
-        <span class="label">{log.path === '' ? t.sidebar.root : log.path}</span>
+        <span class="label">{logName(log.path)}</span>
         <span class="count">{log.adrs.length}</span>
       </button>
     {/each}

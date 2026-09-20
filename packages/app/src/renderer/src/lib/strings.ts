@@ -2,14 +2,34 @@ import type { RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 
 /**
- * Every text of the window that is not built from an ADR, a Problem or a change: labels,
- * hints, titles, questions. The sentences that are built from those are in wording.ts.
- * No component and no state carries English of its own, and nothing compares a text to
- * decide what to do — so a translation replaces these two files and searches for nothing.
+ * What the window itself says: labels, hints, titles, questions — by where they stand, so
+ * the same English word may be here twice ("Status" heads a column and a filter) and a
+ * language that needs two words has two places. What is said about the domain is in
+ * wording.ts: what a Status, a Relation, a Problem, a Repair, a Correction or a change is
+ * called, and the sentences built from them.
+ *
+ * No component and no state carries English of its own, nothing compares a text to decide
+ * what to do, and nothing tells list items apart by their text — so a translation replaces
+ * these two files and searches for nothing.
  *
  * A text with a number or a name in it is a function, so that a language can put the
  * number where it wants it. A name between backticks is set in code (`codeSpans`).
  */
+
+interface Caution {
+  lead: string
+  advice: string
+}
+
+/** How an operation is called in the dialog that shows its change, or says why there is none. */
+interface ReviewWording {
+  /** On the button that applies the change. */
+  action: string
+  title: (prefix: string) => string
+  refused: (prefix: string) => string
+  /** How the warnings of the change are introduced, and what to do about them. */
+  caution?: Caution
+}
 
 const many = (count: number, one: string, more: string): string => (count === 1 ? one : more)
 
@@ -40,7 +60,7 @@ export const t = {
   /** What the lines between the panes are called, for those who move them by keyboard. */
   panes: {
     sidebar: 'Width of the sidebar',
-    middle: 'Width of the list'
+    middle: 'Width of the middle pane'
   },
 
   tabs: {
@@ -97,9 +117,6 @@ export const t = {
     relations: 'Relations',
     corrections: 'Corrections',
     corrected: 'Corrected',
-    /** What a Correction records: its day, and who corrected what when the file says so. */
-    correction: (date: string, author: string | undefined, note: string | undefined): string =>
-      `${date}${author ? ` by ${author}` : ''}${note ? `: ${note}` : ''}`,
     showChange: 'Show the change',
     problems: 'Problems'
   },
@@ -230,7 +247,7 @@ export const t = {
         title: (prefix: string): string => `Deprecate ADR ${prefix}`,
         refused: (prefix: string): string => `Cannot deprecate ADR ${prefix}`
       }
-    } satisfies Record<Decision, unknown>,
+    } satisfies Record<Decision, ReviewWording>,
     repair: {
       action: 'Repair',
       title: (prefix: string): string => `Repair ADR ${prefix}`,
@@ -240,7 +257,7 @@ export const t = {
         advice:
           'A Repair takes what the ADRs say in supersedes and amends as true. If that is what is wrong, cancel and fix the file by hand.'
       }
-    },
+    } satisfies ReviewWording,
     renumber: {
       action: 'Renumber',
       title: (prefix: string): string => `Renumber ADR ${prefix}`,
@@ -250,7 +267,7 @@ export const t = {
         advice:
           'A link in the text that points to the old file name has to be changed by hand, after the Renumber.'
       }
-    },
+    } satisfies ReviewWording,
     migrate: {
       action: 'Migrate',
       adr: (prefix: string): string => `Migrate ADR ${prefix}`,

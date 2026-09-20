@@ -30,7 +30,7 @@
         <div class="warnings">
           {#if review.caution}<p>{review.caution.lead}</p>{/if}
           <ul>
-            {#each review.change.warnings as warning (warning)}
+            {#each review.change.warnings as warning, position (position)}
               <li>{warning}</li>
             {/each}
           </ul>

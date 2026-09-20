@@ -26,6 +26,12 @@ let activeRoot: string | undefined
 
 /** The windows, by the id of their contents, that hold text which is not on disk. */
 const unsaved = new Set<number>()
+/** The windows that do not answer at the moment, and so cannot be asked anything. */
+const hung = new Set<number>()
+/** The app is quitting: its windows are being closed for that reason. */
+let quitting = false
+/** The app was quitting when a window held it up to ask. */
+let quitHeldUp = false
 
 const sessionFile = (): string => join(app.getPath('userData'), 'session.json')
 const saveSession = (): Promise<void> =>
@@ -181,10 +187,15 @@ function registerIpc(): void {
     else unsaved.delete(event.sender.id)
   })
 
-  // The person was asked, or there was nothing to ask about: now the window closes.
-  ipcMain.handle(CHANNEL.closeWindow, (event) => {
+  // The person was asked. "Discard": the window closes, and a quit it held up goes on —
+  // on a Mac the app would otherwise stay in the dock. "Keep editing": nothing is to quit.
+  ipcMain.handle(CHANNEL.answerCloseRequest, (event, close: unknown) => {
+    const resumeQuit = quitHeldUp && close === true
+    quitHeldUp = false
+    if (close !== true) return
     unsaved.delete(event.sender.id)
     BrowserWindow.fromWebContents(event.sender)?.close()
+    if (resumeQuit) app.quit()
   })
 }
 
@@ -213,17 +224,26 @@ function createWindow(): void {
 
   // Closing a window that holds unsaved text asks first, and the window asks: it has the
   // dialog for it. Quitting the app closes its windows, so it goes the same way. A window
-  // that cannot answer any more — crashed, hung, or loading afresh — holds nothing to ask about.
+  // that cannot answer — crashed, or hung for now — is not asked; one that loads afresh
+  // holds no text any more.
   const contents = mainWindow.webContents
   const id = contents.id
   mainWindow.on('close', (event) => {
-    if (!unsaved.has(id) || contents.isCrashed()) return
+    if (!unsaved.has(id) || hung.has(id) || contents.isCrashed()) return
     event.preventDefault()
+    quitHeldUp = quitting
+    quitting = false
+    if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
+    mainWindow.focus()
     contents.send(CHANNEL.closeRequested)
   })
-  mainWindow.on('unresponsive', () => unsaved.delete(id))
-  mainWindow.on('closed', () => unsaved.delete(id))
+  mainWindow.on('unresponsive', () => hung.add(id))
+  mainWindow.on('responsive', () => hung.delete(id))
+  mainWindow.on('closed', () => {
+    unsaved.delete(id)
+    hung.delete(id)
+  })
   contents.on('did-start-loading', () => unsaved.delete(id))
 
   // Nothing ever opens or navigates inside the app: web links go to the system
@@ -266,6 +286,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// A window that asks about unsaved text cancels the quit; it has to know there was one.
+app.on('before-quit', () => {
+  quitting = true
 })
 
 app.on('will-quit', () => {

@@ -35,7 +35,7 @@ const api: Api = {
     ipcRenderer.on(CHANNEL.closeRequested, handler)
     return () => ipcRenderer.removeListener(CHANNEL.closeRequested, handler)
   },
-  closeWindow: () => ipcRenderer.invoke(CHANNEL.closeWindow)
+  answerCloseRequest: (close) => ipcRenderer.invoke(CHANNEL.answerCloseRequest, close)
 }
 
 contextBridge.exposeInMainWorld('api', api)

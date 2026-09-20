@@ -179,10 +179,10 @@ export interface Api {
   onRepositoryChanged(listener: (repository: OpenRepository) => void): () => void
   /** Say whether the window holds text that is not on disk. While it does, closing it asks first. */
   setUnsaved(unsaved: boolean): Promise<void>
-  /** Called when the window is to close while it holds unsaved text. Nothing closes until `closeWindow`. */
+  /** Called when the window is to close while it holds unsaved text. Nothing closes until it was answered. */
   onCloseRequested(listener: () => void): () => void
-  /** Close the window, whatever it holds: the person was asked, or there was nothing to ask about. */
-  closeWindow(): Promise<void>
+  /** What the person said: close the window, whatever it holds — or keep it, and forget that anything was to quit. */
+  answerCloseRequest(close: boolean): Promise<void>
 }
 
 export const CHANNEL = {
@@ -205,5 +205,5 @@ export const CHANNEL = {
   openExternal: 'shell:open-external',
   setUnsaved: 'window:set-unsaved',
   closeRequested: 'window:close-requested',
-  closeWindow: 'window:close'
+  answerCloseRequest: 'window:answer-close-request'
 } as const
