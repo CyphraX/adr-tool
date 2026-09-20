@@ -47,7 +47,7 @@ Keys the suite does not know are preserved and ignored, at the top level and ins
 ### Component ID
 
 - The **Component ID** is the path of map keys from the top-level `components` down to the Component, joined with `/`: `core`, `core/metadata`.
-- A segment consists of lowercase ASCII letters, digits and dashes, and starts and ends with a letter or a digit. IDs are compared exactly.
+- A segment consists of lowercase ASCII letters, digits and dashes, and starts and ends with a letter or a digit. IDs are compared exactly, and a segment is read as it is written: `007` is a segment of its own, not the number 7.
 - The ID is what every Trace, Rule and Diagram names. Changing a segment, or moving a Component to another parent, changes the ID of that Component and of everything below it. Both are one operation of the suite, **Rename** (part 7), which rewrites the declaration and everything that names the ID through one previewed change set, as Renumber does for ADRs. Before part 7 nothing outside the declaration names a Component, and a segment is changed by editing the file.
 - Splitting and merging Components is done by hand. What then names an ID that no longer exists shows up as a Problem (section 6).
 
@@ -86,12 +86,14 @@ Below each unit, one further level: the directories under the unit's source root
 - Only directories that contain at least one Source File become Components. `docs/` does not, and neither does a unit without code.
 - A directory that is a unit, or holds one, is not drafted a second time as a directory.
 - A drafted Component gets the pattern `<its directory>/**`.
-- A segment is made from the directory name: lowercased, every run of characters other than lowercase letters and digits replaced by one dash, dashes at both ends removed; a name that leaves nothing becomes `unit`. Where two siblings would get the same segment, the second in the order of their paths gets `-2`, the third `-3`. Where the segment departs from the directory's name, that name is kept as the Component's `name`.
+- A segment is made from the directory name: lowercased, every run of characters other than lowercase letters and digits replaced by one dash, dashes at both ends removed; a name that leaves nothing becomes `unit`. Where two siblings would get the same segment, the later one in the order of their paths gets `-2`, `-3`, … — counting up until the segment is free, since a sibling may be called `a-2` already. Where the segment departs from the directory's name, that name is kept as the Component's `name`.
 - A build file that cannot be read names no units; the Draft goes on without it.
 
 The checks of section 6 run on the Draft as well. What they find is shown as **hints on the Draft**, not as Problems: a Draft is the suite's own proposal, not something the architect declared.
 
-**Adopt** writes the Draft through a previewed change set: as a new `.arch/components.yml`, or, where the file exists without Components, into that file, where nothing else moves. Nobody has to adopt; the module is usable on the Draft.
+**Adopt** writes the Draft through a previewed change set: as a new `.arch/components.yml`, or, where the file exists without Components, into that file, where nothing else moves — an empty `components` key stays where it is, with its comment, and the Components go below it. Adopt looks at the file as it is when it is asked, not as it was when the Draft was shown: Components that a person declared in the meantime are never overwritten. Where the file is written in a way that Components cannot be added to so that they read back — a document end marker, a top level in braces — Adopt is refused, and says so. Nobody has to adopt; the module is usable on the Draft.
+
+One limit of the Draft is known: in a repository without units, a `test/` directory beside `src/` lies outside of every drafted Component, and its files are Unassigned until a person declares where they belong.
 
 While `.arch/components.yml` exists but cannot be read (section 6), the suite shows the Draft so that the module stays usable, names the Problem, and does not offer Adopt: it would overwrite what a person wrote.
 
@@ -235,6 +237,8 @@ Structure adds these **Problems** about `.arch/components.yml`:
 | A Component has neither `paths` nor `components`.                                                                                           | —                               |
 
 A Repair is offered only where exactly one change is right. Problems of Structure appear in the same Problems view as those of the Decision Logs, grouped by module.
+
+The Repair takes the pattern out where it stands: from a flow list with one comma, from a block list with its line, and with its key when it was the last one — a Component left with neither `paths` nor `components` is then a Problem of its own, for a person to decide. YAML can be written in more ways than a splice can serve: a Component in braces, a comment between two items, a tag or an anchor on an item. There the Repair is refused with the advice to use an editor. Whatever the suite hands out has been checked to read back as a declaration.
 
 With the first Trace (part 7) one more arrives, reported on the ADR: **`affects` names a Component ID that does not exist.** Its Repair takes the item out of the list, where it stands, as the Repair for a Relation to a missing ADR does.
 

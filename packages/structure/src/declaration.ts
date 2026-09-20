@@ -105,7 +105,8 @@ function valueOf(map: YAMLMap, key: string): unknown {
 const emptyToNull = (node: unknown): unknown =>
   isScalar(node) && node.value === null ? null : node
 
-const keyText = (key: unknown): string => (isScalar(key) ? String(key.value) : String(key))
+/** A key as the text it was written as: `007` is a segment of its own, not the number 7. */
+const keyText = (key: unknown): string => scalarText(key) ?? String(key)
 
 /** A scalar as the text it stands for: `2` and `true` written as a name or a pattern are text. */
 function scalarText(node: unknown): string | undefined {

@@ -15,37 +15,36 @@ export async function draftComponents(
   sourceFiles: readonly SourceFile[]
 ): Promise<DeclaredComponent[]> {
   const sources = sourceFiles.map((file) => file.path)
-  const holdsSources = (directory: string): boolean =>
-    sources.some((path) => isBeneath(path, directory))
-
   const found = new Set([
     ...(await workspacePackages(fs, files)),
     ...(await mavenModules(fs, files)),
     ...(await gradleProjects(fs, files))
   ])
-  const units = [...found]
-    .filter((unit) => unit !== '' && !isNeverLookedAt(unit) && holdsSources(unit))
-    .sort()
+
+  // The Source Files beneath each unit, found once: everything below works on these few.
+  const beneath = new Map<string, string[]>()
+  for (const unit of found) {
+    if (unit === '' || isNeverLookedAt(unit)) continue
+    const own = sources.filter((path) => isBeneath(path, unit))
+    if (own.length > 0) beneath.set(unit, own)
+  }
+  const units = [...beneath.keys()].sort()
 
   const build = (unit: string): DeclaredComponent[] => {
+    const inside = units.filter((other) => other !== unit && isBeneath(other, unit))
     // The units directly beneath this one: those with no other unit in between.
-    const nested = units.filter(
-      (other) =>
-        other !== unit &&
-        isBeneath(other, unit) &&
-        !units.some(
-          (between) =>
-            between !== unit &&
-            between !== other &&
-            isBeneath(other, between) &&
-            isBeneath(between, unit)
-        )
+    const nested = inside.filter(
+      (other) => !inside.some((between) => between !== other && isBeneath(other, between))
     )
     const isTaken = (directory: string): boolean =>
-      units.some((other) => other !== unit && (isBeneath(other, directory) || other === directory))
+      inside.some((other) => other === directory || isBeneath(other, directory))
     // Where build files name units, they are the top level; directories beside them are not drafted.
     const directories =
-      unit === '' && units.length > 0 ? [] : childDirectories(unit, sources, isTaken)
+      unit === ''
+        ? units.length > 0
+          ? []
+          : childDirectories('', sources, isTaken)
+        : childDirectories(unit, beneath.get(unit) ?? [], isTaken)
     return named([
       ...nested.map((other) => ({ directory: other, children: build(other) })),
       ...directories.map((directory) => ({ directory, children: [] }))
@@ -55,8 +54,7 @@ export async function draftComponents(
   const top = build('')
   if (top.length > 0 || sources.length === 0) return top
   // Nothing to tell apart: the one directory that holds the code is the one Component.
-  const root = sourceRootOf('', sources)
-  return named([{ directory: root, children: [] }])
+  return named([{ directory: sourceRootOf('', sources), children: [] }])
 }
 
 /** A path lies beneath a directory; everything lies beneath the root. */
@@ -78,6 +76,8 @@ function sourceRootOf(unit: string, sources: readonly string[]): string {
  * The directories that become the children of a unit: those under its source root, after
  * going down for as long as a directory holds exactly one directory and no Source File —
  * which passes over a common base package such as `com/example/shop`.
+ *
+ * `sources` are the Source Files beneath the unit.
  */
 function childDirectories(
   unit: string,
@@ -85,21 +85,22 @@ function childDirectories(
   isTaken: (directory: string) => boolean
 ): string[] {
   let directory = sourceRootOf(unit, sources)
+  let inside = sources.filter((path) => isBeneath(path, directory))
   for (;;) {
-    const beneath = sources.filter((path) => isBeneath(path, directory))
-    const rest = (path: string): string =>
-      directory === '' ? path : path.slice(directory.length + 1)
-    const holdsFiles = beneath.some((path) => !rest(path).includes('/'))
+    const at = directory
+    const rest = (path: string): string => (at === '' ? path : path.slice(at.length + 1))
+    const holdsFiles = inside.some((path) => !rest(path).includes('/'))
     const directories = [
       ...new Set(
-        beneath
+        inside
           .filter((path) => rest(path).includes('/'))
-          .map((path) => (directory === '' ? '' : `${directory}/`) + rest(path).split('/')[0]!)
+          .map((path) => (at === '' ? '' : `${at}/`) + rest(path).split('/')[0]!)
       )
     ].sort()
     const only = directories[0]
     if (!holdsFiles && directories.length === 1 && only !== undefined && !isTaken(only)) {
       directory = only
+      inside = inside.filter((path) => isBeneath(path, only))
       continue
     }
     // What is a unit of its own, or holds one, is not drafted a second time.
@@ -111,15 +112,16 @@ function childDirectories(
 function named(
   level: readonly { directory: string; children: readonly DeclaredComponent[] }[]
 ): DeclaredComponent[] {
-  const taken = new Map<string, number>()
+  const taken = new Set<string>()
   return [...level]
     .sort((a, b) => (a.directory < b.directory ? -1 : a.directory > b.directory ? 1 : 0))
     .map(({ directory, children }) => {
       const written = directory === '' ? 'repository' : lastSegment(directory)
       const base = segmentOf(written)
-      const count = (taken.get(base) ?? 0) + 1
-      taken.set(base, count)
-      const segment = count === 1 ? base : `${base}-${count}`
+      // `-2`, `-3`, … until the segment is free: a sibling may be called `a-2` already.
+      let segment = base
+      for (let count = 2; taken.has(segment); count++) segment = `${base}-${count}`
+      taken.add(segment)
       return {
         id: segment,
         // The directory's own name is shown where the segment had to depart from it.
@@ -185,11 +187,12 @@ async function workspacePackages(fs: FileSystem, files: readonly string[]): Prom
 }
 
 async function mavenModules(fs: FileSystem, files: readonly string[]): Promise<string[]> {
+  const known = new Set(files)
   const modules: string[] = []
   const visited = new Set<string>()
   const visit = async (directory: string): Promise<void> => {
     const pom = directory === '' ? 'pom.xml' : `${directory}/pom.xml`
-    if (visited.has(pom) || !files.includes(pom)) return
+    if (visited.has(pom) || !known.has(pom)) return
     visited.add(pom)
     if (directory !== '') modules.push(directory)
     const text = ((await fs.readText(pom)) ?? '').replace(/<!--[\s\S]*?-->/g, '')
@@ -205,6 +208,16 @@ async function mavenModules(fs: FileSystem, files: readonly string[]): Promise<s
   return modules
 }
 
+const LITERAL = `(?:'[^'\\n]*'|"[^"\\n]*")`
+/**
+ * `include` as a call of its own — not `includeBuild`, not `project(':include')` — and the
+ * string literals that follow it, separated by commas, over as many lines as the call takes.
+ */
+const INCLUDE = new RegExp(
+  `(?<![:'"\\w.])include\\b[ \\t]*(?:\\(\\s*)?(${LITERAL}(?:\\s*,\\s*${LITERAL})*)`,
+  'g'
+)
+
 async function gradleProjects(fs: FileSystem, files: readonly string[]): Promise<string[]> {
   const projects: string[] = []
   for (const settings of ['settings.gradle', 'settings.gradle.kts']) {
@@ -212,8 +225,7 @@ async function gradleProjects(fs: FileSystem, files: readonly string[]): Promise
     const text = ((await fs.readText(settings)) ?? '')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/(^|\s)\/\/.*$/gm, '$1')
-    // `include` and the string literals that follow it, over as many lines as the call takes.
-    for (const call of text.matchAll(/\binclude\b\s*\(?((?:\s*,?\s*(?:'[^'\n]*'|"[^"\n]*"))+)/g)) {
+    for (const call of text.matchAll(INCLUDE)) {
       for (const literal of call[1]!.matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)) {
         const parts = (literal[1] ?? literal[2] ?? '').split(':').filter((part) => part !== '')
         // `:a:b` is the project `b` of the project `a`: both are directories.

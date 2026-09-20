@@ -107,12 +107,17 @@ describe('Adopt', () => {
     expect(after.replaceAll(CRLF, '')).not.toContain('\n')
   })
 
-  it('takes the place of a components key that is empty', async () => {
-    for (const empty of ['components:', 'components: {}', 'components:   # later']) {
-      const before = lines('version: 1', empty, 'owner: team-a')
+  it('goes under a components key that is empty, which stays where it is with its comment', async () => {
+    const cases = [
+      ['components:', 'components:'],
+      ['components: {}', 'components:'],
+      ['components:   # later', 'components:   # later']
+    ]
+    for (const [empty, kept] of cases) {
+      const before = lines('version: 1', empty!, 'owner: team-a')
       const { fs, structure } = await open({ ...CODE, [DECLARATION_PATH]: before })
       const after = written(await planAdopt(fs, structure))
-      expect(after.startsWith('version: 1\ncomponents:\n  my-app:\n')).toBe(true)
+      expect(after.startsWith(`version: 1\n${kept}\n  my-app:\n`)).toBe(true)
       expect(
         after.endsWith('        paths: [packages/core/src/metadata/**]\nowner: team-a\n')
       ).toBe(true)
