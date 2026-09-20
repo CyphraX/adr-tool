@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@adr-tool/kernel": "workspace:*",
-    "typescript": "^5.9.3"
+    "tree-sitter-java": "^0.23.5",
+    "typescript": "^5.9.3",
+    "web-tree-sitter": "^0.27.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.5",

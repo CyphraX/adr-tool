@@ -18,6 +18,13 @@ export default defineConfig(
     }
   },
   {
+    // Plain JavaScript has nowhere to write a return type.
+    files: ['**/*.mjs'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
+  {
     // Tests are full of one-line helpers whose return type is whatever they wrap.
     files: ['**/test/**/*.ts'],
     rules: {
