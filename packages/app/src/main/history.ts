@@ -1,6 +1,7 @@
 import { correctionsIn, type FileChange } from '@adr-tool/core'
 import { WORKING_TREE, type HistoryEntry } from '../shared/ipc'
 import type { FileCommit, Git, WorkingTree } from './git'
+import { t } from './strings'
 
 const fileName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 
@@ -73,7 +74,7 @@ export async function historyOf(
   return [
     {
       id: WORKING_TREE,
-      subject: 'Not committed yet',
+      subject: t.notCommittedYet,
       ...(origin !== undefined && { renamedFrom: fileName(origin) }),
       corrections: correctionsIn(onDisk)
     },

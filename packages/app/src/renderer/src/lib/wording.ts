@@ -2,6 +2,7 @@ import {
   FOREIGN_FORMAT_NAMES,
   nextPrefix,
   type Adr,
+  type Correction,
   type DecisionLog,
   type FileChange,
   type ForeignFormat,
@@ -11,6 +12,7 @@ import {
   type Repair,
   type Status
 } from '@adr-tool/core'
+import { t } from './strings'
 
 export const STATUS_LABEL: Record<Status | 'unknown', string> = {
   proposed: 'Proposed',
@@ -48,6 +50,17 @@ export function relationLabel(relation: Relation, side: 'from' | 'to'): string {
   return (pending ?? RELATION_WORDING[relation.type])[side]
 }
 
+/**
+ * A text of strings.ts that names files sets them between backticks; the markup sets those
+ * parts in code. So a sentence stays one sentence, and a translation can move the names.
+ */
+export function codeSpans(text: string): { text: string; code: boolean }[] {
+  return text
+    .split('`')
+    .map((part, position) => ({ text: part, code: position % 2 === 1 }))
+    .filter((part) => part.text !== '')
+}
+
 const count = (files: number): string => (files === 1 ? 'one file' : `${files} files`)
 
 /** What a change does to how many files, in one sentence: "This renames one file and changes 3 files." */
@@ -68,6 +81,17 @@ export function summarizeChange(files: readonly FileChange[]): string {
   const untouched =
     changed > 0 ? ` Nothing else in ${changed === 1 ? 'it' : 'them'} is touched.` : ''
   return `This ${sentence}.${untouched}`
+}
+
+/** What a Decision Log is called: its path — and the one at the top of the repository has none. */
+export function logName(path: string): string {
+  return path === '' ? t.sidebar.root : path
+}
+
+/** What a Correction records: its day, and who corrected what when the file says so. */
+export function describeCorrection(correction: Correction): string {
+  const { date, author, note } = correction
+  return `${date}${author ? ` by ${author}` : ''}${note ? `: ${note}` : ''}`
 }
 
 /** What the list and the header show in front of an ADR: its number as written, or its date. */

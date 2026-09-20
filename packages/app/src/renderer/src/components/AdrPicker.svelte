@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Adr } from '@adr-tool/core'
   import { statusKey } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
@@ -60,7 +61,7 @@
     aria-expanded={open}
     aria-controls={`${uid}-matches`}
     aria-autocomplete="list"
-    placeholder={candidates.length === 0 ? 'No ADR left to add' : 'Add an ADR: number or title'}
+    placeholder={candidates.length === 0 ? t.metadata.noneLeft : t.metadata.pickerPlaceholder}
     disabled={candidates.length === 0}
     oninput={() => (cursor = 0)}
     onfocus={() => (focused = true)}

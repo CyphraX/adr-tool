@@ -89,7 +89,7 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 *Done when:* the app shows this repository's three ADRs, and editing one of them in another editor updates the view.
 
-*Status (2026-09-19):* built. Both parts of the done-when were checked in the running app over its debugging port: the list shows this repository's three ADRs, and a title edited on disk — and reverted with git — reaches the list within two seconds while the selection stays. The renderer never names a path; it refers to a repository by an id the main process hands out. Known gaps: images with relative paths in an ADR do not load, because the renderer has no file access; panes cannot be resized yet.
+*Status (2026-09-19):* built. Both parts of the done-when were checked in the running app over its debugging port: the list shows this repository's three ADRs, and a title edited on disk — and reverted with git — reaches the list within two seconds while the selection stays. The renderer never names a path; it refers to a repository by an id the main process hands out. Known gaps: images with relative paths in an ADR do not load, because the renderer has no file access; panes cannot be resized yet (they can since the v1 acceptance, below).
 
 ### M3 — Write path
 
@@ -103,7 +103,7 @@ ADRs from foreign repositories are untrusted input. The renderer runs sandboxed 
 
 The done-when was checked operation by operation in the running app, on a scratch git repository, each time by reading `git diff`: Accept of an ADR that supersedes and amends (three files, the intended lines), Reject, Deprecate, an edit of a body (the changed lines only), a Correction (plus its entry), New ADR, Supersede and Amend (one new file; the target changes only at acceptance), Edit Metadata (one line per list), Renumber (one rename at 100 % similarity, one line per ADR that names the old ID).
 
-Known gaps: closing the window does not ask about unsaved text yet; a Metadata dialog with very many Relations can grow taller than the window; a change set is not atomic across a failing disk — Renumber renames first so that the likeliest failure, a file held open by another program, happens before anything is written.
+Known gaps: closing the window does not ask about unsaved text yet (it does since the v1 acceptance, below); a Metadata dialog with very many Relations can grow taller than the window; a change set is not atomic across a failing disk — Renumber renames first so that the likeliest failure, a file held open by another program, happens before anything is written.
 
 A finding of part 4: the app's type check had been pointed at the solution-style `tsconfig.json`, where `svelte-check` sees the components but none of the renderer's plain TypeScript files. A missing function in `state.svelte.ts` passed the check and only failed in the running app. It now checks against `tsconfig.web.json`, which covers both.
 
@@ -154,6 +154,32 @@ The review of this part found two ways in which the rule was broken, both by val
 What M5 decided, and what was tried and thrown out on the way, is [ADR-0005](adr/0005-foreign-formats-are-read-never-written.md): foreign formats are read and never written, recognition is conservative, what another file records about an ADR is not its Metadata, Migration writes what was read and nothing by half. It was written as `proposed` and accepted through the app on 2026-09-20, as ADR-0004 was.
 
 Known gaps: the header of a MADR file names all three signs, not the one that applied. A Status section that stays is named by the first thing that keeps it only. Links in adr-tools files with words other than supersede and amend (`Clarifies`) are not Relations — they stay Markdown links in the text.
+
+### v1 acceptance
+
+The milestones were each checked against their own done-when. The acceptance goes the other way: down the v1 list of [roadmap.md](roadmap.md), item by item, in the running app — over its debugging port, on scratch git repositories, every write read back with `git diff`. The repositories: the fixture `showcase` with a second Decision Log next to it, the fixture `adr-tools`, both open at once.
+
+*Status (2026-09-20):* accepted, with one item that was not met and is now, and two known gaps closed on the way.
+
+| v1 says | Found |
+| ------- | ----- |
+| Desktop app, plus the UI-free `core` it is built on | `core` depends on `yaml` and nothing else; no import of Electron, the DOM or Node's file system (it works against its file-system port). CI type-checks and tests both on Windows, macOS and Linux, and builds the app. |
+| UI in English; strings externalized so translations can follow | **Was not met.** The sentences built from ADRs, Problems and changes were in `lib/wording.ts`; every label, hint, title and question stood in the markup of `App.svelte` and 15 components and in the state, about 170 texts. They are in `lib/strings.ts` now, the main process's few in `main/strings.ts`. `test/strings.test.ts` fails on static text or a spoken attribute in a component's markup; a literal inside an expression or a script it does not see, and that stays a reviewer's to catch. What a translation would have broken went with it: the state decided by the label of a button (`action === 'Save'`) whether the editor closes, it built a title from a lowercased verb, and three lists told their items apart by their text. Two texts changed rather than moved, both for a Decision Log at the top of a repository, which has no path: its Migration and a refusal named it by nothing. See "What stays English" below. |
+| Browse: list, detail, Relations graph; one tab per repository; every Decision Log in the sidebar | Two repositories in two tabs; `docs/adr` and `docs/decisions` both listed, each with its own list, graph and Problems. |
+| Write: new ADR from a Template; Accept, Reject, Deprecate; Amend and Supersede; Correction; Renumber | Clicked through again after the texts had moved, because the state was touched: Edit Metadata (one line), a Correction (the body line and its entry; the editor closes), Accept of an ADR that supersedes and amends (three files, the intended lines), a new ADR that supersedes another (one file; the editor opens on it), a Repair. Reject, Deprecate, Amend and Renumber stand as checked in M3 and M4; they go the same way through `Review`. |
+| Relations stay within one Decision Log | The picker of an ADR in `docs/decisions` offers the other ADR of that log and none of the eight in `docs/adr`; an ID from elsewhere is an `unknown-target` Problem. |
+| Editor modes: source, and source with live preview | Both; the list steps aside for the second. |
+| Search: instant full text, plus quick jump | Ctrl+K from `docs/decisions`, "postgres", Enter: ADR 0004 in `docs/adr` is in front. |
+| Problems view, each Problem with a repair action | The showcase log's one Problem, repaired from the view: one line of one file, and the view says there are none. The rest is M4's done-when on the fixture `broken`. |
+| git: read-only | Branch and the count of uncommitted ADR files at the foot of the sidebar, the dot in the list, the mark in the detail, the history with "Not committed yet" first, and a fresh Correction's marker opening exactly that entry. |
+| Foreign formats, read tolerantly and offered for Migration | The adr-tools repository: eight foreign ADRs with Migrate and History and no other action, the log's Migration previewed as one change of eight files naming what it leaves, cancelled; `git status` clean afterwards. MADR stands as checked in M5. |
+| A documented file format, so that agents and people can write valid ADRs without the app | Two ADRs of a new `date` log written by hand from [file-format.md](file-format.md) alone, one depending on the other: both open, the naming scheme is detected, no Problems, and the app's own writes to them are one line each. |
+
+**What stays English.** `core` says in sentences why it refuses an operation, what a change warns about (Correction, Create, Renumber, Migration), what is wrong with a piece of Metadata (the `detail` of a Problem) and why a foreign file has no Migration, and the app shows them as they come. They are `core`'s, because `adr lint` will say the same; the wording of Problems moves there with it (M4). Until both have codes instead of sentences, a translation of the window would show these in English. So would the language the page declares (`lang="en"` in `index.html`); the product name is a name. That is part of "UI translations" in the roadmap, not of v1: v1 asks that the app's own texts can be replaced without searching the markup, and they can.
+
+**Two known gaps closed**, the one that lost work and the one everybody meets first. Closing the window — or quitting — while the editor holds unsaved text asks first, with the question leaving the editor already asked (M3's gap). Checked on Windows, both answers. That a quit which was held up goes on after "Discard changes" matters on a Mac, where the app otherwise stays in the dock; that path is written and not yet run on one. The panes can be dragged, and moved by keyboard; the list and the graph remember their own width, and no pane can be dragged so far that another becomes unreadable (M2's gap; `lib/panes.ts` with its tests). A finding for whoever tests the first again: `window.close()` from inside the page destroys an Electron window without the `close` event, so it proves nothing; the window has to be asked from outside.
+
+The other known gaps of M2 to M5 are not v1's to close. Each one is in the roadmap now, so that "known" does not come to mean "forgotten".
 
 ### After v1
 

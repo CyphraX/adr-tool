@@ -2,10 +2,12 @@
   import { repairsOf, type Adr, type DecisionLog, type Relation } from '@adr-tool/core'
   import type { Decision } from '../../../shared/ipc'
   import { problemsOf } from '../lib/problems'
-  import { DECISION_LABEL, app, statusKey } from '../lib/state.svelte'
+  import { app, statusKey } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import {
     STATUS_LABEL,
     describeCause,
+    describeCorrection,
     IMPLIED_NOTE,
     describeForeign,
     describeProblem,
@@ -21,6 +23,8 @@
   let { adr, log }: { adr: Adr; log: DecisionLog } = $props()
 
   interface Line {
+    /** What tells the lines apart. Never the label: two types may share a word in another language. */
+    key: string
     label: string
     other: Adr
     /** A Relation of a rejected ADR never took effect. */
@@ -49,6 +53,7 @@
         relation.type === 'supersedes' &&
         (successor.impliedSupersedes?.includes(relation.to) ?? false)
       return {
+        key: `${side} ${relation.type} ${other.id}`,
         label: relationLabel(relation, side),
         other,
         void: relation.state === 'void',
@@ -81,10 +86,10 @@
 
   const facts = $derived(
     [
-      ['Created', adr.metadata.created],
-      ['Decided', adr.metadata.decided],
-      ['Decision-makers', adr.metadata.decisionMakers.join(', ')],
-      ['Tags', adr.metadata.tags.join(', ')]
+      [t.detail.created, adr.metadata.created],
+      [t.detail.decided, adr.metadata.decided],
+      [t.detail.decisionMakers, adr.metadata.decisionMakers.join(', ')],
+      [t.detail.tags, adr.metadata.tags.join(', ')]
     ].filter((fact): fact is [string, string] => Boolean(fact[1]))
   )
 </script>
@@ -93,11 +98,11 @@
   <header>
     <div class="record">
       <p class="id">
-        ADR <span class="prefix">{prefixOf(adr)}</span>
+        {t.detail.adr} <span class="prefix">{prefixOf(adr)}</span>
         <span class="path">{adr.path}</span>
         {#if uncommitted}
-          <span class="uncommitted" title="This file has changes that are not committed yet">
-            uncommitted changes
+          <span class="uncommitted" title={t.detail.uncommittedHint}>
+            {t.detail.uncommitted}
           </span>
         {/if}
       </p>
@@ -112,29 +117,29 @@
       <div class="actions">
         {#each decisions as decision (decision)}
           <button class:primary={decision === 'accept'} onclick={() => app.decide(decision)}>
-            {DECISION_LABEL[decision]}
+            {t.review.decision[decision].action}
           </button>
         {/each}
         {#if canBeSuperseded}
-          <button onclick={() => app.startCreating('supersedes')}>Supersede</button>
+          <button onclick={() => app.startCreating('supersedes')}>{t.detail.supersede}</button>
         {/if}
         {#if canBeAmended}
-          <button onclick={() => app.startCreating('amends')}>Amend</button>
+          <button onclick={() => app.startCreating('amends')}>{t.detail.amend}</button>
         {/if}
         {#if !adr.foreign}
-          <button onclick={() => app.edit()}>Edit</button>
-          <button onclick={() => app.editMetadata()}>Metadata</button>
+          <button onclick={() => app.edit()}>{t.detail.edit}</button>
+          <button onclick={() => app.editMetadata()}>{t.detail.metadata}</button>
         {/if}
         {#if adr.foreign && adr.noMigration === undefined}
-          <button class="primary" onclick={() => app.migrate('adr')}>Migrate</button>
+          <button class="primary" onclick={() => app.migrate('adr')}>{t.detail.migrate}</button>
         {/if}
-        {#if git}<button onclick={() => app.showHistory()}>History</button>{/if}
+        {#if git}<button onclick={() => app.showHistory()}>{t.detail.history}</button>{/if}
       </div>
     {/if}
 
     {#if facts.length > 0}
       <dl>
-        {#each facts as [name, value] (name)}
+        {#each facts as [name, value], position (position)}
           <div>
             <dt>{name}</dt>
             <dd>{value}</dd>
@@ -144,8 +149,8 @@
     {/if}
 
     {#if relations.length > 0}
-      <ul class="relations" aria-label="Relations">
-        {#each relations as relation (relation.label + relation.other.id)}
+      <ul class="relations" aria-label={t.detail.relations}>
+        {#each relations as relation (relation.key)}
           <li class:void={relation.void}>
             <span class="kind">{relation.label}</span>
             <button onclick={() => app.select(relation.other.id)}>
@@ -153,7 +158,7 @@
               <span class="prefix">{prefixOf(relation.other)}</span>
               {relation.other.title ?? relation.other.id}
             </button>
-            {#if relation.void}<span class="note">never took effect</span>{/if}
+            {#if relation.void}<span class="note">{t.neverTookEffect}</span>{/if}
             {#if relation.implied}<span class="note">{IMPLIED_NOTE}</span>{/if}
           </li>
         {/each}
@@ -161,18 +166,16 @@
     {/if}
 
     {#if adr.metadata.corrections.length > 0}
-      <ul class="corrections" aria-label="Corrections">
+      <ul class="corrections" aria-label={t.detail.corrections}>
         {#each adr.metadata.corrections as correction, position (position)}
           <li>
-            <span class="kind">Corrected</span>
+            <span class="kind">{t.detail.corrected}</span>
             <span class="what">
-              {correction.date}{correction.author ? ` by ${correction.author}` : ''}{correction.note
-                ? `: ${correction.note}`
-                : ''}
+              {describeCorrection(correction)}
             </span>
             {#if git}
               <!-- The marker of a Correction leads to what it changed. -->
-              <button onclick={() => app.showHistory(position)}>Show the change</button>
+              <button onclick={() => app.showHistory(position)}>{t.detail.showChange}</button>
             {/if}
           </li>
         {/each}
@@ -180,7 +183,7 @@
     {/if}
 
     {#if problems.length > 0}
-      <ul class="problems" aria-label="Problems">
+      <ul class="problems" aria-label={t.detail.problems}>
         {#each problems as { problem, cause }, position (position)}
           <li class:follows={cause !== undefined}>
             {describeProblem(problem)}
@@ -254,7 +257,9 @@
     color: var(--ink-faint);
   }
 
+  /* In a narrow pane the line breaks in front of the mark, never inside it. */
   .uncommitted {
+    display: inline-block;
     margin-left: 10px;
     padding: 1px 7px;
     border-radius: 8px;

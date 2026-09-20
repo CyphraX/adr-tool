@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { FileChange } from '@adr-tool/core'
   import { diffLines } from '../lib/diff'
+  import { t } from '../lib/strings'
 
   // One file of a change as a person reviews it: a change that is planned, or one git recorded.
   let { file, unchanged }: { file: FileChange; unchanged: string } = $props()
@@ -11,7 +12,7 @@
 
 <section>
   <h2>
-    {file.path}{file.creates ? ' — new file' : ''}
+    {file.path}{file.creates ? t.diff.newFile : ''}
     {#if file.renameTo !== undefined}<span class="to">→ {file.renameTo}</span>{/if}
   </h2>
   <div class="diff">
