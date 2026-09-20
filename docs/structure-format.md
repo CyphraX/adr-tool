@@ -165,7 +165,7 @@ Files are parsed with `tree-sitter-java`. There is no classpath and no build too
   - a single-type import;
   - an on-demand import (`import a.b.*`), for every simple type name in the file that the imported package declares;
   - a static import, as a use of the class it names;
-  - a simple type name that the file's **own package** declares — this is how Dependencies within a package are found. A simple type name counts where it stands in the position of a type (declarations, `extends`, `implements`, generics, casts, `new`, annotations) or as the qualifier of a static access (`Foo.bar()`, `Foo.BAZ`).
+  - a simple type name that the file's **own package** declares — this is how Dependencies within a package are found. A simple type name counts where it stands in the position of a type (declarations, `extends`, `implements`, generics, casts, `new`, annotations) or as the qualifier of a static access (`Foo.bar()`, `Foo.BAZ`). The syntax cannot tell that qualifier from a variable (`lines.size()`), so a qualifier counts only when it resolves to a type; a variable that carries the name of a type of its own package is counted wrongly, and knowingly.
 - Resolution order for a simple name follows the language: single-type import, own package, on-demand imports.
 - A name that two files of the repository declare in the same package (possible across Maven modules) is not resolved, and nothing is counted.
 - A package spread over several Components is fine: a use across that boundary is a real Dependency.

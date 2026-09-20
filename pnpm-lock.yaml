@@ -126,6 +126,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@adr-tool/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -136,6 +139,40 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(yaml@2.9.1))
+
+  packages/kernel:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.5
+        version: 24.13.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(yaml@2.9.1))
+
+  packages/spikes:
+    dependencies:
+      '@adr-tool/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      tree-sitter-java:
+        specifier: ^0.23.5
+        version: 0.23.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      web-tree-sitter:
+        specifier: ^0.27.0
+        version: 0.27.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.5
+        version: 24.13.5
       vitest:
         specifier: ^5.0.1
         version: 5.0.1(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(yaml@2.9.1))
@@ -1582,6 +1619,14 @@ packages:
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
+  node-addon-api@8.9.2:
+    resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
+    engines: {node: ^18 || ^20 || >= 21}
+
+  node-gyp-build@4.8.4:
+    resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
+    hasBin: true
+
   node-releases@2.0.56:
     resolution: {integrity: sha512-x0InOIyzgdk+eyaWaRJFH5snEtiImgBgblZ2CyPrLmqqcuMQkEvcDPHbzqbD8eDsSeJbVOjn+crzyzHaM4D+/A==}
     engines: {node: '>=18'}
@@ -1798,6 +1843,14 @@ packages:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
 
+  tree-sitter-java@0.23.5:
+    resolution: {integrity: sha512-Yju7oQ0Xx7GcUT01mUglPP+bYfvqjNCGdxqigTnew9nLGoII42PNVP3bHrYeMxswiCRM0yubWmN5qk+zsg0zMA==}
+    peerDependencies:
+      tree-sitter: ^0.21.1
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
   trim-lines@3.0.1:
     resolution: {integrity: sha512-kRj8B+YHZCc9kQYdWfJB2/oUl9rA99qbowYYBtr4ui4mZyAQ2JpvVBd/6U2YloATfqBhBTSMhTpgBHtU0Mf3Rg==}
 
@@ -1960,6 +2013,9 @@ packages:
 
   w3c-keyname@2.2.8:
     resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
+
+  web-tree-sitter@0.27.0:
+    resolution: {integrity: sha512-XK08gj6RwTMQatAG7uVRP8MunqotL/XC19vHgkSPKmELgbGPBj4ECvB8haHOUnyj6ls2B8t42UTro14zxGgAHg==}
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -3530,6 +3586,10 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
+  node-addon-api@8.9.2: {}
+
+  node-gyp-build@4.8.4: {}
+
   node-releases@2.0.56: {}
 
   obug@2.2.1: {}
@@ -3784,6 +3844,11 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
+  tree-sitter-java@0.23.5:
+    dependencies:
+      node-addon-api: 8.9.2
+      node-gyp-build: 4.8.4
+
   trim-lines@3.0.1: {}
 
   trough@2.2.0: {}
@@ -3908,6 +3973,8 @@ snapshots:
       - msw
 
   w3c-keyname@2.2.8: {}
+
+  web-tree-sitter@0.27.0: {}
 
   which@2.0.2:
     dependencies:

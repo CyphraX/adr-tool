@@ -23,10 +23,11 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [2, '0002-never-reserialize-markdown', 'accepted'],
     [3, '0003-on-disk-contract', 'accepted'],
     [4, '0004-operations-return-change-sets', 'accepted'],
+    [5, '0005-foreign-formats-are-read-never-written', 'accepted'],
     // Written as proposed; accepting it in the app must not break the build.
     [
-      5,
-      '0005-foreign-formats-are-read-never-written',
+      6,
+      '0006-one-core-package-per-module-on-a-shared-kernel',
       expect.stringMatching(/^(proposed|accepted)$/)
     ]
   ])
@@ -49,7 +50,6 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       to: '0002-never-reserialize-markdown',
       state: 'in-effect'
     },
-    // What ADR-0005 depends on is pending until it is accepted.
     ...[
       '0002-never-reserialize-markdown',
       '0003-on-disk-contract',
@@ -58,7 +58,16 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       type: 'depends-on',
       from: '0005-foreign-formats-are-read-never-written',
       to,
-      state: log.adrs[4]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
-    }))
+      state: 'in-effect'
+    })),
+    // What ADR-0006 depends on is pending until it is accepted.
+    ...['0001-electron-svelte-typescript-throughout', '0004-operations-return-change-sets'].map(
+      (to) => ({
+        type: 'depends-on',
+        from: '0006-one-core-package-per-module-on-a-shared-kernel',
+        to,
+        state: log.adrs[5]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
+      })
+    )
   ])
 })

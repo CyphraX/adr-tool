@@ -1,7 +1,7 @@
 import { FOREIGN_FORMAT_NAMES, type Adr } from '../adr/adr'
 import type { DecisionLog } from '../log/load'
 import type { Status } from '../status'
-import { Refusal } from './draft'
+import { Refusal } from './pending'
 
 /** The ADR `id` of the log, if the tool may write its Metadata. `because` says who is asking for it. */
 export function writable(log: DecisionLog, id: string, because?: string): Adr {

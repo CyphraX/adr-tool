@@ -1,10 +1,10 @@
-import type { Plan } from '../change/change-set'
-import type { FileSystem } from '../fs/port'
+import type { Plan } from '../plan'
+import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList } from '../metadata/write'
 import { RELATION_TYPES, type RelationType } from '../relation'
-import { Refusal, plan } from './draft'
+import { Refusal, plan } from './pending'
 import { requireTarget, writable } from './rules'
 
 /**
@@ -32,7 +32,7 @@ export function planEditMetadata(
   id: string,
   edit: MetadataEdit
 ): Promise<Plan> {
-  return plan(fs, async (drafts) => {
+  return plan(fs, async (pending) => {
     const adr = writable(log, id)
     const changes: { key: MetadataKey; removed: string[]; added: string[] }[] = []
     const change = (key: MetadataKey, current: readonly string[], wanted: string[]): void => {
@@ -71,10 +71,10 @@ export function planEditMetadata(
 
     for (const { key, removed, added } of changes) {
       for (const item of removed) {
-        await drafts.write(adr.path, (view) => removeFromList(view, key, item))
+        await pending.write(adr.path, (view) => removeFromList(view, key, item))
       }
       for (const item of added) {
-        await drafts.write(adr.path, (view) => addToList(view, key, item))
+        await pending.write(adr.path, (view) => addToList(view, key, item))
       }
     }
   })

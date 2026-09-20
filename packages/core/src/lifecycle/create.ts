@@ -1,12 +1,12 @@
 import { namesNumber } from '../foreign/madr'
-import type { Plan } from '../change/change-set'
-import { joinPath, type FileSystem } from '../fs/port'
+import type { Plan } from '../plan'
+import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { nextPrefix, slugify } from '../log/new-id'
 import { fillTemplate, loadTemplate } from '../templates/templates'
 import type { Eol } from '../text/source'
 import type { Today } from './decide'
-import { Refusal, plan } from './draft'
+import { Refusal, plan } from './pending'
 import { requireTarget } from './rules'
 
 export interface NewAdr extends Today {
@@ -25,7 +25,7 @@ export interface NewAdr extends Today {
 export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promise<Plan> {
   let created: { id: string; path: string } | undefined
   const warnings: string[] = []
-  const planned = plan(fs, async (drafts) => {
+  const planned = plan(fs, async (pending) => {
     const title = adr.title.trim().replace(/\s+/g, ' ')
     const slug = slugify(title)
     if (slug === '') throw new Refusal('The title needs at least one letter or digit.')
@@ -69,7 +69,7 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
     const lines = [...metadata, ...body.replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n'), '']
 
     created = { id, path: joinPath(log.path, `${id}.md`) }
-    await drafts.create(created.path, lines.join(eol))
+    await pending.create(created.path, lines.join(eol))
   })
   return planned.then((result) =>
     result.ok && created ? { ...result, created, ...(warnings.length > 0 && { warnings }) } : result
