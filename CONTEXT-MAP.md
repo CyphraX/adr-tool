@@ -22,8 +22,12 @@ A typed, directed connection from an artefact of one context to an artefact of a
 _Avoid_: Link, reference, Relation (that is ADR to ADR, within Decisions)
 
 **Problem**:
-An inconsistency in the suite's own artefacts that the suite detects and names — a Trace to something that does not exist, an orphaned Annotation, a Component whose patterns match no file. Some Problems have a repair. Decisions defines the Problems of a Decision Log; every other context adds its own.
+An inconsistency in the suite's own artefacts that the suite detects and names — a Trace to something that does not exist, an orphaned Annotation, a pattern of a Component that matches no Source File. Some Problems have a Repair. Decisions defines the Problems of a Decision Log; every other context adds its own.
 _Avoid_: Error, warning, issue, Violation (that is code breaking a Rule), Finding (that is a human judgement)
+
+**Repair**:
+An operation the suite offers for a Problem, which writes the one thing that makes the Problem go away, previewed as a change set. A Problem has no Repair where the suite cannot know what was meant. Decisions adds which side it takes as authoritative.
+_Avoid_: Fix, quick fix, auto-fix
 
 ## Relationships
 
