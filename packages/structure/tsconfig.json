@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // As in core and kernel: no DOM lib and no ambient types, so that reaching
+    // for the disk or the UI fails the type check.
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src/**/*"]
+}
