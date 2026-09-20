@@ -25,6 +25,7 @@ This is the plan of the ADR tool, which becomes the Decisions module of a larger
 - Licence and business model (open source or commercial). Until that is decided the app stays local-only: no backend, no accounts, no telemetry
 - Distribution: installers for all three platforms, code signing, auto-update
 - Final product name; the working title is Softarch Suite (see [vision.md](vision.md))
+- Two known gaps of v1 that a first-time user meets at once (see "Known gaps of v1" below): images with relative paths, and the Metadata dialog that can outgrow the window
 
 ## Next — the first follow-ups after v1
 
@@ -38,8 +39,35 @@ This is the plan of the ADR tool, which becomes the Decisions module of a larger
 - Branch overview: `proposed` ADRs on branches that are not checked out, and a warning when a number is already taken on another branch
 - Relations across Decision Logs, written as `<log>/<ID>`; a bare ID keeps meaning "same log"
 - Live editor: table rendering
-- UI translations
+- UI translations. The app's own texts are in two modules of the renderer and one of the main process, ready to be replaced. `core` still answers in English sentences — why it refuses an operation, what a Migration leaves as it is — and so does the wording of Problems once it has moved to `core` for `adr lint`; both need codes before the window can be translated whole
 - Read-only export for non-technical readers (static site or PDF)
 - ADR → code links ("which ADRs affect this file?")
 - Aggregation across repositories, including Relations that cross repository boundaries
 - Timeline, Kanban by Status, dashboards
+
+## Known gaps of v1
+
+Found while the milestones were built, written down in [plan.md](plan.md), and looked at one by one in the v1 acceptance of 2026-09-20. Two were closed there (the window asks before it closes on unsaved text; the panes can be resized). The rest was left on purpose, and this is where each one waits.
+
+Before the first public release:
+
+- **Images with relative paths in an ADR do not load.** The renderer has no file access, by design: an ADR is untrusted input. It needs a protocol of its own in the main process that serves files from below the repository's root and nothing else — security-relevant, so it gets its own pull request and review.
+- **A Metadata dialog with very many Relations can grow taller than the window.** The dialog lets a picker's matches hang out over its edge, so it cannot simply scroll; the lists need their own scrolling area.
+- **Closing the window asks about unsaved text in the editor, not about an open Metadata dialog.** What is lost there is a few picks, never a sentence — but it is lost without a word.
+
+With `adr lint`, because `core` has to say it first:
+
+- Problems are grouped under a root cause only when frontmatter cannot be read at all. A file that can be read but has a Status outside the five values voids its Relations, and what that causes on other ADRs is still listed Problem by Problem.
+
+With more foreign formats:
+
+- The header of a MADR file names all three signs the tool knows the format by, not the one that applied.
+- A Status section that Migration leaves in the text is named by the first thing that keeps it only.
+- Links in adr-tools files with words other than supersede and amend (`Clarifies`) are not Relations; they stay Markdown links in the text.
+
+Later, when a repository shows the need:
+
+- A change set is not atomic across a failing disk. Renumber renames first, so that the likeliest failure — a file held open by another program — happens before anything is written.
+- The history dialog does not follow the files while it is open.
+- The search does not fold "ß" to "ss".
+- The Relations graph draws one Decision Log, scrolls but does not zoom, has no filter by Relation type, and its lines are not read out to a screen reader (the same Relations are in every ADR's detail). An ADR that very many others build on across many layers makes a tall drawing.

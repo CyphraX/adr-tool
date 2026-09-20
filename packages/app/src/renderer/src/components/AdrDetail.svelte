@@ -253,7 +253,9 @@
     color: var(--ink-faint);
   }
 
+  /* In a narrow pane the line breaks in front of the mark, never inside it. */
   .uncommitted {
+    display: inline-block;
     margin-left: 10px;
     padding: 1px 7px;
     border-radius: 8px;
