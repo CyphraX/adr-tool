@@ -28,7 +28,14 @@ const api: Api = {
     const handler = (_: unknown, repository: OpenRepository): void => listener(repository)
     ipcRenderer.on(CHANNEL.repositoryChanged, handler)
     return () => ipcRenderer.removeListener(CHANNEL.repositoryChanged, handler)
-  }
+  },
+  setUnsaved: (unsaved) => ipcRenderer.invoke(CHANNEL.setUnsaved, unsaved),
+  onCloseRequested: (listener) => {
+    const handler = (): void => listener()
+    ipcRenderer.on(CHANNEL.closeRequested, handler)
+    return () => ipcRenderer.removeListener(CHANNEL.closeRequested, handler)
+  },
+  closeWindow: () => ipcRenderer.invoke(CHANNEL.closeWindow)
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -6,18 +6,58 @@
   import HistoryDialog from './components/HistoryDialog.svelte'
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
+  import PaneDivider from './components/PaneDivider.svelte'
   import ProblemsList from './components/ProblemsList.svelte'
   import RelationsGraph from './components/RelationsGraph.svelte'
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
+  import { LIMITS, fitMiddle, fitSidebar, readSizes, type PaneSizes } from './lib/panes'
   import { app } from './lib/state.svelte'
   import { t } from './lib/strings'
   import { codeSpans, describeProblem } from './lib/wording'
 
   onMount(() => void app.start())
 
+  // The main process holds the window open while there is text to lose, and asks back.
+  $effect(() => void window.api.setUnsaved(app.dirty))
+
   const repository = $derived(app.active?.repository.repository)
+
+  // The panes are as wide as they were dragged, within what leaves the others readable;
+  // a pane nobody dragged keeps the proportions of the layout. Remembered for this person
+  // on this machine, and the window works the same when nothing can be remembered.
+  const STORED_SIZES = 'pane-sizes'
+  let sizes = $state<PaneSizes>(readStoredSizes())
+  let panesWidth = $state(0)
+  const middlePane = $derived(app.active?.view === 'graph' ? 'graph' : 'list')
+  const sidebarWidth = $derived(
+    sizes.sidebar === undefined || panesWidth === 0
+      ? sizes.sidebar
+      : fitSidebar(sizes.sidebar, panesWidth)
+  )
+  const middleWidth = $derived.by(() => {
+    const asked = sizes[middlePane]
+    if (asked === undefined || panesWidth === 0) return asked
+    return fitMiddle(asked, panesWidth, sidebarWidth ?? LIMITS.sidebar.default)
+  })
+
+  function readStoredSizes(): PaneSizes {
+    try {
+      return readSizes(localStorage.getItem(STORED_SIZES))
+    } catch {
+      return {}
+    }
+  }
+
+  function resize(pane: keyof PaneSizes, width: number | undefined): void {
+    sizes[pane] = width
+    try {
+      localStorage.setItem(STORED_SIZES, JSON.stringify(sizes))
+    } catch {
+      // Not remembered, then.
+    }
+  }
 
   // Ctrl+K, or Cmd+K on a Mac: search from anywhere — but not over another dialog. Exactly
   // that chord: on a Mac Ctrl+K deletes to the end of the line in the editor, and with
@@ -70,14 +110,37 @@
         class="panes"
         class:wide-editor={app.editing?.mode === 'split'}
         class:wide-middle={app.active.view === 'graph'}
+        bind:clientWidth={panesWidth}
+        style:--sidebar={sidebarWidth === undefined ? undefined : `${sidebarWidth}px`}
+        style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
       >
         <Sidebar />
+        <PaneDivider
+          label={t.panes.sidebar}
+          min={LIMITS.sidebar.min}
+          max={fitSidebar(LIMITS.sidebar.max, panesWidth)}
+          onresize={(width) => resize('sidebar', fitSidebar(width, panesWidth))}
+          onreset={() => resize('sidebar', undefined)}
+        />
         {#if app.active.view === 'problems'}
           <ProblemsList />
         {:else if app.active.view === 'graph' && app.log}
           <RelationsGraph log={app.log} />
         {:else}
           <AdrList />
+        {/if}
+        {#if app.editing?.mode !== 'split'}
+          <PaneDivider
+            label={t.panes.middle}
+            min={LIMITS.middle.min}
+            max={fitMiddle(panesWidth, panesWidth, sidebarWidth ?? LIMITS.sidebar.default)}
+            onresize={(width) =>
+              resize(
+                middlePane,
+                fitMiddle(width, panesWidth, sidebarWidth ?? LIMITS.sidebar.default)
+              )}
+            onreset={() => resize(middlePane, undefined)}
+          />
         {/if}
         {#if app.selected && app.log}
           <AdrDetail adr={app.selected} log={app.log} />
@@ -109,18 +172,23 @@
 
   .panes {
     display: grid;
-    grid-template-columns: 210px minmax(340px, 1fr) minmax(0, 1.4fr);
+    /* Between the panes stand their dividers, which take no room of their own. */
+    grid-template-columns:
+      var(--sidebar, 210px) 0 var(--middle, minmax(340px, 1fr))
+      0 minmax(0, 1.4fr);
     min-height: 0;
   }
 
   /* A drawing needs room; the ADR next to it is there to be glanced at. */
   .panes.wide-middle {
-    grid-template-columns: 210px minmax(0, 2fr) minmax(360px, 1fr);
+    grid-template-columns:
+      var(--sidebar, 210px) 0 var(--middle, minmax(0, 2fr))
+      0 minmax(360px, 1fr);
   }
 
   /* Source and preview side by side need room; the list steps aside while they are open. */
   .panes.wide-editor {
-    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-columns: var(--sidebar, 210px) 0 minmax(0, 1fr);
   }
 
   .panes.wide-editor > :global(.list),

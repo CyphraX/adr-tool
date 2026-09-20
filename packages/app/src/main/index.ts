@@ -24,6 +24,9 @@ const repositories = new Repositories((repository) => {
 })
 let activeRoot: string | undefined
 
+/** The windows, by the id of their contents, that hold text which is not on disk. */
+const unsaved = new Set<number>()
+
 const sessionFile = (): string => join(app.getPath('userData'), 'session.json')
 const saveSession = (): Promise<void> =>
   writeSession(sessionFile(), {
@@ -172,6 +175,17 @@ function registerIpc(): void {
   ipcMain.handle(CHANNEL.openExternal, async (_, url: unknown) => {
     if (typeof url === 'string' && isWebLink(url)) await shell.openExternal(url)
   })
+
+  ipcMain.handle(CHANNEL.setUnsaved, (event, holdsText: unknown) => {
+    if (holdsText === true) unsaved.add(event.sender.id)
+    else unsaved.delete(event.sender.id)
+  })
+
+  // The person was asked, or there was nothing to ask about: now the window closes.
+  ipcMain.handle(CHANNEL.closeWindow, (event) => {
+    unsaved.delete(event.sender.id)
+    BrowserWindow.fromWebContents(event.sender)?.close()
+  })
 }
 
 function createWindow(): void {
@@ -196,6 +210,21 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
+
+  // Closing a window that holds unsaved text asks first, and the window asks: it has the
+  // dialog for it. Quitting the app closes its windows, so it goes the same way. A window
+  // that cannot answer any more — crashed, hung, or loading afresh — holds nothing to ask about.
+  const contents = mainWindow.webContents
+  const id = contents.id
+  mainWindow.on('close', (event) => {
+    if (!unsaved.has(id) || contents.isCrashed()) return
+    event.preventDefault()
+    mainWindow.show()
+    contents.send(CHANNEL.closeRequested)
+  })
+  mainWindow.on('unresponsive', () => unsaved.delete(id))
+  mainWindow.on('closed', () => unsaved.delete(id))
+  contents.on('did-start-loading', () => unsaved.delete(id))
 
   // Nothing ever opens or navigates inside the app: web links go to the system
   // browser, everything else is dropped.
