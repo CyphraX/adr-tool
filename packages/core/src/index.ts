@@ -1,8 +1,18 @@
 export { STATUSES, isStatus, type Status } from './status'
 export { RELATION_TYPES, BACK_REFERENCE_KEYS, isRelationType, type RelationType } from './relation'
 
-export { joinPath, type DirectoryEntry, type FileSystem, type WritableFileSystem } from './fs/port'
-export { memoryFileSystem } from './fs/memory'
+// What core's callers use of the kernel is handed on, so that they have one place to import from.
+export {
+  applyChangeSet,
+  joinPath,
+  memoryFileSystem,
+  type Applied,
+  type ChangeSet,
+  type DirectoryEntry,
+  type FileChange,
+  type FileSystem,
+  type WritableFileSystem
+} from '@adr-tool/kernel'
 
 export { openRepository, type DecisionLog, type Repository } from './log/load'
 export { DEFAULT_LOG_PATHS } from './log/discover'
@@ -16,13 +26,7 @@ export { groupProblems, type ProblemGroup } from './problems/group'
 
 export { applyEdits, type TextEdit } from './text/edit'
 
-export {
-  applyChangeSet,
-  type Applied,
-  type ChangeSet,
-  type FileChange,
-  type Plan
-} from './change/change-set'
+export type { Plan } from './plan'
 export { planAccept, planDeprecate, planReject, type Today } from './lifecycle/decide'
 export { planEditBody, recordsCorrection, type BodyEdit } from './lifecycle/edit-body'
 export { planCreate, type NewAdr } from './lifecycle/create'

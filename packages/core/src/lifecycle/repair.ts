@@ -1,13 +1,13 @@
 import type { Adr } from '../adr/adr'
-import type { Plan } from '../change/change-set'
-import type { FileSystem } from '../fs/port'
+import type { Plan } from '../plan'
+import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList, setScalar } from '../metadata/write'
 import { groupProblems } from '../problems/group'
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import { BACK_REFERENCE_KEYS } from '../relation'
-import { plan } from './draft'
+import { plan } from './pending'
 import { planRenumber } from './renumber'
 import { requireOwnFormat, writable } from './rules'
 
@@ -134,9 +134,9 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
 
   if (repair.kind === 'renumber') return planRenumber(fs, log, repair.adr)
 
-  const planned = await plan(fs, async (drafts) => {
+  const planned = await plan(fs, async (pending) => {
     const adr = writable(log, repair.adr)
-    await drafts.write(adr.path, (view) => {
+    await pending.write(adr.path, (view) => {
       switch (repair.kind) {
         case 'lowercase-status':
           return setScalar(view, 'status', adr.metadata.status!)

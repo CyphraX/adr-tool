@@ -1,0 +1,19 @@
+{
+  "name": "@adr-tool/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What every module of the suite needs and none of them owns: the file-system port and change sets",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
