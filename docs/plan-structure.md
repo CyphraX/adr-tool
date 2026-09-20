@@ -111,10 +111,11 @@ A read-only viewer on CodeMirror 6, which the app already carries: syntax highli
 2. **A synchronous resolver on an asynchronous port.** Spike (b). **Verified (2026-09-20):** one walk, a snapshot, and a parse-load-parse loop for what configurations reach for outside of it.
 3. **Globs.** A small matcher of our own for the subset the specification allows, or a library (`picomatch`). Decide in part 2; the subset is small and must behave the same on every platform.
 4. **Layout with Cycles.** Decide in part 3 with a throwaway prototype, as the graph of M4 was.
-5. **Off the main thread.** `worker_threads` in the main process or Electron's `utilityProcess`. Decide in part 3; the core does not notice. Spike (a) tries tree-sitter in both.
+5. **Off the main thread.** `worker_threads` in the main process or Electron's `utilityProcess`. Decide in part 3; the core does not notice. Spike (a) ran tree-sitter in both, so the choice is open on its merits — isolation against start-up cost and message passing — and not on feasibility.
 
 ## Risks
 
+- **A repository's own resolution settings are honoured, also where they cost Dependencies.** Under `moduleResolution: node10` TypeScript ignores `exports`, so a workspace package that has nothing else is not resolved. That is the repository's choice; the suite reports such uses as not resolved and does not second-guess the configuration.
 - **Precision without a classpath.** Java metrics are a lower bound. The specification says so, and so does the UI wherever a Java metric is shown.
 - **Large repositories.** Parsing file by file and caching per file keeps the work proportional to what changed. A first run over ten thousand files must not block the window — hence the worker — and should be measured in part 3 on a large open-source repository.
 - **The Draft decides the first impression.** If it is poor, the graph is poor. Part 2 is tested against several real layouts (pnpm, npm workspaces, Maven multi-module, Gradle, a single-package repository).
