@@ -8,7 +8,7 @@ import {
   replaceInList,
   setScalar
 } from '../src/metadata/write'
-import { applyEdits, type TextEdit } from '../src/text/edit'
+import { applyEdits, type TextEdit } from '@adr-tool/kernel'
 import { viewSource, type SourceView } from '../src/text/source'
 import { fixture, lines, ownAdrs } from './fixtures'
 
