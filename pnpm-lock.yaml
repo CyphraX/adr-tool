@@ -155,6 +155,22 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(yaml@2.9.1))
 
+  packages/spikes:
+    dependencies:
+      '@adr-tool/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.5
+        version: 24.13.5
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(yaml@2.9.1))
+
 packages:
 
   '@babel/code-frame@7.29.7':

@@ -1,0 +1,19 @@
+{
+  "name": "@adr-tool/spikes",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Temporary: the two spikes of part 1 of docs/plan-structure.md. Their halves move into the structure package with parts 3 and 4, and this package goes",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@adr-tool/kernel": "workspace:*",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "vitest": "^5.0.1"
+  }
+}

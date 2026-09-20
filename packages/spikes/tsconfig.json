@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // As in core and kernel: no ambient types. What the spikes prove has to work
+    // on the file-system port alone, so reaching for `fs` fails the type check.
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src/**/*"]
+}
