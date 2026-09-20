@@ -31,7 +31,9 @@ The app reopens the repositories of the last run. To see every Status, Relations
 
 ## Layout
 
-- `packages/core` — the domain core in pure TypeScript. No Electron, no DOM, no disk access of its own; its type check fails if it reaches for any of them.
+- `packages/kernel` — what every module of the suite needs and none of them owns: the file-system port and change sets ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)).
+- `packages/core` — the domain core of the Decisions module in pure TypeScript. No Electron, no DOM, no disk access of its own; its type check fails if it reaches for any of them.
+- `packages/spikes` — temporary: the two spikes of the Structure module's first part ([plan-structure.md](docs/plan-structure.md)). It dissolves into `packages/structure`.
 - `packages/app` — the Electron + Svelte 5 desktop app. The renderer is sandboxed and talks to the main process only through the preload bridge.
 
 Prettier never formats Markdown in this repository, and the fixtures under `packages/core/test/fixtures` are exempt from git's line-ending normalization: the tool promises never to change a byte it was not asked to change ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)), and its own repository is its first test case.
