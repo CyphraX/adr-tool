@@ -20,7 +20,8 @@ packages/
 ├── kernel/      # what every module needs: the file-system port, the in-memory file system, change sets
 ├── core/        # Decisions, as it is; depends on kernel
 ├── structure/   # pure TypeScript: no Electron, no DOM, no disk access of its own; depends on kernel
-└── app/         # depends on all three
+├── spikes/      # temporary, part 1: dissolves into structure with parts 3 and 4
+└── app/         # depends on kernel, core and structure
 ```
 
 `structure` works against the file-system port, like `core`. What it gets from git — the files git tracks, plus the untracked ones it does not ignore — comes in through a port as well; the app implements it on `main/git.ts`, tests on a list.
@@ -39,6 +40,24 @@ packages/
 
 *Done when:* CI is green with the kernel in place; both spikes have a test in plain Node that runs on all three platforms; spike (a) has also been run by hand in Electron's main process and off the main thread, and what was found is written into this plan — or a fallback is. Fallbacks: for (a), the `java-parser` package (pure JavaScript); for (b), a resolver of our own for relative paths, `paths` aliases and workspace packages.
 
+*Status (2026-09-20):* built. `packages/kernel` holds the port, the in-memory file system and change sets, with tests of its own; `Plan` is generic there, and `core` adds the created ADR and the renamed ID to it. The internal `Draft` of `core` is now `PendingFile`. Both spikes live in `packages/spikes`, a temporary package whose halves move into `structure` with parts 3 and 4. Neither fallback is needed. The decision is [ADR-0006](adr/0006-one-core-package-per-module-on-a-shared-kernel.md), created as `proposed` through `core`'s own operations and waiting for the author to accept it in the app.
+
+What spike (b) found (`packages/spikes/src/ts-resolution.ts`):
+
+- The gap between the asynchronous port and TypeScript's synchronous hosts closes with one walk of the repository that keeps its paths and the text of `package.json` and `tsconfig*.json`. What a configuration reaches for beyond that — an `extends` into `node_modules` — is noted as a miss, loaded, and the configuration is parsed again until nothing is missing.
+- **`node_modules` is never walked, and need not exist.** Workspace packages are found by their `package.json` and offered to TypeScript under a `node_modules` directory that exists only for it. A fresh clone therefore resolves like an installed one, and a bare specifier that is no workspace package is a Library without any lookup.
+- Proven on this repository: the solution-style `tsconfig.json` of `app`, `@adr-tool/core` from the renderer, `core` to `kernel`, `./App.svelte` as a path, the settings of `@electron-toolkit/tsconfig` through `extends`.
+- TypeScript's matcher for `include` and `exclude` is not public; the spike carries a small one of its own. It is the same kind of matcher the Component patterns need (open decision 3).
+
+What spike (a) found (`packages/spikes/src/java-outline.ts`, `packages/spikes/electron/`):
+
+- `web-tree-sitter` 0.27 with the prebuilt `tree-sitter-java.wasm` that the grammar's npm package ships reads package, imports of every kind, top-level types and the simple names in type position from a file written to mislead regular expressions, and keeps what it can of a file with syntax errors.
+- The code never touches the disk: the caller hands in the bytes of the two `.wasm` files (`Parser.init({ wasmBinary })`, `Language.load(bytes)`). That takes "where do the files lie in a packaged app" out of the analysis and leaves it to the app and the CLI, each of which knows its own layout.
+- Run by hand in Electron 44.4 on Windows: the main process, a worker thread of the main process and a utility process all initialise and parse (3 ms for a small file in the main process). In plain Node the same runs in CI, worker thread included. Not run by hand on macOS and Linux; the CI test covers Node there.
+- Two findings for part 4: an annotation names its type with a plain `identifier`, not a `type_identifier`; and the qualifier of a static access (`Totals.sum()`) is syntactically the same as a variable (`lines.size()`), so it is a candidate that only the symbol table confirms. The specification says so now.
+- pnpm 11 refuses to install while a dependency's build script is undecided. The grammar's `node-gyp` build is switched off in `pnpm-workspace.yaml`; only its `.wasm` is used.
+- An ESM entry point of Electron must not `await app.whenReady()` at the top level: `ready` is emitted only after the entry point has loaded, and the two wait for each other.
+
 ### Part 2 — Components
 
 - `structure`: read `.arch/components.yml` (sections 1 and 6 of the specification): keys, Component IDs, patterns, who owns a file, Unassigned. Enumerate Source Files (section 2) — for now by extension only, without parsing. The Draft, from workspace packages, Maven modules, Gradle includes and directories. The Problems and the one Repair. Adopt, as a change set — into a new file, and into an existing one that declares nothing.
@@ -46,7 +65,7 @@ packages/
 - ADR: the analysis never executes anything from the analysed repository.
 - No UI yet beyond what the tests need; the app follows in part 3, so that the first thing seen is the graph and not a list of folders.
 
-*Done when:* in `structure`'s tests, over a Node file system that only the tests have, this repository loads without a declaration and drafts `app`, `core`, `kernel` and `structure` with their directories below; fixtures report every Problem of the specification; adopting the Draft produces a file that reads back as the same Components.
+*Done when:* in `structure`'s tests, over a Node file system that only the tests have, this repository loads without a declaration and drafts `app`, `core`, `kernel` and `structure` (and `spikes`, as long as it exists) with their directories below; fixtures report every Problem of the specification; adopting the Draft produces a file that reads back as the same Components.
 
 ### Part 3 — TypeScript, JavaScript and Svelte; Cycles; the first slice
 
@@ -88,8 +107,8 @@ A read-only viewer on CodeMirror 6, which the app already carries: syntax highli
 
 ## Open implementation decisions
 
-1. **tree-sitter as WASM in three hosts.** Spike (a). The grammar's `.wasm` has to be found in a packaged Electron app and in an `npx` run alike.
-2. **A synchronous resolver on an asynchronous port.** Spike (b).
+1. **tree-sitter as WASM in three hosts.** Spike (a). **Verified (2026-09-20):** it runs in plain Node, in Electron's main process, in a worker thread and in a utility process, from bytes the caller hands in. What remains is packaging: electron-builder has to ship the two `.wasm` files outside the archive (`asarUnpack` or `extraResources`), and the CLI finds them with `import.meta.resolve`. That is decided with distribution.
+2. **A synchronous resolver on an asynchronous port.** Spike (b). **Verified (2026-09-20):** one walk, a snapshot, and a parse-load-parse loop for what configurations reach for outside of it.
 3. **Globs.** A small matcher of our own for the subset the specification allows, or a library (`picomatch`). Decide in part 2; the subset is small and must behave the same on every platform.
 4. **Layout with Cycles.** Decide in part 3 with a throwaway prototype, as the graph of M4 was.
 5. **Off the main thread.** `worker_threads` in the main process or Electron's `utilityProcess`. Decide in part 3; the core does not notice. Spike (a) tries tree-sitter in both.
