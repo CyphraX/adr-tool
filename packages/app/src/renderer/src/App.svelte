@@ -12,7 +12,15 @@
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
-  import { LIMITS, fitMiddle, fitSidebar, readSizes, type PaneSizes } from './lib/panes'
+  import {
+    LIMITS,
+    fitMiddle,
+    fitSidebar,
+    maxMiddle,
+    readSizes,
+    type MiddlePane,
+    type PaneSizes
+  } from './lib/panes'
   import { app } from './lib/state.svelte'
   import { t } from './lib/strings'
   import { codeSpans, describeProblem } from './lib/wording'
@@ -30,16 +38,19 @@
   const STORED_SIZES = 'pane-sizes'
   let sizes = $state<PaneSizes>(readStoredSizes())
   let panesWidth = $state(0)
-  const middlePane = $derived(app.active?.view === 'graph' ? 'graph' : 'list')
+  const middlePane = $derived<MiddlePane>(app.active?.view === 'graph' ? 'graph' : 'list')
+  // Before the window has been measured there is nothing to fit a width into.
   const sidebarWidth = $derived(
-    sizes.sidebar === undefined || panesWidth === 0
-      ? sizes.sidebar
-      : fitSidebar(sizes.sidebar, panesWidth)
+    sizes.sidebar === undefined
+      ? LIMITS.sidebar.default
+      : panesWidth === 0
+        ? sizes.sidebar
+        : fitSidebar(sizes.sidebar, panesWidth)
   )
   const middleWidth = $derived.by(() => {
     const asked = sizes[middlePane]
     if (asked === undefined || panesWidth === 0) return asked
-    return fitMiddle(asked, panesWidth, sidebarWidth ?? LIMITS.sidebar.default)
+    return fitMiddle(asked, panesWidth, sidebarWidth, middlePane)
   })
 
   function readStoredSizes(): PaneSizes {
@@ -111,7 +122,8 @@
         class:wide-editor={app.editing?.mode === 'split'}
         class:wide-middle={app.active.view === 'graph'}
         bind:clientWidth={panesWidth}
-        style:--sidebar={sidebarWidth === undefined ? undefined : `${sidebarWidth}px`}
+        style:--sidebar="{sidebarWidth}px"
+        style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
         style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
       >
         <Sidebar />
@@ -130,17 +142,17 @@
           <AdrList />
         {/if}
         {#if app.editing?.mode !== 'split'}
-          <PaneDivider
-            label={t.panes.middle}
-            min={LIMITS.middle.min}
-            max={fitMiddle(panesWidth, panesWidth, sidebarWidth ?? LIMITS.sidebar.default)}
-            onresize={(width) =>
-              resize(
-                middlePane,
-                fitMiddle(width, panesWidth, sidebarWidth ?? LIMITS.sidebar.default)
-              )}
-            onreset={() => resize(middlePane, undefined)}
-          />
+          <!-- A divider watches the pane in front of it: another pane, another divider. -->
+          {#key app.active.view}
+            <PaneDivider
+              label={t.panes.middle}
+              min={LIMITS.middle.min}
+              max={maxMiddle(panesWidth, sidebarWidth, middlePane)}
+              onresize={(width) =>
+                resize(middlePane, fitMiddle(width, panesWidth, sidebarWidth, middlePane))}
+              onreset={() => resize(middlePane, undefined)}
+            />
+          {/key}
         {/if}
         {#if app.selected && app.log}
           <AdrDetail adr={app.selected} log={app.log} />
@@ -172,9 +184,11 @@
 
   .panes {
     display: grid;
-    /* Between the panes stand their dividers, which take no room of their own. */
+    /* Between the panes stand their dividers, which take no room of their own. What a pane
+       needs at least is lib/panes.ts' to say; 340px is how the layout shares the room out
+       while nobody has dragged the list, not a limit. */
     grid-template-columns:
-      var(--sidebar, 210px) 0 var(--middle, minmax(340px, 1fr))
+      var(--sidebar) 0 var(--middle, minmax(340px, 1fr))
       0 minmax(0, 1.4fr);
     min-height: 0;
   }
@@ -182,13 +196,13 @@
   /* A drawing needs room; the ADR next to it is there to be glanced at. */
   .panes.wide-middle {
     grid-template-columns:
-      var(--sidebar, 210px) 0 var(--middle, minmax(0, 2fr))
-      0 minmax(360px, 1fr);
+      var(--sidebar) 0 var(--middle, minmax(0, 2fr))
+      0 minmax(var(--detail-beside-graph), 1fr);
   }
 
   /* Source and preview side by side need room; the list steps aside while they are open. */
   .panes.wide-editor {
-    grid-template-columns: var(--sidebar, 210px) 0 minmax(0, 1fr);
+    grid-template-columns: var(--sidebar) 0 minmax(0, 1fr);
   }
 
   .panes.wide-editor > :global(.list),

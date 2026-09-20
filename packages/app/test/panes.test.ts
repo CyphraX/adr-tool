@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LIMITS, fitMiddle, fitSidebar, readSizes } from '../src/renderer/src/lib/panes'
+import { LIMITS, fitMiddle, fitSidebar, maxMiddle, readSizes } from '../src/renderer/src/lib/panes'
 
 describe('the width a pane gets', () => {
   it('is what was asked for while the others stay readable', () => {
@@ -22,6 +22,19 @@ describe('the width a pane gets', () => {
   it('keeps its own minimum in a window too small for everything', () => {
     expect(fitMiddle(500, 600, 210)).toBe(LIMITS.middle.min)
     expect(fitSidebar(300, 500)).toBe(LIMITS.sidebar.min)
+  })
+
+  it('leaves the ADR more room next to the graph, as the layout does', () => {
+    expect(LIMITS.detail.besideGraph).toBeGreaterThan(LIMITS.detail.min)
+    expect(fitMiddle(2000, 1280, 210, 'graph')).toBe(1280 - 210 - LIMITS.detail.besideGraph)
+    expect(fitMiddle(2000, 1280, 210, 'list')).toBe(1280 - 210 - LIMITS.detail.min)
+  })
+
+  it('says how far the middle can go, for the divider to announce', () => {
+    expect(maxMiddle(1280, 210, 'list')).toBe(1280 - 210 - LIMITS.detail.min)
+    expect(maxMiddle(1280, 210, 'graph')).toBe(1280 - 210 - LIMITS.detail.besideGraph)
+    // Before the window has been measured there is no room to speak of.
+    expect(maxMiddle(0, 210, 'list')).toBe(LIMITS.middle.min)
   })
 
   it('is a whole number of pixels', () => {

@@ -36,7 +36,9 @@
 
   function onpointerdown(event: PointerEvent): void {
     if (event.button !== 0) return
+    // No text gets selected on the way — and the focus, which that would have given, is given.
     event.preventDefault()
+    divider?.focus()
     divider?.setPointerCapture(event.pointerId)
     dragging = { from: event.clientX, width: measure() }
   }

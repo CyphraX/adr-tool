@@ -7,6 +7,7 @@
   import {
     STATUS_LABEL,
     describeCause,
+    describeCorrection,
     IMPLIED_NOTE,
     describeForeign,
     describeProblem,
@@ -22,6 +23,8 @@
   let { adr, log }: { adr: Adr; log: DecisionLog } = $props()
 
   interface Line {
+    /** What tells the lines apart. Never the label: two types may share a word in another language. */
+    key: string
     label: string
     other: Adr
     /** A Relation of a rejected ADR never took effect. */
@@ -50,6 +53,7 @@
         relation.type === 'supersedes' &&
         (successor.impliedSupersedes?.includes(relation.to) ?? false)
       return {
+        key: `${side} ${relation.type} ${other.id}`,
         label: relationLabel(relation, side),
         other,
         void: relation.state === 'void',
@@ -135,7 +139,7 @@
 
     {#if facts.length > 0}
       <dl>
-        {#each facts as [name, value] (name)}
+        {#each facts as [name, value], position (position)}
           <div>
             <dt>{name}</dt>
             <dd>{value}</dd>
@@ -146,7 +150,7 @@
 
     {#if relations.length > 0}
       <ul class="relations" aria-label={t.detail.relations}>
-        {#each relations as relation (relation.label + relation.other.id)}
+        {#each relations as relation (relation.key)}
           <li class:void={relation.void}>
             <span class="kind">{relation.label}</span>
             <button onclick={() => app.select(relation.other.id)}>
@@ -167,7 +171,7 @@
           <li>
             <span class="kind">{t.detail.corrected}</span>
             <span class="what">
-              {t.detail.correction(correction.date, correction.author, correction.note)}
+              {describeCorrection(correction)}
             </span>
             {#if git}
               <!-- The marker of a Correction leads to what it changed. -->

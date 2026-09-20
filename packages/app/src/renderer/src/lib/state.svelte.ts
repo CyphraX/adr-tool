@@ -12,7 +12,7 @@ import {
 import type { Decision, HistoryEntry, OpenRepository, PlannedChange } from '../../../shared/ipc'
 import { recordedIn } from './history'
 import { t } from './strings'
-import { prefixOf } from './wording'
+import { logName, prefixOf } from './wording'
 
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
@@ -45,7 +45,15 @@ export type Review =
   /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
   /** A question before something is lost. */
-  | { kind: 'confirm'; title: string; reason: string; action: string; proceed: () => void }
+  | {
+      kind: 'confirm'
+      title: string
+      reason: string
+      action: string
+      proceed: () => void
+      /** Whoever asked may want to know that the answer was no. */
+      declined?: () => void
+    }
 
 export interface Caution {
   lead: string
@@ -300,12 +308,12 @@ class AppState {
   async decide(decision: Decision): Promise<void> {
     const [tab, log, adr] = [this.active, this.log, this.selected]
     if (!tab || !log || !adr) return
-    const wording = t.review.decision[decision]
-    const title = wording.title(prefixOf(adr))
+    const texts = t.review.decision[decision]
+    const title = texts.title(prefixOf(adr))
     const plan = await window.api.planDecision(tab.repository.id, log.path, adr.id, decision)
     this.review = plan.ok
-      ? { kind: 'change', title, action: wording.action, change: plan.change, applying: false }
-      : { kind: 'refused', title: wording.refused(prefixOf(adr)), reason: plan.reason }
+      ? { kind: 'change', title, action: texts.action, change: plan.change, applying: false }
+      : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
   }
 
   /**
@@ -359,7 +367,7 @@ class AppState {
     const adr = log?.adrs.find((candidate) => candidate.id === repair.adr)
     if (!tab || !log || !adr) return
     // A Renumber is known by its own name, and warns about something else.
-    const wording = repair.kind === 'renumber' ? t.review.renumber : t.review.repair
+    const texts = repair.kind === 'renumber' ? t.review.renumber : t.review.repair
     const plan = await window.api.planRepair({
       repositoryId: tab.repository.id,
       logPath: log.path,
@@ -368,26 +376,25 @@ class AppState {
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: wording.title(prefixOf(adr)),
-          action: wording.action,
+          title: texts.title(prefixOf(adr)),
+          action: texts.action,
           change: plan.change,
           applying: false,
-          caution: wording.caution
+          caution: texts.caution
         }
-      : { kind: 'refused', title: wording.refused(prefixOf(adr)), reason: plan.reason }
+      : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
   }
 
   /** Plan the Migration of the selected ADR, or of every foreign ADR of the Decision Log in view. */
   async migrate(scope: 'adr' | 'log'): Promise<void> {
     const [tab, log, adr] = [this.active, this.log, this.selected]
     if (!tab || !log || (scope === 'adr' && !adr)) return
-    const wording = t.review.migrate
-    // The Decision Log at the top of the repository has no path to name it by.
-    const where = log.path === '' ? t.sidebar.root : log.path
+    const texts = t.review.migrate
+    const where = logName(log.path)
     const [title, refused] =
       scope === 'adr'
-        ? [wording.adr(prefixOf(adr!)), wording.adrRefused(prefixOf(adr!))]
-        : [wording.log(where), wording.logRefused(where)]
+        ? [texts.adr(prefixOf(adr!)), texts.adrRefused(prefixOf(adr!))]
+        : [texts.log(where), texts.logRefused(where)]
     const plan = await window.api.planMigration({
       repositoryId: tab.repository.id,
       logPath: log.path,
@@ -397,10 +404,10 @@ class AppState {
       ? {
           kind: 'change',
           title,
-          action: wording.action,
+          action: texts.action,
           change: plan.change,
           applying: false,
-          caution: wording.caution
+          caution: texts.caution
         }
       : { kind: 'refused', title: refused, reason: plan.reason }
   }
@@ -604,8 +611,10 @@ class AppState {
   }
 
   dismissReview(): void {
-    if (this.review?.kind === 'change') void window.api.discardChange(this.review.change.changeId)
+    const review = this.review
+    if (review?.kind === 'change') void window.api.discardChange(review.change.changeId)
     this.review = undefined
+    if (review?.kind === 'confirm') review.declined?.()
   }
 
   /**
@@ -614,11 +623,14 @@ class AppState {
    */
   private requestClose(): void {
     this.dismissReview()
-    this.leaveEditor(() => void window.api.closeWindow())
+    this.leaveEditor(
+      () => void window.api.answerCloseRequest(true),
+      () => void window.api.answerCloseRequest(false)
+    )
   }
 
   /** Do something that takes the editor away. With unsaved text the author is asked first. */
-  private leaveEditor(then: () => void): void {
+  private leaveEditor(then: () => void, declined?: () => void): void {
     const proceed = (): void => {
       this.editing = undefined
       then()
@@ -629,7 +641,8 @@ class AppState {
       title: t.review.discard.title,
       reason: t.review.discard.reason,
       action: t.review.discard.action,
-      proceed
+      proceed,
+      ...(declined && { declined })
     }
   }
 

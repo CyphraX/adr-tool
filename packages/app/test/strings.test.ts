@@ -1,13 +1,18 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const RENDERER = join(import.meta.dirname, '../src/renderer/src')
+const RENDERER = fileURLToPath(new URL('../src/renderer/src', import.meta.url))
 
 /** The attributes whose value a person reads or hears. */
 const READ_ALOUD = /\s(?:aria-label|title|placeholder|alt|label)="[^"{]*\p{L}{2,}[^"]*"/gu
 
-/** The words a component's markup says by itself, rather than through strings.ts or wording.ts. */
+/**
+ * The words a component's markup says by itself, rather than through strings.ts or wording.ts:
+ * its static text, and the attributes a person reads or hears. A literal inside an expression
+ * (`{on ? 'Yes' : 'No'}`) or in a script is not seen from here; that stays a reviewer's to catch.
+ */
 function literalText(svelte: string): string[] {
   let markup = svelte
     .replace(/<script[\s\S]*?<\/script>/g, '')
@@ -33,7 +38,7 @@ function components(directory: string): string[] {
   )
 }
 
-describe('the texts of the window are in strings.ts and wording.ts', () => {
+describe('the markup of the components carries no text of its own', () => {
   it('sees text and spoken attributes in markup, and nothing in expressions', () => {
     const sample = `<script lang="ts">const label = 'Hidden'</script>
       <!-- A comment. -->
@@ -43,7 +48,7 @@ describe('the texts of the window are in strings.ts and wording.ts', () => {
     expect(literalText(sample)).toEqual(['title="Opens it"', 'Open'])
   })
 
-  it('no component says anything by itself', () => {
+  it('holds for every component of the renderer', () => {
     const found = components(RENDERER).flatMap((file) =>
       literalText(readFileSync(file, 'utf8')).map((text) => `${file}: ${text}`)
     )
