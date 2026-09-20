@@ -75,15 +75,19 @@ As long as nothing is declared — `.arch/components.yml` does not exist, or has
 The Draft is built from directories, not from parsed code. Its top level is made of, in this order, everything that is found:
 
 1. workspace packages: `pnpm-workspace.yaml`, `workspaces` in the root `package.json`;
-2. Maven modules: `<modules>` in `pom.xml`, followed recursively — a module of a module becomes a child Component;
-3. Gradle projects: `include` lines in `settings.gradle` and `settings.gradle.kts`, read as text, string literals only — `:a:b` becomes the child `b` of `a`;
+2. Maven modules: `<modules>` in `pom.xml`, followed recursively;
+3. Gradle projects: `include` lines in `settings.gradle` and `settings.gradle.kts`, read as text, string literals only — `:a:b` names the directories `a` and `a/b`;
 4. without any of these, the repository as a single unit.
+
+Units nest by the directories they lie in: a unit inside the directory of another is its child Component, whichever build file named it. Where build files name units, they alone make the top level; a directory beside them that is no unit is not drafted, and its Source Files are Unassigned. The repository as a single unit is not a Component itself: the directories below it are the top level. Where there are none to tell apart, the one directory that holds the code is the one Component (`src`, or `repository` with the pattern `**`).
 
 Below each unit, one further level: the directories under the unit's source root. The source root is `src/main/java` where it exists, otherwise `src/` where it exists, otherwise the unit's directory; from there the suite goes down as long as a directory holds exactly one directory and no Source File (this passes over a common base package such as `com/example/shop`), and the directories at that point become the children.
 
-- Only directories that contain at least one Source File become Components. `docs/` does not.
+- Only directories that contain at least one Source File become Components. `docs/` does not, and neither does a unit without code.
+- A directory that is a unit, or holds one, is not drafted a second time as a directory.
 - A drafted Component gets the pattern `<its directory>/**`.
-- A segment is made from the directory name: lowercased, every run of characters other than lowercase letters and digits replaced by one dash, dashes at both ends removed; a name that leaves nothing becomes `unit`. Where two siblings would get the same segment, the second in the order of their paths gets `-2`, the third `-3`.
+- A segment is made from the directory name: lowercased, every run of characters other than lowercase letters and digits replaced by one dash, dashes at both ends removed; a name that leaves nothing becomes `unit`. Where two siblings would get the same segment, the second in the order of their paths gets `-2`, the third `-3`. Where the segment departs from the directory's name, that name is kept as the Component's `name`.
+- A build file that cannot be read names no units; the Draft goes on without it.
 
 The checks of section 6 run on the Draft as well. What they find is shown as **hints on the Draft**, not as Problems: a Draft is the suite's own proposal, not something the architect declared.
 
@@ -108,6 +112,8 @@ Declaration files (`.d.ts`, `.d.mts`, `.d.cts`) are Source Files. A Dependency o
 - In a git repository: what git tracks, plus untracked files git does not ignore — so that a new file is seen before it is added. git is only ever read. Build output is left out because the repository ignores it, not because of its name.
 - Without git: a walk of the directory that honours `.gitignore` files where they exist. In addition `dist/`, `build/`, `out/` and `target/` are left out where they stand next to a build file (`package.json`, `pom.xml`, `build.gradle`, `build.gradle.kts`).
 - Never, in either case and at any depth: `node_modules/`, `.git/`, `.arch/`.
+
+Finding out what a repository consists of takes git or the disk, so it is not the `structure` package that does it: its caller hands in the list of files — the app from git, read-only, or from its walk (part 3) — and `structure` applies the extensions and the last rule.
 
 ### Tests
 
