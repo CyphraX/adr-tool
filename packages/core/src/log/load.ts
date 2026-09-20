@@ -1,5 +1,5 @@
 import { readAdr, type Adr } from '../adr/adr'
-import { joinPath, type FileSystem } from '../fs/port'
+import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import { checkConsistency } from '../problems/check'
 import type { Problem } from '../problems/problem'
 import { relationsOf, type Relation } from '../relations/graph'

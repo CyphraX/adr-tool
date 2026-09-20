@@ -1,8 +1,8 @@
-import type { Plan } from '../change/change-set'
-import type { FileSystem } from '../fs/port'
+import type { Plan } from '../plan'
+import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { addToList, setScalar } from '../metadata/write'
-import { plan } from './draft'
+import { plan } from './pending'
 import { requireStatus, requireTarget, writable } from './rules'
 
 export interface Today {
@@ -21,7 +21,7 @@ export function planAccept(
   id: string,
   when: Today
 ): Promise<Plan> {
-  return plan(fs, async (drafts) => {
+  return plan(fs, async (pending) => {
     const adr = writable(log, id)
     requireStatus(adr, ['proposed'], 'Only a proposed ADR can be accepted.')
 
@@ -36,14 +36,14 @@ export function planAccept(
       return base
     })
 
-    await drafts.write(adr.path, (view) => setScalar(view, 'status', 'accepted'))
-    await drafts.write(adr.path, (view) => setScalar(view, 'decided', date(when)))
+    await pending.write(adr.path, (view) => setScalar(view, 'status', 'accepted'))
+    await pending.write(adr.path, (view) => setScalar(view, 'decided', date(when)))
     for (const old of superseded) {
-      await drafts.write(old.path, (view) => setScalar(view, 'status', 'superseded'))
-      await drafts.write(old.path, (view) => addToList(view, 'superseded-by', id))
+      await pending.write(old.path, (view) => setScalar(view, 'status', 'superseded'))
+      await pending.write(old.path, (view) => addToList(view, 'superseded-by', id))
     }
     for (const base of amended) {
-      await drafts.write(base.path, (view) => addToList(view, 'amended-by', id))
+      await pending.write(base.path, (view) => addToList(view, 'amended-by', id))
     }
   })
 }
@@ -55,20 +55,20 @@ export function planReject(
   id: string,
   when: Today
 ): Promise<Plan> {
-  return plan(fs, async (drafts) => {
+  return plan(fs, async (pending) => {
     const adr = writable(log, id)
     requireStatus(adr, ['proposed'], 'Only a proposed ADR can be rejected.')
-    await drafts.write(adr.path, (view) => setScalar(view, 'status', 'rejected'))
-    await drafts.write(adr.path, (view) => setScalar(view, 'decided', date(when)))
+    await pending.write(adr.path, (view) => setScalar(view, 'status', 'rejected'))
+    await pending.write(adr.path, (view) => setScalar(view, 'decided', date(when)))
   })
 }
 
 /** Deprecate an `accepted` ADR: the decision no longer applies, and nothing takes its place. */
 export function planDeprecate(fs: FileSystem, log: DecisionLog, id: string): Promise<Plan> {
-  return plan(fs, async (drafts) => {
+  return plan(fs, async (pending) => {
     const adr = writable(log, id)
     requireStatus(adr, ['accepted'], 'Only an accepted ADR can be deprecated.')
-    await drafts.write(adr.path, (view) => setScalar(view, 'status', 'deprecated'))
+    await pending.write(adr.path, (view) => setScalar(view, 'status', 'deprecated'))
   })
 }
 
