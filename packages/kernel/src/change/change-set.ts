@@ -22,18 +22,17 @@ export interface ChangeSet {
   readonly files: readonly FileChange[]
 }
 
-/** What planning an operation yields: a change set, or the reason why it cannot be done. */
-export type Plan =
-  | {
+/**
+ * What planning an operation yields: a change set, or the reason why it cannot be done.
+ * `Outcome` is what a module's operations tell their caller beyond the change set.
+ */
+export type Plan<Outcome extends object = object> =
+  | ({
       readonly ok: true
       readonly changeSet: ChangeSet
-      /** The ADR the operation creates, so that the caller can show it afterwards. */
-      readonly created?: { readonly id: string; readonly path: string }
-      /** The ID the operation changes, so that the caller can follow the ADR. */
-      readonly renamed?: { readonly from: string; readonly to: string }
       /** What the person should look at before confirming. The operation can be done all the same. */
       readonly warnings?: readonly string[]
-    }
+    } & Outcome)
   | { readonly ok: false; readonly reason: string }
 
 export type Applied =

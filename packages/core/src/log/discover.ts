@@ -1,5 +1,5 @@
 import { isMap, isSeq, parseDocument } from 'yaml'
-import { normalizePath, type FileSystem } from '../fs/port'
+import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import { scalarText } from '../metadata/scalar'
 import type { Problem } from '../problems/problem'
 import type { NamingScheme } from './naming'

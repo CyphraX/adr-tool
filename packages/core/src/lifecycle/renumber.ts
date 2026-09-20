@@ -1,13 +1,13 @@
 import type { Adr } from '../adr/adr'
-import type { Plan } from '../change/change-set'
+import type { Plan } from '../plan'
 import { namesNumber } from '../foreign/madr'
-import { joinPath, type FileSystem } from '../fs/port'
+import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { nextPrefix } from '../log/new-id'
 import { replaceInList } from '../metadata/write'
 import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
 import { titleOf } from '../text/title'
-import { Refusal, plan } from './draft'
+import { Refusal, plan } from './pending'
 import { requireOwnFormat } from './rules'
 
 /** Every Metadata key whose items are IDs of other ADRs. */
@@ -30,7 +30,7 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
   let renamed: { from: string; to: string } | undefined
   const warnings: string[] = []
 
-  const planned = plan(fs, async (drafts) => {
+  const planned = plan(fs, async (pending) => {
     const adr = log.adrs.find((candidate) => candidate.id === id)
     if (!adr) throw new Refusal(`There is no ADR ${id} in this Decision Log.`)
     if (log.naming !== 'sequential' || adr.number === undefined) {
@@ -48,7 +48,7 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
 
     const digits = /^\d+/.exec(id)![0]
     const to = nextPrefix(log, '') + id.slice(digits.length)
-    await drafts.rename(adr.path, joinPath(log.path, `${to}.md`))
+    await pending.rename(adr.path, joinPath(log.path, `${to}.md`))
 
     for (const other of log.adrs) {
       if (other.id === id) continue
@@ -76,7 +76,7 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
         requireOwnFormat(other, ` It mentions ${id}: migrate it first, or renumber the other ADR.`)
       }
       for (const key of namingKeys(other, id)) {
-        await drafts.write(other.path, (view) => replaceInList(view, key, id, to))
+        await pending.write(other.path, (view) => replaceInList(view, key, id, to))
       }
     }
 

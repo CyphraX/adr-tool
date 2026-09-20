@@ -1,14 +1,14 @@
 import { FOREIGN_FORMAT_NAMES, type Adr } from '../adr/adr'
-import type { Plan } from '../change/change-set'
+import type { Plan } from '../plan'
 import { parseAdrTools } from '../foreign/adr-tools'
 import { migrationOfMadr } from '../foreign/madr'
-import type { FileSystem } from '../fs/port'
+import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { MetadataNotWritableError, addToList, renameKey, setScalar } from '../metadata/write'
 import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
 import type { TextEdit } from '../text/edit'
 import { viewSource, type SourceView, type Span } from '../text/source'
-import { Drafts, Refusal, plan } from './draft'
+import { PendingFiles, Refusal, plan } from './pending'
 
 const LIST_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
 
@@ -19,7 +19,7 @@ const LIST_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
  */
 export function planMigration(fs: FileSystem, log: DecisionLog, id?: string): Promise<Plan> {
   const warnings: string[] = []
-  const planned = plan(fs, async (drafts) => {
+  const planned = plan(fs, async (pending) => {
     const asked = id === undefined ? undefined : log.adrs.find((adr) => adr.id === id)
     if (id !== undefined && !asked) throw new Refusal(`There is no ADR ${id} in this Decision Log.`)
     if (asked && !asked.metadataWritable) {
@@ -68,9 +68,9 @@ export function planMigration(fs: FileSystem, log: DecisionLog, id?: string): Pr
       throw new Refusal(['Nothing can be migrated.', ...leftOut.values()].join(' '))
     }
     warnings.push(...leftOut.values())
-    for (const adr of migrated) await migrate(drafts, log, adr, warnings)
+    for (const adr of migrated) await migrate(pending, log, adr, warnings)
     // The successors last: by now each of them has the frontmatter its own Migration gave it.
-    for (const adr of migrated) await writeSuccessor(drafts, adr, successors.get(adr.id))
+    for (const adr of migrated) await writeSuccessor(pending, adr, successors.get(adr.id))
   })
   return planned.then((result) =>
     result.ok && warnings.length > 0 ? { ...result, warnings } : result
@@ -99,7 +99,7 @@ async function whyNot(
   // Try it on its own first: a file the writer cannot write is named, and does not take the
   // Migration of all the others down with it.
   try {
-    const trial = new Drafts(fs)
+    const trial = new PendingFiles(fs)
     await migrate(trial, undefined, adr, [])
     await writeSuccessor(trial, adr, successor)
     return undefined
@@ -111,21 +111,25 @@ async function whyNot(
   }
 }
 
-async function writeSuccessor(drafts: Drafts, adr: Adr, successor: Adr | undefined): Promise<void> {
+async function writeSuccessor(
+  pending: PendingFiles,
+  adr: Adr,
+  successor: Adr | undefined
+): Promise<void> {
   if (!successor) return
-  await drafts.write(successor.path, (view) => addToList(view, 'supersedes', adr.id))
+  await pending.write(successor.path, (view) => addToList(view, 'supersedes', adr.id))
 }
 
 /** `log` is left out for a trial, which collects no warnings that anybody reads. */
 async function migrate(
-  drafts: Drafts,
+  pending: PendingFiles,
   log: DecisionLog | undefined,
   adr: Adr,
   warnings: string[]
 ): Promise<void> {
   const { metadata } = adr
   if (adr.foreign === 'adr-tools') {
-    await drafts.write(adr.path, (view) => {
+    await pending.write(adr.path, (view) => {
       const file = parseAdrTools(view)
       if (!file) throw new Refusal(`${adr.id} changed on disk. Look at it again.`)
       if (file.keeps !== undefined) {
@@ -139,24 +143,24 @@ async function migrate(
     })
     // Always a Status, also `accepted`: it is what makes the file one of the tool's own.
     const status = metadata.status ?? metadata.rawStatus ?? 'accepted'
-    await drafts.write(adr.path, (view) => setScalar(view, 'status', status))
+    await pending.write(adr.path, (view) => setScalar(view, 'status', status))
     if (metadata.created !== undefined) {
       const created = metadata.created
-      await drafts.write(adr.path, (view) => setScalar(view, 'created', created))
+      await pending.write(adr.path, (view) => setScalar(view, 'created', created))
     }
   } else {
-    const todo = migrationOfMadr(viewSource(await drafts.read(adr.path)))
+    const todo = migrationOfMadr(viewSource(await pending.read(adr.path)))
     if (todo.deciders) {
-      await drafts.write(adr.path, (view) => renameKey(view, 'deciders', 'decision-makers'))
+      await pending.write(adr.path, (view) => renameKey(view, 'deciders', 'decision-makers'))
     }
     if (!todo.status) return
-    await drafts.write(adr.path, (view) => setScalar(view, 'status', 'superseded'))
+    await pending.write(adr.path, (view) => setScalar(view, 'status', 'superseded'))
   }
 
   const lists = { ...metadata.relations, ...metadata.backReferences }
   for (const key of LIST_KEYS) {
     if (lists[key].length > 0) {
-      await drafts.write(adr.path, (view) => addToList(view, key, lists[key]))
+      await pending.write(adr.path, (view) => addToList(view, key, lists[key]))
     }
   }
   for (const written of metadata.backReferences['superseded-by']) {

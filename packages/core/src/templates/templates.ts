@@ -1,5 +1,5 @@
 import { isMap, parseDocument } from 'yaml'
-import type { FileSystem } from '../fs/port'
+import type { FileSystem } from '@adr-tool/kernel'
 import { CONFIG_PATH } from '../log/discover'
 import { scalarText } from '../metadata/scalar'
 import { viewSource } from '../text/source'
