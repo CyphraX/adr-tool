@@ -175,7 +175,9 @@ describe('reading .arch/components.yml (docs/structure-format.md, section 1)', (
   })
 
   it('reads a file with CRLF line endings and a byte order mark', () => {
-    const declaration = readDeclaration('﻿components:\r\n  core:\r\n    paths: [src/**]\r\n')
+    const declaration = readDeclaration(
+      String.fromCharCode(0xfeff) + 'components:\r\n  core:\r\n    paths: [src/**]\r\n'
+    )
     expect(declaration.kind === 'declared' && declaration.components[0]!.paths).toEqual(['src/**'])
   })
 })

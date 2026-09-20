@@ -47,8 +47,8 @@ export function compilePattern(source: string, exact = false): Pattern | undefin
 }
 
 /** Whether a list of patterns claims a path: the last pattern that matches decides. */
-export function matcherOf(sources: readonly string[]): (path: string) => boolean {
-  const patterns = sources.flatMap((source) => compilePattern(source) ?? [])
+export function matcherOf(sources: readonly string[], exact = false): (path: string) => boolean {
+  const patterns = sources.flatMap((source) => compilePattern(source, exact) ?? [])
   return (path) => {
     let claimed = false
     for (const pattern of patterns) {
