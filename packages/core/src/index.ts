@@ -24,7 +24,7 @@ export { hasBeenAccepted, type Relation, type RelationState } from './relations/
 export type { BackReferenceKey, Problem } from './problems/problem'
 export { groupProblems, type ProblemGroup } from './problems/group'
 
-export { applyEdits, type TextEdit } from './text/edit'
+export { applyEdits, type TextEdit } from '@adr-tool/kernel'
 
 export type { Plan } from './plan'
 export { planAccept, planDeprecate, planReject, type Today } from './lifecycle/decide'

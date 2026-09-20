@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyEdits } from '../src/text/edit'
+import { applyEdits } from '@adr-tool/kernel'
 import { editsForLines } from '../src/text/line-diff'
 
 /** Replace everything from `offset` on, and report the result together with the edits it took. */

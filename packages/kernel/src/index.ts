@@ -14,3 +14,6 @@ export {
   type FileChange,
   type Plan
 } from './change/change-set'
+export { PendingFiles, Refusal, plan } from './change/pending'
+
+export { applyEdits, type TextEdit } from './text/edit'
