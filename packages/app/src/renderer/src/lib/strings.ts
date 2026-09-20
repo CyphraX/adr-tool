@@ -37,6 +37,12 @@ export const t = {
     selectToSeeProblems: 'Select an ADR to see what is wrong with it.'
   },
 
+  /** What the lines between the panes are called, for those who move them by keyboard. */
+  panes: {
+    sidebar: 'Width of the sidebar',
+    middle: 'Width of the list'
+  },
+
   tabs: {
     label: 'Open repositories',
     open: 'Open repository',

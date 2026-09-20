@@ -191,6 +191,7 @@ class AppState {
 
   async start(): Promise<void> {
     window.api.onRepositoryChanged((repository) => this.replace(repository))
+    window.api.onCloseRequested(() => this.requestClose())
     const session = await window.api.restoreSession()
     this.tabs = session.repositories.map(newTab)
     this.activeId = session.activeId
@@ -605,6 +606,15 @@ class AppState {
   dismissReview(): void {
     if (this.review?.kind === 'change') void window.api.discardChange(this.review.change.changeId)
     this.review = undefined
+  }
+
+  /**
+   * The window is to close while the editor holds unsaved text. A change that was being
+   * looked at is not applied; the question takes its place.
+   */
+  private requestClose(): void {
+    this.dismissReview()
+    this.leaveEditor(() => void window.api.closeWindow())
   }
 
   /** Do something that takes the editor away. With unsaved text the author is asked first. */
