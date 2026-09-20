@@ -36,7 +36,8 @@ export function isTestByConvention(path: string): boolean {
   const name = segments.pop() ?? ''
   return (
     segments.some((segment) => TEST_DIRECTORIES.has(segment)) ||
-    /\.(?:test|spec)\.[^.]+$/.test(name) ||
+    // `cart.test.ts`, and `cart.test.d.ts` as well.
+    /\.(?:test|spec)\./.test(name) ||
     `/${path}`.includes('/src/test/')
   )
 }
