@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { prefixOf } from '../lib/wording'
 
   // What the tool needs from a person to start an ADR: a title and a Template. The number,
@@ -32,57 +33,53 @@
     <form onsubmit={submit}>
       <h1 id="new-adr-title">
         {#if creating.relation?.type === 'supersedes'}
-          New ADR that supersedes ADR {target ? prefixOf(target) : ''}
+          {t.newAdr.supersedes(target ? prefixOf(target) : '')}
         {:else if creating.relation?.type === 'amends'}
-          New ADR that amends ADR {target ? prefixOf(target) : ''}
+          {t.newAdr.amends(target ? prefixOf(target) : '')}
         {:else}
-          New ADR
+          {t.newAdr.heading}
         {/if}
       </h1>
 
       {#if creating.relation && target}
         <p class="relation">
           {#if creating.relation.type === 'supersedes'}
-            It replaces the decision of “{target.title ?? target.id}” as a whole. That ADR stays as
-            it is until the new one is accepted; then it becomes superseded.
+            {t.newAdr.aboutSupersedes(target.title ?? target.id)}
           {:else}
-            It refines or extends part of “{target.title ?? target.id}”. That ADR keeps its Status;
-            once the new one is accepted, it points to it.
+            {t.newAdr.aboutAmends(target.title ?? target.id)}
           {/if}
         </p>
       {/if}
 
       <label>
-        <span>Title</span>
+        <span>{t.newAdr.title}</span>
         <input
           bind:this={title}
           bind:value={creating.title}
           type="text"
           required
-          placeholder="What is being decided, in a few words"
+          placeholder={t.newAdr.titlePlaceholder}
         />
       </label>
 
       <label>
-        <span>Template</span>
+        <span>{t.newAdr.template}</span>
         <select bind:value={creating.template}>
           {#each creating.templates as template (template.name)}
             <option value={template.name}>
-              {template.name}{template.source === 'repository' ? ' (this repository)' : ''}
+              {template.name}{template.source === 'repository' ? t.newAdr.ofRepository : ''}
             </option>
           {/each}
         </select>
       </label>
 
-      <p class="hint">
-        The ADR starts as proposed. The tool gives it the next number and its file name; you see the
-        file before it is written.
-      </p>
+      <p class="hint">{t.newAdr.hint}</p>
 
       <footer>
-        <button type="button" onclick={() => app.cancelCreating()}>Cancel</button>
-        <button type="submit" class="primary" disabled={creating.title.trim() === ''}>Create</button
-        >
+        <button type="button" onclick={() => app.cancelCreating()}>{t.cancel}</button>
+        <button type="submit" class="primary" disabled={creating.title.trim() === ''}>
+          {t.newAdr.create}
+        </button>
       </footer>
     </form>
   {/if}

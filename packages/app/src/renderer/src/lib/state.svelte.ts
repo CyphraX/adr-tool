@@ -11,7 +11,8 @@ import {
 } from '@adr-tool/core'
 import type { Decision, HistoryEntry, OpenRepository, PlannedChange } from '../../../shared/ipc'
 import { recordedIn } from './history'
-import { prefixOf } from './wording'
+import { t } from './strings'
+import { logName, prefixOf } from './wording'
 
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
@@ -36,48 +37,27 @@ export type Review =
       action: string
       change: PlannedChange
       applying: boolean
+      /** The change writes what the editor or the Metadata dialog holds; applied, they close. */
+      saves?: boolean
       /** How the warnings of the change are introduced, and what to do about them. */
       caution?: Caution
     }
   /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
   /** A question before something is lost. */
-  | { kind: 'confirm'; title: string; reason: string; action: string; proceed: () => void }
+  | {
+      kind: 'confirm'
+      title: string
+      reason: string
+      action: string
+      proceed: () => void
+      /** Whoever asked may want to know that the answer was no. */
+      declined?: () => void
+    }
 
 export interface Caution {
   lead: string
   advice: string
-}
-
-const MORE_THAN_A_CORRECTION: Caution = {
-  lead: 'This looks like more than a Correction:',
-  advice:
-    'If it changes what was decided, cancel and write a new ADR that amends or supersedes this one. If it does not, save.'
-}
-
-const TEXT_STAYS: Caution = {
-  lead: 'The tool does not change the text of an ADR:',
-  advice:
-    'A link in the text that points to the old file name has to be changed by hand, after the Renumber.'
-}
-
-const RELATION_IS_AUTHORITATIVE: Caution = {
-  lead: 'Before you repair:',
-  advice:
-    'A Repair takes what the ADRs say in supersedes and amends as true. If that is what is wrong, cancel and fix the file by hand.'
-}
-
-const MIGRATION_WRITES_WHAT_WAS_READ: Caution = {
-  lead: 'What Migration leaves as it is:',
-  advice:
-    'Migration writes what the tool read from these files, and nothing it would have to guess. What is named here can be put right by hand, before or afterwards.'
-}
-
-/** What a decision is called on its button, and again on the button that confirms it. */
-export const DECISION_LABEL: Record<Decision, string> = {
-  accept: 'Accept',
-  reject: 'Reject',
-  deprecate: 'Deprecate'
 }
 
 export type EditorMode = 'source' | 'split'
@@ -219,6 +199,7 @@ class AppState {
 
   async start(): Promise<void> {
     window.api.onRepositoryChanged((repository) => this.replace(repository))
+    window.api.onCloseRequested(() => this.requestClose())
     const session = await window.api.restoreSession()
     this.tabs = session.repositories.map(newTab)
     this.activeId = session.activeId
@@ -327,16 +308,12 @@ class AppState {
   async decide(decision: Decision): Promise<void> {
     const [tab, log, adr] = [this.active, this.log, this.selected]
     if (!tab || !log || !adr) return
-    const action = DECISION_LABEL[decision]
-    const title = `${action} ADR ${prefixOf(adr)}`
+    const texts = t.review.decision[decision]
+    const title = texts.title(prefixOf(adr))
     const plan = await window.api.planDecision(tab.repository.id, log.path, adr.id, decision)
     this.review = plan.ok
-      ? { kind: 'change', title, action, change: plan.change, applying: false }
-      : {
-          kind: 'refused',
-          title: `Cannot ${action.toLowerCase()} ADR ${prefixOf(adr)}`,
-          reason: plan.reason
-        }
+      ? { kind: 'change', title, action: texts.action, change: plan.change, applying: false }
+      : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
   }
 
   /**
@@ -348,7 +325,7 @@ class AppState {
     if (!tab || !log || !adr) return
     const history: History = {
       adrId: adr.id,
-      title: `History of ADR ${prefixOf(adr)}`,
+      title: t.history.title(prefixOf(adr)),
       entries: undefined,
       selectedId: undefined,
       change: undefined,
@@ -390,10 +367,7 @@ class AppState {
     const adr = log?.adrs.find((candidate) => candidate.id === repair.adr)
     if (!tab || !log || !adr) return
     // A Renumber is known by its own name, and warns about something else.
-    const [verb, caution] =
-      repair.kind === 'renumber'
-        ? (['Renumber', TEXT_STAYS] as const)
-        : (['Repair', RELATION_IS_AUTHORITATIVE] as const)
+    const texts = repair.kind === 'renumber' ? t.review.renumber : t.review.repair
     const plan = await window.api.planRepair({
       repositoryId: tab.repository.id,
       logPath: log.path,
@@ -402,24 +376,25 @@ class AppState {
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: `${verb} ADR ${prefixOf(adr)}`,
-          action: verb,
+          title: texts.title(prefixOf(adr)),
+          action: texts.action,
           change: plan.change,
           applying: false,
-          caution
+          caution: texts.caution
         }
-      : {
-          kind: 'refused',
-          title: `Cannot ${verb.toLowerCase()} ADR ${prefixOf(adr)}`,
-          reason: plan.reason
-        }
+      : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
   }
 
   /** Plan the Migration of the selected ADR, or of every foreign ADR of the Decision Log in view. */
   async migrate(scope: 'adr' | 'log'): Promise<void> {
     const [tab, log, adr] = [this.active, this.log, this.selected]
     if (!tab || !log || (scope === 'adr' && !adr)) return
-    const what = scope === 'adr' ? `ADR ${prefixOf(adr!)}` : `the ADRs of ${log.path}`
+    const texts = t.review.migrate
+    const where = logName(log.path)
+    const [title, refused] =
+      scope === 'adr'
+        ? [texts.adr(prefixOf(adr!)), texts.adrRefused(prefixOf(adr!))]
+        : [texts.log(where), texts.logRefused(where)]
     const plan = await window.api.planMigration({
       repositoryId: tab.repository.id,
       logPath: log.path,
@@ -428,13 +403,13 @@ class AppState {
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: `Migrate ${what}`,
-          action: 'Migrate',
+          title,
+          action: texts.action,
           change: plan.change,
           applying: false,
-          caution: MIGRATION_WRITES_WHAT_WAS_READ
+          caution: texts.caution
         }
-      : { kind: 'refused', title: `Cannot migrate ${what}`, reason: plan.reason }
+      : { kind: 'refused', title: refused, reason: plan.reason }
   }
 
   /** Open the dialog for a new ADR; with a Relation, one that supersedes or amends the selected ADR. */
@@ -474,12 +449,12 @@ class AppState {
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: 'Create the ADR',
-          action: 'Create',
+          title: t.review.create.title,
+          action: t.review.create.action,
           change: plan.change,
           applying: false
         }
-      : { kind: 'refused', title: 'The ADR cannot be created', reason: plan.reason }
+      : { kind: 'refused', title: t.review.create.refused, reason: plan.reason }
   }
 
   /** Open the dialog for the Metadata lists of the selected ADR. */
@@ -489,8 +464,8 @@ class AppState {
     if (!adr.metadataWritable) {
       this.review = {
         kind: 'refused',
-        title: `Cannot edit the Metadata of ADR ${prefixOf(adr)}`,
-        reason: `The frontmatter of ${adr.id} cannot be read. Fix it before the tool writes to it.`
+        title: t.review.metadata.unreadable(prefixOf(adr)),
+        reason: t.review.metadata.unreadableReason(adr.id)
       }
       return
     }
@@ -526,16 +501,13 @@ class AppState {
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: `Change the Metadata of ADR ${prefixOf(adr)}`,
-          action: 'Save',
+          title: t.review.metadata.title(prefixOf(adr)),
+          action: t.save,
           change: plan.change,
-          applying: false
+          applying: false,
+          saves: true
         }
-      : {
-          kind: 'refused',
-          title: `Cannot change the Metadata of ADR ${prefixOf(adr)}`,
-          reason: plan.reason
-        }
+      : { kind: 'refused', title: t.review.metadata.refused(prefixOf(adr)), reason: plan.reason }
   }
 
   /** Start editing the body of the selected ADR. */
@@ -571,13 +543,14 @@ class AppState {
     this.review = plan.ok
       ? {
           kind: 'change',
-          title: `Save ADR ${prefixOf(adr)}`,
-          action: 'Save',
+          title: t.review.body.title(prefixOf(adr)),
+          action: t.save,
           change: plan.change,
           applying: false,
-          caution: MORE_THAN_A_CORRECTION
+          saves: true,
+          caution: t.review.body.caution
         }
-      : { kind: 'refused', title: `Cannot save ADR ${prefixOf(adr)}`, reason: plan.reason }
+      : { kind: 'refused', title: t.review.body.refused(prefixOf(adr)), reason: plan.reason }
   }
 
   /** Leave the editor without saving; asks first when there is text to lose. */
@@ -609,7 +582,7 @@ class AppState {
     const result = await window.api.applyChange(review.change.changeId)
     if (result.applied) {
       // What was saved is on disk now; the editor and the Metadata dialog have nothing left to lose.
-      if (review.action === 'Save') {
+      if (review.saves) {
         this.editing = undefined
         this.editingMetadata = undefined
       }
@@ -626,7 +599,7 @@ class AppState {
         this.edit()
       }
     } else {
-      this.review = { kind: 'refused', title: 'The change was not written', reason: result.reason }
+      this.review = { kind: 'refused', title: t.review.notWritten, reason: result.reason }
     }
   }
 
@@ -638,12 +611,26 @@ class AppState {
   }
 
   dismissReview(): void {
-    if (this.review?.kind === 'change') void window.api.discardChange(this.review.change.changeId)
+    const review = this.review
+    if (review?.kind === 'change') void window.api.discardChange(review.change.changeId)
     this.review = undefined
+    if (review?.kind === 'confirm') review.declined?.()
+  }
+
+  /**
+   * The window is to close while the editor holds unsaved text. A change that was being
+   * looked at is not applied; the question takes its place.
+   */
+  private requestClose(): void {
+    this.dismissReview()
+    this.leaveEditor(
+      () => void window.api.answerCloseRequest(true),
+      () => void window.api.answerCloseRequest(false)
+    )
   }
 
   /** Do something that takes the editor away. With unsaved text the author is asked first. */
-  private leaveEditor(then: () => void): void {
+  private leaveEditor(then: () => void, declined?: () => void): void {
     const proceed = (): void => {
       this.editing = undefined
       then()
@@ -651,10 +638,11 @@ class AppState {
     if (!this.dirty) return proceed()
     this.review = {
       kind: 'confirm',
-      title: 'Discard your changes?',
-      reason: 'The text in the editor has not been saved. Leaving the editor now loses it.',
-      action: 'Discard changes',
-      proceed
+      title: t.review.discard.title,
+      reason: t.review.discard.reason,
+      action: t.review.discard.action,
+      proceed,
+      ...(declined && { declined })
     }
   }
 

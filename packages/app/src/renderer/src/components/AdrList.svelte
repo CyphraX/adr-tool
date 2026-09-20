@@ -1,6 +1,7 @@
 <script lang="ts">
   import { problemsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import { STATUS_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
@@ -27,29 +28,28 @@
 <div class="list">
   <div class="tools">
     <button class="search" onclick={() => app.startSearching()}>
-      Search <kbd>{window.api.platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
+      {t.search}
+      <kbd>{window.api.platform === 'darwin' ? t.list.searchKey.mac : t.list.searchKey.other}</kbd>
     </button>
-    <button onclick={() => app.startCreating()}>New ADR</button>
+    <button onclick={() => app.startCreating()}>{t.list.newAdr}</button>
   </div>
   <div class="head" aria-hidden="true">
-    <span class="prefix">{app.log?.naming === 'date' ? 'Date' : 'No.'}</span>
-    <span>Title</span>
-    <span>Status</span>
-    <span class="decided">Decided</span>
+    <span class="prefix">{app.log?.naming === 'date' ? t.list.date : t.list.number}</span>
+    <span>{t.list.title}</span>
+    <span>{t.list.status}</span>
+    <span class="decided">{t.list.decided}</span>
   </div>
 
   {#if app.adrs.length === 0}
     <p class="empty">
-      {app.log?.adrs.length === 0
-        ? 'This Decision Log has no ADRs yet.'
-        : 'No ADR has this Status.'}
+      {app.log?.adrs.length === 0 ? t.list.empty : t.list.noneWithStatus}
     </p>
   {:else}
     <div
       class="rows"
       role="listbox"
       tabindex="0"
-      aria-label="ADRs"
+      aria-label={t.list.label}
       aria-activedescendant={selectedId ? `adr-${selectedId}` : undefined}
       {onkeydown}
     >
@@ -71,11 +71,11 @@
           <span class="title">
             <span class="text" title={adr.title ?? adr.id}>{adr.title ?? adr.id}</span>
             {#if changed.includes(adr.path)}
-              <span class="uncommitted" title="Uncommitted changes" aria-label="Uncommitted changes"
+              <span class="uncommitted" title={t.list.uncommitted} aria-label={t.list.uncommitted}
               ></span>
             {/if}
             {#if problems > 0}
-              <span class="problems" title="{problems} {problems === 1 ? 'Problem' : 'Problems'}">
+              <span class="problems" title={t.problemCount(problems)}>
                 {problems}
               </span>
             {/if}

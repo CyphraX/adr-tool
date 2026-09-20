@@ -4,6 +4,7 @@
   import { recordsCorrection, type Adr } from '@adr-tool/core'
   import { createBodyEditor, replaceText } from '../lib/editor'
   import { app, type EditorMode } from '../lib/state.svelte'
+  import { t } from '../lib/strings'
   import MarkdownDocument from './MarkdownDocument.svelte'
 
   let { adr }: { adr: Adr } = $props()
@@ -14,8 +15,8 @@
   const correction = $derived(recordsCorrection(adr))
 
   const MODES: [EditorMode, string][] = [
-    ['source', 'Source'],
-    ['split', 'Source and preview']
+    ['source', t.editor.source],
+    ['split', t.editor.split]
   ]
 
   onMount(() => {
@@ -40,7 +41,7 @@
 {#if editing}
   <div class="editor">
     <div class="bar">
-      <div class="modes" role="group" aria-label="Editor layout">
+      <div class="modes" role="group" aria-label={t.editor.layout}>
         {#each MODES as [mode, label] (mode)}
           <button aria-pressed={editing.mode === mode} onclick={() => (editing.mode = mode)}>
             {label}
@@ -50,46 +51,33 @@
 
       {#if correction}
         <label class="note">
-          <span>Correction</span>
-          <input
-            type="text"
-            placeholder="What did you correct? e.g. Spelling"
-            bind:value={editing.note}
-          />
+          <span>{t.editor.correction}</span>
+          <input type="text" placeholder={t.editor.notePlaceholder} bind:value={editing.note} />
         </label>
       {/if}
 
       <div class="actions">
-        <button onclick={() => app.discardEdit()}>{app.dirty ? 'Discard' : 'Close'}</button>
+        <button onclick={() => app.discardEdit()}>{app.dirty ? t.editor.discard : t.close}</button>
         <button
           class="primary"
           disabled={!app.dirty || editing.changedOnDisk !== undefined}
           onclick={() => app.save()}
         >
-          Save
+          {t.save}
         </button>
       </div>
     </div>
 
     {#if editing.missing}
-      <p class="notice">
-        This ADR's file is no longer on disk. Your text is still here; copy it if you need it.
-      </p>
+      <p class="notice">{t.editor.missing}</p>
     {:else if editing.changedOnDisk !== undefined}
       <div class="notice">
-        <p>
-          This file changed on disk while you were editing. Saving is paused until you choose: keep
-          your text, which replaces what is on disk when you save — the preview shows exactly what —
-          or load the file and lose your text.
-        </p>
-        <button onclick={() => app.keepMine()}>Keep my text</button>
-        <button onclick={() => app.loadFromDisk()}>Load the file from disk</button>
+        <p>{t.editor.changedOnDisk}</p>
+        <button onclick={() => app.keepMine()}>{t.editor.keepMine}</button>
+        <button onclick={() => app.loadFromDisk()}>{t.editor.loadFromDisk}</button>
       </div>
     {:else if correction}
-      <p class="hint">
-        This ADR is no longer proposed, so saving records a Correction. A Correction never changes
-        what a reader would understand to have been decided.
-      </p>
+      <p class="hint">{t.editor.correctionHint}</p>
     {/if}
 
     <div class="surfaces" class:split={editing.mode === 'split'}>

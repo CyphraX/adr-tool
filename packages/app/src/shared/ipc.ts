@@ -177,6 +177,12 @@ export interface Api {
   openExternal(url: string): Promise<void>
   /** Called whenever files of an open repository changed on disk. Returns a function that stops listening. */
   onRepositoryChanged(listener: (repository: OpenRepository) => void): () => void
+  /** Say whether the window holds text that is not on disk. While it does, closing it asks first. */
+  setUnsaved(unsaved: boolean): Promise<void>
+  /** Called when the window is to close while it holds unsaved text. Nothing closes until it was answered. */
+  onCloseRequested(listener: () => void): () => void
+  /** What the person said: close the window, whatever it holds — or keep it, and forget that anything was to quit. */
+  answerCloseRequest(close: boolean): Promise<void>
 }
 
 export const CHANNEL = {
@@ -196,5 +202,8 @@ export const CHANNEL = {
   historyChange: 'git:history-change',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
-  openExternal: 'shell:open-external'
+  openExternal: 'shell:open-external',
+  setUnsaved: 'window:set-unsaved',
+  closeRequested: 'window:close-requested',
+  answerCloseRequest: 'window:answer-close-request'
 } as const

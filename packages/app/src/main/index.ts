@@ -13,6 +13,7 @@ import {
 import { Repositories } from './repositories'
 import { metadataEditRequest, migrationRequest, repairRequest } from './requests'
 import { readSession, writeSession } from './session-store'
+import { t } from './strings'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
 
@@ -22,6 +23,15 @@ const repositories = new Repositories((repository) => {
   }
 })
 let activeRoot: string | undefined
+
+/** The windows, by the id of their contents, that hold text which is not on disk. */
+const unsaved = new Set<number>()
+/** The windows that do not answer at the moment, and so cannot be asked anything. */
+const hung = new Set<number>()
+/** The app is quitting: its windows are being closed for that reason. */
+let quitting = false
+/** The app was quitting when a window held it up to ask. */
+let quitHeldUp = false
 
 const sessionFile = (): string => join(app.getPath('userData'), 'session.json')
 const saveSession = (): Promise<void> =>
@@ -58,7 +68,7 @@ function registerIpc(): void {
 
   ipcMain.handle(CHANNEL.openRepository, async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
-    const options = { title: 'Open repository', properties: ['openDirectory' as const] }
+    const options = { title: t.openRepository, properties: ['openDirectory' as const] }
     const picked = await (window
       ? dialog.showOpenDialog(window, options)
       : dialog.showOpenDialog(options))
@@ -86,7 +96,7 @@ function registerIpc(): void {
     (_, repositoryId: unknown, logPath: unknown, adrId: unknown, decision: unknown) => {
       const known = decision === 'accept' || decision === 'reject' || decision === 'deprecate'
       if (![repositoryId, logPath, adrId].every((value) => typeof value === 'string') || !known) {
-        return { ok: false, reason: 'This request cannot be understood.' }
+        return { ok: false, reason: t.notUnderstood }
       }
       return repositories.planDecision(
         repositoryId as string,
@@ -115,7 +125,7 @@ function registerIpc(): void {
       (relation === undefined ||
         ((relation['type'] === 'supersedes' || relation['type'] === 'amends') &&
           typeof relation['target'] === 'string'))
-    if (!valid) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!valid) return { ok: false, reason: t.notUnderstood }
     return repositories.planCreate(given as unknown as CreateRequest)
   })
 
@@ -123,26 +133,26 @@ function registerIpc(): void {
     const fields = ['repositoryId', 'logPath', 'adrId', 'base', 'body', 'note'] as const
     const given = typeof request === 'object' && request !== null ? request : {}
     if (!fields.every((field) => typeof (given as Record<string, unknown>)[field] === 'string')) {
-      return { ok: false, reason: 'This request cannot be understood.' }
+      return { ok: false, reason: t.notUnderstood }
     }
     return repositories.planBodyEdit(given as BodyEditRequest)
   })
 
   ipcMain.handle(CHANNEL.planMetadataEdit, (_, request: unknown) => {
     const edit = metadataEditRequest(request)
-    if (!edit) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!edit) return { ok: false, reason: t.notUnderstood }
     return repositories.planMetadataEdit(edit)
   })
 
   ipcMain.handle(CHANNEL.planRepair, (_, request: unknown) => {
     const repair = repairRequest(request)
-    if (!repair) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!repair) return { ok: false, reason: t.notUnderstood }
     return repositories.planRepair(repair)
   })
 
   ipcMain.handle(CHANNEL.planMigration, (_, request: unknown) => {
     const migration = migrationRequest(request)
-    if (!migration) return { ok: false, reason: 'This request cannot be understood.' }
+    if (!migration) return { ok: false, reason: t.notUnderstood }
     return repositories.planMigration(migration)
   })
 
@@ -161,7 +171,7 @@ function registerIpc(): void {
   ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
     typeof changeId === 'string'
       ? repositories.applyChange(changeId)
-      : { applied: false, reason: 'This request cannot be understood.' }
+      : { applied: false, reason: t.notUnderstood }
   )
 
   ipcMain.handle(CHANNEL.discardChange, (_, changeId: unknown) => {
@@ -170,6 +180,22 @@ function registerIpc(): void {
 
   ipcMain.handle(CHANNEL.openExternal, async (_, url: unknown) => {
     if (typeof url === 'string' && isWebLink(url)) await shell.openExternal(url)
+  })
+
+  ipcMain.handle(CHANNEL.setUnsaved, (event, holdsText: unknown) => {
+    if (holdsText === true) unsaved.add(event.sender.id)
+    else unsaved.delete(event.sender.id)
+  })
+
+  // The person was asked. "Discard": the window closes, and a quit it held up goes on —
+  // on a Mac the app would otherwise stay in the dock. "Keep editing": nothing is to quit.
+  ipcMain.handle(CHANNEL.answerCloseRequest, (event, close: unknown) => {
+    const resumeQuit = quitHeldUp && close === true
+    quitHeldUp = false
+    if (close !== true) return
+    unsaved.delete(event.sender.id)
+    BrowserWindow.fromWebContents(event.sender)?.close()
+    if (resumeQuit) app.quit()
   })
 }
 
@@ -195,6 +221,30 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
+
+  // Closing a window that holds unsaved text asks first, and the window asks: it has the
+  // dialog for it. Quitting the app closes its windows, so it goes the same way. A window
+  // that cannot answer — crashed, or hung for now — is not asked; one that loads afresh
+  // holds no text any more.
+  const contents = mainWindow.webContents
+  const id = contents.id
+  mainWindow.on('close', (event) => {
+    if (!unsaved.has(id) || hung.has(id) || contents.isCrashed()) return
+    event.preventDefault()
+    quitHeldUp = quitting
+    quitting = false
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+    contents.send(CHANNEL.closeRequested)
+  })
+  mainWindow.on('unresponsive', () => hung.add(id))
+  mainWindow.on('responsive', () => hung.delete(id))
+  mainWindow.on('closed', () => {
+    unsaved.delete(id)
+    hung.delete(id)
+  })
+  contents.on('did-start-loading', () => unsaved.delete(id))
 
   // Nothing ever opens or navigates inside the app: web links go to the system
   // browser, everything else is dropped.
@@ -236,6 +286,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// A window that asks about unsaved text cancels the quit; it has to know there was one.
+app.on('before-quit', () => {
+  quitting = true
 })
 
 app.on('will-quit', () => {
