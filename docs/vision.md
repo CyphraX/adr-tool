@@ -3,7 +3,7 @@
 Where this project is heading beyond the ADR tool: one desktop workbench for a software architect, in which decisions, code structure, rules, diagrams, review notes and assessments are connected to each other.
 Agreed in the design session of 2026-09-19. Vocabulary follows [CONTEXT-MAP.md](../CONTEXT-MAP.md) and the glossaries it points to.
 
-[roadmap.md](roadmap.md) and [plan.md](plan.md) remain the plan of the Decisions module and are not replaced by this document. ADR v1 is finished first (M3 to M5); nothing here is a reason to restructure the repository now.
+[roadmap.md](roadmap.md) and [plan.md](plan.md) remain the plan of the Decisions module and are not replaced by this document. ADR v1 was finished first (accepted on 2026-09-20); the first module after it, Structure, has its own plan in [plan-structure.md](plan-structure.md) and its contract in [structure-format.md](structure-format.md).
 
 This list is meant to be complete, and for one developer that is only honest with tiers. Every module is split into **Core** (the first version of that module), **Next** and **Later**, and says what is deliberately **Out**.
 
@@ -31,15 +31,15 @@ Code analysis starts with **TypeScript/JavaScript and Java**, on a language-neut
 
 ## The spine
 
-- A **Component** is a building block the architect names and declares in a file in the repository, mapped to code by path patterns, e.g. `core/metadata` → `packages/core/src/metadata/**`. Components are hierarchical. A first draft is derived from workspace packages, Maven modules and top-level folders; the architect refines it.
-- A Component has a stable **Component ID** (a path slug) apart from its display name. Renaming is an operation of the suite that rewrites every Trace, Rule and Diagram through one change set, as Renumber does for ADRs. Splitting and merging stay manual; what is left dangling shows up as Problems.
-- The smallest unit of the code model is the **Source File**, in both languages. It is what the code viewer opens and what Annotations attach to. Class-level figures such as LCOM are figures inside a file, not a further graph level.
-- A **Trace** is a typed, directed connection between artefacts of different modules: an ADR *affects* a Component, a Finding *cites* an Annotation, an Exception is *justified by* an ADR. It is stored on the source artefact only; the opposite direction is computed. A Trace that points nowhere is a Problem with a repair. **Relation** keeps its meaning: ADR to ADR within one Decision Log.
+- A **Component** is a building block the architect names and declares in a file in the repository, mapped to code by path patterns, e.g. `core/metadata` → `packages/core/src/metadata/**`. Components are hierarchical. A **Draft** is derived from workspace packages, Maven modules, Gradle projects and folders; the architect adopts and refines it.
+- A Component has a stable **Component ID** (a path of segments) apart from its display name. **Rename** is an operation of the suite that rewrites every Trace, Rule and Diagram through one change set, as Renumber does for ADRs. Splitting and merging stay manual; what is left dangling shows up as Problems.
+- The smallest unit of the code model is the **Source File**, in both languages. It is what the code viewer opens and what Annotations attach to. Class-level metrics such as LCOM are metrics inside a file, not a further graph level.
+- A **Trace** is a typed, directed connection between artefacts of different modules: an ADR *affects* a Component, a Finding *cites* an Annotation, an Exception is *justified by* an ADR. It is stored on the source artefact only; the opposite direction is computed. A Trace that points nowhere is a Problem with a Repair. **Relation** keeps its meaning: ADR to ADR within one Decision Log.
 - The C4 words "container" and "component" name view levels of the one Component hierarchy. They are not further kinds of building block.
 
 ## Modules
 
-One module is one bounded context and, in code, one UI-free core package; a small shared kernel holds what all of them need (the file-system port, change sets, the git wrapper, Traces, Problems). Package names are decided when the first new module is built.
+One module is one bounded context and, in code, one UI-free core package; a small shared kernel holds what all of them need. It starts with the file-system port and change sets and grows as modules need it — the git wrapper, Traces and Problems are its likely next contents. The first two are `packages/kernel` and `packages/structure` ([plan-structure.md](plan-structure.md)).
 
 ### 1. Decisions
 
@@ -53,15 +53,15 @@ The ADR tool as described in [roadmap.md](roadmap.md). What the suite adds:
 What the code is made of and how its parts depend on each other. Everything else hangs on this module, and it is the visible slice the suite starts with.
 
 - **Core**
-  - Declare Components: hierarchy, Component ID, display name, path patterns; a derived first draft; a list of Source Files that belong to no Component.
-  - Code model for TypeScript/JavaScript (TypeScript compiler API, full semantic resolution) and Java (`tree-sitter-java` as WASM, resolution through imports). No JVM, in line with [ADR-0001](adr/0001-electron-svelte-typescript-throughout.md). Java stays imprecise below class level; accepted, because architecture analysis works on file, package and Component level.
-  - **Dependency** graph on Source File and on Component level, with the hierarchy collapsing and expanding. An edge between Components opens the Source File Dependencies behind it.
-  - Cycles on both levels.
+  - Declare Components: hierarchy, Component ID, display name, path patterns; the derived Draft; a list of the Unassigned Source Files.
+  - Code model for TypeScript/JavaScript (files parsed one by one and imports resolved with TypeScript's own module resolution — no program, no type checker; Svelte files through their script blocks) and Java (`tree-sitter-java` as WASM, resolution through imports and a symbol table per package). No JVM, in line with [ADR-0001](adr/0001-electron-svelte-typescript-throughout.md). Java stays imprecise below class level; accepted, because architecture analysis works on file, package and Component level.
+  - **Dependency** graph of the Components of one level at a time, going down the hierarchy; a Component without children shows its Source Files. A graph of all Source Files of a repository is never drawn — the matrix gives the overview. An edge between Components opens the Source File Dependencies behind it.
+  - **Cycles** among the Components of a level and among the Source Files of a Component.
   - Dependency structure matrix.
-  - Metrics per Component: afferent and efferent coupling (Ca, Ce), instability, size, relational cohesion, ratio of internal to external edges.
+  - Metrics per Component: afferent and efferent coupling (Ca, Ce), instability, size, relational cohesion, the share of internal Dependencies.
   - Read-only code viewer with syntax highlighting; a Dependency opens the import line that causes it.
   - Re-analysis when files change, in the background; the cache lives in the app's user-data folder, never in the repository.
-  - Rename a Component through a change set.
+  - Rename a Component through a change set — with the first Trace, when there is something outside the declaration to rewrite.
 - **Next**
   - Complexity per function (needed for hotspots); abstractness and distance from the main sequence (mainly meaningful for Java); LCOM4 per class; propagation cost.
   - History analysis from git, read-only: churn, hotspots (churn × complexity), temporal coupling between Source Files and between Components, temporal cohesion within a Component.
@@ -140,7 +140,7 @@ Architecture evaluation: a qualitative judgement, backed by what the other modul
 
 | Stored in the repository (made by a person)                                                                                                     | Derived (recomputed, never in the repository)                                |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| ADRs, Templates, Component declarations, Rules, applied Patterns, Diagrams, Annotations, Assessments, Quality Scenarios, Findings, Risks, Technical Debt Items | code model, Dependencies, metrics, cycles, Violations, Drift, history figures, Problems |
+| ADRs, Templates, Component declarations, Rules, applied Patterns, Diagrams, Annotations, Assessments, Quality Scenarios, Findings, Risks, Technical Debt Items | code model, Dependencies, metrics, Cycles, Violations, Drift, history figures, Problems |
 
 Derived data enters the repository in exactly three places, each deliberately:
 
