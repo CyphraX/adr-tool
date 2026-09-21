@@ -6,9 +6,9 @@ import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { MetadataNotWritableError, addToList, renameKey, setScalar } from '../metadata/write'
 import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
-import type { TextEdit } from '../text/edit'
+import type { TextEdit } from '@adr-tool/kernel'
 import { viewSource, type SourceView, type Span } from '../text/source'
-import { PendingFiles, Refusal, plan } from './pending'
+import { Refusal, pendingFiles, plan, type PendingFiles } from './pending'
 
 const LIST_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
 
@@ -99,7 +99,7 @@ async function whyNot(
   // Try it on its own first: a file the writer cannot write is named, and does not take the
   // Migration of all the others down with it.
   try {
-    const trial = new PendingFiles(fs)
+    const trial = pendingFiles(fs)
     await migrate(trial, undefined, adr, [])
     await writeSuccessor(trial, adr, successor)
     return undefined

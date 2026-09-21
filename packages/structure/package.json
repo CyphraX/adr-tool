@@ -1,0 +1,23 @@
+{
+  "name": "@adr-tool/structure",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The UI-free core of the Structure module: Components, Source Files, Dependencies. No Electron, no DOM, no disk access of its own",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@adr-tool/kernel": "workspace:*",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

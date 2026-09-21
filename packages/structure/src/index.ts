@@ -1,0 +1,6 @@
+export { openStructure, type RepositoryFiles, type Structure } from './structure'
+export type { DeclaredComponent } from './declaration'
+export type { OwnedSourceFile } from './ownership'
+export type { Language, SourceFile } from './source-files'
+export { DECLARATION_PATH, wordingOf, type PatternKey, type StructureProblem } from './problems'
+export { hasRepair, planAdopt, planRepair } from './operations'

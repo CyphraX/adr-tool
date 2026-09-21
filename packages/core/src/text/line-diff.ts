@@ -1,4 +1,4 @@
-import type { TextEdit } from './edit'
+import type { TextEdit } from '@adr-tool/kernel'
 import type { Eol } from './source'
 
 interface Line {
