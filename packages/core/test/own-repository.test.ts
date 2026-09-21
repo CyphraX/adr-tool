@@ -24,10 +24,15 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [3, '0003-on-disk-contract', 'accepted'],
     [4, '0004-operations-return-change-sets', 'accepted'],
     [5, '0005-foreign-formats-are-read-never-written', 'accepted'],
-    // Written as proposed; accepting it in the app must not break the build.
+    // Written as proposed; accepting them in the app must not break the build.
     [
       6,
       '0006-one-core-package-per-module-on-a-shared-kernel',
+      expect.stringMatching(/^(proposed|accepted)$/)
+    ],
+    [
+      7,
+      '0007-the-analysis-never-executes-anything-from-the-analysed',
       expect.stringMatching(/^(proposed|accepted)$/)
     ]
   ])
@@ -68,6 +73,12 @@ it('reads the Decision Log of this repository without a Problem', async () => {
         to,
         state: log.adrs[5]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
       })
-    )
+    ),
+    {
+      type: 'relates-to',
+      from: '0007-the-analysis-never-executes-anything-from-the-analysed',
+      to: '0006-one-core-package-per-module-on-a-shared-kernel',
+      state: log.adrs[6]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
+    }
   ])
 })

@@ -1,12 +1,12 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 import type { Pair, Scalar, YAMLMap, YAMLSeq } from 'yaml'
-import type { TextEdit } from '../text/edit'
+import { Refusal, type TextEdit } from '@adr-tool/kernel'
 import type { SourceView } from '../text/source'
 import { METADATA_KEYS, type MetadataKey } from './keys'
 import { scalarText } from './scalar'
 
 /** The file's Metadata is in a state the tool must not write into; a person has to fix it first. */
-export class MetadataNotWritableError extends Error {}
+export class MetadataNotWritableError extends Refusal {}
 
 /**
  * Set a scalar Metadata key. Returns the edits; nothing outside them changes.

@@ -31,8 +31,9 @@ The app reopens the repositories of the last run. To see every Status, Relations
 
 ## Layout
 
-- `packages/kernel` — what every module of the suite needs and none of them owns: the file-system port and change sets ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)).
+- `packages/kernel` — what every module of the suite needs and none of them owns: the file-system port, splice edits and change sets ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)).
 - `packages/core` — the domain core of the Decisions module in pure TypeScript. No Electron, no DOM, no disk access of its own; its type check fails if it reaches for any of them.
+- `packages/structure` — the core of the Structure module, under the same guard: Components, Source Files and who owns them, the Draft, Adopt ([structure-format.md](docs/structure-format.md)). It reads build files as text and never runs anything of the repository it looks at ([ADR-0007](docs/adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)). The app does not use it yet.
 - `packages/spikes` — temporary: the two spikes of the Structure module's first part ([plan-structure.md](docs/plan-structure.md)). It dissolves into `packages/structure`.
 - `packages/app` — the Electron + Svelte 5 desktop app. The renderer is sandboxed and talks to the main process only through the preload bridge.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyEdits } from '../src/text/edit'
+import { applyEdits } from '@adr-tool/kernel'
 import { viewSource } from '../src/text/source'
 import { fixture, fixtureNames } from './fixtures'
 
