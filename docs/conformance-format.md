@@ -245,7 +245,7 @@ billing must not depend on web: packages/billing/src/invoice.ts:3 imports packag
 | `must-not-depend` | `<from>` must not depend on `<to>` |
 | `may-only-depend` | `<from>` may only depend on `<allowed>` (or: may depend on no other Component), and depends on `<to>` |
 | `layers` | `<from>` must not depend on `<to>`, which lies in a layer above it (in `strict` mode also: which lies more than one layer below it) |
-| `no-cycles` | `<members>` depend on each other in a Cycle: `<round trip>` |
+| `no-cycles` | `<members>` depend on each other in a Cycle (with three or more members: and one round trip through them) |
 | `threshold` | The metric `<metric>` of `<component>` is `<value>`, above the maximum of `<max>` (or: below the minimum of `<min>`) |
 
 ## 4. Exceptions (part 3)

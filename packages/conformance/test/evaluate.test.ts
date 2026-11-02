@@ -230,6 +230,9 @@ describe('no-cycles', () => {
       'features: features/a features/b'
     ])
     const [top] = report.violations
+    expect(sentenceAt(top!, top!.dependencies[0])).toBe(
+      'billing, persistence and web depend on each other in a Cycle: billing -> web -> billing: src/billing/invoice.ts:2 imports src/web/format.ts.'
+    )
     expect(top!.cycle).toEqual({
       members: ['billing', 'persistence', 'web'],
       roundTrip: ['billing', 'web'],
@@ -240,7 +243,7 @@ describe('no-cycles', () => {
       values: { members: ['features/a', 'features/b'], roundTrip: ['features/a', 'features/b'] }
     })
     expect(sentenceAt(report.violations[1]!, report.violations[1]!.dependencies[0])).toBe(
-      'features/a and features/b depend on each other in a Cycle: features/a -> features/b -> features/a: src/features/a/x.ts:1 imports src/features/b/y.ts.'
+      'features/a and features/b depend on each other in a Cycle: src/features/a/x.ts:1 imports src/features/b/y.ts.'
     )
   })
 

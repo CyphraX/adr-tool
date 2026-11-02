@@ -116,8 +116,11 @@ export const SENTENCES = {
     v.where === 'above'
       ? `${v.from} must not depend on ${v.to}, which lies in a layer above it`
       : `${v.from} may only depend on the layer right below it, and ${v.to} lies further down`,
+  // Two depend on each other both ways; for more, one round trip says how.
   'no-cycles': (v: { members: readonly string[]; roundTrip: readonly string[] }): string =>
-    `${listed(v.members)} depend on each other in a Cycle: ${[...v.roundTrip, v.roundTrip[0]!].join(' -> ')}`,
+    v.members.length === 2
+      ? `${listed(v.members)} depend on each other in a Cycle`
+      : `${listed(v.members)} depend on each other in a Cycle: ${[...v.roundTrip, v.roundTrip[0]!].join(' -> ')}`,
   threshold: (v: {
     metric: string
     component: string
