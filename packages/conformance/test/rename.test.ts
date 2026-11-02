@@ -121,4 +121,47 @@ describe('Rename of a Component in .arch/rules.yml (docs/conformance-format.md, 
     )
     expect(refused.ok === false && refused.said?.code).toBe('cannot-rename-in-rules')
   })
+
+  it('is refused, and does not throw, where aliases elsewhere expand past what can be read back', async () => {
+    // The review's probe: a billion laughs beside the Rules, which name ui plainly.
+    const bomb = yaml(
+      'a: &a [x, x, x, x, x, x, x, x, x, x]',
+      'b: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]',
+      'c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b, *b]',
+      'd: &d [*c, *c, *c, *c, *c, *c, *c, *c, *c, *c]',
+      'e: &e [*d, *d, *d, *d, *d, *d, *d, *d, *d, *d]',
+      'rules:',
+      '  - id: r1',
+      '    why: x',
+      '    kind: must-not-depend',
+      '    from: ui',
+      '    to: core'
+    )
+    const refused = await planRenameInRules(memoryFileSystem({ [RULES_PATH]: bomb }), 'ui', 'front')
+    expect(refused.ok === false && refused.said?.code).toBe('cannot-rename-in-rules')
+  })
+
+  it('renames an ID that YAML reads as a number', () => {
+    const text = yaml(
+      'rules:',
+      '  - id: r',
+      '    why: W.',
+      '    kind: must-not-depend',
+      '    from: 2024',
+      '    to: [web]',
+      'exceptions:',
+      '  - rule: r',
+      '    from: 2024',
+      '    to: web',
+      '    reason: R.'
+    )
+    expect(applyEdits(text, renameInRules(text, '2024', 'y2024'))).toBe(
+      text.replaceAll('from: 2024', 'from: y2024')
+    )
+    // And back: the new ID reads as a number, and still as the same Rules.
+    const renamed = text.replaceAll('from: 2024', 'from: y2024')
+    expect(applyEdits(renamed, renameInRules(renamed, 'y2024', '2025'))).toBe(
+      text.replaceAll('from: 2024', 'from: 2025')
+    )
+  })
 })

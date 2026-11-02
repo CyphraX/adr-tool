@@ -9,7 +9,7 @@ import { isAlias, isMap, isScalar, isSeq, parseDocument, type Scalar, type YAMLM
 import { applyEdits, plan, type FileSystem, type Plan, type TextEdit } from '@adr-tool/kernel'
 import { renamedPattern } from './component-patterns'
 import { RULES_PATH } from './problems'
-import { readRules } from './rules'
+import { readRules, scalarText } from './rules'
 import { refusal } from './sentences'
 
 /** The keys of a Rule that take Component patterns. */
@@ -43,9 +43,11 @@ export function renameInRules(text: string, from: string, to: string): TextEdit[
 
   const edits: TextEdit[] = []
   for (const scalar of scalars) {
-    if (typeof scalar.value !== 'string') continue
-    const renamed = renamedPattern(scalar.value, from, to)
-    if (renamed === scalar.value) continue
+    // `from: 2024` names the Component 2024, as the Rules read it.
+    const value = scalarText(scalar)
+    if (value === undefined) continue
+    const renamed = renamedPattern(value, from, to)
+    if (renamed === value) continue
     if (!scalar.range) throw cannot
     const written =
       scalar.type === 'QUOTE_DOUBLE'
@@ -63,10 +65,26 @@ export function renameInRules(text: string, from: string, to: string): TextEdit[
   if (edits.length === 0) return edits
 
   const after = parseDocument(applyEdits(text, edits), { uniqueKeys: false })
-  if (after.errors.length > 0 || JSON.stringify(after.toJS()) !== JSON.stringify(doc.toJS())) {
+  const expected = readsAs(doc)
+  if (after.errors.length > 0 || expected === undefined || readsAs(after) !== expected) {
     throw cannot
   }
   return edits
+}
+
+/**
+ * What a document reads as, to compare: its values, a number or a boolean as the text the
+ * Rules read it as. `undefined` where it cannot be made out: aliases that would expand past
+ * what the YAML library allows, say.
+ */
+function readsAs(doc: ReturnType<typeof parseDocument>): string | undefined {
+  try {
+    return JSON.stringify(doc.toJS(), (_key, value: unknown) =>
+      typeof value === 'number' || typeof value === 'boolean' ? String(value) : value
+    )
+  } catch {
+    return undefined
+  }
 }
 
 /**

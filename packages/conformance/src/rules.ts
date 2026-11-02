@@ -477,7 +477,7 @@ const isEmpty = (node: unknown): boolean =>
 const textAt = (map: YAMLMap, key: string): string | undefined => scalarText(valueOf(map, key))
 
 /** A scalar as the text it stands for: `2` and `true` written as a name are text. */
-function scalarText(node: unknown): string | undefined {
+export function scalarText(node: unknown): string | undefined {
   if (!isScalar(node) || node.value === null || typeof node.value === 'object') return undefined
   return typeof node.value === 'string' ? node.value : (node.source ?? String(node.value))
 }
