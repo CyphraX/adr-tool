@@ -1,4 +1,4 @@
-import { rootOf } from './group'
+import { unreadableFrontmatter } from './group'
 import type { Problem } from './problem'
 
 /**
@@ -68,8 +68,7 @@ export function describeProblem(problem: Problem): string {
 }
 
 /** Is the root cause the frontmatter (as against the Status)? */
-const unreadable = (root: Problem): boolean =>
-  root.kind === 'invalid-frontmatter' || root.kind === 'unterminated-frontmatter'
+const unreadable = unreadableFrontmatter
 
 /**
  * Above the Problems that follow from `root`, a root cause of `groupProblems`, where `root`
@@ -83,7 +82,7 @@ export function describeConsequences(root: Problem): string {
 
 /** Next to a Problem on one ADR that is only reported because of `root` on another. */
 export function describeCause(root: Problem): string {
-  const adr = rootOf(root) ?? ''
+  const adr = 'adr' in root ? root.adr : ''
   return unreadable(root)
     ? `Reported only because the frontmatter of ${adr} cannot be read.`
     : `Reported only because the Status of ${adr} is none of the five values, which voids its Relations.`

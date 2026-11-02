@@ -72,6 +72,19 @@ describe('where a Problem is', () => {
     ])
   })
 
+  it('says the line of the file, not of the frontmatter, in the message of the parser', async () => {
+    const fs = memoryFileSystem({
+      'docs/adr/0001-a.md': '---\nstatus: accepted\ntags: [x]\ntags: [y]\n---\n\n# A\n'
+    })
+    const { logs } = await openRepository(fs)
+    const problem = logs[0]!.problems[0]!
+    expect(problem.kind === 'invalid-frontmatter' && problem.detail).toMatch(/at line 4, column 1$/)
+    expect(await locateProblem(fs, problem, logs[0])).toEqual({
+      path: 'docs/adr/0001-a.md',
+      line: 4
+    })
+  })
+
   it('counts lines the same way in a file with CRLF and a byte order mark', async () => {
     expect(
       await places({
@@ -96,6 +109,64 @@ describe('where a Problem is', () => {
         'docs/adr/0002-new.md': '---\nstatus: accepted\nsupersedes: [0001-old]\n---\n\n# New\n'
       })
     ).toEqual(['docs/adr/0001-old.md:1 missing-back-reference'])
+  })
+
+  it('never searches the text below a frontmatter for what it names', async () => {
+    expect(
+      await places({
+        'docs/adr/0001-b.md': [
+          '---',
+          'tags: [status-page]',
+          '---',
+          '',
+          '# B',
+          '',
+          'The order status is kept, see 0002-a.',
+          ''
+        ].join('\n'),
+        'docs/adr/0002-a.md': '---\nstatus: accepted\nsupersedes: [0001-b]\n---\n\n# A\n'
+      })
+    ).toEqual([
+      'docs/adr/0001-b.md:1 missing-back-reference',
+      'docs/adr/0001-b.md:1 not-marked-superseded'
+    ])
+  })
+
+  it('is the line of the Status where MADR names a successor in it', async () => {
+    expect(
+      await places({
+        'docs/decisions/0001-old.md': [
+          '---',
+          'status: superseded by [ADR-0002](0002-new.md)',
+          '---',
+          '',
+          '# Old',
+          ''
+        ].join('\n'),
+        'docs/decisions/0002-new.md': '---\nstatus: proposed\n---\n\n# New\n'
+      })
+    ).toEqual([
+      'docs/decisions/0001-old.md:2 unfounded-back-reference',
+      'docs/decisions/0001-old.md:2 superseded-without-successor'
+    ])
+  })
+
+  it('is the item of the list under the title where MADR 2 keeps the Status', async () => {
+    expect(
+      await places({
+        'docs/decisions/0001-a.md': [
+          '---',
+          'tags: [x]',
+          '---',
+          '',
+          '# Use a status page',
+          '',
+          '* Deciders: A',
+          '* Status: on hold',
+          ''
+        ].join('\n')
+      })
+    ).toEqual([expect.stringMatching(/^docs\/decisions\/0001-a\.md:8 /)])
   })
 
   it('is the first of several ADRs, without a line for a number they share', async () => {
@@ -135,6 +206,26 @@ describe('where a Problem is', () => {
         ].join('\n')
       })
     ).toEqual(['doc/adr/0002-next.md:9 unknown-target'])
+    // Only the Status section is searched: not a title that has the word in it.
+    expect(
+      await places({
+        'doc/adr/0001-status-page.md': [
+          '# 1. Use a status page, replaces 0009-gone',
+          '',
+          'Date: 2016-02-12',
+          '',
+          '## Status',
+          '',
+          'On hold',
+          '',
+          'Supersedes [9. Gone](0009-gone.md)',
+          ''
+        ].join('\n')
+      })
+    ).toEqual([
+      'doc/adr/0001-status-page.md:7 invalid-metadata',
+      'doc/adr/0001-status-page.md:9 unknown-target'
+    ])
   })
 
   it('is where the fixture `broken` says it', async () => {

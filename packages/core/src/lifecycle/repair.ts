@@ -4,7 +4,7 @@ import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList, setScalar } from '../metadata/write'
-import { groupProblems } from '../problems/group'
+import { carries, groupProblems } from '../problems/group'
 import { describeCause } from '../problems/wording'
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import { BACK_REFERENCE_KEYS } from '../relation'
@@ -173,8 +173,8 @@ function premiseOf(log: DecisionLog, repair: Repair): string[] {
   if (!type || !source || source.id === repair.adr) return []
 
   // A source whose Status cannot be read is a root cause: what it voids is not repaired here.
-  const { status, relations } = source.metadata
-  if (!relations[type].includes(repair.adr)) {
+  const { status } = source.metadata
+  if (!carries(source, type, repair.adr)) {
     return [
       `${source.id} does not name ${repair.adr} in ${type}. If it should, cancel and add it to ${source.id} by hand: the Back-reference is right then.`
     ]

@@ -31,7 +31,7 @@ export {
   describeProblem,
   type ProblemCode
 } from './problems/wording'
-export { locateProblem, type ProblemPlace } from './problems/locate'
+export { locateProblem, problemLocator, type ProblemPlace } from './problems/locate'
 
 export { applyEdits, type TextEdit } from '@adr-tool/kernel'
 

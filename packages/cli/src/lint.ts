@@ -2,7 +2,7 @@ import {
   describeCause,
   describeProblem,
   groupProblems,
-  locateProblem,
+  problemLocator,
   openRepository,
   type DecisionLog,
   type FileSystem,
@@ -33,6 +33,8 @@ export interface LintReport {
   /** The Decision Logs that were checked, by their directories. */
   readonly logs: readonly string[]
   readonly problems: readonly LintedGroup[]
+  /** What was not checked, and why: for standard error, not part of the result. */
+  readonly notes: readonly string[]
 }
 
 /**
@@ -46,11 +48,18 @@ export async function lint(fs: FileSystem): Promise<LintReport | undefined> {
     declaration.kind === 'declared'
       ? everyComponent(declaration.components).map((component) => component.id)
       : undefined
+  const notes =
+    declaration.kind === 'unreadable'
+      ? [
+          `${DECLARATION_PATH} cannot be read (${declaration.detail}), so the Traces in affects are not checked.`
+        ]
+      : []
   const repository = await openRepository(fs, components ? { components } : {})
   if (repository.discoveredBy === 'none') return undefined
 
+  const locate = problemLocator(fs)
   const report = async (problem: Problem, log?: DecisionLog): Promise<LintedProblem> => {
-    const { path, line } = await locateProblem(fs, problem, log)
+    const { path, line } = await locate(problem, log)
     return {
       code: problem.kind,
       message: describeProblem(problem),
@@ -75,5 +84,5 @@ export async function lint(fs: FileSystem): Promise<LintReport | undefined> {
       })
     }
   }
-  return { logs: repository.logs.map((log) => log.path), problems }
+  return { logs: repository.logs.map((log) => log.path), problems, notes }
 }

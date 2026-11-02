@@ -74,6 +74,7 @@ export const t = {
     noRepositoryLead:
       'Open the folder of a git repository to read its Architecture Decision Records.',
     badConfiguration: "This repository's ADR configuration cannot be used",
+    partOfConfiguration: "Part of this repository's ADR configuration cannot be used:",
     noAdrs: (repository: string): string => `No ADRs found in ${repository}`,
     whereItLooks:
       "Softarch Suite looks for `.adr/config.yml`, then for adr-tools' `.adr-dir`, then for the folders `docs/adr`, `doc/adr` and `docs/decisions`. As soon as one of them appears, the ADRs show up here.",

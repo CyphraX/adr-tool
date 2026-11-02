@@ -158,7 +158,7 @@ ADR_TOOL_REPO="$PWD/packages/core/test/fixtures/showcase" pnpm dev
 
 ```console
 $ pnpm build
-$ node packages/cli/dist/adr.js lint packages/core/test/fixtures/broken
+$ node packages/cli/dist/adr.mjs lint packages/core/test/fixtures/broken
 docs/adr/0004-api-style.md:2: status-not-lowercase: The Status is written "Rejected". It has to be lowercase.
 docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-written, which is not in this Decision Log.
 …

@@ -1,3 +1,5 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -53,6 +55,38 @@ describe('a repository on disk', () => {
       '../moved.md'
     )
     expect(await fs.readText('adr/0001-modular-monolith.md')).toContain('# ')
+  })
+
+  it('does not follow a symbolic link out of its root, to read or to write', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'adr-links-'))
+    try {
+      const outside = join(scratch, 'outside')
+      const root = join(scratch, 'repo')
+      mkdirSync(outside)
+      mkdirSync(join(root, 'docs/adr'), { recursive: true })
+      writeFileSync(join(outside, 'secret.md'), 'secret')
+      writeFileSync(join(root, 'docs/adr/0001-a.md'), '# A\n')
+      symlinkSync(join(outside, 'secret.md'), join(root, 'docs/adr/0002-leak.md'))
+      symlinkSync(outside, join(root, 'docs/out'))
+      symlinkSync(join(root, 'docs/adr/0001-a.md'), join(root, 'docs/adr/0003-same.md'))
+      const fs = nodeFileSystem(root)
+
+      expect(await fs.readText('docs/adr/0002-leak.md')).toBeUndefined()
+      expect(await fs.list('docs/out')).toBeUndefined()
+      expect((await fs.list('docs/adr'))?.map((entry) => entry.name).sort()).toEqual([
+        '0001-a.md',
+        '0003-same.md'
+      ])
+      expect(await fs.readText('docs/adr/0003-same.md')).toBe('# A\n')
+      await expect(fs.writeText('docs/adr/0002-leak.md', 'x')).rejects.toThrow('outside')
+      await expect(fs.writeText('docs/out/new/0009-x.md', 'x')).rejects.toThrow('outside')
+      await expect(fs.rename('docs/adr/0001-a.md', 'docs/out/moved.md')).rejects.toThrow('outside')
+      expect(readFileSync(join(outside, 'secret.md'), 'utf8')).toBe('secret')
+      await fs.writeText('docs/adr/new/0004-b.md', '# B\n')
+      expect(await fs.readText('docs/adr/new/0004-b.md')).toBe('# B\n')
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
   })
 
   it('is watched at its Decision Logs and where new ones can appear, never as a whole tree', async () => {

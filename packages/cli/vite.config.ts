@@ -11,7 +11,7 @@ export default defineConfig({
     minify: false,
     rollupOptions: {
       output: {
-        entryFileNames: 'adr.js',
+        entryFileNames: 'adr.mjs',
         banner: '#!/usr/bin/env node'
       }
     }

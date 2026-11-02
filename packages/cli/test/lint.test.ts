@@ -1,8 +1,17 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
+import { repositoryFiles } from '../src/files'
 import { run } from '../src/run'
 
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
@@ -10,12 +19,19 @@ const fixtures = fileURLToPath(new URL('../../core/test/fixtures/', import.meta.
 
 /** Runs the command as a shell would, and keeps what it prints. */
 async function adr(...args: string[]): Promise<{ code: number; out: string; err: string }> {
+  return adrIn(repository, ...args)
+}
+
+async function adrIn(
+  cwd: string,
+  ...args: string[]
+): Promise<{ code: number; out: string; err: string }> {
   let out = ''
   let err = ''
   const code = await run(args, {
     out: (text) => void (out += text),
     err: (text) => void (err += text),
-    cwd: repository
+    cwd
   })
   return { code, out, err }
 }
@@ -181,5 +197,105 @@ describe('adr lint (docs/cli.md)', () => {
     expect(code).toBe(0)
     expect(out).toMatch(/^Usage: adr lint \[path\] \[--format text\|json\|github\]/)
     expect((await adr('lint', '--help')).code).toBe(0)
+  })
+
+  it('takes options anywhere, and a path after --', async () => {
+    expect((await adr('--format', 'json', 'lint')).out).toBe(
+      '{"logs":["docs/adr"],"problems":[]}\n'
+    )
+    const root = repo({ '-dir/docs/adr/0001-a.md': adrText('status: accepted') })
+    expect((await adrIn(root, 'lint', '--', '-dir')).code).toBe(0)
+    // A value that looks like an option is still the value, and not understood.
+    const { code, err } = await adr('lint', '--format', '-h')
+    expect(code).toBe(2)
+    expect(err).toMatch(/--format takes/)
+  })
+
+  it('keeps each Problem on one line, whatever a value holds', async () => {
+    const root = repo({
+      'docs/adr/0001-a.md': adrText(
+        'status: "on hold\\n::error file=x.md,line=1::fake"',
+        'depends-on: ["0009-gone\\r\\nmore"]'
+      )
+    })
+    const { out } = await adr('lint', root)
+    const lines = out.trimEnd().split('\n')
+    expect(lines).toHaveLength(4)
+    expect(lines[0]).toBe(
+      'docs/adr/0001-a.md:2: invalid-metadata: status: "on hold\\n::error file=x.md,line=1::fake" is not one of proposed, accepted, rejected, deprecated, superseded'
+    )
+    expect(lines[1]).toContain('names 0009-gone\\r\\nmore, which')
+    expect(lines.some((line) => line.startsWith('::'))).toBe(false)
+    const configured = repo({ '.adr/config.yml': 'logs:\n  - path: "::error file=x::y"\n' })
+    expect((await adr('lint', configured)).out).toMatch(/^\.\/::error file=x::y: /)
+  })
+
+  it('names the files of --format github from the directory it runs in', async () => {
+    const root = repo({
+      'service/docs/adr/0001-a.md': adrText('status: accepted', 'depends-on: [0009-gone]')
+    })
+    const { out } = await adrIn(root, 'lint', 'service', '--format', 'github')
+    expect(out).toMatch(/^::error file=service\/docs\/adr\/0001-a\.md,line=3,/)
+  })
+
+  it('counts a Problem of the configuration apart from the Decision Logs', async () => {
+    const root = repo({
+      '.adr/config.yml': 'logs:\n  - path: docs/adr\n  - path: docs/gone\n',
+      'docs/adr/0001-a.md': adrText('status: accepted', 'depends-on: [0009-gone]')
+    })
+    const { out } = await adr('lint', root)
+    expect(out.trimEnd().split('\n').at(-1)).toBe(
+      '2 Problems in the configuration and 1 Decision Log.'
+    )
+  })
+
+  it('says on standard error that it cannot check Traces against a declaration it cannot read', async () => {
+    const root = repo({
+      '.arch/components.yml': 'components:\n  billing: [x]\n',
+      'docs/adr/0001-a.md': adrText('status: accepted', 'affects: [nothing-declared]')
+    })
+    const { code, err } = await adr('lint', root)
+    expect(code).toBe(0)
+    expect(err).toMatch(
+      /^adr lint: \.arch\/components\.yml cannot be read \(.*\), so the Traces in affects are not checked\.\n$/
+    )
+  })
+
+  it('reads nothing outside the repository, not through a symbolic link either', async () => {
+    const outside = repo({
+      'secret.md': adrText('status: TOP-SECRET-VALUE'),
+      'adr/0001-out.md': adrText('status: TOP-SECRET-VALUE')
+    })
+    const root = repo({ 'docs/adr/0001-a.md': adrText('status: accepted') })
+    symlinkSync(join(outside, 'secret.md'), join(root, 'docs/adr/0002-leak.md'))
+    mkdirSync(join(root, 'docs/adr/0003-dir.md'))
+    symlinkSync(join(root, 'docs/adr/0001-a.md'), join(root, 'docs/adr/0004-same.md'))
+    const { code, out, err } = await adr('lint', root)
+    expect(out).not.toContain('TOP-SECRET')
+    expect(err).toBe('')
+    // A link inside the repository is followed; the duplicate it makes is a Problem as any.
+    expect(code).toBe(0)
+
+    const linked = repo({ 'README.md': '# A\n' })
+    mkdirSync(join(linked, 'docs'))
+    symlinkSync(join(outside, 'adr'), join(linked, 'docs/adr'))
+    expect((await adr('lint', linked)).code).toBe(2)
+
+    const files = repositoryFiles(root)
+    expect(await files.readText('docs/adr/0002-leak.md')).toBeUndefined()
+    expect(await files.readText('docs/adr/0004-same.md')).toContain('accepted')
+    expect((await files.list('docs/adr'))?.map((entry) => `${entry.name} ${entry.kind}`)).toEqual(
+      expect.arrayContaining(['0001-a.md file', '0003-dir.md directory', '0004-same.md file'])
+    )
+    expect((await files.list('docs/adr'))?.some((entry) => entry.name === '0002-leak.md')).toBe(
+      false
+    )
+  })
+
+  it('reads the repository at the root of the file system as any other', async () => {
+    const files = repositoryFiles('/')
+    expect(await files.list('.')).toEqual(
+      expect.arrayContaining([{ name: 'tmp', kind: 'directory' }])
+    )
   })
 })

@@ -137,6 +137,11 @@ describe('the repair of a Problem', () => {
     expect(await premise('status: accepted')).toEqual([
       '0002-more does not name 0001-base in amends. If it should, cancel and add it to 0002-more by hand: the Back-reference is right then.'
     ])
+    // A Status that cannot be read, on an ADR that does not amend it: the Back-reference stays
+    // unfounded whatever that Status becomes, and is repaired on its own.
+    expect(await premise('status: acepted')).toEqual([
+      '0002-more does not name 0001-base in amends. If it should, cancel and add it to 0002-more by hand: the Back-reference is right then.'
+    ])
   })
 
   it('does not mark an ADR as superseded whose Status is not one that can be superseded', async () => {

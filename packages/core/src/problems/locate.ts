@@ -1,5 +1,7 @@
 import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import { isMap, isSeq, parseDocument, type Node, type YAMLMap } from 'yaml'
+import type { Adr } from '../adr/adr'
+import { parseAdrTools } from '../foreign/adr-tools'
 import type { DecisionLog } from '../log/load'
 import { scalarText } from '../metadata/scalar'
 import { viewSource } from '../text/source'
@@ -17,41 +19,78 @@ export interface ProblemPlace {
  * Where `problem`, reported on `log` — or on the repository as a whole, without one — is.
  * Reads the file it is about; a file that cannot be read any more has no line.
  */
-export async function locateProblem(
+export function locateProblem(
   fs: FileSystem,
   problem: Problem,
   log?: DecisionLog
 ): Promise<ProblemPlace> {
-  if (problem.kind === 'invalid-configuration' || problem.kind === 'missing-log-directory') {
-    return { path: problem.path }
-  }
-  const id = 'adr' in problem ? problem.adr : problem.adrs[0]!
-  const path = log?.adrs.find((adr) => adr.id === id)?.path ?? joinPath(log?.path ?? '', `${id}.md`)
-  // Two ADRs share a number by their file names; no line of either says it.
-  if (problem.kind === 'duplicate-number') return { path }
-  const text = await fs.readText(path)
-  return text === undefined ? { path } : { path, line: lineOf(problem, text) }
+  return problemLocator(fs)(problem, log)
 }
 
-/** The line of `text` that `problem` is about. */
-function lineOf(problem: Problem, text: string): number {
+/**
+ * `locateProblem` for many Problems at once: each file is read and taken apart once, however
+ * many Problems are reported on it. For one check of a repository — what it read is kept.
+ */
+export function problemLocator(
+  fs: FileSystem
+): (problem: Problem, log?: DecisionLog) => Promise<ProblemPlace> {
+  const files = new Map<string, Promise<FileLines | undefined>>()
+  return async (problem, log) => {
+    if (problem.kind === 'invalid-configuration' || problem.kind === 'missing-log-directory') {
+      return { path: problem.path }
+    }
+    const id = 'adr' in problem ? problem.adr : problem.adrs[0]!
+    const adr = log?.adrs.find((one) => one.id === id)
+    const path = adr?.path ?? joinPath(log?.path ?? '', `${id}.md`)
+    // Two ADRs share a number by their file names; no line of either says it.
+    if (problem.kind === 'duplicate-number') return { path }
+    if (!files.has(path)) {
+      files.set(
+        path,
+        fs.readText(path).then((text) => (text === undefined ? undefined : fileLines(text, adr)))
+      )
+    }
+    const file = await files.get(path)!
+    return file === undefined ? { path } : { path, line: file.lineOf(problem) }
+  }
+}
+
+interface FileLines {
+  lineOf(problem: Problem): number
+}
+
+/**
+ * The lines of one file that Problems can be about. With a frontmatter, they are its keys and
+ * items, and the text below it is never searched: a word in the text says nothing. Without
+ * one — a file of a foreign format — they are the lines where that format writes its Status
+ * and its links to other ADRs.
+ */
+function fileLines(text: string, adr: Adr | undefined): FileLines {
   const view = viewSource(text)
-  const lineAt = (offset: number): number => text.slice(0, offset).split('\n').length
-  if (view.unterminatedFrontmatter || !view.frontmatter) {
-    // A file of a foreign format keeps its Metadata in its text: what the Problem names is
-    // looked for there.
-    return view.unterminatedFrontmatter ? 1 : (lineInText(problem, text) ?? 1)
+  const starts = [0]
+  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) starts.push(at + 1)
+  const lineAt = (offset: number): number => {
+    let low = 0
+    let high = starts.length - 1
+    while (low < high) {
+      const middle = (low + high + 1) >> 1
+      if (starts[middle]! <= offset) low = middle
+      else high = middle - 1
+    }
+    return low + 1
   }
 
-  const start = view.frontmatter.start
-  const doc = parseDocument(text.slice(start, view.frontmatter.end))
-  if (problem.kind === 'invalid-frontmatter') {
-    const error = doc.errors[0]
-    return lineAt(start + (error?.pos[0] ?? 0))
-  }
-  const map = isMap(doc.contents) ? doc.contents : undefined
+  const lineText = (line: number): string =>
+    text.slice(starts[line - 1], starts[line] ?? text.length)
+
+  // An unterminated frontmatter is about its opening line.
+  if (view.unterminatedFrontmatter) return { lineOf: () => 1 }
+
+  const front = view.frontmatter
+  const doc = front && parseDocument(text.slice(front.start, front.end))
+  const map = doc && isMap(doc.contents) ? doc.contents : undefined
   const at = (node: Node | undefined): number | undefined =>
-    node?.range ? lineAt(start + node.range[0]) : undefined
+    front && node?.range ? lineAt(front.start + node.range[0]) : undefined
   const key = (name: string): number | undefined => at(pairOf(map, name)?.key as Node)
   const item = (name: string, value: string): number | undefined => {
     const node = pairOf(map, name)?.value
@@ -59,34 +98,71 @@ function lineOf(problem: Problem, text: string): number {
     return scalarText(node) === value ? at(node as Node) : undefined
   }
 
-  switch (problem.kind) {
-    case 'invalid-metadata':
-      return key(problem.key) ?? 1
-    case 'status-not-lowercase':
-    case 'not-marked-superseded':
-    case 'superseded-without-successor':
-      return key('status') ?? lineInText(problem, text) ?? 1
-    case 'unknown-target':
-      return item(problem.key, problem.target) ?? key(problem.key) ?? textLine(text, problem.target)
-    case 'self-reference':
-      return item(problem.key, problem.adr) ?? key(problem.key) ?? 1
-    case 'unknown-component':
-      return item('affects', problem.component) ?? key('affects') ?? 1
-    case 'missing-back-reference':
-      return key(problem.key) ?? 1
-    case 'unfounded-back-reference':
-      return item(problem.key, problem.source) ?? key(problem.key) ?? 1
-    case 'supersedes-cycle': {
-      const others = problem.adrs.slice(1)
-      return (
-        others.map((other) => item('supersedes', other)).find((line) => line !== undefined) ??
-        key('supersedes') ??
-        lineInText(problem, text) ??
-        1
-      )
+  // Where the Status is written, and the links of a foreign format with it: the `status` key,
+  // the `* Status:` item of the list under the title (MADR 2), or the Status section (adr-tools).
+  const statusLines = ((): number[] => {
+    const own = key('status')
+    if (own !== undefined) return [own]
+    const listed = listedStatus(text, front ? lineAt(front.end) : 0)
+    if (listed !== undefined) return [listed]
+    if (front) return []
+    const section = parseAdrTools(view)?.section
+    if (!section) return []
+    const lines: number[] = []
+    // From the line after the heading to the last line of the section.
+    for (
+      let line = lineAt(section.start) + 1;
+      line <= lineAt(Math.max(section.end - 1, 0));
+      line++
+    ) {
+      if (lineText(line).trim() !== '') lines.push(line)
     }
-    default:
-      return 1
+    return lines
+  })()
+  const status = statusLines[0]
+  /** In a foreign format: the line of the Status that links to `id`, or the Status itself. */
+  const link = (id: string): number | undefined =>
+    adr?.foreign === undefined && front
+      ? undefined
+      : (statusLines.find((line) => lineText(line).includes(id)) ?? status)
+
+  return {
+    lineOf(problem) {
+      switch (problem.kind) {
+        case 'invalid-frontmatter': {
+          const error = doc?.errors[0]
+          return front ? lineAt(front.start + (error?.pos[0] ?? 0)) : 1
+        }
+        case 'invalid-metadata':
+          return key(problem.key) ?? (problem.key === 'status' ? status : undefined) ?? 1
+        case 'status-not-lowercase':
+        case 'not-marked-superseded':
+        case 'superseded-without-successor':
+          return status ?? 1
+        case 'unknown-target':
+          return item(problem.key, problem.target) ?? key(problem.key) ?? link(problem.target) ?? 1
+        case 'self-reference':
+          return item(problem.key, problem.adr) ?? key(problem.key) ?? link(problem.adr) ?? 1
+        case 'unknown-component':
+          return item('affects', problem.component) ?? key('affects') ?? 1
+        case 'missing-back-reference':
+          // Missing altogether: there is no line it could be on.
+          return key(problem.key) ?? 1
+        case 'unfounded-back-reference':
+          return item(problem.key, problem.source) ?? key(problem.key) ?? link(problem.source) ?? 1
+        case 'supersedes-cycle': {
+          const others = problem.adrs.slice(1)
+          return (
+            others.map((other) => item('supersedes', other)).find(Boolean) ??
+            key('supersedes') ??
+            others.map((other) => link(other)).find(Boolean) ??
+            1
+          )
+        }
+        default:
+          return 1
+      }
+    }
   }
 }
 
@@ -97,36 +173,14 @@ function pairOf(
   return map?.items.find((pair) => scalarText(pair.key) === name)
 }
 
-/** In a file without frontmatter: the line that names what the Problem is about. */
-function lineInText(problem: Problem, text: string): number | undefined {
-  switch (problem.kind) {
-    case 'unknown-target':
-      return textLine(text, problem.target)
-    case 'self-reference':
-      return textLine(text, problem.adr)
-    case 'unfounded-back-reference':
-    case 'missing-back-reference':
-      return 'source' in problem ? textLine(text, problem.source) : undefined
-    case 'supersedes-cycle':
-      return problem.adrs
-        .slice(1)
-        .map((other) => textLine(text, other))
-        .find((line) => line > 1)
-    case 'invalid-metadata':
-    case 'status-not-lowercase':
-    case 'not-marked-superseded':
-    case 'superseded-without-successor':
-      return textLine(text, /status/i)
-    default:
-      return undefined
-  }
-}
-
-/** The first line that holds `what`, or 1. */
-function textLine(text: string, what: string | RegExp): number {
+/** The line of `* Status: …` in the first list below the frontmatter, as MADR 2 writes it. */
+function listedStatus(text: string, after: number): number | undefined {
   const lines = text.split('\n')
-  const found = lines.findIndex((line) =>
-    typeof what === 'string' ? line.includes(what) : what.test(line)
-  )
-  return found === -1 ? 1 : found + 1
+  for (let index = after; index < lines.length; index++) {
+    const line = lines[index]!
+    if (/^\s*[*-]\s+Status\s*:/i.test(line)) return index + 1
+    // The list under the title ends at the first heading after it.
+    if (/^#{2,6}\s/.test(line)) return undefined
+  }
+  return undefined
 }

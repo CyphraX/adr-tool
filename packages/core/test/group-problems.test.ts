@@ -152,4 +152,58 @@ describe('Problems grouped by their root cause', () => {
       ['0003-newer', 1]
     ])
   })
+
+  it('keeps what a Status outside the five values would not change on its own', async () => {
+    // 0002-a does not supersede 0001-b: fixing its Status leaves the Back-reference unfounded.
+    const amends = await log({
+      '0001-b': adr('status: superseded', 'superseded-by: [0002-a]'),
+      '0002-a': adr('status: approved', 'amends: [0001-b]')
+    })
+    expect(
+      groupProblems(amends).map(({ problem, consequences }) => [problem.kind, consequences.length])
+    ).toEqual([
+      ['invalid-metadata', 0],
+      ['unfounded-back-reference', 0],
+      ['superseded-without-successor', 0]
+    ])
+    const nothing = await log({
+      '0001-b': adr('status: accepted', 'superseded-by: [0002-a]'),
+      '0002-a': adr('status: approved')
+    })
+    expect(
+      groupProblems(nothing).map(({ problem, consequences }) => [problem.kind, consequences.length])
+    ).toEqual([
+      ['invalid-metadata', 0],
+      ['unfounded-back-reference', 0]
+    ])
+  })
+
+  it('puts a superseded ADR under the Status of the one that does supersede it', async () => {
+    // Without a Back-reference that names it: "approved" may well mean accepted.
+    const read = await log({
+      '0001-b': adr('status: superseded'),
+      '0002-a': adr('status: approved', 'supersedes: [0001-b]')
+    })
+    expect(
+      groupProblems(read).map(({ problem, consequences }) => [
+        problem.kind,
+        consequences.map((consequence) => consequence.kind)
+      ])
+    ).toEqual([['invalid-metadata', ['superseded-without-successor']]])
+  })
+
+  it('takes a Status that is read as one of the five values for no root cause', async () => {
+    // `[accepted]` is written in the wrong form, and read as the default: accepted.
+    const read = await log({
+      '0001-old': adr('status: [accepted]'),
+      '0002-new': adr('status: accepted', 'supersedes: [0001-old]')
+    })
+    expect(
+      groupProblems(read).map(({ problem, consequences }) => [problem.kind, consequences.length])
+    ).toEqual([
+      ['invalid-metadata', 0],
+      ['missing-back-reference', 0],
+      ['not-marked-superseded', 0]
+    ])
+  })
 })

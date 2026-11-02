@@ -6,7 +6,7 @@
   "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository, for CI",
   "type": "module",
   "bin": {
-    "adr": "./dist/adr.js"
+    "adr": "./dist/adr.mjs"
   },
   "scripts": {
     "build": "vite build",

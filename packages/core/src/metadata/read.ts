@@ -48,7 +48,13 @@ export function readMetadata(view: SourceView, adr: string): MetadataReading {
   const doc = parseDocument(view.text.slice(view.frontmatter.start, view.frontmatter.end))
   if (doc.errors.length > 0) {
     // The first line of the message ends in a colon: the library quotes the source after it.
-    const detail = doc.errors[0]!.message.split('\n')[0]!.replace(/:$/, '')
+    // It counts lines from the start of the frontmatter; the file's lines are counted here.
+    const before = view.text.slice(0, view.frontmatter.start).split('\n').length - 1
+    const detail = doc.errors[0]!.message.split('\n')[0]!
+      .replace(/:$/, '')
+      .replace(/ at line (\d+), column (\d+)$/, (_, line: string, column: string) => {
+        return ` at line ${Number(line) + before}, column ${column}`
+      })
     return unreadable({ kind: 'invalid-frontmatter', adr, detail })
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
