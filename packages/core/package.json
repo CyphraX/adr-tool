@@ -6,7 +6,8 @@
   "description": "The UI-free core of the Decisions module of Softarch Suite: no Electron, no DOM, no disk access of its own",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./export": "./src/export/index.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -19,6 +20,12 @@
   },
   "dependencies": {
     "@adr-tool/kernel": "workspace:*",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5",
     "yaml": "^2.9.1"
   }
 }

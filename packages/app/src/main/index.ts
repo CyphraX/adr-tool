@@ -1,6 +1,6 @@
 import { app, dialog, ipcMain, protocol, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
@@ -12,8 +12,9 @@ import {
 } from '../shared/ipc'
 import { analysisHost } from './analysis-host'
 import { ASSET_SCHEME, assetHandler } from './assets'
+import { exportPdf, writeExport } from './export'
 import { nodeFileSystem } from './node-file-system'
-import { Repositories } from './repositories'
+import { Repositories, localDate } from './repositories'
 import {
   createRequest,
   metadataEditRequest,
@@ -297,6 +298,50 @@ function registerIpc(): void {
     if (typeof changeId === 'string') repositories.discardChange(changeId)
   })
 
+  // An export goes where the person points in a dialog of the system, never where the
+  // renderer says; what it wrote is all the renderer may have opened.
+  const exported = new Set<string>()
+  ipcMain.handle(CHANNEL.exportSite, async (event, repositoryId: unknown) => {
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      title: t.export.siteTitle,
+      buttonLabel: t.export.siteButton,
+      properties: ['openDirectory' as const, 'createDirectory' as const]
+    }
+    const picked = await (window
+      ? dialog.showOpenDialog(window, options)
+      : dialog.showOpenDialog(options))
+    const out = picked.filePaths[0]
+    if (picked.canceled || out === undefined) return undefined
+    const result = await writeExport(root, out, localDate())
+    if (!result.ok) return result
+    exported.add(result.index)
+    return { ok: true, path: result.index, adrs: result.adrs }
+  })
+  ipcMain.handle(CHANNEL.exportPdf, async (event, repositoryId: unknown) => {
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      title: t.export.pdfTitle,
+      defaultPath: `${basename(root)} decisions.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    }
+    const picked = await (window
+      ? dialog.showSaveDialog(window, options)
+      : dialog.showSaveDialog(options))
+    if (picked.canceled || !picked.filePath) return undefined
+    const result = await exportPdf(root, picked.filePath, localDate(), printToPdf)
+    if (!result.ok) return result
+    exported.add(result.index)
+    return { ok: true, path: result.index, adrs: result.adrs }
+  })
+  ipcMain.handle(CHANNEL.openExported, async (_, path: unknown) => {
+    if (typeof path === 'string' && exported.has(path)) await shell.openPath(path)
+  })
+
   ipcMain.handle(CHANNEL.openExternal, async (_, url: unknown) => {
     if (typeof url === 'string' && isWebLink(url)) await shell.openExternal(url)
   })
@@ -316,6 +361,34 @@ function registerIpc(): void {
     BrowserWindow.fromWebContents(event.sender)?.close()
     if (resumeQuit) app.quit()
   })
+}
+
+/**
+ * A page of an export as a PDF, A4, one ADR per page: loaded in a window nobody sees, which
+ * runs no script and navigates nowhere — the page itself fetches nothing from elsewhere.
+ */
+async function printToPdf(url: string): Promise<Buffer> {
+  const window = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      javascript: false
+    }
+  })
+  try {
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    window.webContents.on('will-navigate', (event) => event.preventDefault())
+    await window.loadURL(url)
+    return await window.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true
+    })
+  } finally {
+    window.destroy()
+  }
 }
 
 function createWindow(): void {

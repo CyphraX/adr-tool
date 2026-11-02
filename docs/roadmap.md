@@ -41,7 +41,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 - ~~Relations across Decision Logs, written as `<log>/<ID>`; a bare ID keeps meaning "same log"~~ Built on 2026-11-02 ([file-format.md, section 3](file-format.md#3-metadata); [plan-roadmap.md](plan-roadmap.md), part 6).
 - Live editor: table rendering
 - UI translations. The app's own texts are in two modules of the renderer and one of the main process, ready to be replaced. `core` still answers in English sentences — why it refuses an operation, what a change warns about, what is wrong with a piece of Metadata, why a foreign file has no Migration — and so does the wording of Problems, which has moved to `core` for `adr lint` and has its codes already; the rest needs codes before the window can be translated whole
-- Read-only export for non-technical readers (static site or PDF)
+- ~~Read-only export for non-technical readers (static site or PDF)~~ Built on 2026-11-02 ([ADR-0014](adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md); [cli.md](cli.md); [plan-roadmap.md](plan-roadmap.md), part 10).
 - ADR → code links ("which ADRs affect this file?"): closed by the first Trace of Structure, part 7 — an ADR names the Components it affects in `affects`, and a Component lists its ADRs ([plan-structure.md](plan-structure.md)). From a file it is one step: its Component.
 - Aggregation across repositories, including Relations that cross repository boundaries
 - Timeline, Kanban by Status, dashboards

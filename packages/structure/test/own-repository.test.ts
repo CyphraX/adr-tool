@@ -147,9 +147,10 @@ it('finds the Dependency from app to core, and the Source File Dependencies behi
       'packages/app/src/renderer/src/components/RelationsGraph.svelte'
     ])
   )
-  expect(
-    behind.dependencies.every((dependency) => dependency.to === 'packages/core/src/index.ts')
-  ).toBe(true)
+  // Through the entries of the package only: its index, and the export (part 10).
+  expect(new Set(behind.dependencies.map((dependency) => dependency.to))).toEqual(
+    new Set(['packages/core/src/index.ts', 'packages/core/src/export/index.ts'])
+  )
 })
 
 // The done-when of part 5, as far as `structure` goes: the app shows these numbers.

@@ -2,7 +2,7 @@
 
 The contract of the suite's command line (`packages/cli`): what it reads, what it prints, and how it ends. It is written for CI first — a pipeline that should fail when a Decision Log breaks — and for anyone who wants the app's checks without the window. It is built on `core` and says what the app says ([plan-roadmap.md](plan-roadmap.md), part 4).
 
-The command reads and never writes. Repairs stay in the app, where each one is previewed.
+`adr lint` reads and never writes. Repairs stay in the app, where each one is previewed. `adr export` writes, and only into the directory it is given ([ADR-0014](adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
 
 ## Running it
 
@@ -12,6 +12,7 @@ The command is one file with nothing to install beside it: `pnpm build` writes i
 node packages/cli/dist/adr.mjs lint            # the repository in the current directory
 node packages/cli/dist/adr.mjs lint ../shop    # another one
 pnpm adr lint                                 # the same, from this repository
+node packages/cli/dist/adr.mjs export --out site   # the Decision Logs as pages, into ./site
 ```
 
 It is not published to npm yet; that comes with distribution (roadmap, "Before the first public release").
@@ -110,6 +111,41 @@ The code of a Problem is its kind in `core` (`packages/core/src/problems/problem
 | `missing-log-directory` | A configured Decision Log directory does not exist |
 
 A new kind of Problem gets a new code. A code is never given a different meaning, and is renamed only with a note in this document.
+
+## `adr export [path] --out <directory> [--log <directory>]...`
+
+Writes the Decision Logs of the repository at `path` — the current directory when it is left out — as HTML pages that open from disk, into `--out`. `--log` names a Decision Log by its directory, as `adr lint` finds it (`docs/adr`, or `.` for the root); it may be given more than once, and every Decision Log is exported when it is not given. The repository is found and read as `adr lint` reads it; nothing of it is changed.
+
+```sh
+node packages/cli/dist/adr.mjs export --out ../decisions-site
+node packages/cli/dist/adr.mjs export services/billing --out site --log docs/adr
+```
+
+### What it writes
+
+| File | What it is |
+| ---- | ---------- |
+| `index.html` | Every exported ADR, by Decision Log and by Status — proposed, accepted, rejected, deprecated, superseded — with its number, title and the date it was decided or created |
+| `<log>/<ADR>.html` | One page per ADR, at the path of its file with `.html` for `.md`: its Status, Metadata, Relations and Back-references as links, its Corrections, and its text. A link to the ADR before and after it in its Decision Log |
+| `print.html` | Every ADR on one page, each starting a printed page; its links lead within the page. It prints to PDF in any browser |
+| `style.css` | The style sheet of every page, light and dark as the system is, and for print |
+| the images | Each image an ADR shows that is a file of the repository, copied byte for byte to the same path |
+| `softarch-export.json` | The marker: which tool wrote the export, when, of which Decision Logs, and the files it wrote |
+
+The pages run no script and fetch nothing: the text of an ADR is rendered as in the app, without HTML that could run, and each page allows only its own style sheet and images. A link in an ADR to another exported ADR leads to its page, a heading included; a web link stays a web link; a link to any other file of the repository becomes its text, with the path as its title. An image from the web becomes a link to it. An image that is no file of the repository — missing, outside it, or reached through a symbolic link that leads out — or that is larger than 20 MiB is left out, and standard error says so.
+
+`--out` is written into only when it is not there yet, is empty, or holds an earlier export, known by its marker. An export over an earlier one writes every file again and removes the files the earlier export wrote and this one does not — the page of an ADR that is gone; a file that someone put there stays. Any other directory is refused, and nothing is written.
+
+The last line says what was written: `Exported 13 ADRs of 1 Decision Log to /home/me/site. Open /home/me/site/index.html.`
+
+A PDF comes from the app (**Export → PDF…**), which prints `print.html` with its own browser engine; the command line brings none along.
+
+### How it ends
+
+| Exit code | When |
+| --------- | ---- |
+| 0 | The export was written |
+| 2 | Nothing was written: `path` is no directory, no Decision Log was found there, `--log` names none of them, `--out` is missing or holds something other than an export, or the command line is not understood. What went wrong is printed to standard error |
 
 ## In CI
 

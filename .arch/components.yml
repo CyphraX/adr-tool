@@ -17,6 +17,8 @@ components:
     components:
       adr:
         paths: [packages/core/src/adr/**]
+      export:
+        paths: [packages/core/src/export/**]
       foreign:
         paths: [packages/core/src/foreign/**]
       lifecycle:

@@ -484,7 +484,7 @@ export class Repositories {
 }
 
 /** Today's date as the user sees it on their calendar, not in UTC. */
-function localDate(now = new Date()): string {
+export function localDate(now = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }

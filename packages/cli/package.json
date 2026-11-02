@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository, for CI",
+  "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository, for CI; `adr export` writes them as HTML pages",
   "type": "module",
   "bin": {
     "adr": "./dist/adr.mjs"

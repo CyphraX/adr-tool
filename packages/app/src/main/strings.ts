@@ -42,6 +42,16 @@ export const t = {
     stillAnnounced: (files: string): string =>
       `git could not take ${files} out of the index again, where the app had announced them for the commit. \`git rm --cached\` with their paths does that; the files on disk stay as they are.`
   },
+  export: {
+    siteTitle: 'Export as web pages',
+    siteButton: 'Export here',
+    pdfTitle: 'Export as PDF',
+    noLog: 'This repository has no Decision Log to export.',
+    notDirectory: (path: string): string => `${path} is not a folder.`,
+    notEmpty: (path: string): string =>
+      `${path} is not empty, and no export was written there. Choose an empty folder, or one an earlier export wrote.`,
+    outside: (path: string): string => `${path} lies outside the folder of the export.`
+  },
   branches: {
     numberTaken: (number: number, branches: readonly string[], id: string): string =>
       `On the ${branches.length === 1 ? 'branch' : 'branches'} ${list(branches)}, ${id} has the number ${number} too. Whichever of the two is merged second has to be renumbered.`
