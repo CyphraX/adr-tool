@@ -15,6 +15,7 @@
     relationLabel,
     repairLabel
   } from '../lib/wording'
+  import { baseOf } from '../lib/markdown'
   import BodyEditor from './BodyEditor.svelte'
   import MarkdownDocument from './MarkdownDocument.svelte'
   import StatusMark from './StatusMark.svelte'
@@ -43,6 +44,7 @@
   // What git says: absent without git, and then there is no history to offer either.
   const git = $derived(app.active?.repository.git)
   const uncommitted = $derived(git?.changed.includes(adr.path) ?? false)
+  const base = $derived(app.active && baseOf(app.active.repository.id, adr.path))
 
   // Both directions: what this ADR says about others, and what others say about it.
   const relations = $derived.by((): Line[] => {
@@ -233,7 +235,7 @@
     <BodyEditor {adr} />
   {:else}
     <div class="reading">
-      <MarkdownDocument markdown={adr.body} />
+      <MarkdownDocument markdown={adr.body} {base} />
     </div>
   {/if}
 </article>

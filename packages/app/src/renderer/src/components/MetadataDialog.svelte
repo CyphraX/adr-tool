@@ -76,115 +76,118 @@
       <span class="of">{adr.title ?? adr.id}</span>
     </h1>
 
-    <div class="field">
-      <h2>{t.metadata.decisionMakers}</h2>
-      <ChipInput
-        bind:items={editing.decisionMakers}
-        suggestions={knownDecisionMakers}
-        label={t.metadata.decisionMakers}
-        placeholder={t.metadata.decisionMakersPlaceholder}
-      />
-    </div>
-
-    <div class="field">
-      <h2>{t.metadata.tags}</h2>
-      <ChipInput
-        bind:items={editing.tags}
-        suggestions={knownTags}
-        label={t.metadata.tags}
-        placeholder={t.metadata.tagsPlaceholder}
-      />
-    </div>
-
-    {#each types as type (type)}
-      {@const chosen = editing.relations[type]}
+    <!-- The lists scroll here, between the title and the buttons, when there are many. -->
+    <div class="fields">
       <div class="field">
-        <h2>{RELATION_TYPE_LABEL[type]} <span class="about">{t.metadata.about[type]}</span></h2>
-        {#if chosen.length > 0}
-          <ul aria-label={RELATION_TYPE_LABEL[type]}>
-            {#each chosen as id (id)}
-              {@const other = adrs.find((candidate) => candidate.id === id)}
-              <li class:missing={!other}>
-                {#if other}
-                  <StatusMark status={statusKey(other)} />
-                  <span class="prefix">{prefixOf(other)}</span>
-                  <span class="title">{other.title ?? other.id}</span>
+        <h2>{t.metadata.decisionMakers}</h2>
+        <ChipInput
+          bind:items={editing.decisionMakers}
+          suggestions={knownDecisionMakers}
+          label={t.metadata.decisionMakers}
+          placeholder={t.metadata.decisionMakersPlaceholder}
+        />
+      </div>
+
+      <div class="field">
+        <h2>{t.metadata.tags}</h2>
+        <ChipInput
+          bind:items={editing.tags}
+          suggestions={knownTags}
+          label={t.metadata.tags}
+          placeholder={t.metadata.tagsPlaceholder}
+        />
+      </div>
+
+      {#each types as type (type)}
+        {@const chosen = editing.relations[type]}
+        <div class="field">
+          <h2>{RELATION_TYPE_LABEL[type]} <span class="about">{t.metadata.about[type]}</span></h2>
+          {#if chosen.length > 0}
+            <ul aria-label={RELATION_TYPE_LABEL[type]}>
+              {#each chosen as id (id)}
+                {@const other = adrs.find((candidate) => candidate.id === id)}
+                <li class:missing={!other}>
+                  {#if other}
+                    <StatusMark status={statusKey(other)} />
+                    <span class="prefix">{prefixOf(other)}</span>
+                    <span class="title">{other.title ?? other.id}</span>
+                  {:else}
+                    <span class="title">{t.metadata.notInLog(id)}</span>
+                  {/if}
+                  <button
+                    aria-label={t.metadata.remove(id)}
+                    onclick={() => chosen.splice(chosen.indexOf(id), 1)}>×</button
+                  >
+                </li>
+              {/each}
+            </ul>
+          {/if}
+          <Picker
+            candidates={candidates(type, chosen)}
+            label={t.metadata.addTo(RELATION_TYPE_LABEL[type])}
+            placeholder={t.metadata.pickerPlaceholder}
+            noneLeft={t.metadata.noneLeft}
+            textOf={(other) => `${other.id} ${prefixOf(other)} ${other.title ?? ''}`}
+            newestFirst
+            onpick={(id) => chosen.push(id)}
+          >
+            {#snippet option(other)}
+              <StatusMark status={statusKey(other)} />
+              <span class="prefix">{prefixOf(other)}</span>
+              <span class="title">{other.title ?? other.id}</span>
+            {/snippet}
+          </Picker>
+        </div>
+      {/each}
+
+      <div class="field">
+        <h2>{t.metadata.components} <span class="about">{t.metadata.componentsAbout}</span></h2>
+        {#if editing.affects.length > 0}
+          <ul aria-label={t.metadata.components}>
+            {#each editing.affects as id (id)}
+              {@const component = declared?.find((candidate) => candidate.id === id)}
+              <li class:missing={!component}>
+                {#if component}
+                  <span class="title">{component.name}</span>
+                  {#if component.name !== component.id}<code>{component.id}</code>{/if}
                 {:else}
-                  <span class="title">{t.metadata.notInLog(id)}</span>
+                  <span class="title">{t.metadata.notDeclared(id)}</span>
                 {/if}
                 <button
                   aria-label={t.metadata.remove(id)}
-                  onclick={() => chosen.splice(chosen.indexOf(id), 1)}>×</button
+                  onclick={() => editing.affects.splice(editing.affects.indexOf(id), 1)}>×</button
                 >
               </li>
             {/each}
           </ul>
         {/if}
-        <Picker
-          candidates={candidates(type, chosen)}
-          label={t.metadata.addTo(RELATION_TYPE_LABEL[type])}
-          placeholder={t.metadata.pickerPlaceholder}
-          noneLeft={t.metadata.noneLeft}
-          textOf={(other) => `${other.id} ${prefixOf(other)} ${other.title ?? ''}`}
-          newestFirst
-          onpick={(id) => chosen.push(id)}
-        >
-          {#snippet option(other)}
-            <StatusMark status={statusKey(other)} />
-            <span class="prefix">{prefixOf(other)}</span>
-            <span class="title">{other.title ?? other.id}</span>
-          {/snippet}
-        </Picker>
-      </div>
-    {/each}
-
-    <div class="field">
-      <h2>{t.metadata.components} <span class="about">{t.metadata.componentsAbout}</span></h2>
-      {#if editing.affects.length > 0}
-        <ul aria-label={t.metadata.components}>
-          {#each editing.affects as id (id)}
-            {@const component = declared?.find((candidate) => candidate.id === id)}
-            <li class:missing={!component}>
-              {#if component}
-                <span class="title">{component.name}</span>
-                {#if component.name !== component.id}<code>{component.id}</code>{/if}
-              {:else}
-                <span class="title">{t.metadata.notDeclared(id)}</span>
-              {/if}
-              <button
-                aria-label={t.metadata.remove(id)}
-                onclick={() => editing.affects.splice(editing.affects.indexOf(id), 1)}>×</button
+        {#if declared}
+          <Picker
+            candidates={componentsLeft}
+            label={t.metadata.addTo(t.metadata.components)}
+            placeholder={t.metadata.componentPlaceholder}
+            noneLeft={t.metadata.noComponentLeft}
+            textOf={(component) => `${component.id} ${component.name}`}
+            onpick={(id) => editing.affects.push(id)}
+          >
+            {#snippet option(component)}
+              <span class="title" style:padding-left="{depthOf(component) * 14}px"
+                >{component.name}</span
               >
-            </li>
-          {/each}
-        </ul>
-      {/if}
-      {#if declared}
-        <Picker
-          candidates={componentsLeft}
-          label={t.metadata.addTo(t.metadata.components)}
-          placeholder={t.metadata.componentPlaceholder}
-          noneLeft={t.metadata.noComponentLeft}
-          textOf={(component) => `${component.id} ${component.name}`}
-          onpick={(id) => editing.affects.push(id)}
-        >
-          {#snippet option(component)}
-            <span class="title" style:padding-left="{depthOf(component) * 14}px"
-              >{component.name}</span
-            >
-            {#if component.name !== component.id}<code>{component.id}</code>{/if}
-          {/snippet}
-        </Picker>
+              {#if component.name !== component.id}<code>{component.id}</code>{/if}
+            {/snippet}
+          </Picker>
+        {:else}
+          <p class="hint inline">{t.metadata.noDeclaration}</p>
+        {/if}
+      </div>
+
+      {#if !proposed}
+        <p class="hint">{t.metadata.hintDecided}</p>
       {:else}
-        <p class="hint inline">{t.metadata.noDeclaration}</p>
+        <p class="hint">{t.metadata.hintProposed}</p>
       {/if}
     </div>
-
-    {#if !proposed}
-      <p class="hint">{t.metadata.hintDecided}</p>
-    {:else}
-      <p class="hint">{t.metadata.hintProposed}</p>
-    {/if}
 
     <footer>
       <button onclick={() => app.cancelEditingMetadata()}>{t.cancel}</button>
@@ -198,9 +201,10 @@
 <style>
   dialog {
     width: min(560px, calc(100vw - 80px));
+    max-height: calc(100vh - 40px);
     margin: auto;
-    padding: 22px 24px 18px;
-    /* The matches of a picker may hang out of the dialog. */
+    padding: 22px 0 18px;
+    /* The matches of a picker are placed in the window and hang out over the edge. */
     overflow: visible;
     border: 1px solid var(--line-strong);
     border-radius: 8px;
@@ -208,6 +212,24 @@
     color: var(--ink);
     box-shadow: 0 18px 60px rgb(0 0 0 / 0.28);
     user-select: text;
+  }
+
+  dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1,
+  footer {
+    flex: none;
+    padding: 0 24px;
+  }
+
+  .fields {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 24px 2px;
   }
 
   dialog::backdrop {

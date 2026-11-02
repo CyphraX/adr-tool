@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { renderMarkdown } from '../lib/markdown'
+  import { renderMarkdown, type DocumentBase } from '../lib/markdown'
   import { app } from '../lib/state.svelte'
 
   // The ADR itself, set as a document: the same in the reading view and in the editor's preview.
-  let { markdown }: { markdown: string } = $props()
-  const html = $derived(renderMarkdown(markdown))
+  // With a base, the images it names next to it in its repository are shown.
+  let { markdown, base }: { markdown: string; base?: DocumentBase | undefined } = $props()
+  const html = $derived(renderMarkdown(markdown, base))
 
   // Nothing navigates inside the app. A link to another ADR of this log selects it;
   // a web link opens in the system browser; everything else does nothing.

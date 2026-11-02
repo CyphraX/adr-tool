@@ -86,6 +86,7 @@ Rules:
 - The body is the author's. The tool changes it in exactly one situation: Migration of a foreign ADR may remove a `## Status` section whose content was captured completely in the Metadata, and shows the diff first (section 8, "Migration").
 - The **title** is the text of the first level-one ATX heading (`# …`) in the body that is not inside a code block. An ADR without one is shown under its ID. A leading number that repeats the ADR's own (`# 3. Title` in `0003-….md`, as adr-tools writes it) is not part of the title; the heading itself stays as it is. The price: a title that really begins with the ADR's own number and a dot — "3. Normalform reicht aus" in `0003-….md` — is shown without it. That takes a coincidence, nothing is written, and the text below the header still shows the heading in full.
 - A new ADR gets its body from a Template (section 7).
+- An **image** the body names is shown from the repository: a relative path is read relative to the ADR's file, a path with a leading slash relative to the root of the repository, as on GitHub. Only images are shown — by their extension: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.apng`, `.svg`, `.bmp`, `.ico` — and only from below the root of the repository; a path that leads out of it, with `..` or through a symbolic link, shows nothing. Images from the web or another host (`https://…`, `//host/…`) are not loaded: the app makes no request the person did not ask for.
 
 ## 5. What each operation writes
 

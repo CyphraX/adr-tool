@@ -3,6 +3,7 @@
   import type { EditorView } from '@codemirror/view'
   import { recordsCorrection, type Adr } from '@adr-tool/core'
   import { createBodyEditor, replaceText } from '../lib/editor'
+  import { baseOf } from '../lib/markdown'
   import { app, type EditorMode } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import MarkdownDocument from './MarkdownDocument.svelte'
@@ -13,6 +14,7 @@
   let view: EditorView | undefined
   const editing = $derived(app.editing)
   const correction = $derived(recordsCorrection(adr))
+  const base = $derived(app.active && baseOf(app.active.repository.id, adr.path))
 
   const MODES: [EditorMode, string][] = [
     ['source', t.editor.source],
@@ -84,7 +86,7 @@
       <div class="source" bind:this={host}></div>
       {#if editing.mode === 'split'}
         <div class="preview">
-          <MarkdownDocument markdown={editing.text} />
+          <MarkdownDocument markdown={editing.text} {base} />
         </div>
       {/if}
     </div>

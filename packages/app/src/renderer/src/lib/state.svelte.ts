@@ -255,6 +255,14 @@ class AppState {
       )
   )
 
+  /** Whether a dialog holds what was entered and not yet carried out: picks, a typed title. */
+  readonly dialogDirty = $derived(
+    this.metadataDirty || (this.creating !== undefined && this.creating.title.trim() !== '')
+  )
+
+  /** Whether closing the window now would lose anything that was typed or picked. */
+  readonly holdsUnsaved = $derived(this.dirty || this.dialogDirty)
+
   async start(): Promise<void> {
     window.api.onRepositoryChanged((repository) => this.replace(repository))
     window.api.onStructureChanged((repositoryId) => {
@@ -386,16 +394,18 @@ class AppState {
     const texts = t.review.rename
     const to = (id.includes('/') ? id.slice(0, id.lastIndexOf('/') + 1) : '') + segment
     const plan = await window.api.planRename(tab.repository.id, id, segment)
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title: texts.title(id, to),
-          action: texts.action,
-          change: plan.change,
-          applying: false,
-          renames: { from: id, to }
-        }
-      : { kind: 'refused', title: texts.refused(id), reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: texts.title(id, to),
+            action: texts.action,
+            change: plan.change,
+            applying: false,
+            renames: { from: id, to }
+          }
+        : { kind: 'refused', title: texts.refused(id), reason: plan.reason }
+    )
   }
 
   /** A Component was renamed: what the Structure view shows of it, and below it, goes with it. */
@@ -482,15 +492,17 @@ class AppState {
     if (!tab) return
     const texts = t.review.adopt
     const plan = await window.api.planAdopt(tab.repository.id)
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title: texts.title,
-          action: texts.action,
-          change: plan.change,
-          applying: false
-        }
-      : { kind: 'refused', title: texts.refused, reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: texts.title,
+            action: texts.action,
+            change: plan.change,
+            applying: false
+          }
+        : { kind: 'refused', title: texts.refused, reason: plan.reason }
+    )
   }
 
   /** Plan the Repair of a Problem of the declaration. Nothing is written yet. */
@@ -499,15 +511,17 @@ class AppState {
     if (!tab || problem.kind !== 'dead-pattern') return
     const texts = t.review.structureRepair
     const plan = await window.api.planStructureRepair(tab.repository.id, problem)
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title: texts.title(problem.component),
-          action: texts.action,
-          change: plan.change,
-          applying: false
-        }
-      : { kind: 'refused', title: texts.refused(problem.component), reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: texts.title(problem.component),
+            action: texts.action,
+            change: plan.change,
+            applying: false
+          }
+        : { kind: 'refused', title: texts.refused(problem.component), reason: plan.reason }
+    )
   }
 
   /** Filtering is about ADRs: it leads back to their list. */
@@ -575,9 +589,11 @@ class AppState {
     const texts = t.review.decision[decision]
     const title = texts.title(prefixOf(adr))
     const plan = await window.api.planDecision(tab.repository.id, log.path, adr.id, decision)
-    this.review = plan.ok
-      ? { kind: 'change', title, action: texts.action, change: plan.change, applying: false }
-      : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+    this.present(
+      plan.ok
+        ? { kind: 'change', title, action: texts.action, change: plan.change, applying: false }
+        : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+    )
   }
 
   /**
@@ -637,16 +653,18 @@ class AppState {
       logPath: log.path,
       repair
     })
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title: texts.title(prefixOf(adr)),
-          action: texts.action,
-          change: plan.change,
-          applying: false,
-          caution: texts.caution
-        }
-      : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: texts.title(prefixOf(adr)),
+            action: texts.action,
+            change: plan.change,
+            applying: false,
+            caution: texts.caution
+          }
+        : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+    )
   }
 
   /** Plan the Migration of the selected ADR, or of every foreign ADR of the Decision Log in view. */
@@ -664,16 +682,18 @@ class AppState {
       logPath: log.path,
       ...(scope === 'adr' && { adrId: adr!.id })
     })
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title,
-          action: texts.action,
-          change: plan.change,
-          applying: false,
-          caution: texts.caution
-        }
-      : { kind: 'refused', title: refused, reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title,
+            action: texts.action,
+            change: plan.change,
+            applying: false,
+            caution: texts.caution
+          }
+        : { kind: 'refused', title: refused, reason: plan.reason }
+    )
   }
 
   /** Open the dialog for a new ADR; with a Relation, one that supersedes or amends the selected ADR. */
@@ -709,16 +729,19 @@ class AppState {
       // A reactive proxy cannot cross the process boundary; send a plain copy.
       ...(creating.relation && { relation: $state.snapshot(creating.relation) })
     })
+    if (this.held(plan)) return
     this.creating = undefined
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title: t.review.create.title,
-          action: t.review.create.action,
-          change: plan.change,
-          applying: false
-        }
-      : { kind: 'refused', title: t.review.create.refused, reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: t.review.create.title,
+            action: t.review.create.action,
+            change: plan.change,
+            applying: false
+          }
+        : { kind: 'refused', title: t.review.create.refused, reason: plan.reason }
+    )
   }
 
   /** Open the dialog for the Metadata lists of the selected ADR. */
@@ -763,16 +786,18 @@ class AppState {
       relations,
       affects
     })
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title: t.review.metadata.title(prefixOf(adr)),
-          action: t.save,
-          change: plan.change,
-          applying: false,
-          saves: true
-        }
-      : { kind: 'refused', title: t.review.metadata.refused(prefixOf(adr)), reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: t.review.metadata.title(prefixOf(adr)),
+            action: t.save,
+            change: plan.change,
+            applying: false,
+            saves: true
+          }
+        : { kind: 'refused', title: t.review.metadata.refused(prefixOf(adr)), reason: plan.reason }
+    )
   }
 
   /** Start editing the body of the selected ADR. */
@@ -805,17 +830,19 @@ class AppState {
       body: editing.text,
       note: editing.note
     })
-    this.review = plan.ok
-      ? {
-          kind: 'change',
-          title: t.review.body.title(prefixOf(adr)),
-          action: t.save,
-          change: plan.change,
-          applying: false,
-          saves: true,
-          caution: t.review.body.caution
-        }
-      : { kind: 'refused', title: t.review.body.refused(prefixOf(adr)), reason: plan.reason }
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: t.review.body.title(prefixOf(adr)),
+            action: t.save,
+            change: plan.change,
+            applying: false,
+            saves: true,
+            caution: t.review.body.caution
+          }
+        : { kind: 'refused', title: t.review.body.refused(prefixOf(adr)), reason: plan.reason }
+    )
   }
 
   /** Leave the editor without saving; asks first when there is text to lose. */
@@ -870,6 +897,25 @@ class AppState {
     }
   }
 
+  /**
+   * Whether a question was asked while a plan was made — the window is to close — so that what
+   * the plan came back with gives way: the question stays, and a planned change is dropped.
+   */
+  private held(plan: { ok: true; change: { changeId: string } } | { ok: false }): boolean {
+    if (this.review?.kind !== 'confirm') return false
+    if (plan.ok) void window.api.discardChange(plan.change.changeId)
+    return true
+  }
+
+  /** Show what a plan came back with, unless a question was asked meanwhile. */
+  private present(review: Review): void {
+    if (this.review?.kind === 'confirm') {
+      if (review.kind === 'change') void window.api.discardChange(review.change.changeId)
+      return
+    }
+    this.review = review
+  }
+
   confirmReview(): void {
     const review = this.review
     if (review?.kind !== 'confirm') return
@@ -893,10 +939,29 @@ class AppState {
     // question, asked before, a "no" to it would tell the main process that no quit waits.
     if (this.review?.kind === 'confirm') this.review = undefined
     else this.dismissReview()
-    this.leaveEditor(
-      () => void window.api.answerCloseRequest(true),
-      () => void window.api.answerCloseRequest(false)
-    )
+    const answer = (close: boolean) => (): void => void window.api.answerCloseRequest(close)
+    this.leaveDialogs(() => this.leaveEditor(answer(true), answer(false)), answer(false))
+  }
+
+  /**
+   * Close the dialogs for a new ADR and for Metadata. With something entered in one of them,
+   * the author is asked first, as for unsaved text in the editor.
+   */
+  private leaveDialogs(then: () => void, declined: () => void): void {
+    const proceed = (): void => {
+      this.creating = undefined
+      this.editingMetadata = undefined
+      then()
+    }
+    if (!this.dialogDirty) return proceed()
+    this.review = {
+      kind: 'confirm',
+      title: t.review.discardDialog.title,
+      reason: t.review.discardDialog.reason,
+      action: t.review.discardDialog.action,
+      proceed,
+      declined
+    }
   }
 
   /** Do something that takes the editor away. With unsaved text the author is asked first. */
