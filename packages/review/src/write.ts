@@ -13,6 +13,7 @@ import { linesText, readAnnotation, type Anchor, type AnnotationType } from './a
 import type { Found } from './find'
 import {
   addToList,
+  asText,
   formatScalar,
   frontmatterIn,
   insertKey,
@@ -25,7 +26,7 @@ import { annotationsDirectory } from './read'
 import { refuse, type ReviewSaid } from './sentences'
 import { slugOf } from './slug'
 import { citedAdr, type AdrReference } from './traces'
-import { eolOf, quoteBlock, sourceLines, viewFile, type Eol, type FileView } from './text'
+import { eolOf, lineAt, quoteBlock, sourceLines, viewFile, type Eol, type FileView } from './text'
 
 /** Run the planning of an operation; a Refusal becomes the reason why it cannot be done. */
 async function planning<Outcome extends object>(
@@ -274,20 +275,21 @@ function anchorEdits(view: FileView, path: string, anchor: Anchor): TextEdit[] {
   } else {
     if (!fm.anchor()) refuse({ code: 'key-by-hand', values: { path, key: 'anchor' } })
     edits.push(...setValue(fm, 'path', anchor.path, 'anchor'))
-    edits.push(...setValue(fm, 'lines', linesText(anchor), 'anchor'))
-    if (anchor.commit) edits.push(...setValue(fm, 'commit', anchor.commit, 'anchor'))
+    edits.push(...setValue(fm, 'lines', linesText(anchor), 'anchor', asText))
+    if (anchor.commit) edits.push(...setValue(fm, 'commit', anchor.commit, 'anchor', asText))
     else edits.push(...removeKey(fm, 'commit', 'anchor'))
   }
 
   const block = quoteBlock(text, view.bodyStart)
   if (!block) {
-    // No quoted lines to replace: the block comes first in the body.
+    // No quoted lines to replace: the block comes first in the body, after a blank line and
+    // before one, as a new Annotation has it.
     const rest = text.slice(view.bodyStart)
-    const lead = rest.startsWith('\n') || rest.startsWith('\r\n') || rest === '' ? eol : ''
+    const blank = rest === '' || lineAt(text, view.bodyStart).content.trim() === ''
     edits.push({
       start: view.bodyStart,
       end: view.bodyStart,
-      insert: lead + quoteLines(anchor, eol) + (rest === '' ? '' : eol)
+      insert: eol + quoteLines(anchor, eol) + (blank ? '' : eol)
     })
     return edits
   }

@@ -64,12 +64,14 @@ function pairEnd(fm: Frontmatter, pair: AnyPair): number {
 /**
  * Replace the value of `key` where it stands — inside `anchor` when `within` is given — or
  * insert the key in the order of the format. An existing value keeps its quoting.
+ * `format` writes the value; `asText` for a value the suite reads by its text.
  */
 export function setValue(
   fm: Frontmatter,
   key: string,
   value: string,
-  within?: 'anchor'
+  within?: 'anchor',
+  format: (value: string, like?: Scalar['type']) => string = formatScalar
 ): TextEdit[] {
   const map = within ? fm.anchor() : undefined
   if (within && !map) refuse({ code: 'key-by-hand', values: { path: fm.path, key: within } })
@@ -78,22 +80,22 @@ export function setValue(
   if (pair) {
     const node = pair.value as Scalar | null
     if (node === null || !isScalar(node) || !node.range) {
-      if (node === null) return [fillEmpty(fm, pair, formatScalar(value))]
+      if (node === null) return [fillEmpty(fm, pair, format(value))]
       refuse({ code: 'key-by-hand', values: { path: fm.path, key: shownKey } })
     }
     if (node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED') {
       refuse({ code: 'key-by-hand', values: { path: fm.path, key: shownKey } })
     }
-    if (node.value === null) return [fillEmpty(fm, pair, formatScalar(value))]
+    if (node.value === null) return [fillEmpty(fm, pair, format(value))]
     return [
       {
         start: fm.abs(node.range[0]),
         end: fm.abs(node.range[1]),
-        insert: formatScalar(value, node.type)
+        insert: format(value, node.type)
       }
     ]
   }
-  return [insertKey(fm, key, `${key}: ${formatScalar(value)}`, within)]
+  return [insertKey(fm, key, `${key}: ${format(value)}`, within)]
 }
 
 /** `key:` with nothing after it gets the value behind the colon; a spelled-out `null` is replaced. */
@@ -255,6 +257,13 @@ export function removeFromList(fm: Frontmatter, key: string, item: string): Text
 
 /** Other tools that read the frontmatter, Jekyll for one, still take these words for booleans. */
 const YAML_1_1_BOOLEAN = /^(y|n|yes|no|on|off)$/i
+
+/**
+ * A value the suite reads by its text, as it is: `anchor.lines` and `anchor.commit`
+ * (docs/review-format.md, section 2). Its quoting is kept where it had one.
+ */
+export const asText = (value: string, like?: Scalar['type']): string =>
+  like === 'QUOTE_SINGLE' || like === 'QUOTE_DOUBLE' ? formatScalar(value, like) : value
 
 /**
  * A string as a YAML scalar: plain when that reads back as the same string, double-quoted
