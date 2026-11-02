@@ -165,7 +165,7 @@ export function readRules(text: string | undefined): RulesFile {
   if (doc.errors.length > 0) {
     const error = doc.errors[0]!
     return unreadable(
-      { code: 'not-yaml', values: { message: error.message.split('\n')[0]! } },
+      { code: 'not-yaml', values: { message: error.message.split('\n')[0]!.replace(/:$/, '') } },
       error.linePos?.[0].line ?? 1
     )
   }
@@ -180,7 +180,7 @@ export function readRules(text: string | undefined): RulesFile {
   }
   for (const key of ['rules', 'exceptions', 'patterns'] as const) {
     const node = valueOf(top, key)
-    if (node === undefined || isEmpty(node)) continue
+    if (node === undefined || node === null || isEmpty(node)) continue
     if (!isSeq(node)) {
       return unreadable({ code: 'key-not-list', values: { key } }, lineOf(keyNodeOf(top, key)))
     }

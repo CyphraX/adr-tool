@@ -127,7 +127,7 @@ export const SENTENCES = {
     bound: 'max' | 'min'
     limit: number
   }): string =>
-    `The ${v.metric} of ${v.component} is ${formatNumber(v.value)}, ${v.bound === 'max' ? 'above the maximum' : 'below the minimum'} of ${formatNumber(v.limit)}`,
+    `The metric ${v.metric} of ${v.component} is ${formatNumber(v.value)}, ${v.bound === 'max' ? 'above the maximum' : 'below the minimum'} of ${formatNumber(v.limit)}`,
   // A Violation at one of its imports: what Jonas reads on his pull request.
   'violation-at': (v: { violation: Said; file: string; line: number; imports: string }): string =>
     `${english(v.violation)}: ${v.file}:${v.line} imports ${v.imports}.`,
