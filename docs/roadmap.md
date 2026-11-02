@@ -21,7 +21,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 
 ## Before the first public release
 
-- Editor mode 3, the live editor, in its light form: headings, emphasis, links, lists and code are rendered inline; tables stay source
+- ~~Editor mode 3, the live editor, in its light form: headings, emphasis, links, lists and code are rendered inline; tables stay source.~~ Built on 2026-11-02 ([plan-roadmap.md](plan-roadmap.md), part 3)
 - ~~Licence and business model (open source or commercial).~~ Decided on 2026-11-02: MIT, and no business model in the code ([ADR-0010](adr/0010-the-suite-is-open-source-under-the-mit-licence.md)). The app stays local-only: no backend, no accounts, no telemetry
 - Distribution: installers for all three platforms, code signing, auto-update
 - Windows and macOS back into CI. They were switched off on 2026-11-02 to save runs; until then a Windows-only failure — a path, a CRLF fixture, a file held open — shows up only by hand

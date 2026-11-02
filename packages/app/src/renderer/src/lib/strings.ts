@@ -162,6 +162,7 @@ export const t = {
     layout: 'Editor layout',
     source: 'Source',
     split: 'Source and preview',
+    live: 'Live',
     correction: 'Correction',
     notePlaceholder: 'What did you correct? e.g. Spelling',
     discard: 'Discard',

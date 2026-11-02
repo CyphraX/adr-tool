@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import type { EditorView } from '@codemirror/view'
   import { recordsCorrection, type Adr } from '@adr-tool/core'
-  import { createBodyEditor, replaceText } from '../lib/editor'
+  import { createBodyEditor, replaceText, setLive } from '../lib/editor'
   import { baseOf } from '../lib/markdown'
   import { app, type EditorMode } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -18,7 +18,8 @@
 
   const MODES: [EditorMode, string][] = [
     ['source', t.editor.source],
-    ['split', t.editor.split]
+    ['split', t.editor.split],
+    ['live', t.editor.live]
   ]
 
   onMount(() => {
@@ -28,10 +29,16 @@
       onChange: (text) => {
         if (app.editing) app.editing.text = text
       },
-      onSave: () => void app.save()
+      onSave: () => void app.save(),
+      live: app.editing?.mode === 'live'
     })
     view.focus()
     return () => view?.destroy()
+  })
+
+  // The live mode decorates the same editor; switching keeps the text, the cursor and the history.
+  $effect(() => {
+    if (view && editing) setLive(view, editing.mode === 'live')
   })
 
   // The text can change from outside the editor: the version from disk was loaded.

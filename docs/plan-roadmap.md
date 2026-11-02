@@ -48,6 +48,8 @@ Editor mode 3 (roadmap, "Before the first public release"): headings, emphasis, 
 
 *Done when:* an ADR edited in the live mode saves the same bytes as the same keystrokes in the source mode, and a heading, a bold word, a link, a list and a code block read as rendered while the cursor is elsewhere.
 
+*Status (2026-11-02):* built. The editor's third mode is called Live. What it does to the text is one function, `liveMarks` (`packages/app/src/renderer/src/lib/live.ts`), read from the syntax tree of the editor: which marks it hides — of headings with their space, of emphasis, strikethrough, inline code, links with their target, quotes, the fences of a code block, a rule — where a bullet stands for a list mark, and how a line or a span looks (`packages/app/test/live.test.ts`). Every line a selection touches shows its source, and all of a fenced code block while one of its lines does; tables stay source. The editor only decorates: it keeps the same document, so a save writes what is in it. In the running app, on a copy of the showcase log, the same keystrokes typed into ADR 0008 in the live mode and in the source mode saved the same bytes; with the cursor elsewhere, the heading, a bold word, inline code, a link and the list read as rendered.
+
 ### Part 4 — `adr lint`
 
 The first follow-up after v1 (roadmap, "Next"): a command line for CI, built on `core`, in a package of its own (`packages/cli`). Its contract is a document of its own, `docs/cli.md`.
