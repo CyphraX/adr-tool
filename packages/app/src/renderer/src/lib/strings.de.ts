@@ -144,6 +144,8 @@ export const de: typeof en = {
     refused: {
       foreign:
         'Es ist in einem fremden Format geschrieben, das das Werkzeug liest und nie schreibt. Migrieren Sie es zuerst.',
+      unmigratable:
+        'Es ist in einem fremden Format geschrieben, das das Werkzeug liest und nie schreibt, und lässt sich so, wie es ist, nicht migrieren: sein Kopf sagt, warum. Ändern Sie seine Datei von Hand.',
       unreadable: 'Sein Frontmatter ist nicht lesbar. Beheben Sie das zuerst.',
       unknown: 'Sein Status ist keiner der fünf Werte. Korrigieren Sie zuerst den Status.',
       undecided: 'Ein vorgeschlagenes ADR wird zuerst angenommen oder abgelehnt.',

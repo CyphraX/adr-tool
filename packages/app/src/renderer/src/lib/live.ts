@@ -272,6 +272,9 @@ export function liveTables(state: EditorState): LiveTable[] {
   syntaxTree(state).iterate({
     enter: (ref) => {
       if (ref.name !== 'Table') return
+      // A table in a quote or a list keeps the marks of its lines, which the live mode draws
+      // as the quote or the list: it stays text, as the rest of the quote does.
+      if (ref.node.parent?.name !== 'Document') return false
       const from = doc.lineAt(ref.from).from
       // The parser may end a table after the line break of its last row.
       const end = doc.sliceString(ref.to - 1, ref.to) === '\n' ? ref.to - 1 : ref.to
@@ -282,4 +285,25 @@ export function liveTables(state: EditorState): LiveTable[] {
     }
   })
   return tables
+}
+
+/**
+ * Where the cursor goes when it moves a line down (`1`) or up (`-1`) into a table that is drawn
+ * as a table: the start of its first line, or of its last; `undefined` when the line it leaves
+ * is not next to one. Moving by lines would step over the table as over one line.
+ */
+export function stepIntoTable(
+  state: EditorState,
+  tables: readonly LiveTable[],
+  direction: 1 | -1
+): number | undefined {
+  const { main } = state.selection
+  if (!main.empty || state.selection.ranges.length > 1) return undefined
+  const line = state.doc.lineAt(main.head)
+  const table =
+    direction === 1
+      ? tables.find((one) => one.from === line.to + 1)
+      : tables.find((one) => one.to === line.from - 1)
+  if (!table) return undefined
+  return direction === 1 ? table.from : state.doc.lineAt(table.to).from
 }

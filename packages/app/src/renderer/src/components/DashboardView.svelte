@@ -11,7 +11,15 @@
   // and which Components the ADRs affect. Each figure leads to what it counts.
   let { log }: { log: DecisionLog } = $props()
 
-  const dashboard = $derived(dashboardOf(log.adrs, localToday()))
+  // Today, as long as the view is open: past midnight it is another day.
+  let today = $state(localToday())
+  $effect(() => {
+    const timer = setInterval(() => (today = localToday()), 60_000)
+    return () => clearInterval(timer)
+  })
+  const dashboard = $derived(dashboardOf(log.adrs, today))
+  // The median says something about several proposals that name the day they were written.
+  const dated = $derived(dashboard.waiting.filter((one) => one.days !== undefined).length)
   const problems = $derived(app.problemGroups.length)
   const declared = $derived(
     new Map((app.active?.repository.components ?? []).map((one) => [one.id, one.name]))
@@ -87,7 +95,7 @@
             </li>
           {/each}
         </ul>
-        {#if dashboard.medianWait !== undefined && dashboard.waiting.length > 1}
+        {#if dashboard.medianWait !== undefined && dated > 1}
           <p class="quiet">{t.dashboard.median(dashboard.medianWait)}</p>
         {/if}
       {/if}
