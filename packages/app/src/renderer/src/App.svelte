@@ -141,26 +141,30 @@
 
 {#snippet structureFrame(active: Active)}
   {@const structure = active.structure}
-  {#if structure.view}
-    <div class="panes structure" style:--sidebar="{sidebarWidth}px">
-      <StructureSidebar />
-      {#if structure.problems}
-        <RepositoryProblems />
-      {:else}
-        <StructureCenter view={structure.view} />
-      {/if}
+  <!-- The sidebar stands from the start: the Problems of the repository are reached from it
+       while the level is still being analysed, or could not be. -->
+  <div class="panes structure" style:--sidebar="{sidebarWidth}px">
+    <StructureSidebar />
+    {#if structure.problems}
+      <RepositoryProblems />
+    {:else if structure.view}
+      <StructureCenter view={structure.view} />
+    {:else if structure.error}
+      <main class="message">
+        <h1>{t.structure.failed}</h1>
+        <p>{structure.error}</p>
+      </main>
+    {:else}
+      <main class="message">
+        <p>{t.structure.analysing}</p>
+      </main>
+    {/if}
+    {#if structure.view}
       <StructureDetail view={structure.view} />
-    </div>
-  {:else if structure.error}
-    <main class="message">
-      <h1>{t.structure.failed}</h1>
-      <p>{structure.error}</p>
-    </main>
-  {:else}
-    <main class="message">
-      <p>{t.structure.analysing}</p>
-    </main>
-  {/if}
+    {:else}
+      <aside class="no-detail"></aside>
+    {/if}
+  </div>
 {/snippet}
 
 {#snippet decisionsFrame(active: Active)}
@@ -352,6 +356,11 @@
     padding: 0 32px;
     color: var(--ink-soft);
     line-height: 1.55;
+  }
+
+  .no-detail {
+    border-left: 1px solid var(--line);
+    background: var(--paper);
   }
 
   .message.on-paper {
