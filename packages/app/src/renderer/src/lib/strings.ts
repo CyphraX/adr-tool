@@ -144,6 +144,7 @@ export const t = {
     metadata: 'Metadata',
     migrate: 'Migrate',
     history: 'History',
+    commit: 'Commit',
     created: 'Created',
     decided: 'Decided',
     decisionMakers: 'Decision-makers',
@@ -181,6 +182,31 @@ export const t = {
     newFile: ' — new file',
     renamedOnly: 'The file is renamed. Its text does not change.',
     wasRenamedOnly: 'The file was renamed. Its text did not change.'
+  },
+
+  commit: {
+    title: (prefix: string): string => `Commit ADR ${prefix}`,
+    asking: 'Asking git what would be committed …',
+    summary: (files: number, others: number): string =>
+      `This commits ${many(files, 'one file as it is', `${files} files as they are`)} on disk, and nothing else.${
+        others === 0
+          ? ''
+          : ` ${many(others, 'One other changed file stays as it is', `${others} other changed files stay as they are`)}, staged or not.`
+      }`,
+    related: 'Also commit the ADRs it names or that name it',
+    relatedHint:
+      'Accepting an ADR writes the Back-reference into the ADR it supersedes or amends. Committed apart, the history would hold a Problem in between.',
+    message: 'Message',
+    hooks:
+      "git commits as it does on the command line: with this repository's hooks and your signing, if you have set them up. Nothing is pushed.",
+    action: 'Commit',
+    committing: 'Committing …',
+    again: 'Try again',
+    committed: (sha: string): string => `Committed as ${sha.slice(0, 7)}.`,
+    detached:
+      'HEAD is detached: the commit goes on no branch. Create a branch at it afterwards to keep it.',
+    madeButSaid: (sha: string, said: string): string =>
+      `Committed as ${sha.slice(0, 7)}. After the commit, git said:\n\n${said}`
   },
 
   history: {

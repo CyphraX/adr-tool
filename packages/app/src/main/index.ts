@@ -256,6 +256,25 @@ function registerIpc(): void {
     }
   )
 
+  ipcMain.handle(CHANNEL.planCommit, (_, ...ids: unknown[]) =>
+    ids.length === 3 && ids.every((id) => typeof id === 'string')
+      ? repositories.planCommit(...(ids as [string, string, string]))
+      : { ok: false, reason: t.notUnderstood }
+  )
+
+  ipcMain.handle(CHANNEL.commit, (_, planId: unknown, include: unknown, message: unknown) =>
+    typeof planId === 'string' &&
+    typeof message === 'string' &&
+    Array.isArray(include) &&
+    include.every((path) => typeof path === 'string')
+      ? repositories.commit(planId, include as string[], message)
+      : { committed: false, reason: t.notUnderstood }
+  )
+
+  ipcMain.handle(CHANNEL.discardCommit, (_, planId: unknown) => {
+    if (typeof planId === 'string') repositories.discardCommit(planId)
+  })
+
   ipcMain.handle(CHANNEL.applyChange, async (_, changeId: unknown) => {
     if (typeof changeId !== 'string') return { applied: false, reason: t.notUnderstood }
     const result = await repositories.applyChange(changeId)

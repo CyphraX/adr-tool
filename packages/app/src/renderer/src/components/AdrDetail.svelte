@@ -139,6 +139,10 @@
           <button class="primary" onclick={() => app.migrate('adr')}>{t.detail.migrate}</button>
         {/if}
         {#if git}<button onclick={() => app.showHistory()}>{t.detail.history}</button>{/if}
+        {#if uncommitted}
+          <button title={t.commit.hooks} onclick={() => app.startCommit()}>{t.detail.commit}</button
+          >
+        {/if}
       </div>
     {/if}
 

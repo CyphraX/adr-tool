@@ -21,6 +21,11 @@ const api: Api = {
     ipcRenderer.invoke(CHANNEL.history, repositoryId, logPath, adrId),
   historyChange: (repositoryId, logPath, adrId, entryId) =>
     ipcRenderer.invoke(CHANNEL.historyChange, repositoryId, logPath, adrId, entryId),
+  planCommit: (repositoryId, logPath, adrId) =>
+    ipcRenderer.invoke(CHANNEL.planCommit, repositoryId, logPath, adrId),
+  commit: (planId, include, message) =>
+    ipcRenderer.invoke(CHANNEL.commit, planId, include, message),
+  discardCommit: (planId) => ipcRenderer.invoke(CHANNEL.discardCommit, planId),
   applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
   discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),
   openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url),

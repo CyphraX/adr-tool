@@ -46,7 +46,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       expect.stringMatching(/^(proposed|accepted)$/)
     ],
     [10, '0010-the-suite-is-open-source-under-the-mit-licence', 'accepted'],
-    [11, '0011-the-product-is-called-softarch-suite', 'accepted']
+    [11, '0011-the-product-is-called-softarch-suite', 'accepted'],
+    [12, '0012-committing-an-adr-runs-git-commit-for-its-files-only', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
