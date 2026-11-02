@@ -1,12 +1,13 @@
 /**
- * What `core` and `structure` say, in German: one sentence for every code they have, taking the
- * values their English sentence takes (docs/plan-roadmap.md, part 12). The compiler asks for a
- * sentence for every code; a code without one does not build.
+ * What `core`, `structure` and `review` say, in German: one sentence for every code they have,
+ * taking the values their English sentence takes (docs/plan-roadmap.md, part 12). The compiler
+ * asks for a sentence for every code; a code without one does not build.
  *
  * The vocabulary of the tool stays as it is: ADR, Decision Log, Status, Relation, Problem,
- * Migration, Frontmatter; Metadaten, Rückverweis, Reparatur, Korrektur, Vorlage, Komponente,
- * Entwurf, Quelldatei. What names a value or a key of a file — proposed, accepted, supersedes,
- * affects — is written as the file writes it.
+ * Migration, Frontmatter, Annotation; Metadaten, Rückverweis, Reparatur, Korrektur, Vorlage,
+ * Komponente, Entwurf, Quelldatei, Antwort, Anker, zitierte Zeilen, verwaist, neu anheften. What
+ * names a value or a key of a file — proposed, accepted, supersedes, affects, resolved — is
+ * written as the file writes it.
  */
 import {
   STATUSES,
@@ -14,13 +15,16 @@ import {
   type Said,
   type SENTENCES as CORE_SENTENCES
 } from '@adr-tool/core'
+import type { REVIEW_SENTENCES } from '@adr-tool/review'
 import type { STRUCTURE_SENTENCES } from '@adr-tool/structure/model'
 
 /**
- * Every code of `core` and `structure`, with the values of its sentence. The kernel's codes are
- * in both; they are taken once.
+ * Every code of `core`, `structure` and `review`, with the values of its sentence. The kernel's
+ * codes are in each; they are taken once.
  */
-type Codes = typeof CORE_SENTENCES & Omit<typeof STRUCTURE_SENTENCES, keyof typeof CORE_SENTENCES>
+type Codes = typeof CORE_SENTENCES &
+  Omit<typeof STRUCTURE_SENTENCES, keyof typeof CORE_SENTENCES> &
+  Omit<typeof REVIEW_SENTENCES, keyof typeof CORE_SENTENCES>
 
 /** A sentence for every code, taking the values the English one takes. */
 type Wording<S> = { readonly [Code in keyof S]: S[Code] }
@@ -44,6 +48,13 @@ const SEGMENT_RULE =
 /** The start every refusal to write a foreign file shares. */
 const foreign = (v: { adr: string; format: ForeignFormat }): string =>
   `${v.adr} ist im Format von ${FORMAT[v.format]} geschrieben. Das Werkzeug liest dieses Format und schreibt es nie.`
+
+/** A list of names as a sentence has them: `a`, `a und b`, `a, b und c`. */
+const listed = (names: readonly string[]): string =>
+  names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} und ${names.at(-1)}`
+
+/** How an orphaned Annotation is attached again, as the end of its Problem. */
+const ATTACH_AGAIN = 'Sie muss neu an die Zeilen geheftet werden, um die es geht.'
 
 /** What keeps a section in the text: `„Proposed“, „Clarifies […](…)“`. */
 const quoted = (what: readonly string[]): string => what.map((one) => `„${one}“`).join(', ')
@@ -274,7 +285,78 @@ export const DE: Wording<Codes> = {
 
   // Why a Java file cannot be read.
   'java-missing': (v) => `Es fehlt: ${v.what}.`,
-  'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.'
+  'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
+
+  // The Problems of Review.
+  'unreadable-configuration': (v) =>
+    `${v.path} kann nicht gelesen werden: ${german(v.detail)}. Bis die Datei korrigiert ist, wird keine Annotation gelesen.`,
+  'invalid-annotations-directory': (v) =>
+    `„annotations“ in ${v.path} muss ein relativer Pfad innerhalb des Repositorys sein, nicht „${v.value}“. Bis das korrigiert ist, wird keine Annotation gelesen.`,
+  'unreadable-annotation': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'invalid-type': (v) =>
+    `${v.path}: „type“ muss note, question oder concern sein, nicht „${v.value}“.`,
+  'invalid-state': (v) => `${v.path}: „state“ muss open oder resolved sein, nicht „${v.value}“.`,
+  'invalid-key': (v) => `${v.path}: „${v.key}“ ${german(v.detail)}.`,
+  'no-anchor': (v) => `${v.path} hat keinen Anker: „anchor“ braucht „path“ und „lines“.`,
+  'invalid-anchor': (v) => `${v.path}: Der Anker ${german(v.detail)}.`,
+  'no-quote': (v) =>
+    `Der Text von ${v.path} beginnt nicht mit den zitierten Zeilen in einem geschlossenen Codeblock.`,
+  'quote-does-not-match-lines': (v) =>
+    `${v.path} zitiert ${v.quoted} ${v.quoted === 1 ? 'Zeile' : 'Zeilen'} für die Zeilen ${v.lines}, das sind ${v.count}.`,
+  'unknown-adr': (v) => `${v.path} verweist auf ${v.adr}, das kein ADR dieses Repositorys ist.`,
+  'ambiguous-adr': (v) =>
+    `${v.path} verweist auf ${v.adr}, das es in mehreren Decision Logs gibt: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
+  orphaned: (v) =>
+    v.file === 'gone'
+      ? `${v.annotation} ist verwaist: ${v.path} gibt es nicht mehr, auch nicht unter einem neuen Namen mit den zitierten Zeilen. ${ATTACH_AGAIN}`
+      : `${v.annotation} ist verwaist: Die zitierten Zeilen ${v.lines} von ${v.path} werden darin nicht mehr gefunden. ${ATTACH_AGAIN}`,
+  'unreadable-reply': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'replies-without-annotation': (v) =>
+    `${v.path} enthält Antworten auf ${v.annotation}, aber es gibt keine Annotation ${v.annotation}.`,
+
+  // Why an Annotation's file cannot be read, or a value is wrong: the rest of a sentence about it.
+  'config-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
+  'config-not-mapping': () => 'die oberste Ebene muss ein Mapping sein',
+  'no-frontmatter': () => 'es hat kein Frontmatter',
+  'frontmatter-open': () => 'sein Frontmatter wird nie geschlossen',
+  'frontmatter-yaml': (v) => `sein Frontmatter ist kein gültiges YAML: ${v.message}`,
+  'frontmatter-mapping': () => 'sein Frontmatter muss ein Mapping sein',
+  'needs-text': () => 'muss ein Text sein',
+  'needs-day': () => 'muss ein Datum der Form YYYY-MM-DD sein',
+  'needs-adr-list': () => 'muss eine Liste von ADRs sein',
+  'anchor-path': () => 'nennt einen Pfad, der absolut ist oder das Repository verlässt',
+  'anchor-lines': () => 'muss seine Zeilen als Zahl oder als Bereich wie 12-18 angeben',
+  'anchor-commit': () =>
+    'muss seinen Commit mit dessen vollem Namen aus 40 oder 64 Hexadezimalziffern nennen',
+
+  // Why an operation on Annotations is refused.
+  'annotations-unavailable': (v) =>
+    `Die Annotationen können nicht geschrieben werden: ${german(v.detail)}`,
+  'no-annotation': (v) => `Es gibt keine Annotation ${v.id}.`,
+  'annotation-unreadable': (v) =>
+    `${v.path} kann nicht gelesen werden. Die Datei muss korrigiert werden, bevor die Suite hineinschreibt.`,
+  'annotation-needs-author': () =>
+    'Eine Annotation braucht den Namen ihrer Autorin oder ihres Autors.',
+  'reply-needs-author': () => 'Eine Antwort braucht den Namen ihrer Autorin oder ihres Autors.',
+  'reply-needs-text': () => 'Eine Antwort braucht einen Text.',
+  'not-a-day': (v) => `„${v.date}“ ist kein Datum der Form YYYY-MM-DD.`,
+  'no-source-file': (v) => `${v.path} ist keine Datei dieses Repositorys.`,
+  'no-lines': (v) =>
+    `${v.lines} sind keine Zeilen: Anzugeben sind die erste und die letzte, gezählt ab 1.`,
+  'lines-outside': (v) =>
+    `${v.path} hat ${v.count} ${v.count === 1 ? 'Zeile' : 'Zeilen'}; die Zeilen ${v.lines} liegen nicht darin.`,
+  'resolved-already': (v) => `${v.id} hat bereits den Zustand resolved.`,
+  'open-already': (v) => `${v.id} hat bereits den Zustand open.`,
+  'cited-already': (v) => `${v.id} verweist bereits auf ${v.adr}.`,
+  'not-cited': (v) => `${v.id} verweist nicht auf ${v.adr}.`,
+  'no-such-adr': (v) => `${v.adr} ist kein ADR dieses Repositorys.`,
+  'adr-in-several-logs': (v) =>
+    `${v.adr} gibt es in mehreren Decision Logs: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
+  'key-by-hand': (v) =>
+    `„${v.key}“ in ${v.path} ist so geschrieben, dass die Suite es nicht an seiner Stelle ändern kann. Es muss in einem Editor geändert werden.`,
+  'not-moved': (v) => `${v.id} steht, wo sein Anker es sagt: Es gibt nichts zu aktualisieren.`,
+  'without-repair': () =>
+    'Dieses Problem hat keine Reparatur: Die Suite kann nicht wissen, was gemeint war.'
 }
 
 /** What a module said, in German; `undefined` for a code that has no German sentence. */

@@ -255,6 +255,7 @@ describe('this repository, as the window gets it', () => {
       'core',
       'kernel',
       'mcp',
+      'review',
       'structure',
       '(unassigned)'
     ])
