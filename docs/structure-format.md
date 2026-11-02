@@ -56,7 +56,7 @@ Keys the suite does not know are preserved and ignored, at the top level and ins
 - Rename gives a declared Component a new segment. The Draft has no Rename: its IDs follow directories, and are adopted first.
 - The new segment follows the rules above, differs from the old one, and is not taken by a sibling. The `name` stays: a Component without one is shown under its new segment afterwards.
 - In the declaration, the key is rewritten where it stands, its quoting kept; nothing else in the file changes. The Components below it follow by themselves, since their IDs are made from it.
-- In the same change set, every Trace that names the old ID or an ID below it is rewritten: `affects` in every ADR of the repository ([file-format.md](file-format.md), section 5). Rules and Diagrams join when they exist.
+- In the same change set, every Trace that names the old ID or an ID below it is rewritten: `affects` in every ADR of the repository ([file-format.md](file-format.md), section 5), and every Component ID in `.arch/rules.yml` ([conformance-format.md](conformance-format.md), section 7). Diagrams join when they exist. Where one of these files cannot be renamed in, the whole Rename is refused with its reason.
 - Rename is refused while the file cannot be read, and where the key is written in a way a splice cannot serve — an alias, say: what the suite hands out has been checked to read back as the same declaration under the new IDs.
 
 ### Patterns

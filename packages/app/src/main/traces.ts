@@ -1,7 +1,7 @@
 /**
- * Where Decisions and Structure meet: an ADR's Traces name Components. The two cores do not
- * know each other (ADR-0006); the app reads what Structure declares and hands it to `core`,
- * and puts the halves of a Rename together into one change set.
+ * Where Decisions and Structure meet: an ADR's Traces name Components, and so do the Rules of
+ * Conformance. The cores do not know each other (ADR-0006); the app reads what Structure
+ * declares and hands it to `core`, and puts the parts of a Rename together into one change set.
  */
 import {
   joinChangeSets,
@@ -11,6 +11,7 @@ import {
   type Plan,
   type Repository
 } from '@adr-tool/core'
+import { planRenameInRules } from '@adr-tool/conformance'
 import {
   DECLARATION_PATH,
   everyComponent,
@@ -42,8 +43,9 @@ export async function openWithTraces(
 
 /**
  * Rename a Component: Structure plans the new segment in the declaration, `core` the Traces in
- * every ADR that name the Component or one below it. One change set, previewed as a whole, with
- * what either half warns of — and why either half refuses — as its module says it, code and all.
+ * every ADR that name the Component or one below it, Conformance the IDs in `.arch/rules.yml`
+ * (docs/conformance-format.md, section 7). One change set, previewed as a whole, with what any
+ * part warns of — and why any part refuses — as its module says it, code and all.
  */
 export async function planComponentRename(
   fs: FileSystem,
@@ -55,11 +57,14 @@ export async function planComponentRename(
   const { logs } = await openRepository(fs)
   const traces = await planRenameTraces(fs, logs, declared.renamed.from, declared.renamed.to)
   if (!traces.ok) return traces
-  const warnings = [...(declared.warnings ?? []), ...(traces.warnings ?? [])]
-  const warned = [...(declared.warned ?? []), ...(traces.warned ?? [])]
+  const rules = await planRenameInRules(fs, declared.renamed.from, declared.renamed.to)
+  if (!rules.ok) return rules
+  const parts = [declared, traces, rules]
+  const warnings = parts.flatMap((part) => part.warnings ?? [])
+  const warned = parts.flatMap((part) => part.warned ?? [])
   return {
     ok: true,
-    changeSet: joinChangeSets(declared.changeSet, traces.changeSet),
+    changeSet: joinChangeSets(declared.changeSet, traces.changeSet, rules.changeSet),
     ...(warnings.length > 0 && { warnings }),
     // Codes only where every warning has one: a code stands where its warning stands.
     ...(warned.length > 0 && warned.length === warnings.length && { warned })

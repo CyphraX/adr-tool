@@ -141,6 +141,64 @@ describe('renaming a Component', () => {
   })
 })
 
+describe('renaming a Component that the Rules name (docs/conformance-format.md, section 7)', () => {
+  const RULES = [
+    'rules:',
+    '  - id: core-apart',
+    '    why: The cores speak their own glossaries.',
+    '    kind: must-not-depend',
+    '    from: [core/**, structure]',
+    "    to: ['structure']",
+    'exceptions:',
+    '  - rule: core-apart',
+    '    from: core',
+    '    to: structure',
+    '    reason: For now.',
+    ''
+  ].join('\n')
+
+  it('rewrites them in the same change set as the declaration and the ADRs', async () => {
+    const fs = memoryFileSystem({ ...REPOSITORY, '.arch/rules.yml': RULES })
+    const plan = await planComponentRename(fs, 'structure', 'architecture')
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.changeSet.files.map((file) => file.path)).toEqual([
+      '.arch/components.yml',
+      'docs/adr/0001-one-core-per-module.md',
+      '.arch/rules.yml'
+    ])
+    expect(plan.changeSet.files[2]!.after).toBe(
+      RULES.replace('[core/**, structure]', '[core/**, architecture]')
+        .replace("['structure']", "['architecture']")
+        .replace('to: structure', 'to: architecture')
+    )
+    // Below the renamed one, too: core/** follows core.
+    const below = await planComponentRename(fs, 'core', 'decisions')
+    if (!below.ok) throw new Error(below.reason)
+    expect(below.changeSet.files.find((file) => file.path === '.arch/rules.yml')!.after).toContain(
+      'from: [decisions/**, structure]'
+    )
+  })
+
+  it("is refused with conformance's reason and code where the file cannot be renamed in", async () => {
+    const fs = memoryFileSystem({
+      ...REPOSITORY,
+      '.arch/rules.yml': RULES.replace(
+        "    to: ['structure']",
+        '    to: &target structure'
+      ).replace('    to: structure', '    to: *target')
+    })
+    expect(await planComponentRename(fs, 'structure', 'architecture')).toEqual({
+      ok: false,
+      reason:
+        '.arch/rules.yml is written in a way the suite cannot rename structure in. Change it in an editor.',
+      said: {
+        code: 'cannot-rename-in-rules',
+        values: { path: '.arch/rules.yml', id: 'structure' }
+      }
+    })
+  })
+})
+
 // The done-when of part 7 (docs/plan-structure.md), as far as the files go: this repository
 // declares its Components, and its ADRs name them.
 describe('this repository', () => {
@@ -155,7 +213,7 @@ describe('this repository', () => {
     expect(adr.metadata.affects).toEqual(['kernel', 'core', 'structure'])
   })
 
-  it('renames structure with one line in the declaration and one in ADR-0006', async () => {
+  it('renames structure in the declaration, in ADR-0006 and in the Rules', async () => {
     const plan = await planComponentRename(nodeFileSystem(own), 'structure', 'architecture')
     if (!plan.ok) throw new Error(plan.reason)
     const lines = (text: string): string[] => text.split('\n')
@@ -169,6 +227,15 @@ describe('this repository', () => {
       {
         path: 'docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md',
         changed: ['affects: [kernel, core, structure]']
+      },
+      {
+        path: '.arch/rules.yml',
+        changed: [
+          '    from: [core, structure]',
+          '    to: [core, structure]',
+          '    to: [kernel, structure]',
+          '    layers: [app, [cli, mcp], conformance, [core, structure], kernel]'
+        ]
       }
     ])
   })
