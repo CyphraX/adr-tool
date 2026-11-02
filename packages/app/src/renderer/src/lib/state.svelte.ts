@@ -20,7 +20,9 @@ import type {
   SourceFileText,
   StructureView
 } from '../../../shared/ipc'
+import type { Language } from '../../../shared/language'
 import { recordedIn } from './history'
+import { chooseLanguage } from './language'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
 import { moveOf, type StatusKey } from './views'
@@ -364,6 +366,21 @@ class AppState {
       this.active.logPath = path
       this.active.selectedId = undefined
     })
+  }
+
+  /**
+   * Speak another language, or the system's when `language` is left out. The window reloads in
+   * it; text that is not saved is asked about first, and `declined` is called if it is kept.
+   */
+  speak(language: Language | undefined, declined: () => void): void {
+    this.leaveDialogs(
+      () =>
+        this.leaveEditor(() => {
+          chooseLanguage(language)
+          location.reload()
+        }, declined),
+      declined
+    )
   }
 
   /** Switch the repository in front to another module. The editor is a Decisions thing. */

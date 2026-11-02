@@ -9,7 +9,7 @@ import type {
   Repository,
   Templates
 } from '@adr-tool/core'
-import type { Language } from './language'
+import type { Language as WindowLanguage } from './language'
 import type {
   Cycle,
   Dependency,
@@ -492,7 +492,7 @@ export interface Api {
   /** Say whether the window holds text that is not on disk. While it does, closing it asks first. */
   setUnsaved(unsaved: boolean): Promise<void>
   /** Say the language of the window, so that what the main process says is said in it too. */
-  setLanguage(language: Language): Promise<void>
+  setLanguage(language: WindowLanguage): Promise<void>
   /** Called when the window is to close while it holds unsaved text. Nothing closes until it was answered. */
   onCloseRequested(listener: () => void): () => void
   /** What the person said: close the window, whatever it holds — or keep it, and forget that anything was to quit. */

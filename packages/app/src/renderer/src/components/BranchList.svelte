@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { language } from '../lib/language'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { STATUS_LABEL, logName, prefixOf } from '../lib/wording'
+  import { STATUS_LABEL, STATUS_WIDTH, logName, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   const branches = $derived(app.active?.branches)
@@ -16,14 +17,14 @@
     ]).size > 1
   )
 
-  const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
+  const day = new Intl.DateTimeFormat(language, { dateStyle: 'medium' })
   const dated = (iso: string): string => {
     const date = new Date(iso)
     return Number.isNaN(date.getTime()) ? iso : day.format(date)
   }
 </script>
 
-<div class="list">
+<div class="list" style:--status={STATUS_WIDTH}>
   <div class="tools">
     <p class="lead">{t.branches.lead}</p>
     <button onclick={() => app.loadBranches()} disabled={branches?.loading}>
@@ -184,7 +185,7 @@
 
   .row {
     display: grid;
-    grid-template-columns: 5.5ch minmax(0, 1fr) 12.5ch 11ch;
+    grid-template-columns: 5.5ch minmax(0, 1fr) var(--status) 11ch;
     column-gap: 12px;
     align-items: center;
     width: 100%;
@@ -195,7 +196,7 @@
 
   @container (max-width: 520px) {
     .row {
-      grid-template-columns: 5.5ch minmax(0, 1fr) 12.5ch;
+      grid-template-columns: 5.5ch minmax(0, 1fr) var(--status);
     }
 
     .change {

@@ -1,4 +1,4 @@
-import type { Adr, Relation, RelationType } from '@adr-tool/core'
+import { STATUSES, type Adr, type Relation, type RelationType } from '@adr-tool/core'
 import { language } from './language'
 import { t } from './strings'
 import { de } from './wording.de'
@@ -12,6 +12,9 @@ import { en, type Wording } from './wording.en'
 const said: Wording = language === 'de' ? de : en
 
 export const STATUS_LABEL = said.status
+
+/** The room a column of Statuses takes: the longest of the five names, and its mark. */
+export const STATUS_WIDTH = `${Math.max(...STATUSES.map((status) => said.status[status].length)) + 2.5}ch`
 
 /** What a Relation type is called where Relations are edited. */
 export const RELATION_TYPE_LABEL = Object.fromEntries(

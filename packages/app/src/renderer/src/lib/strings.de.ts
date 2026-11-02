@@ -57,6 +57,12 @@ export const de: typeof en = {
     close: (repository: string): string => `${repository} schließen`
   },
 
+  language: {
+    label: 'Sprache des Fensters',
+    system: 'Systemsprache',
+    names: { en: 'English', de: 'Deutsch' }
+  },
+
   sidebar: {
     label: 'Decision Logs und Filter',
     logs: 'Decision Logs',
@@ -71,8 +77,7 @@ export const de: typeof en = {
     boardHint:
       'Die ADRs nach Status; ziehen Sie eines, um es anzunehmen, abzulehnen, als veraltet zu markieren oder zu ersetzen',
     dashboard: 'Dashboard',
-    dashboardHint:
-      'Das Decision Log in Zahlen: Status, Probleme, wartende Vorschläge, Komponenten',
+    dashboardHint: 'Das Decision Log in Zahlen: Status, Probleme, wartende Vorschläge, Komponenten',
     check: 'Prüfen',
     problems: 'Probleme',
     migrate: 'Migrieren',
@@ -309,7 +314,8 @@ export const de: typeof en = {
     tagsPlaceholder: 'Ein Tag, dann Enter',
     about: {
       supersedes: 'Ersetzt jene Entscheidung als Ganzes, sobald dieses ADR angenommen ist.',
-      amends: 'Präzisiert oder erweitert einen Teil jener Entscheidung, sobald dieses ADR angenommen ist.',
+      amends:
+        'Präzisiert oder erweitert einen Teil jener Entscheidung, sobald dieses ADR angenommen ist.',
       'depends-on': 'Diese Entscheidung gilt nur, solange jene gilt.',
       'relates-to': 'Lohnt sich zusammen zu lesen.'
     } satisfies Record<RelationType, string>,
@@ -366,8 +372,7 @@ export const de: typeof en = {
       'Schreibt diese Komponenten in `.arch/components.yml`. Sie sehen die Datei, bevor sie geschrieben wird.',
     code: 'Code',
     sourceFiles: (count: number): string => many(count, 'Eine Quelldatei', `${count} Quelldateien`),
-    testFiles: (count: number): string =>
-      many(count, 'davon ein Test', `davon ${count} Tests`),
+    testFiles: (count: number): string => many(count, 'davon ein Test', `davon ${count} Tests`),
     dependencies: (count: number): string =>
       many(count, 'Eine Abhängigkeit', `${count} Abhängigkeiten`),
     libraries: (count: number): string => many(count, 'Eine Bibliothek', `${count} Bibliotheken`),
@@ -402,7 +407,11 @@ export const de: typeof en = {
       inCycle: 'in einem Zyklus',
       weakest: 'schwächste Abhängigkeit eines Zyklus',
       weight: (count: number): string =>
-        many(count, 'Eine Abhängigkeit zwischen Quelldateien', `${count} Abhängigkeiten zwischen Quelldateien`)
+        many(
+          count,
+          'Eine Abhängigkeit zwischen Quelldateien',
+          `${count} Abhängigkeiten zwischen Quelldateien`
+        )
     },
 
     views: {
@@ -445,8 +454,7 @@ export const de: typeof en = {
       fanOut: {
         short: 'Fan-out',
         long: 'Fan-out',
-        definition:
-          'Fan-out: die Komponenten mit demselben Elternteil, von denen diese abhängt.'
+        definition: 'Fan-out: die Komponenten mit demselben Elternteil, von denen diese abhängt.'
       },
       fanIn: {
         short: 'Fan-in',
@@ -531,7 +539,11 @@ export const de: typeof en = {
       testFiles: (tests: number, counted: boolean): string =>
         counted
           ? many(tests, 'Davon ein Test', `Davon ${count(tests)} Tests`)
-          : many(tests, 'Eine Testdatei, nicht gezählt', `${count(tests)} Testdateien, nicht gezählt`),
+          : many(
+              tests,
+              'Eine Testdatei, nicht gezählt',
+              `${count(tests)} Testdateien, nicht gezählt`
+            ),
       empty: 'Sie enthält keine Quelldatei und hat daher keine Metriken.',
       files: 'Quelldateien',
       filesIn: (directory: string): string => `In \`${directory}\`:`,
@@ -624,8 +636,7 @@ export const de: typeof en = {
       deprecate: {
         action: 'Als veraltet markieren',
         title: (prefix: string): string => `ADR ${prefix} als veraltet markieren`,
-        refused: (prefix: string): string =>
-          `ADR ${prefix} kann nicht als veraltet markiert werden`
+        refused: (prefix: string): string => `ADR ${prefix} kann nicht als veraltet markiert werden`
       }
     } satisfies Record<Decision, ReviewWording>,
     repair: {

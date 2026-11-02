@@ -104,6 +104,14 @@ export const en = {
     close: (repository: string): string => `Close ${repository}`
   },
 
+  language: {
+    label: 'Language of the window',
+    /** The choice that leaves it to the system's language. */
+    system: 'System language',
+    /** Each language by its own name. */
+    names: { en: 'English', de: 'Deutsch' }
+  },
+
   sidebar: {
     label: 'Decision Logs and filters',
     logs: 'Decision Logs',

@@ -1,6 +1,16 @@
 <script lang="ts">
+  import { LANGUAGES, isLanguage } from '../../../shared/language'
+  import { chosenLanguage } from '../lib/language'
   import { app, type Module } from '../lib/state.svelte'
   import { t } from '../lib/strings'
+
+  // The language chosen in the window; none leaves it to the system's.
+  const chosen = chosenLanguage() ?? ''
+
+  function speak(event: Event & { currentTarget: HTMLSelectElement }): void {
+    const select = event.currentTarget
+    app.speak(isLanguage(select.value) ? select.value : undefined, () => (select.value = chosen))
+  }
 
   // The modules of the suite, for the repository in front. More of them follow.
   const MODULES: readonly Module[] = ['decisions', 'structure']
@@ -45,6 +55,18 @@
       {/each}
     </div>
   {/if}
+  <select
+    class="language"
+    aria-label={t.language.label}
+    title={t.language.label}
+    value={chosen}
+    onchange={speak}
+  >
+    <option value="">{t.language.system}</option>
+    {#each LANGUAGES as language (language)}
+      <option value={language}>{t.language.names[language]}</option>
+    {/each}
+  </select>
   <button class="open" onclick={() => app.open()}>{t.tabs.open}</button>
 </header>
 
@@ -127,6 +149,29 @@
     color: var(--ink);
     font-weight: 500;
     box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+
+  .language {
+    flex: none;
+    align-self: center;
+    margin: 0 8px 0 auto;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ink-soft);
+    font: inherit;
+  }
+
+  /* Beside the modules, which take the room on the left already. */
+  .modules + .language {
+    margin-left: 0;
+  }
+
+  .language:hover,
+  .language:focus-visible {
+    border-color: var(--line);
+    color: var(--ink);
   }
 
   .open {
