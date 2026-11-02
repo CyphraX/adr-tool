@@ -160,16 +160,23 @@ export interface MigrationRequest {
 
 /** One node of a level in the Structure view (docs/structure-format.md, section 4). */
 export interface StructureNode {
-  readonly kind: 'component' | 'own-files' | 'unassigned' | 'source-file'
-  /** The Component ID; the parent's for its own files; the path of a Source File. */
+  readonly kind: 'component' | 'own-files' | 'unassigned' | 'source-file' | 'directory'
+  /**
+   * The Component ID; the parent's for its own files; the path of a Source File; for a
+   * directory below a Component without children, the Component's ID and the directory's path
+   * below the Component's base — an address in the views, not a Component ID.
+   */
   readonly id: string
-  /** The Component's name; the parent's for its own files; the file name of a Source File. */
+  /**
+   * The Component's name; the parent's for its own files; the file name of a Source File; the
+   * path of a directory from the level it is on.
+   */
   readonly name: string
   /** How many Source Files it stands for. */
   readonly files: number
   /** The lines of those files. */
   readonly lines: number
-  /** A Component's metrics (section 5). The other nodes have a size and nothing else. */
+  /** The metrics (section 5) of a Component or a directory. The other nodes have a size and nothing else. */
   readonly metrics?: Metrics
 }
 
@@ -186,7 +193,7 @@ export interface StructureEdge {
 export interface StructureRow extends StructureNode {
   /** 0 on the level itself, one more for each Component expanded around it. */
   readonly depth: number
-  /** A Component that contains Source Files: its row can be expanded. */
+  /** A Component that contains Source Files, or a directory: its row can be expanded. */
   readonly expandable: boolean
 }
 
@@ -222,13 +229,19 @@ export interface StructureNeighbour {
 }
 
 /** What the Component page shows of one Component: the declaration, the metrics, the Dependencies. */
+/** The page of a Component, or of a directory below a Component without children. */
 export interface StructureComponent {
   readonly id: string
   readonly name: string
+  /**
+   * Set for a directory: the path it stands for. A directory is no Component — it has no
+   * patterns, no Rename, and no ADR names it.
+   */
+  readonly directory?: string
   readonly description?: string
   readonly paths: readonly string[]
   readonly tests: readonly string[]
-  /** The Component whose children it is one of; `undefined` at the top. */
+  /** The Component or directory whose children it is one of; `undefined` at the top. */
   readonly level: string | undefined
   /**
    * The Source Files it contains that are counted, in the order of their paths: the first
@@ -276,9 +289,9 @@ export interface StructureView {
   readonly notAnalysed: readonly NotAnalysed[]
   /** How long the analysis took. */
   readonly milliseconds: number
-  /** The Components above the level, from the top down to its parent. Empty at the top. */
+  /** The Components and directories above the level, from the top down to its parent. Empty at the top. */
   readonly path: readonly { readonly id: string; readonly name: string }[]
-  /** The Component whose children or Source Files are shown; `undefined` at the top. */
+  /** The Component or directory whose children or Source Files are shown; `undefined` at the top. */
   readonly parent: string | undefined
   /** Whether test files are included. */
   readonly tests: boolean

@@ -2,7 +2,7 @@
   import type { StructureEdge, StructureRow, StructureView } from '../../../shared/ipc'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { nodeLabel } from '../lib/structure'
+  import { nodeLabel, opens } from '../lib/structure'
 
   // The dependency structure matrix of the level: row i and column i are the same node, a
   // cell is the Dependency of its row on its column. Rows come after what they use, so below
@@ -105,8 +105,7 @@
                 title={row.kind === 'source-file' ? row.id : nodeLabel(row)}
                 aria-pressed={selectedRow === index}
                 onclick={() => select(row)}
-                ondblclick={() => row.kind === 'component' && app.openComponent(row.id)}
-                >{nodeLabel(row)}</button
+                ondblclick={() => opens(row) && app.openComponent(row.id)}>{nodeLabel(row)}</button
               >
               <span class="number">{index + 1}</span>
             </div>
@@ -272,6 +271,11 @@
     font-family: var(--code);
     font-size: 12px;
     font-weight: 400;
+  }
+
+  .row-head.directory .label {
+    font-family: var(--code);
+    font-size: 12px;
   }
 
   .row-head.own-files .label,

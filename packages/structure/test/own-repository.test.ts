@@ -8,6 +8,7 @@ import {
   metricsOf,
   openStructure,
   planAdopt,
+  withDirectories,
   type DeclaredComponent
 } from '../src'
 import { metricsByDefinition } from './metrics-by-definition'
@@ -157,7 +158,10 @@ it('computes the metrics of this repository as their definitions say', async () 
   const { dependencies, lineCounts } = await analyseDependencies(fs, files, structure.sourceFiles)
 
   const metrics = metricsOf(structure, dependencies, lineCounts)
-  expect(metrics).toEqual(metricsByDefinition(structure, dependencies, lineCounts, false))
+  // The directories below a Component without children are checked by the same definitions.
+  const explored = withDirectories(structure)
+  expect(metrics).toEqual(metricsByDefinition(explored, dependencies, lineCounts, false))
+  expect([...metrics.keys()]).toContain('app/renderer/lib')
   // The kernel depends on nothing else here, and nothing here depends on the app: the two ends
   // of the scale.
   expect(metrics.get('kernel')!.instability).toBe(0)

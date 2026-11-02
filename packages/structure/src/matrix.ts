@@ -19,7 +19,7 @@ export interface MatrixRow {
   readonly node: LevelNode
   /** 0 for a node of the level itself; one more for each Component expanded around it. */
   readonly depth: number
-  /** A Component that contains Source Files: its row can be expanded. */
+  /** A Component that contains Source Files, or a directory: its row can be expanded. */
   readonly expandable: boolean
 }
 
@@ -87,7 +87,8 @@ export function matrixOf(
     )) {
       const node = byId.get(id)!
       const first = rows.length
-      const expandable = node.kind === 'component' && node.files.length > 0
+      const expandable =
+        (node.kind === 'component' || node.kind === 'directory') && node.files.length > 0
       if (expandable && open.has(node.id)) {
         place(levelOf(structure, dependencies, node.id, options)!, depth + 1)
         groups.push({ id: node.id, depth, first, last: rows.length - 1 })

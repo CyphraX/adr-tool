@@ -205,17 +205,25 @@ Views show one level of the hierarchy at a time. The **nodes** of a level are:
 - below a parent that owns Source Files itself: one node for those files, labelled `<name> (own files)`;
 - at the top level: one node `(unassigned)` for the Unassigned Source Files, when there are any.
 
-A Component without children shows its Source Files as nodes.
+A Component without children shows what it owns **by directory** (part 8), at any depth:
+
+- Its **base** is the deepest directory that holds all of its Source Files, test files included, so that the levels do not change with the filter.
+- The level below the Component shows the Source Files that lie directly in the base, each as a node, and one **directory node** for each directory directly below the base that holds Source Files of the Component. A directory node opens like a Component, onto the same again: the Source Files directly in it, and its directories.
+- A directory that holds exactly one directory and no Source File of the Component is passed over: the node stands for the deepest such directory and is labelled with the path from the level's directory, `internal/impl`. This passes over the steps of a Java package path.
+- Where the Component's Source Files all lie in its base, there are no directory nodes: the level is its Source Files.
+- A directory node whose Source Files are all test files is not shown while test files are left out.
+- A directory node is addressed by the Component's ID followed by the path of its directory below the base: `cart/internal/impl`. That is an address in the views, not a Component ID. No declaration, Trace or Rule names it, Rename does not apply, and it follows the files when they move. A Component without children has no IDs below its own, so the two never meet.
+- Directories are never declared and never written: Adopt writes the Draft's Components, not the directories below them. A directory that should be a Component is declared as one; its parent then has children, and shows them.
 
 - The Dependency from node A to node B is the set of Dependencies from Source Files of A to Source Files of B. Its **weight** is the number of distinct pairs of Source Files. It is type-only when every Dependency in it is.
-- The two nodes that are not Components exist to make every Dependency visible. They have a size and no other metric, and they do not count towards fan-in and fan-out.
+- The own-files node and `(unassigned)` exist to make every Dependency visible. They have a size and no other metric, and they do not count towards fan-in and fan-out. A directory node has the metrics of a Component; a Source File node has a size.
 - A graph of all Source Files of a repository is never drawn; the matrix of section 5 gives the overview.
 
 ### Cycles
 
 A **Cycle** is a strongly connected group with more than one member: among the Source Files of one Component without children, or among the nodes of one level. The own-files node takes part like a Component — a Cycle between a parent's own files and its child is real. `(unassigned)` never takes part: it is a bag of unrelated files and would tie everything together. Cycles are reported as groups, never as the elementary round trips inside them.
 
-For each Cycle the suite shows one round trip as an example: a shortest one, and among several the one whose sequence of IDs or paths, starting at its smallest member, sorts first. Among the nodes of a level it also names the **weakest Dependency**: the Dependency on that round trip with the lowest weight, the first such in the round trip's order — the candidate for cutting. Among Source Files every Dependency weighs one, and none is named.
+For each Cycle the suite shows one round trip as an example: a shortest one, and among several the one whose sequence of IDs or paths, starting at its smallest member, sorts first. Among the nodes of a level it also names the **weakest Dependency**: the Dependency on that round trip with the lowest weight, the first such in the round trip's order — the candidate for cutting. Among Source Files every Dependency weighs one, and none is named: not on a level of Source Files, nor on a level of directories and Source Files.
 
 A Cycle that consists of type-only Dependencies alone is marked as such; it does not exist at run time. Cycles are computed on what the view shows: without test files by default.
 
@@ -223,7 +231,7 @@ In Structure a Cycle is a fact. It becomes a Violation only through a Rule of th
 
 ## 5. Metrics (part 5)
 
-Every metric is shown with its definition. All of them are computed per Component on the Source Files it contains; "outside" means outside what it contains. By default test files are left out and type-only Dependencies count; Unassigned files count as outside. A Component that contains no Source File has no metrics. "Dependencies" are Source File Dependencies here, each pair of files once, as in section 3.
+Every metric is shown with its definition. All of them are computed per Component on the Source Files it contains, and per directory node of section 4 on the Source Files of its Component beneath it; "outside" means outside what it contains. By default test files are left out and type-only Dependencies count; Unassigned files count as outside. A Component that contains no Source File has no metrics. "Dependencies" are Source File Dependencies here, each pair of files once, as in section 3.
 
 | Metric                 | Definition                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -231,7 +239,7 @@ Every metric is shown with its definition. All of them are computed per Componen
 | Efferent coupling, Ce  | Source Files inside that depend on at least one Source File outside.                                          |
 | Afferent coupling, Ca  | Source Files outside that depend on at least one Source File inside.                                          |
 | Instability, I         | Ce / (Ca + Ce); undefined when both are zero. 0 is maximally stable, 1 maximally unstable.                    |
-| Fan-out, fan-in        | Components with the same parent that this one depends on, and that depend on it.                              |
+| Fan-out, fan-in        | Components with the same parent — or directory nodes on the same level — that this one depends on, and that depend on it. |
 | Relational cohesion, H | (R + 1) / N, with N the number of Source Files inside and R the number of Dependencies among them.            |
 | Internal share         | Dependencies among the files inside, divided by all Dependencies that start or end inside; undefined when there are none. |
 
@@ -239,9 +247,9 @@ Ce, Ca and I follow Robert C. Martin's definitions, with the Source File in the 
 
 **The dependency structure matrix** lists the nodes of one level as rows and columns, in the same order. The cell in the row of A and the column of B holds the Dependency from A to B: its weight, and the same list of Source File Dependencies as the edge in the graph opens. The diagonal stays empty. Graph and matrix are two views of one model and share filter and selection.
 
-- **Order.** Within a level, rows are in topological order, so that a Dependency of a row on an earlier row lies below the diagonal; whatever lies above the diagonal closes a Cycle — or a round trip through `(unassigned)`, which section 4 does not call one. The members of a Cycle come as one, and so do those of such a round trip. A row, or a Cycle, comes as soon as everything it depends on outside of itself has come; among those that could come next, the one with the member that is first in the order of the level's nodes: the Components as declared, the own files before the children, `(unassigned)` last, Source Files by path.
+- **Order.** Within a level, rows are in topological order, so that a Dependency of a row on an earlier row lies below the diagonal; whatever lies above the diagonal closes a Cycle — or a round trip through `(unassigned)`, which section 4 does not call one. The members of a Cycle come as one, and so do those of such a round trip. A row, or a Cycle, comes as soon as everything it depends on outside of itself has come; among those that could come next, the one with the member that is first in the order of the level's nodes: the Components as declared, the own files before the children, `(unassigned)` last, Source Files by path; below a Component without children, the Source Files directly in the directory by path, then its directory nodes by path.
 - **Inside a Cycle** the order keeps what lies above the diagonal light. The members are placed one by one: the first member that depends on no member still to be placed; when there is none, the member whose Dependencies from the members still to be placed outweigh its Dependencies on them the most, the first such in the level's order. In a Cycle of two this puts the lighter of the two Dependencies above the diagonal.
-- **Expanding.** The row of a Component that contains Source Files can be expanded into the rows of the level below it, in that level's order, where the Component stood — and so on, down to Source Files. A cell then holds the Dependencies from the Source Files of its row to those of its column, whatever level each of them is at. The rule still holds: what lies above the diagonal closes a Cycle, at one level or another.
+- **Expanding.** The row of a Component that contains Source Files, or of a directory node, can be expanded into the rows of the level below it, in that level's order, where the Component stood — and so on, down to Source Files. A cell then holds the Dependencies from the Source Files of its row to those of its column, whatever level each of them is at. The rule still holds: what lies above the diagonal closes a Cycle, at one level or another.
 
 ## 6. Problems (part 2)
 

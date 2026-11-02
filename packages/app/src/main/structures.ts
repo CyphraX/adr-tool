@@ -3,10 +3,12 @@ import { readFile, stat } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
 import {
+  isDirectoryNode,
   levelOf,
   matrixOf,
   metricsOf,
   sizeOf,
+  withDirectories,
   type DeclaredComponent,
   type Level,
   type LevelNode,
@@ -192,8 +194,12 @@ export function viewOf(
       collect(component.children, component.id)
     }
   }
-  collect(structure.components, undefined)
+  // The directories below a Component without children are nodes, pages and steps of the
+  // way back up as well; `structure` finds them once and hands out the same ones every time.
+  const explored = withDirectories(structure)
+  collect(explored.components, undefined)
   const metrics = metricsOf(structure, dependencies.dependencies, lineCounts, { tests })
+  const hasPage = (kind: LevelNode['kind']): boolean => kind === 'component' || kind === 'directory'
 
   const nameOf = (node: Pick<LevelNode, 'kind' | 'id'>): string =>
     node.kind === 'source-file'
@@ -204,28 +210,29 @@ export function viewOf(
     id: node.id,
     name: nameOf(node),
     ...sizeOf(node.files, lineCounts),
-    ...(node.kind === 'component' && metrics.has(node.id) ? { metrics: metrics.get(node.id)! } : {})
+    ...(hasPage(node.kind) && metrics.has(node.id) ? { metrics: metrics.get(node.id)! } : {})
   })
 
   const matrix = matrixOf(structure, dependencies.dependencies, level.parent, expanded, {
     tests
   })!
-  const segments = level.parent?.split('/') ?? []
-  const path = segments.map((_, index) => {
-    const id = segments.slice(0, index + 1).join('/')
-    return { id, name: byId.get(id)?.name ?? id }
-  })
+  // Up from the level through its ancestors: a directory that was passed over is no step.
+  const path: { id: string; name: string }[] = []
+  for (let id = level.parent; id !== undefined; id = parentOf.get(id)) {
+    path.unshift({ id, name: byId.get(id)?.name ?? id })
+  }
 
-  // Every Component the level or the matrix shows, expanded ones included, gets its page.
+  // Every Component and directory the level or the matrix shows, expanded ones included, gets
+  // its page.
   const shown = new Set([
-    ...level.nodes.filter((node) => node.kind === 'component').map((node) => node.id),
-    ...matrix.rows.filter((row) => row.node.kind === 'component').map((row) => row.node.id),
+    ...level.nodes.filter((node) => hasPage(node.kind)).map((node) => node.id),
+    ...matrix.rows.filter((row) => hasPage(row.node.kind)).map((row) => row.node.id),
     ...matrix.groups.map((group) => group.id)
   ])
   const testsInside = new Map<string, number>()
   const javaInside = new Set<string>()
   const filesInside = new Map<string, string[]>()
-  for (const file of structure.sourceFiles) {
+  for (const file of explored.sourceFiles) {
     const counted = tests || !file.test
     for (let id = file.component; id !== undefined; id = parentOf.get(id)) {
       if (file.test) testsInside.set(id, (testsInside.get(id) ?? 0) + 1)
@@ -307,6 +314,7 @@ function pageOf(
   return {
     id: component.id,
     name: component.name,
+    ...(isDirectoryNode(component) ? { directory: component.directory } : {}),
     ...(component.description === undefined ? {} : { description: component.description }),
     paths: component.paths,
     tests: component.tests,

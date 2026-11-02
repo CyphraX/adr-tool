@@ -28,6 +28,10 @@ _Avoid_: Accept (that decides an ADR), apply, import, generate
 One file of source code; the smallest unit the code model knows. It is owned by at most one Component: where a Component and one of its descendants both claim it, the descendant owns it. A Source File that cannot be parsed is not analysed: it stays in the model without Dependencies of its own.
 _Avoid_: Element, unit, class, type
 
+**Directory node**:
+A directory below a Component without children, as the views show it, so that the levels go down as deep as the folders do. It has the Dependencies, Cycles and metrics of a Component, but it is not one: nothing declares it, and nothing may name it — no Trace, no Rule. Who wants it named declares it as a Component.
+_Avoid_: Sub-component, package (Java's), folder Component
+
 **Unassigned**:
 Said of a Source File that no Component claims. It is a state, not a Problem.
 _Avoid_: Orphaned (that is an Annotation without its Anchor), unmapped, uncovered

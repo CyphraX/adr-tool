@@ -2,7 +2,7 @@
   import type { StructureEdge, StructureView } from '../../../shared/ipc'
   import { NODE, layoutGraph, pathOf } from '../lib/graph-layout'
   import { app } from '../lib/state.svelte'
-  import { nodeLabel } from '../lib/structure'
+  import { nodeLabel, opens } from '../lib/structure'
   import { t } from '../lib/strings'
 
   // One level of the Components as a drawing: left to right is "depends on", so what is used
@@ -102,7 +102,7 @@
               title={node.kind === 'source-file' ? node.id : nodeLabel(node)}
               aria-pressed={selection?.kind === 'node' && selection.id === node.id}
               onclick={() => app.selectInStructure({ kind: 'node', id: node.id })}
-              ondblclick={() => node.kind === 'component' && app.openComponent(node.id)}
+              ondblclick={() => opens(node) && app.openComponent(node.id)}
             >
               <span class="name">{nodeLabel(node)}</span>
               {#if node.kind !== 'source-file'}
@@ -245,6 +245,11 @@
   .node.unassigned {
     background: var(--panel);
     color: var(--ink-soft);
+  }
+
+  .node.directory .name {
+    font-family: var(--code);
+    font-size: 12px;
   }
 
   .node.source-file .name {
