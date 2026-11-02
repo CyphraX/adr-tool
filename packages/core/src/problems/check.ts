@@ -1,7 +1,13 @@
 import type { Adr } from '../adr/adr'
 import type { NamingScheme } from '../log/naming'
 import { BACK_REFERENCE_KEYS } from '../relation'
-import type { Relation } from '../relations/graph'
+import type { LogContext, Relation } from '../relations/graph'
+import {
+  absoluteReference,
+  isQualified,
+  normalReference,
+  referenceTo
+} from '../relations/reference'
 import type { BackReferenceKey, Problem } from './problem'
 
 const MIRRORED = Object.entries(BACK_REFERENCE_KEYS) as [
@@ -16,9 +22,11 @@ const MIRRORED = Object.entries(BACK_REFERENCE_KEYS) as [
 export function checkConsistency(
   adrs: readonly Adr[],
   relations: readonly Relation[],
-  scheme: NamingScheme
+  scheme: NamingScheme,
+  log: LogContext = { path: '', guests: [] }
 ): Problem[] {
   const byId = new Map(adrs.map((adr) => [adr.id, adr]))
+  const guests = new Set(log.guests.map((guest) => guest.reference))
   const inEffect = relations.filter((relation) => relation.state === 'in-effect')
   const problems: Problem[] = []
 
@@ -27,8 +35,13 @@ export function checkConsistency(
 
     // The Relation is authoritative: every one in effect needs its mirror on the target …
     for (const { from, to } of founded) {
-      const target = byId.get(to)!
-      if (!target.metadata.backReferences[key].includes(from)) {
+      // A target in another log is that log's to check.
+      const target = byId.get(to)
+      if (!target) continue
+      const mirrored = target.metadata.backReferences[key].map((item) =>
+        normalReference(log.path, item)
+      )
+      if (!mirrored.includes(from)) {
         problems.push({ kind: 'missing-back-reference', adr: to, key, source: from })
       }
       if (type === 'supersedes' && target.metadata.status !== 'superseded') {
@@ -38,10 +51,11 @@ export function checkConsistency(
 
     // … and every Back-reference needs a Relation in effect behind it.
     for (const adr of adrs) {
-      for (const source of adr.metadata.backReferences[key]) {
+      for (const written of adr.metadata.backReferences[key]) {
+        const source = normalReference(log.path, written)
         if (source === adr.id) problems.push({ kind: 'self-reference', adr: adr.id, key })
-        else if (!byId.has(source)) {
-          problems.push({ kind: 'unknown-target', adr: adr.id, key, target: source })
+        else if (!byId.has(source) && !guests.has(source)) {
+          problems.push({ kind: 'unknown-target', adr: adr.id, key, target: written })
         } else if (
           !founded.some((relation) => relation.from === source && relation.to === adr.id)
         ) {
@@ -58,8 +72,21 @@ export function checkConsistency(
     }
   }
 
-  for (const cycle of supersedesCycles(adrs, relations)) {
-    problems.push({ kind: 'supersedes-cycle', adrs: cycle })
+  // A circle may run through other logs and back: what they supersede among each other counts.
+  const known = new Set([...byId.keys(), ...guests])
+  const between = log.guests.flatMap((guest) =>
+    [...guest.metadata.relations.supersedes, ...(guest.impliedSupersedes ?? [])].flatMap(
+      (written) => {
+        const target = absoluteReference(guest.log, written)
+        const to = referenceTo(log.path, target.log, target.id)
+        return isQualified(to) && known.has(to) ? [{ from: guest.reference, to }] : []
+      }
+    )
+  )
+  for (const cycle of supersedesCycles(relations, between)) {
+    // A circle among other logs alone is theirs to report.
+    if (cycle.some((id) => !isQualified(id)))
+      problems.push({ kind: 'supersedes-cycle', adrs: cycle })
   }
 
   if (scheme === 'sequential') {
@@ -87,15 +114,20 @@ export function checkTraces(adrs: readonly Adr[], components: readonly string[])
   )
 }
 
+const ownFirst = (a: string, b: string): number =>
+  Number(isQualified(a)) - Number(isQualified(b)) || (a < b ? -1 : a > b ? 1 : 0)
+
 /**
  * Groups of ADRs that supersede each other in a circle, whatever the state of the Relations:
  * the strongly connected components of the `supersedes` graph with more than one member.
  */
-function supersedesCycles(adrs: readonly Adr[], relations: readonly Relation[]): string[][] {
+function supersedesCycles(
+  relations: readonly Relation[],
+  between: readonly { from: string; to: string }[]
+): string[][] {
   const next = new Map<string, string[]>()
-  for (const { type, from, to } of relations) {
-    if (type === 'supersedes') next.set(from, [...(next.get(from) ?? []), to])
-  }
+  const edges = [...relations.filter(({ type }) => type === 'supersedes'), ...between]
+  for (const { from, to } of edges) next.set(from, [...(next.get(from) ?? []), to])
 
   // Tarjan's algorithm.
   const index = new Map<string, number>()
@@ -125,10 +157,11 @@ function supersedesCycles(adrs: readonly Adr[], relations: readonly Relation[]):
         onStack.delete(member)
         component.push(member)
       } while (member !== id)
-      if (component.length > 1) cycles.push(component.sort())
+      // The log's own ADRs first: the first one is the ADR the Problem is reported on.
+      if (component.length > 1) cycles.push(component.sort(ownFirst))
     }
   }
 
-  for (const adr of adrs) if (!index.has(adr.id)) visit(adr.id)
+  for (const id of next.keys()) if (!index.has(id)) visit(id)
   return cycles
 }

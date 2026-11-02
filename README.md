@@ -44,7 +44,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 ### Decisions
 
 - **Browse.** The app opens one tab per repository and finds every Decision Log in it. You can filter the ADRs by Status: proposed, accepted, rejected, deprecated or superseded. Each ADR shows its Metadata, its Relations and its Back-references, and its text is rendered.
-- **Relations graph.** It shows which ADR supersedes, amends, depends on or relates to which. An ADR stands to the right of what it builds on.
+- **Relations graph.** It shows which ADR supersedes, amends, depends on or relates to which. An ADR stands to the right of what it builds on. A Relation can lead into another Decision Log of the repository, written `docs/adr/0002-…`; the graph draws that ADR with a dashed border.
 
   ![The Relations graph of a Decision Log](docs/screenshots/readme/relations.png)
 
@@ -283,7 +283,8 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
   - the known gaps before the first release and the live editor (built);
   - an `adr lint` CLI for CI (built);
   - MADR 2.x and log4brains (built);
-  - Relations across Decision Logs, committing an ADR, a branch overview;
+  - Relations across Decision Logs (built);
+  - committing an ADR, a branch overview;
   - an MCP server for agents;
   - export, timeline, board and dashboard;
   - a German translation, and the repositories in the window seen together.

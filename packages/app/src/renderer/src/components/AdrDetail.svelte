@@ -2,9 +2,11 @@
   import { repairsOf, type Adr, type DecisionLog, type Relation } from '@adr-tool/core'
   import type { Decision } from '../../../shared/ipc'
   import { problemsOf } from '../lib/problems'
+  import { namedIn, type Named } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import {
+    logName,
     STATUS_LABEL,
     describeCause,
     describeCorrection,
@@ -27,7 +29,8 @@
     /** What tells the lines apart. Never the label: two types may share a word in another language. */
     key: string
     label: string
-    other: Adr
+    /** The other ADR: of this Decision Log, or of another log of the repository. */
+    other: Named
     /** A Relation of a rejected ADR never took effect. */
     void: boolean
     /** Only the other ADR's file records it: MADR notes a supersession on the superseded ADR. */
@@ -49,20 +52,17 @@
   // Both directions: what this ADR says about others, and what others say about it.
   const relations = $derived.by((): Line[] => {
     const line = (relation: Relation, side: 'from' | 'to'): Line | undefined => {
-      const other = log.adrs.find(
-        (candidate) => candidate.id === relation[side === 'from' ? 'to' : 'from']
-      )
+      const other = namedIn(log, relation[side === 'from' ? 'to' : 'from'])
       if (!other) return undefined
-      const successor = side === 'from' ? adr : other
-      const implied =
-        relation.type === 'supersedes' &&
-        (successor.impliedSupersedes?.includes(relation.to) ?? false)
       return {
         key: `${side} ${relation.type} ${other.id}`,
         label: relationLabel(relation, side),
         other,
         void: relation.state === 'void',
-        implied: implied && side === 'from'
+        implied:
+          side === 'from' &&
+          relation.type === 'supersedes' &&
+          (adr.impliedSupersedes?.includes(relation.to) ?? false)
       }
     }
     return [
@@ -156,12 +156,19 @@
     {#if relations.length > 0}
       <ul class="relations" aria-label={t.detail.relations}>
         {#each relations as relation (relation.key)}
+          {@const other = relation.other}
           <li class:void={relation.void}>
             <span class="kind">{relation.label}</span>
-            <button onclick={() => app.select(relation.other.id)}>
-              <StatusMark status={statusKey(relation.other)} />
-              <span class="prefix">{prefixOf(relation.other)}</span>
-              {relation.other.title ?? relation.other.id}
+            <button
+              onclick={() =>
+                other.log === undefined
+                  ? app.select(other.adr.id)
+                  : app.jumpTo(other.log, other.adr.id)}
+            >
+              <StatusMark status={statusKey(other.adr)} />
+              {#if other.log !== undefined}<span class="log">{logName(other.log)}</span>{/if}
+              <span class="prefix">{prefixOf(other.adr)}</span>
+              {other.adr.title ?? other.adr.id}
             </button>
             {#if relation.void}<span class="note">{t.neverTookEffect}</span>{/if}
             {#if relation.implied}<span class="note">{IMPLIED_NOTE}</span>{/if}
@@ -216,8 +223,14 @@
           <li class:follows={cause !== undefined}>
             {describeProblem(problem)}
             {#if cause !== undefined}
-              <button class="cause" onclick={() => app.select(cause.adr)}
-                >{describeCause(cause.problem)}</button
+              <button
+                class="cause"
+                onclick={() => {
+                  // The cause may be an ADR of another log of the repository.
+                  const named = namedIn(log, cause.adr)
+                  if (named?.log !== undefined) app.jumpTo(named.log, named.adr.id)
+                  else app.select(cause.adr)
+                }}>{describeCause(cause.problem)}</button
               >
             {/if}
             {#if cause === undefined && !editing}
@@ -415,6 +428,13 @@
 
   .relations .prefix {
     color: var(--ink-soft);
+  }
+
+  /* An ADR of another Decision Log says which one, in front of its number. */
+  .relations .log {
+    margin-right: 6px;
+    font-size: 12px;
+    color: var(--ink-faint);
   }
 
   .void button {

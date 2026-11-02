@@ -1,4 +1,3 @@
-import type { Adr } from '../adr/adr'
 import type { Plan } from '../plan'
 import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
@@ -10,7 +9,8 @@ import type { BackReferenceKey, Problem } from '../problems/problem'
 import { BACK_REFERENCE_KEYS } from '../relation'
 import { plan } from './pending'
 import { planRenumber } from './renumber'
-import { requireOwnFormat, writable } from './rules'
+import { isQualified, normalReference, referenceTo } from '../relations/reference'
+import { logOf, nameOf, named, requireOwnFormat, writable } from './rules'
 
 /**
  * What repairs a Problem (docs/file-format.md, section 5, "Repairs"). Each one names the ADR
@@ -50,6 +50,8 @@ export function repairsOf(log: DecisionLog, problem: Problem): Repair[] {
   // Renumber renames a file; every other Repair writes into one, and a file in a foreign
   // format is only written by Migration.
   const foreign = new Set(log.adrs.filter((adr) => adr.foreign).map((adr) => adr.id))
+  // A Problem of another log's ADR is repaired there.
+  if ('adr' in problem && isQualified(problem.adr)) return []
   return candidatesOf(log, problem).filter(
     (repair) => repair.kind === 'renumber' || !foreign.has(repair.adr)
   )
@@ -136,6 +138,21 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
 
   const planned = await plan(fs, async (pending) => {
     const adr = writable(log, repair.adr)
+    if (repair.kind === 'remove-item' && repair.key !== 'affects') {
+      // However the item is written: `0002-b`, or `docs/adr/0002-b` in the log `docs/adr`.
+      const lists: Record<string, readonly string[]> = {
+        ...adr.metadata.relations,
+        ...adr.metadata.backReferences
+      }
+      const item = normalReference(log.path, repair.item)
+      const written = (lists[repair.key] ?? []).filter(
+        (one) => normalReference(log.path, one) === item
+      )
+      for (const one of written.length > 0 ? written : [repair.item]) {
+        await pending.write(adr.path, (view) => removeFromList(view, repair.key, one))
+      }
+      return
+    }
     await pending.write(adr.path, (view) => {
       switch (repair.kind) {
         case 'lowercase-status':
@@ -169,22 +186,21 @@ function premiseOf(log: DecisionLog, repair: Repair): string[] {
   const type = (Object.keys(BACK_REFERENCE_KEYS) as (keyof typeof BACK_REFERENCE_KEYS)[]).find(
     (relation) => BACK_REFERENCE_KEYS[relation] === repair.key
   )
-  const source: Adr | undefined = log.adrs.find((adr) => adr.id === repair.item)
-  if (!type || !source || source.id === repair.adr) return []
+  const source = named(log, repair.item)
+  if (!type || !source || ('reference' in source ? false : source.id === repair.adr)) return []
 
   // A source whose Status cannot be read is a root cause: what it voids is not repaired here.
   const { status } = source.metadata
-  if (!carries(source, type, repair.adr)) {
+  // What the source names this ADR by: the bare ID in the same log, `<log>/<ID>` from another.
+  const self = referenceTo(logOf(log, source), log.path, repair.adr)
+  const name = nameOf(source)
+  if (!carries(source, type, self)) {
     return [
-      `${source.id} does not name ${repair.adr} in ${type}. If it should, cancel and add it to ${source.id} by hand: the Back-reference is right then.`
+      `${name} does not name ${repair.adr} in ${type}. If it should, cancel and add it to ${name} by hand: the Back-reference is right then.`
     ]
   }
   if (status === 'proposed') {
-    return [
-      `${source.id} is still proposed. When it is accepted, the Back-reference is written again.`
-    ]
+    return [`${name} is still proposed. When it is accepted, the Back-reference is written again.`]
   }
-  return status === 'rejected'
-    ? [`${source.id} was rejected: its Relations never take effect.`]
-    : []
+  return status === 'rejected' ? [`${name} was rejected: its Relations never take effect.`] : []
 }

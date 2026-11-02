@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Adr, RelationType } from '@adr-tool/core'
   import type { ComponentName } from '../../../shared/ipc'
+  import { everyNamed, namedIn, type Named } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
+  import { logName, RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import ChipInput from './ChipInput.svelte'
   import Picker from './Picker.svelte'
   import StatusMark from './StatusMark.svelte'
@@ -38,10 +39,16 @@
   /** How deep a Component lies, for the indentation of the picker. */
   const depthOf = (component: ComponentName): number => component.id.split('/').length - 1
 
-  /** The ADRs a Relation of this type can still be added to. */
-  function candidates(type: RelationType, chosen: string[]): Adr[] {
-    return adrs.filter((candidate) => {
-      if (candidate.id === editing?.adrId || chosen.includes(candidate.id)) return false
+  /**
+   * The ADRs a Relation of this type can still be added to: of this Decision Log, and of the
+   * other logs of the repository (docs/file-format.md, section 3).
+   */
+  function candidates(type: RelationType, chosen: string[]): Named[] {
+    const log = app.log
+    if (!log) return []
+    const taken = new Set(chosen.map((id) => namedIn(log, id)?.id ?? id))
+    return everyNamed(log).filter(({ id, adr: candidate }) => {
+      if (id === editing?.adrId || taken.has(id)) return false
       const status = statusKey(candidate)
       // Accepting such a Relation writes to its target, and a foreign file is never written.
       if ((type === 'supersedes' || type === 'amends') && candidate.foreign) return false
@@ -105,10 +112,12 @@
           {#if chosen.length > 0}
             <ul aria-label={RELATION_TYPE_LABEL[type]}>
               {#each chosen as id (id)}
-                {@const other = adrs.find((candidate) => candidate.id === id)}
-                <li class:missing={!other}>
-                  {#if other}
+                {@const named = app.log && namedIn(app.log, id)}
+                <li class:missing={!named}>
+                  {#if named}
+                    {@const other = named.adr}
                     <StatusMark status={statusKey(other)} />
+                    {#if named.log !== undefined}<span class="log">{logName(named.log)}</span>{/if}
                     <span class="prefix">{prefixOf(other)}</span>
                     <span class="title">{other.title ?? other.id}</span>
                   {:else}
@@ -127,12 +136,13 @@
             label={t.metadata.addTo(RELATION_TYPE_LABEL[type])}
             placeholder={t.metadata.pickerPlaceholder}
             noneLeft={t.metadata.noneLeft}
-            textOf={(other) => `${other.id} ${prefixOf(other)} ${other.title ?? ''}`}
+            textOf={({ id, adr: other }) => `${id} ${prefixOf(other)} ${other.title ?? ''}`}
             newestFirst
             onpick={(id) => chosen.push(id)}
           >
-            {#snippet option(other)}
+            {#snippet option({ adr: other, log })}
               <StatusMark status={statusKey(other)} />
+              {#if log !== undefined}<span class="log">{logName(log)}</span>{/if}
               <span class="prefix">{prefixOf(other)}</span>
               <span class="title">{other.title ?? other.id}</span>
             {/snippet}
@@ -290,6 +300,12 @@
   .prefix {
     flex: none;
     color: var(--ink-soft);
+  }
+
+  .log {
+    flex: none;
+    font-size: 12px;
+    color: var(--ink-faint);
   }
 
   .title {

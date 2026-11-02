@@ -3,7 +3,8 @@ import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { addToList, setScalar } from '../metadata/write'
 import { plan } from './pending'
-import { requireStatus, requireTarget, writable } from './rules'
+import { referenceTo } from '../relations/reference'
+import { logOf, requireStatus, requireTarget, writable, writableTarget } from './rules'
 
 export interface Today {
   /** The date to record, `YYYY-MM-DD`, in the user's own time zone. */
@@ -26,24 +27,27 @@ export function planAccept(
     requireStatus(adr, ['proposed'], 'Only a proposed ADR can be accepted.')
 
     const superseded = adr.metadata.relations.supersedes.map((target) => {
-      const old = writable(log, target, `${id} supersedes ${target}`)
+      const old = writableTarget(log, target, `${id} supersedes ${target}`)
       requireTarget('supersedes', old)
       return old
     })
     const amended = adr.metadata.relations.amends.map((target) => {
-      const base = writable(log, target, `${id} amends ${target}`)
+      const base = writableTarget(log, target, `${id} amends ${target}`)
       requireTarget('amends', base)
       return base
     })
 
     await pending.write(adr.path, (view) => setScalar(view, 'status', 'accepted'))
     await pending.write(adr.path, (view) => setScalar(view, 'decided', date(when)))
+    // A target in another log names this ADR with its log's directory.
     for (const old of superseded) {
+      const self = referenceTo(logOf(log, old), log.path, id)
       await pending.write(old.path, (view) => setScalar(view, 'status', 'superseded'))
-      await pending.write(old.path, (view) => addToList(view, 'superseded-by', id))
+      await pending.write(old.path, (view) => addToList(view, 'superseded-by', self))
     }
     for (const base of amended) {
-      await pending.write(base.path, (view) => addToList(view, 'amended-by', id))
+      const self = referenceTo(logOf(log, base), log.path, id)
+      await pending.write(base.path, (view) => addToList(view, 'amended-by', self))
     }
   })
 }

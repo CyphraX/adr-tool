@@ -186,6 +186,7 @@ describe('creating an ADR', () => {
       naming: 'sequential',
       adrs: [],
       relations: [],
+      guests: [],
       problems: []
     }
     const plan = await planCreate(fs, empty, {

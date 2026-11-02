@@ -5,7 +5,8 @@ import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList } from '../metadata/write'
 import { RELATION_TYPES, type RelationType } from '../relation'
 import { Refusal, plan } from './pending'
-import { requireTarget, writable } from './rules'
+import { isQualified, normalReference } from '../relations/reference'
+import { named, requireTarget, writable, type AnyAdr } from './rules'
 
 /**
  * The lists of an ADR's Metadata as they should be afterwards. A list that is left out is
@@ -54,7 +55,20 @@ export function planEditMetadata(
     }
     for (const type of RELATION_TYPES) {
       const wanted = edit.relations?.[type]
-      if (wanted) change(type, adr.metadata.relations[type], [...new Set(wanted)])
+      if (!wanted) continue
+      // An ADR is named once. What is written stays as it is written; what is new is written as
+      // the tool writes it: `0002-b` for `docs/adr/0002-b` in the log `docs/adr`.
+      const normal = (item: string): string => normalReference(log.path, item)
+      const written = new Map<string, string>()
+      for (const item of adr.metadata.relations[type]) {
+        if (!written.has(normal(item))) written.set(normal(item), item)
+      }
+      const items = new Map<string, string>()
+      for (const item of wanted) {
+        if (!items.has(normal(item)))
+          items.set(normal(item), written.get(normal(item)) ?? normal(item))
+      }
+      change(type, adr.metadata.relations[type], [...items.values()])
     }
     if (edit.affects) change('affects', adr.metadata.affects, [...new Set(edit.affects)])
 
@@ -86,11 +100,19 @@ export function planEditMetadata(
   })
 }
 
-/** The target of a new Relation: another ADR of the same Decision Log. */
-function other(log: DecisionLog, id: string, target: string): DecisionLog['adrs'][number] {
-  if (target === id) throw new Refusal(`${id} cannot have a Relation to itself.`)
-  const adr = log.adrs.find((candidate) => candidate.id === target)
-  if (!adr) throw new Refusal(`There is no ADR ${target} in this Decision Log.`)
+/** The target of a new Relation: another ADR of the Decision Log, or of another log. */
+function other(log: DecisionLog, id: string, target: string): AnyAdr {
+  if (normalReference(log.path, target) === id) {
+    throw new Refusal(`${id} cannot have a Relation to itself.`)
+  }
+  const adr = named(log, target)
+  if (!adr) {
+    throw new Refusal(
+      isQualified(target)
+        ? `There is no ADR ${target} in this repository.`
+        : `There is no ADR ${target} in this Decision Log.`
+    )
+  }
   return adr
 }
 

@@ -2,9 +2,10 @@
   import { RELATION_TYPES, type DecisionLog } from '@adr-tool/core'
   import { NODE, layoutGraph, pathOf } from '../lib/graph-layout'
   import { problemsOf } from '../lib/problems'
+  import { everyNamed } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
+  import { logName, RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   // The Relations of the Decision Log in view as a drawing: left to right is "builds on",
@@ -12,15 +13,23 @@
   // lines; the lines are one SVG underneath.
   let { log }: { log: DecisionLog } = $props()
 
+  // An ADR of another Decision Log is drawn where a Relation leads to it or comes from it.
+  const named = $derived(new Map(everyNamed(log).map((one) => [one.id, one])))
+  const ids = $derived.by(() => {
+    const related = new Set(log.relations.flatMap(({ from, to }) => [from, to]))
+    const guests = (log.guests ?? []).map((guest) => guest.reference)
+    return [
+      ...guests.filter((reference) => related.has(reference)),
+      ...log.adrs.map(({ id }) => id)
+    ]
+  })
+
   // `relates-to` does not say which of the two builds on the other.
   const layout = $derived(
-    layoutGraph(
-      log.adrs.map((adr) => adr.id),
-      log.relations,
-      { decidesLayer: (relation) => relation.type !== 'relates-to' }
-    )
+    layoutGraph(ids, log.relations, {
+      decidesLayer: (relation) => relation.type !== 'relates-to'
+    })
   )
-  const adrOf = $derived(new Map(log.adrs.map((adr) => [adr.id, adr])))
   // The keyboard goes through the drawing as the eye does: column by column, top to bottom.
   const nodes = $derived(layout.nodes.toSorted((a, b) => a.layer - b.layer || a.y - b.y))
   const selectedId = $derived(app.selected?.id)
@@ -74,25 +83,34 @@
         </svg>
 
         {#each nodes as node (node.id)}
-          {@const adr = adrOf.get(node.id)}
-          {#if adr}
+          {@const one = named.get(node.id)}
+          {#if one}
+            {@const adr = one.adr}
             {@const status = statusKey(adr)}
-            {@const problems = problemsOf(app.problemGroups, adr.id).filter(
-              (own) => !own.cause
-            ).length}
+            {@const problems =
+              one.log === undefined
+                ? problemsOf(app.problemGroups, adr.id).filter((own) => !own.cause).length
+                : 0}
             <button
               id="node-{node.id}"
               class="node {status}"
+              class:guest={one.log !== undefined}
               class:selected={node.id === selectedId}
               style:left="{node.x}px"
               style:top="{node.y}px"
               style:width="{NODE.width}px"
               style:height="{NODE.height}px"
-              title={adr.title ?? adr.id}
+              title={one.log === undefined
+                ? (adr.title ?? adr.id)
+                : t.graph.inLog(one.log, adr.title ?? adr.id)}
               aria-current={node.id === selectedId}
-              onclick={() => app.select(node.id)}
+              onclick={() =>
+                one.log === undefined ? app.select(adr.id) : app.jumpTo(one.log, adr.id)}
             >
               <StatusMark {status} />
+              {#if one.log !== undefined}
+                <span class="log">{one.log === '' ? logName('') : one.log.split('/').at(-1)}/</span>
+              {/if}
               <span class="prefix">{prefixOf(adr)}</span>
               <span class="title">{adr.title ?? adr.id}</span>
               {#if problems > 0}
@@ -269,6 +287,19 @@
   .node.selected {
     border-color: var(--focus);
     background: var(--selected);
+  }
+
+  /* An ADR of another Decision Log: drawn for the Relation, kept and shown in its own log. */
+  .node.guest {
+    border-style: dashed;
+    background: var(--panel);
+  }
+
+  .log {
+    flex: none;
+    margin-right: -4px;
+    font-size: 11.5px;
+    color: var(--ink-faint);
   }
 
   .node :global(svg) {

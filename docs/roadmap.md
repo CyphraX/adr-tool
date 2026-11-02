@@ -38,7 +38,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 - MCP server, so agents get first-class access on top of `core`
 - git write: a "commit this ADR" convenience (stage and commit, possibly push)
 - Branch overview: `proposed` ADRs on branches that are not checked out, and a warning when a number is already taken on another branch
-- Relations across Decision Logs, written as `<log>/<ID>`; a bare ID keeps meaning "same log"
+- ~~Relations across Decision Logs, written as `<log>/<ID>`; a bare ID keeps meaning "same log"~~ Built on 2026-11-02 ([file-format.md, section 3](file-format.md#3-metadata); [plan-roadmap.md](plan-roadmap.md), part 6).
 - Live editor: table rendering
 - UI translations. The app's own texts are in two modules of the renderer and one of the main process, ready to be replaced. `core` still answers in English sentences — why it refuses an operation, what a change warns about, what is wrong with a piece of Metadata, why a foreign file has no Migration — and so does the wording of Problems, which has moved to `core` for `adr lint` and has its codes already; the rest needs codes before the window can be translated whole
 - Read-only export for non-technical readers (static site or PDF)

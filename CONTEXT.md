@@ -57,7 +57,7 @@ _Avoid_: Replace, override, update
 ### Connections
 
 **Relation**:
-A typed, directed connection from one ADR to another ADR in the same Decision Log. The types are fixed: `supersedes`, `amends`, `depends-on`, `relates-to`.
+A typed, directed connection from one ADR to another ADR of the repository: of the same Decision Log by its ID, of another log as `<log>/<ID>` ([docs/file-format.md](docs/file-format.md), section 3). The types are fixed: `supersedes`, `amends`, `depends-on`, `relates-to`.
 _Avoid_: Link, reference (a plain Markdown hyperlink to code, tickets or websites is not a Relation)
 
 **Back-reference**:

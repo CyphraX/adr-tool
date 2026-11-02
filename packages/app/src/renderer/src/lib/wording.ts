@@ -95,7 +95,7 @@ export function describeCorrection(correction: Correction): string {
 }
 
 /** What the list and the header show in front of an ADR: its number as written, or its date. */
-export function prefixOf(adr: Adr): string {
+export function prefixOf(adr: Pick<Adr, 'id' | 'number'>): string {
   const digits = /^\d+/.exec(adr.id)?.[0] ?? ''
   if (adr.number !== undefined || digits.length !== 8) return digits
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
@@ -157,7 +157,7 @@ export function describeForeign(adr: Adr): string {
 }
 
 /** Under a Problem without a Repair, when it is reported on an ADR in a foreign format. */
-export function noRepairIn(adr: Adr): string {
+export function noRepairIn(adr: Pick<Adr, 'foreign' | 'noMigration'>): string {
   if (!adr.foreign) return NO_REPAIR
   const never = `The tool reads the format of ${FOREIGN_FORMAT_NAMES[adr.foreign]} and never writes it.`
   return adr.noMigration === undefined

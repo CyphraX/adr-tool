@@ -210,7 +210,8 @@ export const t = {
       'depends-on': 'This decision only holds while that one does.',
       'relates-to': 'Worth reading together.'
     } satisfies Record<RelationType, string>,
-    notInLog: (id: string): string => `${id} — not in this Decision Log`,
+    notInLog: (id: string): string =>
+      id.includes('/') ? `${id} — not in this repository` : `${id} — not in this Decision Log`,
     remove: (item: string): string => `Remove ${item}`,
     addTo: (list: string): string => `Add to ${list}`,
     noneLeft: 'No ADR left to add',
@@ -484,6 +485,7 @@ export const t = {
       'Read it from left to right: an ADR stands to the right of what it supersedes, amends or depends on, and its arrow points there.',
     legend: 'What the lines mean',
     proposed: 'proposed',
+    inLog: (log: string, title: string): string => `${title} — in the Decision Log ${log}`,
     unrelated: (count: number): string =>
       many(
         count,

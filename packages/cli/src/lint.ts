@@ -2,6 +2,8 @@ import {
   describeCause,
   describeProblem,
   groupProblems,
+  isQualified,
+  parseReference,
   problemLocator,
   openRepository,
   type DecisionLog,
@@ -74,9 +76,30 @@ export async function lint(fs: FileSystem): Promise<LintReport | undefined> {
   for (const problem of repository.problems) {
     problems.push({ ...(await report(problem)), consequences: [] })
   }
-  for (const log of repository.logs) {
-    for (const group of groupProblems(log)) {
-      const consequences = await Promise.all(group.consequences.map((one) => report(one, log)))
+  // A root cause in one log may have consequences in another: they are listed under it, in
+  // the log it is reported in, and it is counted once.
+  const grouped = repository.logs.map((log) => ({ log, groups: groupProblems(log) }))
+  const elsewhere = new Map<string, { problem: Problem; log: DecisionLog }[]>()
+  const keyOf = (log: string, problem: Problem): string =>
+    `${log}\0${problem.kind}\0${'adr' in problem ? problem.adr : ''}`
+  for (const { log, groups } of grouped) {
+    for (const group of groups) {
+      if (!('adr' in group.problem) || !isQualified(group.problem.adr)) continue
+      const root = parseReference(group.problem.adr)
+      const key = keyOf(root.log!, { ...group.problem, adr: root.id })
+      const list = elsewhere.get(key) ?? []
+      elsewhere.set(key, [...list, ...group.consequences.map((problem) => ({ problem, log }))])
+    }
+  }
+  for (const { log, groups } of grouped) {
+    for (const group of groups) {
+      if ('adr' in group.problem && isQualified(group.problem.adr)) continue
+      const consequences = await Promise.all([
+        ...group.consequences.map((one) => report(one, log)),
+        ...(elsewhere.get(keyOf(log.path, group.problem)) ?? []).map((one) =>
+          report(one.problem, one.log)
+        )
+      ])
       problems.push({
         ...(await report(group.problem, log)),
         ...(consequences.length > 0 && { lead: describeCause(group.problem) }),
