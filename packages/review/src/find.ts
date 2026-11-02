@@ -176,8 +176,9 @@ async function historyOf(
 
 /**
  * Where the quoted lines are in `lines`: the quoted lines themselves, the nearest to where the
- * Anchor was; otherwise the most similar block that is similar enough. With history, only lines
- * that are new since, or quoted lines kept, are looked at.
+ * Anchor was; otherwise, with history, the block that holds the quoted lines the diff kept, if
+ * it is similar enough; otherwise the most similar block that is similar enough. With history,
+ * only lines that are new since, quoted lines kept, or lines the diff cannot place are looked at.
  */
 function locate(
   anchor: Anchor,
@@ -192,9 +193,16 @@ function locate(
   // Which lines may belong to the Anchor's block, and where the Anchor would be now.
   let allowed: (index: number) => boolean = () => true
   let near = start
-  if (matches) {
+  if (history && matches) {
     const { ofOld, ofNew } = matches
-    allowed = (index) => ofNew[index]! === -1 || (ofNew[index]! >= start && ofNew[index]! < end)
+    // A line the old text has more than once — a closing brace, a blank line — the diff may
+    // pair with any of them: that it kept one elsewhere says nothing about where it belongs.
+    const times = new Map<string, number>()
+    for (const line of history) times.set(line, (times.get(line) ?? 0) + 1)
+    allowed = (index) => {
+      const old = ofNew[index]!
+      return old === -1 || (old >= start && old < end) || times.get(history[old]!)! > 1
+    }
     near = expectedStart(ofOld, start)
   }
 
@@ -208,6 +216,27 @@ function locate(
     if (same && (exact === undefined || Math.abs(at - near) < Math.abs(exact - near))) exact = at
   }
   if (exact !== undefined) return { start: exact, end: exact + quote.length, similarity: 1 }
+
+  // The block that holds the quoted lines the diff kept, each where it is now: a line inserted
+  // among them belongs to the block, and a kept line is not left out for a shorter one.
+  if (matches) {
+    const pinned = quote.map((_, offset) => {
+      const now = matches.ofOld[start + offset]!
+      return now >= 0 ? now : undefined
+    })
+    const kept = pinned.filter((now) => now !== undefined)
+    if (kept.length > 0) {
+      let [from, to] = [kept[0]!, kept[kept.length - 1]! + 1]
+      let between = true
+      for (let at = from; at < to && between; at++) between = allowed(at)
+      if (between) {
+        while (from > 0 && allowed(from - 1)) from--
+        while (to < plain.length && allowed(to)) to++
+        const block = mostSimilarBlock(quote, plain, from, to, near, pinned)
+        if (block && block.similarity >= SIMILAR_ENOUGH) return block
+      }
+    }
+  }
 
   // The most similar block, in the runs of lines that may belong to it.
   const runs: [number, number][] = []

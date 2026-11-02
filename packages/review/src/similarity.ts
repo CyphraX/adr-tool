@@ -44,13 +44,17 @@ export interface Block {
  * one minus that cost over the characters of the longer of the two. Of equally similar blocks
  * the one that starts nearest to `near` wins, then the shorter one. `undefined` when the quoted
  * lines have no characters to compare, or the range no lines.
+ *
+ * `pinned` names, for a quoted line, the line of `lines` it is known to be — the diff kept it —:
+ * that quoted line is paired with that line and no other, so every block holds it.
  */
 export function mostSimilarBlock(
   quote: readonly string[],
   lines: readonly string[],
   from: number,
   to: number,
-  near: number
+  near: number,
+  pinned: readonly (number | undefined)[] = []
 ): Block | undefined {
   const n = quote.length
   const m = to - from
@@ -72,6 +76,24 @@ export function mostSimilarBlock(
     const next = new Float64Array(width)
     const nextBegin = new Int32Array(width)
     const line = quote[i - 1]!
+    const pin = pinned[i - 1]
+    if (pin !== undefined) {
+      // Paired with its line, or nothing: after it, lines of the block without a partner.
+      const at = pin - from + 1
+      next.fill(Infinity)
+      for (let j = Math.max(at, 1); j <= m; j++) {
+        if (j === at) {
+          next[j] = cost[j - 1]! + editDistance(line, lines[from + j - 1]!)
+          nextBegin[j] = begin[j - 1]!
+        } else {
+          next[j] = next[j - 1]! + lines[from + j - 1]!.length
+          nextBegin[j] = nextBegin[j - 1]!
+        }
+      }
+      cost = next
+      begin = nextBegin
+      continue
+    }
     next[0] = cost[0]! + line.length
     nextBegin[0] = begin[0]!
     for (let j = 1; j <= m; j++) {
@@ -97,7 +119,7 @@ export function mostSimilarBlock(
   let best: Block | undefined
   for (let j = 1; j <= m; j++) {
     const start = begin[j]!
-    if (start >= j) continue
+    if (start >= j || cost[j] === Infinity) continue
     const size = Math.max(quoted, before[j]! - before[start]!)
     const block = { start: from + start, end: from + j, similarity: 1 - cost[j]! / size }
     if (!best || better(block, best, near)) best = block
