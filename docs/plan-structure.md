@@ -6,7 +6,7 @@ How the second module of the suite gets built: Components, the code model, Depen
 
 ## Working mode
 
-As in v1: one branch and one pull request per part, `main` stays green, CI on Windows, macOS and Linux, cores built test-first, new terms into the glossary the moment they are settled, hard-to-reverse decisions as ADRs — written in the app as `proposed`, accepted by the author.
+As in v1: one branch and one pull request per part, `main` stays green, CI on Linux (Windows and macOS were switched off on 2026-11-02 to save runs, and come back with distribution), cores built test-first, new terms into the glossary the moment they are settled, hard-to-reverse decisions as ADRs — written in the app as `proposed`, accepted by the author.
 
 Two things carry over from v1 in particular:
 

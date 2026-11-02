@@ -19,9 +19,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Line endings, paths and file watching differ per platform, and the
-        # tool promises byte-identical files on all of them (ADR-0002).
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Linux only, to save runs. Line endings, paths and file watching differ
+        # per platform, and the tool promises byte-identical files on all of
+        # them (ADR-0002); Windows and macOS come back with distribution (see
+        # docs/roadmap.md, "Before the first public release"):
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4

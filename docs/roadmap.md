@@ -24,6 +24,7 @@ This is the plan of the ADR tool, which becomes the Decisions module of a larger
 - Editor mode 3, the live editor, in its light form: headings, emphasis, links, lists and code are rendered inline; tables stay source
 - Licence and business model (open source or commercial). Until that is decided the app stays local-only: no backend, no accounts, no telemetry
 - Distribution: installers for all three platforms, code signing, auto-update
+- Windows and macOS back into CI. They were switched off on 2026-11-02 to save runs; until then a Windows-only failure — a path, a CRLF fixture, a file held open — shows up only by hand
 - Final product name; the working title is Softarch Suite (see [vision.md](vision.md))
 - Three known gaps of v1 that a first-time user can meet at once (see "Known gaps of v1" below): images with relative paths, the Metadata dialog that can outgrow the window, and the dialogs the window closes over without asking
 

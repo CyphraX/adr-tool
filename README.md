@@ -27,7 +27,7 @@ pnpm dev
 
 The app reopens the repositories of the last run. To see every Status, Relations and a Problem at once, open the showcase Decision Log in `packages/core/test/fixtures/showcase`.
 
-`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm build` are what CI runs on Windows, macOS and Linux.
+`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm build` are what CI runs, on Linux for now; Windows and macOS are switched off until distribution (see [roadmap.md](docs/roadmap.md)).
 
 ## Layout
 
