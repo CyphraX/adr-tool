@@ -1,7 +1,8 @@
 /**
  * Where Decisions and Structure meet: an ADR's Traces name Components, and so do the Rules of
- * Conformance. The cores do not know each other (ADR-0006); the app reads what Structure
- * declares and hands it to `core`, and puts the parts of a Rename together into one change set.
+ * Conformance. `core` does not know Structure, and no core knows another's operations
+ * (ADR-0006); the app reads what Structure declares and hands it to `core`, and puts the parts
+ * of a Rename together into one change set.
  */
 import {
   joinChangeSets,

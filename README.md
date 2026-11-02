@@ -328,7 +328,7 @@ CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull re
 
 ### Project layout
 
-A pnpm monorepo. Each module of the suite has one UI-free core package, and the module cores never depend on each other ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)).
+A pnpm monorepo. Each module of the suite has one UI-free core package. The module cores depend on the kernel and may depend on Structure's model, whose Components every module refers to; otherwise they never depend on each other ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)).
 
 | Package | Contents |
 | --- | --- |
