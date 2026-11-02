@@ -50,7 +50,9 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [12, '0012-committing-an-adr-runs-git-commit-for-its-files-only', 'accepted'],
     [13, '0013-agents-write-adrs-through-the-mcp-server-as-previewed-change', 'accepted'],
     [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted'],
-    [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted']
+    [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted'],
+    [19, '0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history', 'accepted'],
+    [20, '0020-git-is-a-port-of-the-kernel-implemented-once-for-node', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -113,6 +115,36 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       from: '0015-a-change-set-is-written-beside-its-files-and-renamed-into',
       to: '0004-operations-return-change-sets',
       state: 'in-effect'
-    }
+    },
+    ...[
+      '0004-operations-return-change-sets',
+      '0020-git-is-a-port-of-the-kernel-implemented-once-for-node'
+    ].map((to) => ({
+      type: 'depends-on',
+      from: '0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history',
+      to,
+      state: 'in-effect'
+    })),
+    {
+      type: 'relates-to',
+      from: '0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history',
+      to: '0002-never-reserialize-markdown',
+      state: 'in-effect'
+    },
+    {
+      type: 'depends-on',
+      from: '0020-git-is-a-port-of-the-kernel-implemented-once-for-node',
+      to: '0006-one-core-package-per-module-on-a-shared-kernel',
+      state: 'in-effect'
+    },
+    ...[
+      '0007-the-analysis-never-executes-anything-from-the-analysed',
+      '0012-committing-an-adr-runs-git-commit-for-its-files-only'
+    ].map((to) => ({
+      type: 'relates-to',
+      from: '0020-git-is-a-port-of-the-kernel-implemented-once-for-node',
+      to,
+      state: 'in-effect'
+    }))
   ])
 })

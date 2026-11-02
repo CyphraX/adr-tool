@@ -41,7 +41,7 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
 
   // The packages of the workspace are the top level.
   const top = structure.components.map((component) => component.id)
-  expect(top).toEqual(['app', 'cli', 'core', 'kernel', 'mcp', 'structure'])
+  expect(top).toEqual(['app', 'cli', 'core', 'kernel', 'mcp', 'review', 'structure'])
   expect(structure.components.find((component) => component.id === 'core')!.paths).toEqual([
     'packages/core/**'
   ])

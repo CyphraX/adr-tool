@@ -48,6 +48,8 @@ components:
         paths: [packages/kernel/src/text/**]
   mcp:
     paths: [packages/mcp/**]
+  review:
+    paths: [packages/review/**]
   structure:
     paths: [packages/structure/**]
     components:
