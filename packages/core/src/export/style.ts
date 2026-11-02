@@ -118,6 +118,10 @@ details.corrections ul { margin: 0.4rem 0 0; padding-left: 1.25rem; }
 .body th, .body td { border: 1px solid var(--line); padding: 0.3rem 0.6rem; text-align: left; }
 .body blockquote { margin: 0; padding-left: 1rem; border-left: 3px solid var(--line); color: var(--ink-soft); }
 .body a[title]:not([href]) { color: inherit; text-decoration: underline dotted; }
+/* A drawn Mermaid block: drawn on light paper, which it was drawn for, in either scheme. */
+.body figure.diagram { margin: 0 0 1rem; }
+.body figure.diagram img { display: block; max-width: 100%; height: auto; padding: 0.75rem; border-radius: 6px; background: #fcfcfd; border: 1px solid var(--line); }
+.body details.diagram-source { margin-top: 0.35rem; font-family: var(--ui); font-size: 0.8rem; color: var(--ink-faint); }
 
 footer { padding-top: 1rem; padding-bottom: 2.5rem; color: var(--ink-faint); font-size: 0.8rem; }
 
@@ -131,7 +135,8 @@ footer { padding-top: 1rem; padding-bottom: 2.5rem; color: var(--ink-faint); fon
   article.adr { max-width: none; margin: 0; border: 0; border-radius: 0; padding: 0; background: none; }
   .print article.adr + article.adr { break-before: page; }
   article.adr header, dl.facts, dl.relations { break-inside: avoid; }
-  .body pre, .body table, .body img, .body blockquote { break-inside: avoid; }
+  .body pre, .body table, .body img, .body blockquote, .body figure.diagram { break-inside: avoid; }
+  .body details.diagram-source { display: none; }
   .body h2, .body h3 { break-after: avoid; }
   details.corrections > *:not(summary) { display: block; }
   a { color: inherit; text-decoration: none; }

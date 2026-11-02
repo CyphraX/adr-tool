@@ -13,7 +13,7 @@ import {
   type ViewUpdate
 } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import { liveMarks, liveTables, stepIntoTable, type LiveTable } from './live'
+import { liveDiagrams, liveMarks, liveTables, stepIntoTable, type LiveTable } from './live'
 
 // The source of an ADR is its raw material: monospace, quiet, with just enough emphasis to
 // find one's way. The colours come from the app's tokens, so light and dark follow.
@@ -67,7 +67,12 @@ const hidden = Decoration.replace({})
 const bullet = Decoration.replace({ widget: new Bullet() })
 
 function decorationsOf(state: EditorState): DecorationSet {
-  const ranges: Range<Decoration>[] = liveMarks(state).map((mark) => {
+  // A Mermaid block drawn as its diagram has no lines to mark.
+  const drawn = state.facet(diagramRenderer) ? liveDiagrams(state) : []
+  const marks = liveMarks(state).filter(
+    (mark) => !drawn.some((diagram) => mark.from >= diagram.from && mark.from <= diagram.to)
+  )
+  const ranges: Range<Decoration>[] = marks.map((mark) => {
     switch (mark.kind) {
       case 'hide':
         return hidden.range(mark.from, mark.to)
@@ -163,7 +168,23 @@ const liveTheme = EditorView.theme({
   // A column the delimiter row aligns keeps its alignment.
   '.cm-live-table th:not([align])': { textAlign: 'left' },
   '.cm-live-table th': { fontWeight: '600', background: 'var(--panel)' },
-  '.cm-live-table code': { fontFamily: 'var(--code)', fontSize: '0.9em' }
+  '.cm-live-table code': { fontFamily: 'var(--code)', fontSize: '0.9em' },
+  // A Mermaid block reads as in the preview: its diagram, or its source and why it is not drawn.
+  '.cm-live-diagram': { padding: '4px 0 8px', cursor: 'text', overflowX: 'auto' },
+  '.cm-live-diagram svg': { display: 'block', maxWidth: '100%', height: 'auto' },
+  '.cm-live-diagram figure': { margin: '0' },
+  '.cm-live-diagram pre': {
+    margin: '0',
+    fontFamily: 'var(--code)',
+    fontSize: '13.5px',
+    whiteSpace: 'pre-wrap',
+    backgroundColor: 'var(--panel)'
+  },
+  '.cm-live-diagram .diagram-error': {
+    fontFamily: 'var(--ui)',
+    fontSize: '12.5px',
+    color: 'var(--problem)'
+  }
 })
 
 /** How the live mode renders a table: as the preview does, sanitized. Without one, tables stay source. */
@@ -216,6 +237,73 @@ function tablesOf(state: EditorState): DecorationSet {
 }
 
 /**
+ * How the live mode draws a Mermaid block into a box: its diagram, or its source with the
+ * sentence that says why there is none; `done` once the box has its size. Without one, the
+ * blocks stay source.
+ */
+const diagramRenderer = Facet.define<
+  (source: string, box: HTMLElement, done: () => void) => void,
+  ((source: string, box: HTMLElement, done: () => void) => void) | undefined
+>({
+  combine: (values) => values[0]
+})
+
+/** A Mermaid block of the text, drawn in place of its lines. A click into it puts the cursor there. */
+class Diagram extends WidgetType {
+  constructor(
+    readonly source: string,
+    readonly render: (source: string, box: HTMLElement, done: () => void) => void
+  ) {
+    super()
+  }
+  override eq(other: Diagram): boolean {
+    return other.source === this.source
+  }
+  toDOM(view: EditorView): HTMLElement {
+    const box = document.createElement('div')
+    box.className = 'cm-live-diagram'
+    // Until it is drawn, the block is its source.
+    const pre = document.createElement('pre')
+    pre.textContent = this.source
+    box.append(pre)
+    this.render(this.source, box, () => view.requestMeasure())
+    const inert = (event: Event): void => {
+      if ((event.target as Element).closest('a')) event.preventDefault()
+    }
+    for (const type of ['click', 'auxclick', 'dragstart']) box.addEventListener(type, inert)
+    return box
+  }
+  override ignoreEvent(): boolean {
+    return false
+  }
+}
+
+function diagramsOf(state: EditorState): DecorationSet {
+  const render = state.facet(diagramRenderer)
+  if (!render) return Decoration.none
+  return Decoration.set(
+    liveDiagrams(state).map((diagram) =>
+      Decoration.replace({ widget: new Diagram(diagram.source, render), block: true }).range(
+        diagram.from,
+        diagram.to
+      )
+    )
+  )
+}
+
+/** The Mermaid blocks of the live mode, replaced as the tables are, by a field of the state. */
+const diagrams = StateField.define<DecorationSet>({
+  create: diagramsOf,
+  update: (value, transaction) =>
+    transaction.docChanged ||
+    transaction.selection ||
+    syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
+      ? diagramsOf(transaction.state)
+      : value,
+  provide: (field) => EditorView.decorations.from(field)
+})
+
+/**
  * The tables of the live mode. A table spans lines, and only a field of the state may replace
  * whole lines; a plugin may not (docs/plan-roadmap.md, part 11).
  */
@@ -230,14 +318,16 @@ const tables = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field)
 })
 
-/** The cursor moves a line down or up into a table, rather than over it. */
+/** The cursor moves a line down or up into a table or a diagram, rather than over it. */
 const intoTable =
   (direction: 1 | -1) =>
   (view: EditorView): boolean => {
     const drawn: LiveTable[] = []
-    view.state.field(tables).between(0, view.state.doc.length, (from, to) => {
-      drawn.push({ from, to })
-    })
+    for (const field of [tables, diagrams]) {
+      view.state.field(field).between(0, view.state.doc.length, (from, to) => {
+        drawn.push({ from, to })
+      })
+    }
     const to = stepIntoTable(view.state, drawn, direction)
     if (to === undefined) return false
     view.dispatch({ selection: { anchor: to }, scrollIntoView: true })
@@ -254,6 +344,7 @@ const tableKeys = Prec.high(
 const live = [
   livePlugin,
   tables,
+  diagrams,
   tableKeys,
   liveTheme,
   EditorView.editorAttributes.of({ class: 'cm-live' })
@@ -276,6 +367,8 @@ export interface BodyEditorOptions {
   live?: boolean
   /** How the live mode renders a table, as sanitized HTML. */
   renderTable?: (markdown: string) => string
+  /** How the live mode draws a Mermaid block into a box, sanitized. */
+  renderDiagram?: (source: string, box: HTMLElement, done: () => void) => void
 }
 
 /** A CodeMirror 6 editor for the body of an ADR. It holds plain text; nothing is ever re-serialized. */
@@ -291,6 +384,7 @@ export function createBodyEditor(options: BodyEditorOptions): EditorView {
         markdown({ base: markdownLanguage }),
         liveMode.of(options.live ? live : []),
         options.renderTable ? tableRenderer.of(options.renderTable) : [],
+        options.renderDiagram ? diagramRenderer.of(options.renderDiagram) : [],
         syntaxHighlighting(highlighting),
         theme,
         keymap.of([

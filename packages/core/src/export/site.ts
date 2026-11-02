@@ -14,6 +14,11 @@ export interface ExportOptions {
   readonly title: string
   /** When it was made, `YYYY-MM-DD`; every page says so. */
   readonly date: string
+  /**
+   * The Mermaid blocks drawn, as SVG by their source (docs/adr/0016-…). A block whose source is
+   * not among them stays a code block; without any, every block does, as in `adr export`.
+   */
+  readonly diagrams?: ReadonlyMap<string, string>
 }
 
 export interface ExportedFile {
@@ -128,6 +133,23 @@ export function exportSite(repository: Repository, options: ExportOptions): Expo
   }
   const images = new Set<string>()
   const files: ExportedFile[] = [{ path: 'style.css', text: STYLE }]
+  /** The drawings of the Mermaid blocks, by where they go: beside the page of their ADR. */
+  const drawings = new Map<string, string>()
+  /** Per ADR, the path of the drawing of each of its blocks, by its source. */
+  const drawingsOf = new Map<string, Map<string, string>>()
+  const drawingOf = (exported: Exported, source: string): string | undefined => {
+    const svg = options.diagrams?.get(source)
+    if (svg === undefined) return undefined
+    const own = drawingsOf.get(exported.page) ?? new Map<string, string>()
+    drawingsOf.set(exported.page, own)
+    let path = own.get(source)
+    if (path === undefined) {
+      path = `${exported.page.replace(/\.html$/, '')}.diagram-${own.size + 1}.svg`
+      own.set(source, path)
+      drawings.set(path, svg)
+    }
+    return path
+  }
 
   /** The links of a page at `page`, for an ADR in `directory`; in print, to the anchors. */
   // In print every ADR is on one page: its headings are told apart by its anchor.
@@ -147,7 +169,11 @@ export function exportSite(repository: Repository, options: ExportOptions): Expo
       images.add(path)
       return hrefFrom(print ? PRINT_PAGE : exported.page, path)
     },
-    heading: (slug) => headingIn(exported, print, slug)
+    heading: (slug) => headingIn(exported, print, slug),
+    diagram: (source) => {
+      const path = drawingOf(exported, source)
+      return path === undefined ? undefined : hrefFrom(print ? PRINT_PAGE : exported.page, path)
+    }
   })
 
   const articles: string[] = []
@@ -201,6 +227,11 @@ export function exportSite(repository: Repository, options: ExportOptions): Expo
     `<main class="print">\n${articles.join('\n')}\n</main>`
   )
   files.push({ path: PRINT_PAGE, text: print })
+  for (const [path, svg] of drawings) {
+    files.push({ path, text: svg })
+    // An image of the repository of that very name would be written over the drawing.
+    images.delete(path)
+  }
   // What the export consists of: a later export into the directory removes what it no longer has.
   const marker = (copied: readonly string[]): ExportedFile => ({
     path: EXPORT_MARKER,

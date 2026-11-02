@@ -10,6 +10,7 @@ import {
   type TemplateInfo
 } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
+import { mermaidSources } from '@adr-tool/core/export'
 import type {
   BranchOverview,
   CommitPlan,
@@ -18,11 +19,15 @@ import type {
   OpenRepository,
   PlannedChange,
   SourceFileText,
+  StructureOutline,
   StructureView
 } from '../../../shared/ipc'
 import type { Language } from '../../../shared/language'
+import { drawnForExport } from './diagrams'
 import { followHistory, recordedIn } from './history'
 import { chooseLanguage } from './language'
+import type { Module } from './modules'
+import { repositoryProblems } from './repository-problems'
 import { wordOf } from './said'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
@@ -47,9 +52,10 @@ export type MiddleView =
   /** Every ADR of every open repository, and every Problem (docs/plan-roadmap.md, part 13). */
   | 'all-adrs'
   | 'all-problems'
+  /** Every Problem of the repository in front, of every module (docs/plan-vision.md, part 2). */
+  | 'repository-problems'
 
-/** The modules of the suite the window switches between, per repository. */
-export type Module = 'decisions' | 'structure'
+export type { Module }
 
 /** What the middle of the Structure view shows of a level: the drawing, the matrix, or the metrics. */
 export type StructureShow = 'graph' | 'matrix' | 'metrics'
@@ -88,6 +94,22 @@ interface StructureTab {
   selection: StructureSelection | undefined
   /** The Source File the middle shows instead of the level, if one is open. */
   code: CodeView | undefined
+  /** The middle shows the Problems of the repository instead of the level. */
+  problems: boolean
+}
+
+/**
+ * What Structure knows of the whole repository (`StructureOutline`), for the Problems of the
+ * repository and the search: the last answer, kept while the next one is asked for.
+ */
+interface OutlineTab {
+  known: StructureOutline | undefined
+  /** An analysis is asked for and has not answered yet. */
+  reading: boolean
+  /** Why the last one failed. */
+  failed: string | undefined
+  /** Counts the requests, so that an answer that is overtaken is dropped. */
+  asked: number
 }
 
 /** What branches that are not checked out do to the ADRs, as git was last asked. */
@@ -111,6 +133,7 @@ interface Tab {
   statusFilter: StatusFilter
   selectedId: string | undefined
   structure: StructureTab
+  outline: OutlineTab
   branches: BranchesTab
   /** How the Relations graph is shown: the Relation types it draws, and its scale. */
   graph: { types: RelationType[]; scale: number }
@@ -312,6 +335,11 @@ class AppState {
   /** The Problems of the log in view: each root cause once, with what follows from it. */
   readonly problemGroups = $derived(this.log ? groupProblems(this.log) : [])
 
+  /** Every Problem of the repository in front, of every module (docs/plan-vision.md, part 2). */
+  readonly repositoryProblems = $derived(
+    this.active && repositoryProblems(this.active.repository, this.active.outline)
+  )
+
   /** Whether the editor holds text that is not on disk. */
   readonly dirty = $derived(
     this.editing !== undefined && this.editing.text !== withLf(this.editing.base)
@@ -340,6 +368,7 @@ class AppState {
       if (tab?.structure.view) void this.loadStructure(tab)
       // The file in the viewer may be one that changed.
       if (tab?.structure.code) void this.readSourceFile(tab)
+      if (tab?.outline.known || tab?.outline.reading) void this.loadOutline(tab)
     })
     window.api.onCloseRequested(() => this.requestClose())
     const session = await window.api.restoreSession()
@@ -347,6 +376,8 @@ class AppState {
     this.activeId = session.activeId
     this.ready = true
     for (const tab of this.tabs) void this.loadBranches(tab)
+    // The count of the repository's Problems stands in every sidebar: Structure's are asked for.
+    this.needOutline(this.active)
   }
 
   async open(): Promise<void> {
@@ -358,6 +389,7 @@ class AppState {
         void this.loadBranches(this.tabs.at(-1))
       }
       this.activeId = repository.id
+      this.needOutline(this.active)
     })
   }
 
@@ -380,6 +412,7 @@ class AppState {
     this.leaveEditor(() => {
       this.activeId = id
       void window.api.setActiveRepository(id)
+      this.needOutline(this.active)
     })
   }
 
@@ -454,23 +487,105 @@ class AppState {
     tab.structure.expanded = []
     tab.structure.selection = undefined
     tab.structure.code = undefined
+    tab.structure.problems = false
     void this.loadStructure(tab)
   }
 
   /**
    * Show a Component's page in the Structure view, at the level it is part of: where an ADR
-   * names it, say.
+   * names it, say, or the search finds it. From the Problems of the repository, they stay in
+   * the middle (`fromProblems`).
    */
-  showComponent(id: string): void {
+  showComponent(id: string, fromProblems = false): void {
     const tab = this.active
     if (!tab) return
+    this.searching = undefined
     this.leaveEditor(() => {
       tab.module = 'structure'
       tab.structure.parent = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : undefined
       tab.structure.expanded = []
       tab.structure.selection = { kind: 'node', id }
       tab.structure.code = undefined
+      tab.structure.problems = fromProblems
       void this.loadStructure(tab)
+    })
+  }
+
+  /** Show a Source File in the code viewer of Structure, from wherever the view is: the search. */
+  showSourceFile(path: string): void {
+    const tab = this.active
+    if (!tab) return
+    this.searching = undefined
+    this.leaveEditor(() => {
+      tab.module = 'structure'
+      if (!tab.structure.view) void this.loadStructure(tab)
+      this.openSourceFile(path)
+    })
+  }
+
+  /** Ask what Structure knows of the whole repository: every Component and Source File, and its Problems. */
+  async loadOutline(tab: Tab | undefined = this.active): Promise<void> {
+    if (!tab) return
+    const outline = tab.outline
+    const asked = ++outline.asked
+    outline.reading = true
+    const result = await window.api
+      .structureOutline(tab.repository.id)
+      .catch((error: unknown) => ({ ok: false as const, reason: String(error) }))
+    if (asked !== outline.asked) return
+    outline.reading = false
+    if (result.ok) {
+      outline.known = result.outline
+      outline.failed = undefined
+    } else {
+      outline.failed = result.reason
+    }
+  }
+
+  /** Ask for the outline of a tab, unless it is known or asked for already. */
+  private needOutline(tab: Tab | undefined): void {
+    if (tab && !tab.outline.known && !tab.outline.reading) void this.loadOutline(tab)
+  }
+
+  /** Show the Problems of the repository in front, in the middle of the module that is in front. */
+  showRepositoryProblems(): void {
+    const tab = this.active
+    if (!tab) return
+    this.needOutline(tab)
+    if (tab.module === 'structure') {
+      tab.structure.problems = true
+      tab.structure.code = undefined
+    } else {
+      this.show('repository-problems')
+    }
+  }
+
+  /** From the Problems of the repository: an ADR in Decisions, with the Problems beside it. */
+  showProblemAdr(logPath: string, id: string): void {
+    const tab = this.active
+    if (!tab) return
+    const arrive = (): void => {
+      tab.module = 'decisions'
+      tab.view = 'repository-problems'
+      tab.logPath = logPath
+      tab.selectedId = id
+    }
+    // The ADR that is open already stays open, editor and all.
+    const there = logPath === this.log?.path && id === tab.selectedId
+    if (there) arrive()
+    else this.leaveEditor(arrive)
+  }
+
+  /** From the Problems of the repository: the declaration in Structure, with the Problems beside it. */
+  showProblemDeclaration(): void {
+    const tab = this.active
+    if (!tab) return
+    this.leaveEditor(() => {
+      tab.module = 'structure'
+      tab.structure.problems = true
+      tab.structure.code = undefined
+      tab.structure.selection = undefined
+      if (!tab.structure.view) void this.loadStructure(tab)
     })
   }
 
@@ -517,6 +632,7 @@ class AppState {
     if (!this.active) return
     this.active.structure.show = show
     this.active.structure.code = undefined
+    this.active.structure.problems = false
   }
 
   /**
@@ -528,6 +644,7 @@ class AppState {
     if (!tab) return
     const open = tab.structure.code?.path === path ? tab.structure.code.file : undefined
     tab.structure.code = { path, marks: [...marks], line, file: open, error: undefined }
+    tab.structure.problems = false
     if (!open) void this.readSourceFile(tab)
   }
 
@@ -624,7 +741,17 @@ class AppState {
     if (!tab || this.exporting) return
     this.exporting = true
     const id = tab.repository.id
-    const result = await (kind === 'site' ? window.api.exportSite(id) : window.api.exportPdf(id))
+    // The Mermaid blocks are drawn here, where there is a browser to draw them, and shown in the
+    // export as drawn; the export writes them through the same code as `adr export`, which has
+    // none and keeps them as code (docs/adr/0016-…).
+    const result = await drawnForExport(
+      tab.repository.repository.logs.flatMap((log) =>
+        log.adrs.flatMap((adr) => mermaidSources(adr.body))
+      )
+    )
+      .then((diagrams) =>
+        kind === 'site' ? window.api.exportSite(id, diagrams) : window.api.exportPdf(id, diagrams)
+      )
       .catch((error: unknown) => ({ ok: false as const, reason: String(error) }))
       .finally(() => (this.exporting = false))
     if (result === undefined) return
@@ -725,7 +852,10 @@ class AppState {
   }
 
   startSearching(): void {
-    if (this.active) this.searching = { query: '' }
+    if (!this.active) return
+    this.searching = { query: '' }
+    // Components and Source Files are searched as far as Structure knows them.
+    this.needOutline(this.active)
   }
 
   stopSearching(): void {
@@ -755,9 +885,14 @@ class AppState {
       // What is in the middle has to show where the jump went: the graph does if it draws
       // the ADR, the list does unless a filter hides it.
       const drawn = this.log?.relations.some(({ from, to }) => from === id || to === id)
-      // The timeline and the board show every ADR of the log.
+      // The timeline and the board show every ADR of the log, the Problems of the repository
+      // every ADR that has one; the ADR is beside them.
       const shown =
-        across || tab.view === 'timeline' || tab.view === 'board' || (tab.view === 'graph' && drawn)
+        across ||
+        tab.view === 'timeline' ||
+        tab.view === 'board' ||
+        tab.view === 'repository-problems' ||
+        (tab.view === 'graph' && drawn)
       if (!shown) tab.view = 'adrs'
       const adr = this.log?.adrs.find((candidate) => candidate.id === id)
       if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
@@ -992,9 +1127,13 @@ class AppState {
     this.committing = undefined
   }
 
-  /** Ask for one of the repairs of a Problem. The main process plans it; nothing is written yet. */
-  async repair(repair: Repair): Promise<void> {
-    const [tab, log] = [this.active, this.log]
+  /**
+   * Ask for one of the repairs of a Problem of a Decision Log: of the one in view, or of
+   * another one of the repository in front. The main process plans it; nothing is written yet.
+   */
+  async repair(repair: Repair, logPath: string | undefined = this.log?.path): Promise<void> {
+    const tab = this.active
+    const log = tab?.repository.repository.logs.find((one) => one.path === logPath)
     const adr = log?.adrs.find((candidate) => candidate.id === repair.adr)
     if (!tab || !log || !adr) return
     // A Renumber is known by its own name, and warns about something else.
@@ -1435,11 +1574,13 @@ function newTab(repository: OpenRepository): Tab {
       show: 'graph',
       expanded: [],
       code: undefined,
+      problems: false,
       view: undefined,
       loading: false,
       error: undefined,
       selection: undefined
     },
+    outline: { known: undefined, reading: false, failed: undefined, asked: 0 },
     branches: {
       overview: undefined,
       loading: false,

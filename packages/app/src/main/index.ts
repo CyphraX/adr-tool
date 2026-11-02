@@ -19,6 +19,7 @@ import { nodeFileSystem } from './node-file-system'
 import { Repositories, localDate } from './repositories'
 import {
   createRequest,
+  diagramsRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
@@ -221,6 +222,17 @@ function registerIpc(): void {
     }
   })
 
+  ipcMain.handle(CHANNEL.structureOutline, async (_, repositoryId: unknown) => {
+    if (typeof repositoryId !== 'string') return { ok: false, reason: t.notUnderstood }
+    const root = repositories.rootOf(repositoryId)
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    try {
+      return { ok: true, outline: await structures.outline(repositoryId, root) }
+    } catch (error) {
+      return { ok: false, reason: t.analysisFailed(String(error)) }
+    }
+  })
+
   ipcMain.handle(CHANNEL.planAdopt, async (_, repositoryId: unknown) => {
     const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
@@ -303,7 +315,7 @@ function registerIpc(): void {
   // An export goes where the person points in a dialog of the system, never where the
   // renderer says; what it wrote is all the renderer may have opened.
   const exported = new Set<string>()
-  ipcMain.handle(CHANNEL.exportSite, async (event, repositoryId: unknown) => {
+  ipcMain.handle(CHANNEL.exportSite, async (event, repositoryId: unknown, diagrams: unknown) => {
     const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
     const window = BrowserWindow.fromWebContents(event.sender)
@@ -317,12 +329,12 @@ function registerIpc(): void {
       : dialog.showOpenDialog(options))
     const out = picked.filePaths[0]
     if (picked.canceled || out === undefined) return undefined
-    const result = await writeExport(root, out, localDate())
+    const result = await writeExport(root, out, localDate(), diagramsRequest(diagrams))
     if (!result.ok) return result
     exported.add(result.index)
     return { ok: true, path: result.index, adrs: result.adrs }
   })
-  ipcMain.handle(CHANNEL.exportPdf, async (event, repositoryId: unknown) => {
+  ipcMain.handle(CHANNEL.exportPdf, async (event, repositoryId: unknown, diagrams: unknown) => {
     const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
     const window = BrowserWindow.fromWebContents(event.sender)
@@ -335,7 +347,13 @@ function registerIpc(): void {
       ? dialog.showSaveDialog(window, options)
       : dialog.showSaveDialog(options))
     if (picked.canceled || !picked.filePath) return undefined
-    const result = await exportPdf(root, picked.filePath, localDate(), printToPdf)
+    const result = await exportPdf(
+      root,
+      picked.filePath,
+      localDate(),
+      printToPdf,
+      diagramsRequest(diagrams)
+    )
     if (!result.ok) return result
     exported.add(result.index)
     return { ok: true, path: result.index, adrs: result.adrs }

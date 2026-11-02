@@ -2,6 +2,7 @@ import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from 
 import type { StructureProblem } from '@adr-tool/structure/model'
 import type {
   CreateRequest,
+  DrawnDiagram,
   MetadataEditRequest,
   MigrationRequest,
   RenameRequest,
@@ -92,6 +93,36 @@ export function structureRepairRequest(problem: unknown): StructureProblem | und
     return undefined
   }
   return key === 'paths' || key === 'tests' ? { kind, component, key, pattern } : undefined
+}
+
+/** A drawing larger than this is no drawing of a block of an ADR. */
+const DIAGRAM_LIMIT = 4 * 1024 * 1024
+/** More drawings than this are no export of Decision Logs. */
+const DIAGRAMS_AT_MOST = 2000
+/**
+ * What a sanitized drawing never holds (docs/adr/0016-…): a script, an element of HTML, a handler
+ * of an event, a `javascript:` address. Sanitized in the window already; looked at again here,
+ * before anything of it is written to disk.
+ */
+const NEVER_IN_A_DRAWING =
+  /<\s*(?:script|foreignObject|iframe|object|embed)\b|\son[a-z]+\s*=|javascript:/i
+
+/**
+ * The Mermaid blocks the window drew for an export, by their source. A drawing that is not an
+ * SVG and nothing else is left out: its block stays a code block.
+ */
+export function diagramsRequest(diagrams: unknown): Map<string, string> {
+  const drawn = new Map<string, string>()
+  if (!Array.isArray(diagrams)) return drawn
+  for (const given of diagrams.slice(0, DIAGRAMS_AT_MOST)) {
+    const { source, svg } = record(given) as Partial<Record<keyof DrawnDiagram, unknown>>
+    if (typeof source !== 'string' || typeof svg !== 'string') continue
+    const text = svg.trim()
+    const whole = text.startsWith('<svg') && text.endsWith('</svg>')
+    if (!whole || text.length > DIAGRAM_LIMIT || NEVER_IN_A_DRAWING.test(text)) continue
+    drawn.set(source, text)
+  }
+  return drawn
 }
 
 function repairOf(given: Record<string, unknown>): Repair | undefined {

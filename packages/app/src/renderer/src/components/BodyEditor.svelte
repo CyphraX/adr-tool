@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import type { EditorView } from '@codemirror/view'
   import { recordsCorrection, type Adr } from '@adr-tool/core'
+  import { drawInto } from '../lib/diagrams'
   import { createBodyEditor, replaceText, setLive } from '../lib/editor'
   import { baseOf, renderMarkdown } from '../lib/markdown'
   import { app, type EditorMode } from '../lib/state.svelte'
@@ -32,7 +33,9 @@
       onSave: () => void app.save(),
       live: app.editing?.mode === 'live',
       // A table in the live mode is the preview's table, its images included.
-      renderTable: (markdown) => renderMarkdown(markdown, base)
+      renderTable: (markdown) => renderMarkdown(markdown, base),
+      // A Mermaid block in the live mode is the preview's diagram.
+      renderDiagram: drawInto
     })
     view.focus()
     return () => view?.destroy()

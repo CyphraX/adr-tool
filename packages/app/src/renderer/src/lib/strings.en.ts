@@ -170,6 +170,37 @@ export const en = {
     hint: 'Select an ADR to read it: the repository it belongs to comes to the front.'
   },
 
+  /** Every Problem of the repository in front, of every module (docs/plan-vision.md, part 2). */
+  repositoryProblems: {
+    /** The row in the sidebar of every module that leads there. */
+    entry: 'Problems of the repository',
+    entryHint:
+      'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, and of the Traces between them',
+    counting: 'Structure is still analysing the code: its Problems are counted once it is done.',
+    check: 'Check',
+    heading: 'Problems of the repository',
+    lead: 'Every Problem the suite knows in this repository. A click opens what it is about, in its module; a Repair is previewed before anything is written.',
+    none: 'No Problems in this repository.',
+    noneHere: 'No Problems.',
+    traces: 'Traces from ADRs to Components',
+    backToStructure: 'Back to the Components',
+    declaration: 'The declaration',
+    component: 'Component',
+    reading: 'Structure is analysing the code. Its Problems follow once it is done.',
+    again: 'Structure is analysing the code again: these are the Problems of its last analysis.',
+    failed: (reason: string): string => `Structure could not analyse the code: ${reason}`,
+    draft:
+      'Nothing is declared yet: what the checks find on the Draft are hints, which Structure shows beside it.',
+    byHand:
+      'The suite cannot know what was meant here. Fix `.arch/components.yml` in an editor; the view follows.'
+  },
+
+  /** A Mermaid block of an ADR, drawn in the preview and in the live mode. */
+  diagram: {
+    cannotDraw: (said: string): string => `This diagram cannot be drawn. Mermaid says: ${said}`,
+    cannotDrawAtAll: 'This diagram cannot be drawn.'
+  },
+
   export: {
     exporting: 'Exporting…',
     siteTitle: 'Exported as web pages',
@@ -708,12 +739,27 @@ export const en = {
   },
 
   searching: {
-    label: 'Search the ADRs',
-    placeholder: 'Search titles, text, tags, people — or type a number',
-    found: 'ADRs found',
+    label: 'Search ADRs, Components and Source Files',
+    placeholder: 'Search ADRs, Components, Source Files — or type the number of an ADR',
+    found: 'Found',
+    adrs: 'ADRs',
+    components: 'Components',
+    sourceFiles: 'Source Files',
+    /** Beside each hit: what kind of thing it is. */
+    component: 'Component',
+    sourceFile: 'Source File',
+    draft: 'Draft',
+    unassigned: 'Unassigned',
     more: (shown: number, all: number): string =>
       `The best ${shown} of ${all}. Another word narrows it down.`,
-    none: 'No ADR has all of these words.'
+    moreOf: (shown: number, all: number): string => `The best ${shown} of ${all}.`,
+    none: 'Nothing has all of these words.',
+    analysing:
+      'Structure is still analysing the code: its Components and Source Files are searched once it is done.',
+    analysingAgain:
+      'Structure is analysing the code again: its Components and Source Files are searched as it last found them.',
+    notAnalysed: (reason: string): string =>
+      `Components and Source Files are not searched: ${reason}`
   },
 
   /** The dialog that shows a change before it is written, a refusal, or a question. */

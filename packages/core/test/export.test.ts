@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem, openRepository } from '../src'
 import { EXPORT_MARKER, PRINT_PAGE, exportSite, pageOf } from '../src/export'
-import { slugOf } from '../src/export/markdown'
+import { mermaidSources, slugOf } from '../src/export/markdown'
 
 // docs/plan-roadmap.md, part 10
 
@@ -221,5 +221,88 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
   it('names a page as its file, as HTML, and a heading as GitHub does', () => {
     expect(pageOf('docs/adr/0001-a.md')).toBe('docs/adr/0001-a.html')
     expect(slugOf('Größe & Gewicht: 2. Teil')).toBe('größe--gewicht-2-teil')
+  })
+
+  describe('of Mermaid blocks (docs/adr/0016-…)', () => {
+    const FLOW = 'flowchart LR\n  a --> b'
+    const BROKEN = 'flowchart LR\n  a -->'
+    const MERMAID = {
+      'docs/adr/0001-flow.md': adr(
+        'status: accepted',
+        [
+          '# Flow',
+          '',
+          '```mermaid',
+          FLOW,
+          '```',
+          '',
+          '```mermaid title="later"',
+          BROKEN,
+          '```',
+          '',
+          '```mermaidx',
+          'not one',
+          '```',
+          '',
+          '    flowchart LR',
+          '',
+          '```mermaid',
+          FLOW,
+          '```',
+          ''
+        ].join('\n')
+      )
+    }
+    const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><text>a</text></svg>'
+
+    async function withDiagrams(diagrams?: Map<string, string>) {
+      const repository = await openRepository(memoryFileSystem(MERMAID))
+      return exportSite(repository, {
+        title: 'T',
+        date: '2026-11-02',
+        ...(diagrams && { diagrams })
+      })
+    }
+
+    it('finds the blocks as the export does: a fence whose info starts with the word', () => {
+      expect(mermaidSources(MERMAID['docs/adr/0001-flow.md'])).toEqual([FLOW, BROKEN])
+      // As GitHub reads it: the word in lowercase.
+      expect(mermaidSources('```Mermaid\nA\n```\n')).toEqual([])
+      expect(mermaidSources('```mermaid\r\nA\r\n```\n')).toEqual(['A'])
+      expect(mermaidSources('> ```mermaid\n> graph TD\n> ```\n')).toEqual(['graph TD'])
+      expect(mermaidSources('```mermaid\n```\n')).toEqual([''])
+      expect(mermaidSources('`mermaid` and ~~~ mermaid\n')).toEqual([])
+    })
+
+    it('stays a code block where nothing was drawn, as in `adr export`', async () => {
+      const { files } = await withDiagrams()
+      const page = fileOf(files, 'docs/adr/0001-flow.html')
+      expect(page).toContain(
+        '<pre><code class="language-mermaid">flowchart LR\n  a --> b\n</code></pre>'
+      )
+      expect(page).not.toContain('<img')
+      expect(files.some((file) => file.path.endsWith('.svg'))).toBe(false)
+    })
+
+    it('shows a drawn block as an image beside its page, and its source a click away', async () => {
+      const { files, marker, print } = await withDiagrams(new Map([[FLOW, SVG]]))
+      const page = fileOf(files, 'docs/adr/0001-flow.html')
+      // Both blocks of the same source are one drawing; the broken one stays code.
+      expect(fileOf(files, 'docs/adr/0001-flow.diagram-1.svg')).toBe(SVG)
+      expect(files.filter((file) => file.path.endsWith('.svg'))).toHaveLength(1)
+      expect(
+        page.match(/<img src="..\/..\/docs\/adr\/0001-flow.diagram-1.svg" alt="Diagram">/g)
+      ).toHaveLength(2)
+      expect(page).toContain('<figure class="diagram">')
+      expect(page).toContain(
+        '<details class="diagram-source"><summary>Mermaid source</summary><pre><code class="language-mermaid">'
+      )
+      expect(page).toContain('a -->\n</code></pre>')
+      expect(print).toContain('<img src="docs/adr/0001-flow.diagram-1.svg" alt="Diagram">')
+      // Nothing of it runs, and the page keeps its policy.
+      expect(page).not.toContain('<svg')
+      expect(page).toContain(`content="default-src 'none'; style-src 'self'; img-src 'self'"`)
+      expect(JSON.parse(marker([]).text).files).toContain('docs/adr/0001-flow.diagram-1.svg')
+    })
   })
 })

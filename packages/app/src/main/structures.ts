@@ -3,6 +3,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
 import {
+  everyComponent,
   isDirectoryNode,
   levelOf,
   matrixOf,
@@ -17,6 +18,7 @@ import {
 } from '@adr-tool/structure/model'
 import type {
   SourceFileResult,
+  StructureOutline,
   StructureComponent,
   StructureNeighbour,
   StructureNode,
@@ -78,6 +80,13 @@ export class Structures {
     const entry = this.entryOf(repositoryId, root)
     const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
     return viewOf(repositoryId, analysis, parent, tests, expanded)
+  }
+
+  /** Every Component and Source File, and the Problems of the declaration, after the analysis. */
+  async outline(repositoryId: string, root: string): Promise<StructureOutline> {
+    const entry = this.entryOf(repositoryId, root)
+    const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
+    return outlineOf(repositoryId, analysis)
   }
 
   /** A Source File's text for the code viewer, if the analysis lists it as one. */
@@ -286,6 +295,23 @@ export function viewOf(
       expanded: matrix.groups.map((group) => group.id)
     },
     components
+  }
+}
+
+/** What the analysis knows of the whole repository, for the views across the modules. */
+export function outlineOf(repositoryId: string, analysis: Analysis): StructureOutline {
+  const { structure } = analysis
+  return {
+    repositoryId,
+    origin: structure.origin,
+    components: everyComponent(structure.components).map(({ id, name }) => ({ id, name })),
+    sourceFiles: structure.sourceFiles.map((file) => ({
+      path: file.path,
+      ...(file.component !== undefined && { component: file.component }),
+      test: file.test
+    })),
+    problems: structure.problems,
+    hints: structure.hints
   }
 }
 

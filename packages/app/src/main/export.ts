@@ -30,10 +30,23 @@ function describe(refusal: ExportRefusal): string {
  * Write every Decision Log of the repository at `root` as HTML pages that open from disk into
  * `out` (docs/plan-roadmap.md, part 10): an empty directory, one an earlier export wrote, or
  * one that is not there yet. It is `adr export` (packages/cli/src/export.ts), by the same rules;
- * nothing of the repository is changed.
+ * nothing of the repository is changed. The Mermaid blocks the window drew, `diagrams`, are
+ * shown as drawn (docs/adr/0016-…); every other block stays code.
  */
-export async function writeExport(root: string, out: string, date: string): Promise<Exported> {
-  const result = await exportTo({ root, out, title: basename(root), date, warn: () => {} })
+export async function writeExport(
+  root: string,
+  out: string,
+  date: string,
+  diagrams: ReadonlyMap<string, string> = new Map()
+): Promise<Exported> {
+  const result = await exportTo({
+    root,
+    out,
+    title: basename(root),
+    date,
+    warn: () => {},
+    diagrams
+  })
   if (!result.ok) return { ok: false, reason: describe(result.reason) }
   return { ok: true, index: result.index, print: result.print, adrs: result.adrs }
 }
@@ -47,12 +60,13 @@ export async function exportPdf(
   root: string,
   file: string,
   date: string,
-  print: (page: string, site: string) => Promise<Buffer>
+  print: (page: string, site: string) => Promise<Buffer>,
+  diagrams: ReadonlyMap<string, string> = new Map()
 ): Promise<Exported> {
   const scratch = await mkdtemp(join(tmpdir(), 'softarch-export-'))
   try {
     const site = join(scratch, 'site')
-    const exported = await writeExport(root, site, date)
+    const exported = await writeExport(root, site, date, diagrams)
     if (!exported.ok) return exported
     await writeFile(file, await print(pathToFileURL(exported.print).href, site))
     return { ...exported, index: file }

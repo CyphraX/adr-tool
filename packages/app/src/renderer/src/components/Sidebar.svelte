@@ -59,6 +59,22 @@
   ])
 </script>
 
+{#snippet repositoryRow()}
+  {@const count = app.repositoryProblems?.count ?? 0}
+  {@const counting = app.repositoryProblems?.structure.state === 'reading'}
+  <!-- Every Problem of the repository, of every module, in one list (docs/plan-vision.md, part 2). -->
+  <button
+    class="row"
+    class:current={view === 'repository-problems'}
+    aria-pressed={view === 'repository-problems'}
+    title={counting ? t.repositoryProblems.counting : t.repositoryProblems.entryHint}
+    onclick={() => app.showRepositoryProblems()}
+  >
+    <span class="label all">{t.repositoryProblems.entry}</span>
+    <span class="count" class:some={count > 0}>{count}{counting ? '…' : ''}</span>
+  </button>
+{/snippet}
+
 <nav aria-label={t.sidebar.label}>
   <section>
     <h2>{t.sidebar.logs}</h2>
@@ -132,6 +148,7 @@
         {app.problemGroups.length}
       </span>
     </button>
+    {@render repositoryRow()}
     {#if foreign > 0}
       <!-- Every ADR the tool reads and does not write, in one change to look at. -->
       <button

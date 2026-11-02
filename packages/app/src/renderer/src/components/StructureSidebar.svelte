@@ -11,6 +11,8 @@
   const structure = $derived(app.active?.structure)
   const view = $derived(structure?.view)
   const selection = $derived(structure?.selection)
+  const problems = $derived(app.repositoryProblems)
+  const counting = $derived(problems?.structure.state === 'reading')
 </script>
 
 {#snippet withCode(text: string)}
@@ -70,6 +72,23 @@
       >
         <span class="label">{t.structure.notAnalysed}</span>
         <span class="count">{view.notAnalysed.length}</span>
+      </button>
+    </section>
+
+    <section>
+      <h2>{t.repositoryProblems.check}</h2>
+      <!-- Every Problem of the repository, of every module, in one list (docs/plan-vision.md, part 2). -->
+      <button
+        class="row"
+        class:current={structure?.problems}
+        aria-pressed={structure?.problems}
+        title={counting ? t.repositoryProblems.counting : t.repositoryProblems.entryHint}
+        onclick={() => app.showRepositoryProblems()}
+      >
+        <span class="label">{t.repositoryProblems.entry}</span>
+        <span class="count" class:some={(problems?.count ?? 0) > 0}>
+          {problems?.count ?? 0}{counting ? '…' : ''}
+        </span>
       </button>
     </section>
 
@@ -174,6 +193,18 @@
 
   .count {
     color: var(--ink-faint);
+  }
+
+  .count.some {
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--problem);
+    color: var(--paper);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
   }
 
   .findings {

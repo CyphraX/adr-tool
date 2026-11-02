@@ -25,6 +25,12 @@ export interface Links {
    * the same ADR leads there.
    */
   readonly heading: (slug: string) => string
+  /**
+   * Where the drawing of a Mermaid block is in the export, by the block's source; `undefined`
+   * when there is none — the export of the command line has no browser to draw it with —, and
+   * the block stays a code block (docs/adr/0016-…).
+   */
+  readonly diagram?: (source: string) => string | undefined
 }
 
 /** As much of a node of the HTML tree as the links need. */
@@ -39,6 +45,46 @@ interface HtmlNode {
 /** The text of a node and all below it. */
 const textOf = (node: HtmlNode): string =>
   node.type === 'text' ? (node.value ?? '') : (node.children ?? []).map(textOf).join('')
+
+/**
+ * The source of a Mermaid block, as `pre` holds it: a fenced code block whose info string starts
+ * with the word `mermaid`. The source is the block's text without the line break remark adds.
+ */
+export function mermaidSourceOf(node: HtmlNode): string | undefined {
+  if (node.type !== 'element' || node.tagName !== 'pre') return undefined
+  const code = node.children?.find((child) => child.type === 'element')
+  const classes = code?.tagName === 'code' ? code.properties?.['className'] : undefined
+  if (!Array.isArray(classes) || !classes.includes('language-mermaid')) return undefined
+  return textOf(code!).replace(/\n$/, '')
+}
+
+/**
+ * A Mermaid block drawn: the picture, as an image of the export — an SVG shown by `<img>` runs
+ * nothing and fetches nothing, and keeps the content security policy of the page —, with its
+ * source a click away.
+ */
+function drawn(node: HtmlNode, href: string): void {
+  const pre = { ...node }
+  node.tagName = 'figure'
+  node.properties = { className: ['diagram'] }
+  node.children = [
+    { type: 'element', tagName: 'img', properties: { src: href, alt: 'Diagram' }, children: [] },
+    {
+      type: 'element',
+      tagName: 'details',
+      properties: { className: ['diagram-source'] },
+      children: [
+        {
+          type: 'element',
+          tagName: 'summary',
+          properties: {},
+          children: [{ type: 'text', value: 'Mermaid source' }]
+        },
+        pre
+      ]
+    }
+  ]
+}
 
 /** A heading's slug as GitHub makes it: lower case, letters, digits, `-` and `_`, spaces as `-`. */
 export function slugOf(text: string): string {
@@ -121,6 +167,12 @@ function rehypeExport() {
       return result
     }
     const visit = (node: HtmlNode): void => {
+      const source = mermaidSourceOf(node)
+      const href = source === undefined ? undefined : links.diagram?.(source)
+      if (href !== undefined) {
+        drawn(node, href)
+        return
+      }
       const properties = node.properties
       if (node.type === 'element' && properties) {
         const id = properties['id']
@@ -187,6 +239,24 @@ const pipeline = unified()
   .use(rehypeSanitize)
   .use(rehypeExport)
   .use(rehypeStringify)
+
+const reading = unified().use(remarkParse).use(remarkGfm).use(remarkRehype).use(rehypeSanitize)
+
+/**
+ * The sources of the Mermaid blocks of an ADR's body, in their order, each once: what a window
+ * draws for the export to show (`Links.diagram`), found as the export finds them.
+ */
+export function mermaidSources(markdown: string): string[] {
+  const tree = reading.runSync(reading.parse(markdown)) as HtmlNode
+  const sources = new Set<string>()
+  const visit = (node: HtmlNode): void => {
+    const source = mermaidSourceOf(node)
+    if (source !== undefined) sources.add(source)
+    else node.children?.forEach(visit)
+  }
+  visit(tree)
+  return [...sources]
+}
 
 /** The body of an ADR as HTML that is safe to put into a page of the export. */
 export function renderBody(markdown: string, links: Links): string {

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { Attachment } from 'svelte/attachments'
+  import { drawIn, windowTheme, type Theme } from '../lib/diagrams'
   import { renderMarkdown, type DocumentBase } from '../lib/markdown'
   import { app } from '../lib/state.svelte'
 
@@ -16,6 +18,23 @@
   } = $props()
   const html = $derived(renderMarkdown(markdown, base))
 
+  // A Mermaid block is drawn in place (docs/adr/0016-…). The document is set here rather than
+  // by Svelte, so that what takes a block's place is the document's and nobody else's.
+  let theme = $state<Theme>(windowTheme())
+  $effect(() => {
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)')
+    const follow = (): void => void (theme = windowTheme())
+    scheme.addEventListener('change', follow)
+    return () => scheme.removeEventListener('change', follow)
+  })
+  function setDocument(html: string, theme: Theme): Attachment<HTMLElement> {
+    return (element) => {
+      // Sanitized in lib/markdown.ts.
+      element.innerHTML = html
+      drawIn(element, theme)
+    }
+  }
+
   // Nothing navigates inside the app. A link to another ADR of this log selects it;
   // a web link opens in the system browser; everything else does nothing.
   function followLink(event: MouseEvent): void {
@@ -29,10 +48,7 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="document" onclick={followLink}>
-  <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized in lib/markdown.ts -->
-  {@html html}
-</div>
+<div class="document" {@attach setDocument(html, theme)} onclick={followLink}></div>
 
 <style>
   .document {
@@ -143,5 +159,24 @@
 
   .document :global(input[type='checkbox']) {
     margin-right: 0.4em;
+  }
+
+  /* A drawn Mermaid block, and a block that cannot be drawn, with what Mermaid says beside it. */
+  .document :global(figure.diagram) {
+    margin: 0 0 1em;
+    overflow-x: auto;
+  }
+
+  .document :global(figure.diagram svg) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .document :global(.diagram-error) {
+    margin-top: -0.6em;
+    font-family: var(--ui);
+    font-size: 0.8em;
+    color: var(--problem);
   }
 </style>

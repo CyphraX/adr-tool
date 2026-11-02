@@ -29,6 +29,11 @@ export interface ExportRequest {
   readonly date: string
   /** What is left out, and why: an image that is no file of the repository, one too large. */
   readonly warn: (text: string) => void
+  /**
+   * The Mermaid blocks a window drew, as SVG by their source (docs/adr/0016-…): the app passes
+   * them, the command line has no browser and passes none — its blocks stay code.
+   */
+  readonly diagrams?: ReadonlyMap<string, string>
 }
 
 /** Why nothing, or not all, was exported. The command line and the app each say it in words. */
@@ -103,7 +108,8 @@ export async function exportTo(request: ExportRequest): Promise<ExportResult> {
   const site = exportSite(repository, {
     ...(logs && { logs }),
     title: request.title,
-    date: request.date
+    date: request.date,
+    ...(request.diagrams && { diagrams: request.diagrams })
   })
   const images = await imagesToCopy(root, site.images, warn)
   const copied = images.map((image) => image.path)

@@ -121,6 +121,37 @@ export const de: typeof en = {
     hint: 'Wählen Sie ein ADR, um es zu lesen: Das Repository, zu dem es gehört, kommt nach vorn.'
   },
 
+  repositoryProblems: {
+    entry: 'Probleme des Repositorys',
+    entryHint:
+      'Alle Probleme dieses Repositorys in einer Liste: seiner Decision Logs, der Deklaration seiner Komponenten und der Traces dazwischen',
+    counting:
+      'Die Struktur analysiert den Code noch; ihre Probleme werden gezählt, sobald sie fertig ist.',
+    check: 'Prüfen',
+    heading: 'Probleme des Repositorys',
+    lead: 'Alle Probleme, die die Suite in diesem Repository kennt. Ein Klick öffnet, worum es geht, in seinem Modul; eine Reparatur sehen Sie, bevor etwas geschrieben wird.',
+    none: 'Keine Probleme in diesem Repository.',
+    noneHere: 'Keine Probleme.',
+    traces: 'Traces von ADRs zu Komponenten',
+    backToStructure: 'Zurück zu den Komponenten',
+    declaration: 'Die Deklaration',
+    component: 'Komponente',
+    reading:
+      'Die Struktur analysiert den Code. Was sie an Problemen findet, folgt, sobald sie fertig ist.',
+    again: 'Die Struktur analysiert den Code erneut: Dies sind die Probleme ihrer letzten Analyse.',
+    failed: (reason: string): string => `Die Struktur konnte den Code nicht analysieren: ${reason}`,
+    draft:
+      'Noch ist nichts deklariert: Was die Prüfungen am Entwurf finden, sind Hinweise, die die Struktur neben ihm zeigt.',
+    byHand:
+      'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie `.arch/components.yml` in einem Editor; die Ansicht folgt.'
+  },
+
+  diagram: {
+    cannotDraw: (said: string): string =>
+      `Dieses Diagramm lässt sich nicht zeichnen. Mermaid sagt: ${said}`,
+    cannotDrawAtAll: 'Dieses Diagramm lässt sich nicht zeichnen.'
+  },
+
   export: {
     exporting: 'Wird exportiert …',
     siteTitle: 'Als Webseiten exportiert',
@@ -665,12 +696,26 @@ export const de: typeof en = {
   },
 
   searching: {
-    label: 'Die ADRs durchsuchen',
-    placeholder: 'Titel, Text, Tags, Personen suchen — oder eine Nummer eingeben',
-    found: 'Gefundene ADRs',
+    label: 'ADRs, Komponenten und Quelldateien durchsuchen',
+    placeholder: 'ADRs, Komponenten, Quelldateien suchen — oder die Nummer eines ADRs eingeben',
+    found: 'Gefunden',
+    adrs: 'ADRs',
+    components: 'Komponenten',
+    sourceFiles: 'Quelldateien',
+    component: 'Komponente',
+    sourceFile: 'Quelldatei',
+    draft: 'Entwurf',
+    unassigned: 'Nicht zugeordnet',
     more: (shown: number, all: number): string =>
       `Die besten ${shown} von ${all}. Ein weiteres Wort grenzt ein.`,
-    none: 'Kein ADR enthält alle diese Wörter.'
+    moreOf: (shown: number, all: number): string => `Die besten ${shown} von ${all}.`,
+    none: 'Nichts enthält alle diese Wörter.',
+    analysing:
+      'Die Struktur analysiert den Code noch; ihre Komponenten und Quelldateien werden durchsucht, sobald sie fertig ist.',
+    analysingAgain:
+      'Die Struktur analysiert den Code erneut; ihre Komponenten und Quelldateien werden durchsucht, wie sie sie zuletzt gefunden hat.',
+    notAnalysed: (reason: string): string =>
+      `Komponenten und Quelldateien werden nicht durchsucht: ${reason}`
   },
 
   review: {
