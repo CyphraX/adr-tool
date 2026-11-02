@@ -169,7 +169,7 @@ The tool looks, in this order, and stops at the first step that yields something
 1. `.adr/config.yml` in the repository root.
 2. `.adr-dir` in the repository root — adr-tools' file holding the relative path of its directory.
 3. The directories `docs/adr`, `doc/adr` and `docs/decisions`; each one that exists is a Decision Log.
-4. Nothing found: the repository has no Decision Log yet. The first ADR is created in `docs/adr` (section 7).
+4. Nothing found: the repository has no Decision Log yet. The first ADR is created in the directory step 1 or 2 names, when it does not exist yet, and otherwise in `docs/adr` (section 7). While `.adr/config.yml` or `.adr-dir` cannot be used, no first ADR is created: it would not be found once the configuration is repaired.
 
 Opening a repository never writes. `.adr/` is created the first time something has to be configured.
 

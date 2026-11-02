@@ -7,6 +7,7 @@ export {
   joinChangeSets,
   joinPath,
   memoryFileSystem,
+  normalizePath,
   type Applied,
   type ChangeSet,
   type DirectoryEntry,
@@ -17,6 +18,7 @@ export {
 
 export { openRepository, type DecisionLog, type OpenOptions, type Repository } from './log/load'
 export { DEFAULT_LOG_PATHS } from './log/discover'
+export { firstLog } from './log/first'
 export type { NamingScheme } from './log/naming'
 export {
   FOREIGN_FORMAT_NAMES,

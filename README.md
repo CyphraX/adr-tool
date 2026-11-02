@@ -33,6 +33,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 - [Install](#install)
 - [Usage](#usage)
   - [Checking ADRs in CI](#checking-adrs-in-ci)
+  - [Agents over MCP](#agents-over-mcp)
 - [Development](#development)
 - [Documentation](#documentation)
 - [Roadmap](#roadmap)
@@ -168,6 +169,17 @@ docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-wri
 
 The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs it on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
 
+### Agents over MCP
+
+`adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
+
+```console
+$ pnpm build
+$ claude mcp add softarch -- node "$PWD/packages/mcp/dist/adr-mcp.mjs" .
+```
+
+Any client that starts a server as a process works the same way. The tools and what they answer are in [docs/mcp.md](docs/mcp.md).
+
 ### Sample repositories
 
 The test fixtures are useful for exploring the app. They are test data, so copy one before you try anything that writes.
@@ -251,6 +263,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
 | [`packages/cli`](packages/cli) | The command line, `adr lint`, built on both cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
+| [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
 ### Conventions
@@ -272,6 +285,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
 | [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint`, its output, its codes and exit codes |
+| [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
 | [CONTEXT.md](CONTEXT.md), [CONTEXT-MAP.md](CONTEXT-MAP.md) | The domain language and how its contexts relate |
 
@@ -286,7 +300,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
   - Relations across Decision Logs (built);
   - committing an ADR (built);
   - a branch overview;
-  - an MCP server for agents;
+  - an MCP server for agents (built);
   - export, timeline, board and dashboard;
   - a German translation, and the repositories in the window seen together.
 - **Deferred:** distribution — installers, code signing and auto-update.
