@@ -38,3 +38,5 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # The Decision Log of this repository, checked by its own command line (docs/cli.md).
+      - run: node packages/cli/dist/adr.mjs lint --format github

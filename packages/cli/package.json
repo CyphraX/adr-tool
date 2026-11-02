@@ -1,0 +1,24 @@
+{
+  "name": "@adr-tool/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository, for CI",
+  "type": "module",
+  "bin": {
+    "adr": "./dist/adr.mjs"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@adr-tool/core": "workspace:*",
+    "@adr-tool/structure": "workspace:*",
+    "@types/node": "^24.13.5",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.1"
+  }
+}

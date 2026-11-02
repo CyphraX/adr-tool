@@ -32,6 +32,7 @@ The app runs locally: there is no backend, no account and no telemetry.
   - [Structure](#structure)
 - [Install](#install)
 - [Usage](#usage)
+  - [Checking ADRs in CI](#checking-adrs-in-ci)
 - [Development](#development)
 - [Documentation](#documentation)
 - [Roadmap](#roadmap)
@@ -57,7 +58,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![The live mode: the text reads as rendered, the line with the cursor shows its source](docs/screenshots/readme/live.png)
 
-- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Each Problem comes with a Repair, which is previewed like any other change.
+- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Where it can know what was meant, a Problem comes with a Repair, which is previewed like any other change. What only follows from a file that cannot be read, or from a Status that is none of the five values, is listed under that root cause.
 
   ![The Problems of a Decision Log, each with its Repair](docs/screenshots/readme/problems.png)
 
@@ -151,6 +152,22 @@ pnpm dev
 ADR_TOOL_REPO="$PWD/packages/core/test/fixtures/showcase" pnpm dev
 ```
 
+### Checking ADRs in CI
+
+`adr lint` checks the Decision Logs of a repository by the same rules as the app, without the window. It prints each Problem with its file, line and code, and exits with 1 when there is one:
+
+```console
+$ pnpm build
+$ node packages/cli/dist/adr.mjs lint packages/core/test/fixtures/broken
+docs/adr/0004-api-style.md:2: status-not-lowercase: The Status is written "Rejected". It has to be lowercase.
+docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-written, which is not in this Decision Log.
+…
+
+10 Problems in 1 Decision Log.
+```
+
+The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs it on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
+
 ### Sample repositories
 
 The test fixtures are useful for exploring the app. They are test data, so copy one before you try anything that writes.
@@ -220,8 +237,9 @@ The patterns, test files, the Draft, the Dependencies of each language and the d
 | `pnpm typecheck` | Runs `tsc`, and `svelte-check` for the renderer |
 | `pnpm lint` | Runs ESLint |
 | `pnpm format` / `pnpm format:check` | Runs Prettier, writing or checking |
+| `pnpm adr lint` | Checks this repository's ADRs with the built command line |
 
-CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request.
+CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr lint` on the repository itself.
 
 ### Project layout
 
@@ -232,6 +250,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets |
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
+| [`packages/cli`](packages/cli) | The command line, `adr lint`, built on both cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
 ### Conventions
@@ -252,6 +271,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [docs/plan-roadmap.md](docs/plan-roadmap.md) | The parts of the rest of the roadmap, with their status |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
+| [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint`, its output, its codes and exit codes |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
 | [CONTEXT.md](CONTEXT.md), [CONTEXT-MAP.md](CONTEXT-MAP.md) | The domain language and how its contexts relate |
 
@@ -261,7 +281,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 - **Structure:** parts 1 to 8 are built ([plan-structure.md](docs/plan-structure.md)).
 - **The rest of the roadmap** is being built part by part ([plan-roadmap.md](docs/plan-roadmap.md)):
   - the known gaps before the first release and the live editor (built);
-  - an `adr lint` CLI for CI;
+  - an `adr lint` CLI for CI (built);
   - MADR 2.x and log4brains;
   - Relations across Decision Logs, committing an ADR, a branch overview;
   - an MCP server for agents;

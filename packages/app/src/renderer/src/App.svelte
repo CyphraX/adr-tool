@@ -139,54 +139,65 @@
         {/if}
       </main>
     {:else}
-      <div
-        class="panes"
-        class:wide-editor={app.editing?.mode === 'split'}
-        class:wide-middle={app.active.view === 'graph'}
-        bind:clientWidth={panesWidth}
-        style:--sidebar="{sidebarWidth}px"
-        style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
-        style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
-      >
-        <Sidebar />
-        <PaneDivider
-          label={t.panes.sidebar}
-          min={LIMITS.sidebar.min}
-          max={fitSidebar(LIMITS.sidebar.max, panesWidth)}
-          onresize={(width) => resize('sidebar', fitSidebar(width, panesWidth))}
-          onreset={() => resize('sidebar', undefined)}
-        />
-        {#if app.active.view === 'problems'}
-          <ProblemsList />
-        {:else if app.active.view === 'graph' && app.log}
-          <RelationsGraph log={app.log} />
-        {:else}
-          <AdrList />
+      <div class="body">
+        {#if repository.problems.length > 0}
+          <!-- A log loads, another one or a setting of the configuration does not. -->
+          <div class="configuration" role="status">
+            <strong>{t.welcome.partOfConfiguration}</strong>
+            {#each repository.problems as problem, position (position)}
+              <span>{describeProblem(problem)}</span>
+            {/each}
+          </div>
         {/if}
-        {#if app.editing?.mode !== 'split'}
-          <!-- A divider watches the pane in front of it: another pane, another divider. -->
-          {#key app.active.view}
-            <PaneDivider
-              label={t.panes.middle}
-              min={LIMITS.middle.min}
-              max={maxMiddle(panesWidth, sidebarWidth, middlePane)}
-              onresize={(width) =>
-                resize(middlePane, fitMiddle(width, panesWidth, sidebarWidth, middlePane))}
-              onreset={() => resize(middlePane, undefined)}
-            />
-          {/key}
-        {/if}
-        {#if app.selected && app.log}
-          <AdrDetail adr={app.selected} log={app.log} />
-        {:else}
-          <main class="message on-paper">
-            <p>
-              {app.active.view === 'problems'
-                ? t.welcome.selectToSeeProblems
-                : t.welcome.selectToRead}
-            </p>
-          </main>
-        {/if}
+        <div
+          class="panes"
+          class:wide-editor={app.editing?.mode === 'split'}
+          class:wide-middle={app.active.view === 'graph'}
+          bind:clientWidth={panesWidth}
+          style:--sidebar="{sidebarWidth}px"
+          style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
+          style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
+        >
+          <Sidebar />
+          <PaneDivider
+            label={t.panes.sidebar}
+            min={LIMITS.sidebar.min}
+            max={fitSidebar(LIMITS.sidebar.max, panesWidth)}
+            onresize={(width) => resize('sidebar', fitSidebar(width, panesWidth))}
+            onreset={() => resize('sidebar', undefined)}
+          />
+          {#if app.active.view === 'problems'}
+            <ProblemsList />
+          {:else if app.active.view === 'graph' && app.log}
+            <RelationsGraph log={app.log} />
+          {:else}
+            <AdrList />
+          {/if}
+          {#if app.editing?.mode !== 'split'}
+            <!-- A divider watches the pane in front of it: another pane, another divider. -->
+            {#key app.active.view}
+              <PaneDivider
+                label={t.panes.middle}
+                min={LIMITS.middle.min}
+                max={maxMiddle(panesWidth, sidebarWidth, middlePane)}
+                onresize={(width) =>
+                  resize(middlePane, fitMiddle(width, panesWidth, sidebarWidth, middlePane))}
+                onreset={() => resize(middlePane, undefined)}
+              />
+            {/key}
+          {/if}
+          {#if app.selected && app.log}
+            <AdrDetail adr={app.selected} log={app.log} />
+          {:else}
+            <main class="message on-paper">
+              <p>
+                {app.active.view === 'problems'
+                  ? t.welcome.selectToSeeProblems
+                  : t.welcome.selectToRead}
+              </p>
+            </main>
+          {/if}
+        </div>
       </div>
     {/if}
   </div>
@@ -202,6 +213,27 @@
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     height: 100%;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .body > .panes {
+    flex: 1;
+  }
+
+  .configuration {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    border-left: 3px solid var(--proposed);
+    background: color-mix(in srgb, var(--proposed) 10%, transparent);
+    line-height: 1.5;
   }
 
   .panes {

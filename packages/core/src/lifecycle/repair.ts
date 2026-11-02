@@ -4,7 +4,8 @@ import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList, setScalar } from '../metadata/write'
-import { groupProblems } from '../problems/group'
+import { carries, groupProblems } from '../problems/group'
+import { describeCause } from '../problems/wording'
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import { BACK_REFERENCE_KEYS } from '../relation'
 import { plan } from './pending'
@@ -107,8 +108,8 @@ const same = (a: Repair, b: Repair): boolean => {
 
 /**
  * Plan a Repair. It has to be one of the Repairs of a Problem the log has right now, and
- * of a Problem that stands on its own: what only follows from a file that cannot be read
- * is not repaired, the file is. What is planned is the Repair as `core` offers it, never
+ * of a Problem that stands on its own: what only follows from a file whose frontmatter or
+ * Status cannot be read is not repaired, the file is. What is planned is the Repair as `core` offers it, never
  * the object that was handed in.
  */
 export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair): Promise<Plan> {
@@ -127,10 +128,7 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
     const root = groups.find(({ consequences }) => consequences.some(offered))?.problem
     return {
       ok: false,
-      reason:
-        root && 'adr' in root
-          ? `This is only reported because the frontmatter of ${root.adr} cannot be read. Fix that file first.`
-          : 'This Problem is no longer there.'
+      reason: root ? `${describeCause(root)} Fix that first.` : 'This Problem is no longer there.'
     }
   }
 
@@ -174,13 +172,9 @@ function premiseOf(log: DecisionLog, repair: Repair): string[] {
   const source: Adr | undefined = log.adrs.find((adr) => adr.id === repair.item)
   if (!type || !source || source.id === repair.adr) return []
 
-  const { status, rawStatus, relations } = source.metadata
-  if (status === undefined) {
-    return [
-      `The Status of ${source.id} cannot be read ("${rawStatus}"). If that ADR has been accepted, cancel and fix its Status instead: the Back-reference is right then.`
-    ]
-  }
-  if (!relations[type].includes(repair.adr)) {
+  // A source whose Status cannot be read is a root cause: what it voids is not repaired here.
+  const { status } = source.metadata
+  if (!carries(source, type, repair.adr)) {
     return [
       `${source.id} does not name ${repair.adr} in ${type}. If it should, cancel and add it to ${source.id} by hand: the Back-reference is right then.`
     ]

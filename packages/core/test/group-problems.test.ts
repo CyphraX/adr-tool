@@ -87,6 +87,54 @@ describe('Problems grouped by their root cause', () => {
     ])
   })
 
+  it('puts what a Status outside the five values causes under that Status', async () => {
+    // "approved" voids the Relations of 0002-new: its Back-references on 0001-old lose their
+    // ground, and 0001-old is superseded by nobody that counts.
+    const read = await log({
+      '0001-old': adr('status: superseded', 'superseded-by: [0002-new]'),
+      '0002-new': adr('status: approved', 'supersedes: [0001-old]', 'depends-on: [0009-gone]')
+    })
+    const groups = groupProblems(read)
+    expect(
+      groups.map(({ problem, consequences }) => [
+        problem.kind,
+        consequences.map((consequence) => consequence.kind)
+      ])
+    ).toEqual([
+      ['invalid-metadata', ['unfounded-back-reference', 'superseded-without-successor']],
+      // Read from a file that can be read, whatever its Status: a Problem of its own.
+      ['unknown-target', []]
+    ])
+  })
+
+  it('puts what follows on an ADR with such a Status itself under it too', async () => {
+    const read = await log({
+      '0001-old': adr('status: retired', 'superseded-by: [0002-new]'),
+      '0002-new': adr('status: accepted', 'supersedes: [0001-old]')
+    })
+    const groups = groupProblems(read)
+    expect(
+      groups.map(({ problem, consequences }) => [
+        problem.kind,
+        consequences.map((consequence) => consequence.kind)
+      ])
+    ).toEqual([['invalid-metadata', ['not-marked-superseded']]])
+  })
+
+  it('leaves another invalid value and what it would cause as they are', async () => {
+    const read = await log({
+      '0001-old': adr('status: superseded', 'superseded-by: [0002-new]'),
+      '0002-new': adr('status: proposed', 'decided: 2026-01-01', 'supersedes: [0001-old]')
+    })
+    expect(
+      groupProblems(read).map(({ problem, consequences }) => [problem.kind, consequences.length])
+    ).toEqual([
+      ['invalid-metadata', 0],
+      ['unfounded-back-reference', 0],
+      ['superseded-without-successor', 0]
+    ])
+  })
+
   it('names a consequence of two unreadable ADRs under the first of them only', async () => {
     const read = await log({
       '0001-old': adr('status: superseded', 'superseded-by: [0002-new, 0003-newer]'),
@@ -102,6 +150,60 @@ describe('Problems grouped by their root cause', () => {
     ).toEqual([
       ['0002-new', 2],
       ['0003-newer', 1]
+    ])
+  })
+
+  it('keeps what a Status outside the five values would not change on its own', async () => {
+    // 0002-a does not supersede 0001-b: fixing its Status leaves the Back-reference unfounded.
+    const amends = await log({
+      '0001-b': adr('status: superseded', 'superseded-by: [0002-a]'),
+      '0002-a': adr('status: approved', 'amends: [0001-b]')
+    })
+    expect(
+      groupProblems(amends).map(({ problem, consequences }) => [problem.kind, consequences.length])
+    ).toEqual([
+      ['invalid-metadata', 0],
+      ['unfounded-back-reference', 0],
+      ['superseded-without-successor', 0]
+    ])
+    const nothing = await log({
+      '0001-b': adr('status: accepted', 'superseded-by: [0002-a]'),
+      '0002-a': adr('status: approved')
+    })
+    expect(
+      groupProblems(nothing).map(({ problem, consequences }) => [problem.kind, consequences.length])
+    ).toEqual([
+      ['invalid-metadata', 0],
+      ['unfounded-back-reference', 0]
+    ])
+  })
+
+  it('puts a superseded ADR under the Status of the one that does supersede it', async () => {
+    // Without a Back-reference that names it: "approved" may well mean accepted.
+    const read = await log({
+      '0001-b': adr('status: superseded'),
+      '0002-a': adr('status: approved', 'supersedes: [0001-b]')
+    })
+    expect(
+      groupProblems(read).map(({ problem, consequences }) => [
+        problem.kind,
+        consequences.map((consequence) => consequence.kind)
+      ])
+    ).toEqual([['invalid-metadata', ['superseded-without-successor']]])
+  })
+
+  it('takes a Status that is read as one of the five values for no root cause', async () => {
+    // `[accepted]` is written in the wrong form, and read as the default: accepted.
+    const read = await log({
+      '0001-old': adr('status: [accepted]'),
+      '0002-new': adr('status: accepted', 'supersedes: [0001-old]')
+    })
+    expect(
+      groupProblems(read).map(({ problem, consequences }) => [problem.kind, consequences.length])
+    ).toEqual([
+      ['invalid-metadata', 0],
+      ['missing-back-reference', 0],
+      ['not-marked-superseded', 0]
     ])
   })
 })
