@@ -322,6 +322,13 @@ export interface StructureView {
  */
 export interface StructureOutline {
   readonly repositoryId: string
+  /**
+   * Kept current: Structure is open, and its files are watched. Otherwise the outline is as
+   * of `analysedAt`, and the files may have changed since.
+   */
+  readonly current: boolean
+  /** When the analysis it comes from was asked for, in milliseconds since the epoch. */
+  readonly analysedAt: number
   /** Declared in `.arch/components.yml`, or the Draft. */
   readonly origin: 'declared' | 'draft'
   /** Every Component, each parent before its children; directories are none. */
@@ -343,6 +350,8 @@ export interface OutlinedSourceFile {
 export type OutlineResult =
   | { readonly ok: true; readonly outline: StructureOutline }
   | { readonly ok: false; readonly reason: string }
+  /** Another tab came to the front before the analysis began: ask again when this one does. */
+  | { readonly ok: false; readonly dropped: true }
 
 /**
  * A Mermaid block of an ADR as the window drew it: its source as the block holds it, and the
@@ -542,7 +551,11 @@ export interface Api {
    * Every Component and Source File of the repository, and the Problems of its declaration,
    * from the last analysis — analysed off the main thread the first time it is asked for.
    */
-  structureOutline(repositoryId: string): Promise<OutlineResult>
+  /**
+   * What Structure knows of the whole repository. `fresh` asks for an analysis of now where
+   * Structure is not open: for the Problems of the repository, and the search.
+   */
+  structureOutline(repositoryId: string, fresh?: boolean): Promise<OutlineResult>
   /** Called when the analysis of a repository changed: files changed, or a change was applied. */
   onStructureChanged(listener: (repositoryId: string) => void): () => void
   /** Plan writing the Draft into `.arch/components.yml`. Nothing is written until the change is applied. */

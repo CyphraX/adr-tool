@@ -28,7 +28,7 @@ import {
 } from './requests'
 import { readSession, writeSession } from './session-store'
 import { setLanguage, t } from './strings'
-import { Structures, cacheName } from './structures'
+import { AnalysisDropped, Structures, cacheName } from './structures'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
 
@@ -118,6 +118,7 @@ function registerIpc(): void {
 
   ipcMain.handle(CHANNEL.setActiveRepository, async (_, id: unknown) => {
     activeRoot = typeof id === 'string' ? repositories.rootOf(id) : undefined
+    structures.bringToFront(typeof id === 'string' ? id : undefined)
     await saveSession()
   })
 
@@ -222,13 +223,14 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.handle(CHANNEL.structureOutline, async (_, repositoryId: unknown) => {
+  ipcMain.handle(CHANNEL.structureOutline, async (_, repositoryId: unknown, fresh: unknown) => {
     if (typeof repositoryId !== 'string') return { ok: false, reason: t.notUnderstood }
     const root = repositories.rootOf(repositoryId)
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
     try {
-      return { ok: true, outline: await structures.outline(repositoryId, root) }
+      return { ok: true, outline: await structures.outline(repositoryId, root, fresh === true) }
     } catch (error) {
+      if (error instanceof AnalysisDropped) return { ok: false, dropped: true }
       return { ok: false, reason: t.analysisFailed(String(error)) }
     }
   })

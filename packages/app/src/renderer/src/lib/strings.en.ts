@@ -177,6 +177,11 @@ export const en = {
     entryHint:
       'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, and of the Traces between them',
     counting: 'Structure is still analysing the code: its Problems are counted once it is done.',
+    /** Structure is not open, so its files are not watched: the count may be older than they are. */
+    asOf: (at: number): string =>
+      `Counted with the analysis of the code at ${new Date(at).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}. Opening the list analyses it again.`,
+    asOfShort: (at: number): string =>
+      `As of the analysis of the code at ${new Date(at).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}.`,
     check: 'Check',
     heading: 'Problems of the repository',
     lead: 'Every Problem the suite knows in this repository. A click opens what it is about, in its module; a Repair is previewed before anything is written.',

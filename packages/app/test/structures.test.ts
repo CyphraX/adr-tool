@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { metricsOf } from '@adr-tool/structure/model'
 import { analyse, readCache, writeCache, type Analysis } from '../src/main/analysis'
-import { readSourceFile, Structures, viewOf } from '../src/main/structures'
+import { AnalysisDropped, readSourceFile, Structures, viewOf } from '../src/main/structures'
 
 /** A small repository without git: a Cycle between two Components, one of which has children. */
 let root: string
@@ -399,5 +399,89 @@ describe('the Structures of the open repositories', () => {
     structures.refresh('repo')
     await new Promise((resolve) => setTimeout(resolve, 400))
     expect(runs).toBe(2)
+  })
+
+  // docs/plan-vision.md, part 2, and the review of it: the other modules ask for an analysis
+  // without watching the files; Structure, once it is opened, watches them.
+  it('analyses for the count once, without watching, and watches once Structure is opened', async () => {
+    const analysis = (await analyse(root, undefined)).analysis
+    let runs = 0
+    const watched: string[] = []
+    const structures = new Structures(
+      async () => {
+        runs++
+        return analysis
+      },
+      () => undefined,
+      (watching) => {
+        watched.push(watching)
+        return { close: async () => undefined }
+      }
+    )
+    const first = await structures.outline('repo', root)
+    expect(first.current).toBe(false)
+    expect(watched).toEqual([])
+    // Asked again for what is known: the last analysis answers.
+    await structures.outline('repo', root)
+    expect(runs).toBe(1)
+    // The Problems of the repository or the search are opened: an analysis of now.
+    await structures.outline('repo', root, true)
+    expect(runs).toBe(2)
+
+    await structures.view('repo', root, undefined, false)
+    expect(watched).toEqual([root])
+    // Opened, Structure analyses once more, as the files may have changed in between.
+    expect(runs).toBe(3)
+    const opened = await structures.outline('repo', root, true)
+    expect(opened.current).toBe(true)
+    // Kept current by the watcher: nothing to analyse again.
+    expect(runs).toBe(3)
+    await structures.view('repo', root, 'shop', false)
+    expect([runs, watched.length]).toEqual([3, 1])
+  })
+
+  it('runs one analysis at a time, the tab in front first, and drops what is no longer wanted', async () => {
+    const analysis = (await analyse(root, undefined)).analysis
+    const asked: string[] = []
+    const answers: (() => void)[] = []
+    const structures = new Structures(
+      (at) =>
+        new Promise((resolve) => {
+          asked.push(at)
+          answers.push(() => resolve(analysis))
+        }),
+      () => undefined,
+      false
+    )
+    const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+    const one = structures.outline('one', '/one')
+    const two = structures.outline('two', '/two')
+    const three = structures.outline('three', '/three')
+    const four = structures.view('four', '/four', undefined, false)
+    await settle()
+    expect(asked).toEqual(['/one'])
+
+    // The tab of three comes to the front: it goes next; two was asked for its count only
+    // and is dropped, four was asked for its Structure and waits.
+    structures.bringToFront('three')
+    await expect(two).rejects.toBeInstanceOf(AnalysisDropped)
+    answers.shift()!()
+    await one
+    await settle()
+    expect(asked).toEqual(['/one', '/three'])
+    answers.shift()!()
+    await three
+    await settle()
+    expect(asked).toEqual(['/one', '/three', '/four'])
+    answers.shift()!()
+    await four
+
+    // Asked again once its tab is in front, two is analysed then.
+    structures.bringToFront('two')
+    const again = structures.outline('two', '/two')
+    await settle()
+    expect(asked.at(-1)).toBe('/two')
+    answers.shift()!()
+    expect((await again).repositoryId).toBe('two')
   })
 })

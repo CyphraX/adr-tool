@@ -24,6 +24,8 @@ async function opened(): Promise<OpenRepository> {
 
 const OUTLINE: StructureOutline = {
   repositoryId: 'r1',
+  current: true,
+  analysedAt: 0,
   origin: 'declared',
   components: [
     { id: 'kernel', name: 'kernel' },

@@ -196,6 +196,9 @@
         {:else}
           {#if structure.again}
             <p class="empty" role="status">{t.repositoryProblems.again}</p>
+          {:else if tab?.outline.known && !tab.outline.known.current}
+            <!-- Structure is not open, so its files are not watched: say how old the list is. -->
+            <p class="empty">{t.repositoryProblems.asOfShort(tab.outline.known.analysedAt)}</p>
           {/if}
           {#if structure.entries.length === 0}
             <p class="empty">

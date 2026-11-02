@@ -102,14 +102,18 @@ interface StructureTab {
  * What Structure knows of the whole repository (`StructureOutline`), for the Problems of the
  * repository and the search: the last answer, kept while the next one is asked for.
  */
-interface OutlineTab {
-  known: StructureOutline | undefined
+class OutlineTab {
+  /**
+   * Not made deeply reactive: it is replaced as a whole, and the search runs over tens of
+   * thousands of its Source Files at every key.
+   */
+  known = $state.raw<StructureOutline | undefined>(undefined)
   /** An analysis is asked for and has not answered yet. */
-  reading: boolean
+  reading = $state(false)
   /** Why the last one failed. */
-  failed: string | undefined
+  failed = $state<string | undefined>(undefined)
   /** Counts the requests, so that an answer that is overtaken is dropped. */
-  asked: number
+  asked = 0
 }
 
 /** What branches that are not checked out do to the ADRs, as git was last asked. */
@@ -523,23 +527,28 @@ class AppState {
     })
   }
 
-  /** Ask what Structure knows of the whole repository: every Component and Source File, and its Problems. */
-  async loadOutline(tab: Tab | undefined = this.active): Promise<void> {
+  /**
+   * Ask what Structure knows of the whole repository: every Component and Source File, and its
+   * Problems. `fresh` asks for an analysis of now where Structure is not open, and its files
+   * are not watched.
+   */
+  async loadOutline(tab: Tab | undefined = this.active, fresh = false): Promise<void> {
     if (!tab) return
     const outline = tab.outline
     const asked = ++outline.asked
     outline.reading = true
     const result = await window.api
-      .structureOutline(tab.repository.id)
+      .structureOutline(tab.repository.id, fresh)
       .catch((error: unknown) => ({ ok: false as const, reason: String(error) }))
     if (asked !== outline.asked) return
     outline.reading = false
     if (result.ok) {
       outline.known = result.outline
       outline.failed = undefined
-    } else {
+    } else if ('reason' in result) {
       outline.failed = result.reason
     }
+    // Dropped, as another tab came to the front: asked again when this one does.
   }
 
   /** Ask for the outline of a tab, unless it is known or asked for already. */
@@ -547,11 +556,22 @@ class AppState {
     if (tab && !tab.outline.known && !tab.outline.reading) void this.loadOutline(tab)
   }
 
+  /**
+   * The outline as of now, for a view that lists or searches it: analysed again where it may
+   * be older than the files, which the cache of the analysis makes cheap.
+   */
+  private freshOutline(tab: Tab | undefined): void {
+    if (!tab) return
+    const { known, reading } = tab.outline
+    if (known && !known.current && !reading) void this.loadOutline(tab, true)
+    else this.needOutline(tab)
+  }
+
   /** Show the Problems of the repository in front, in the middle of the module that is in front. */
   showRepositoryProblems(): void {
     const tab = this.active
     if (!tab) return
-    this.needOutline(tab)
+    this.freshOutline(tab)
     if (tab.module === 'structure') {
       tab.structure.problems = true
       tab.structure.code = undefined
@@ -855,7 +875,7 @@ class AppState {
     if (!this.active) return
     this.searching = { query: '' }
     // Components and Source Files are searched as far as Structure knows them.
-    this.needOutline(this.active)
+    this.freshOutline(this.active)
   }
 
   stopSearching(): void {
@@ -1580,7 +1600,7 @@ function newTab(repository: OpenRepository): Tab {
       error: undefined,
       selection: undefined
     },
-    outline: { known: undefined, reading: false, failed: undefined, asked: 0 },
+    outline: new OutlineTab(),
     branches: {
       overview: undefined,
       loading: false,

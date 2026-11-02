@@ -45,28 +45,68 @@ const UNWATCHED =
 
 export type Analyser = (root: string) => Promise<Analysis>
 
+/** What watches a repository's files, and is told to stop. */
+export type WatchFiles = (root: string, changed: () => void) => { close(): Promise<void> }
+
+/** Chokidar, without what git never lists and what tools rewrite all the time. */
+const chokidar: WatchFiles = (root, changed) =>
+  watch(root, {
+    ignoreInitial: true,
+    ignored: (path) => UNWATCHED.test(path.slice(root.length))
+  }).on('all', changed) as FSWatcher
+
+/** An analysis that was waiting and is not wanted any more: its tab is no longer in front. */
+export class AnalysisDropped extends Error {
+  constructor() {
+    super('The analysis was not wanted any more.')
+  }
+}
+
 interface Entry {
   readonly root: string
   analysis?: Analysis
+  /** When the analysis was asked for, in milliseconds. */
+  analysedAt?: number
   running?: Promise<Analysis>
   /** Files changed while an analysis was running: it runs again when it is done. */
   again: boolean
-  watcher?: FSWatcher
+  /** Structure was opened: the files are watched and the analysis is kept current. */
+  watcher?: { close(): Promise<void> }
   timer?: NodeJS.Timeout
 }
 
 /**
- * The Structure module's side of the open repositories. A repository is analysed the first
- * time its Structure is asked for, and from then on watched and analysed again when its files
- * change. The levels are computed here, from the analysis, which is cheap.
+ * Why an analysis runs: for Structure, which is open and kept current, or for what the other
+ * modules show of it — the count of the Problems, the search —, which is not wanted any more
+ * when another tab comes to the front.
+ */
+type Wanted = 'structure' | 'outline'
+
+interface Job {
+  readonly repositoryId: string
+  readonly entry: Entry
+  wanted: Wanted
+  readonly resolve: (analysis: Analysis) => void
+  readonly reject: (error: unknown) => void
+}
+
+/**
+ * The Structure module's side of the open repositories. A repository whose tab comes to the
+ * front is analysed once, for the count of its Problems and the search; its files are watched,
+ * and it is analysed again when they change, only from the time its Structure is opened. One
+ * analysis runs at a time, and the one of the tab in front goes first. The levels are computed
+ * here, from the analysis, which is cheap.
  */
 export class Structures {
   private readonly entries = new Map<string, Entry>()
+  private readonly waiting: Job[] = []
+  private busy = false
+  private front: string | undefined
 
   constructor(
     private readonly analyser: Analyser,
     private readonly onChanged: (repositoryId: string) => void,
-    private readonly watchFiles = true
+    private readonly watchFiles: WatchFiles | false = chokidar
   ) {}
 
   /** One level of a repository's Components, after the analysis it comes from. */
@@ -77,29 +117,70 @@ export class Structures {
     tests: boolean,
     expanded: readonly string[] = []
   ): Promise<StructureView> {
-    const entry = this.entryOf(repositoryId, root)
-    const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
+    const analysis = await this.opened(repositoryId, root)
     return viewOf(repositoryId, analysis, parent, tests, expanded)
   }
 
-  /** Every Component and Source File, and the Problems of the declaration, after the analysis. */
-  async outline(repositoryId: string, root: string): Promise<StructureOutline> {
+  /**
+   * Every Component and Source File, and the Problems of the declaration, after the analysis.
+   * The last one does, unless `fresh` asks for one of now where the files are not watched.
+   */
+  async outline(repositoryId: string, root: string, fresh = false): Promise<StructureOutline> {
     const entry = this.entryOf(repositoryId, root)
-    const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
-    return outlineOf(repositoryId, analysis)
+    const known = entry.analysis && (entry.watcher || !fresh) ? entry.analysis : undefined
+    const analysis = known ?? (await this.run(repositoryId, entry, 'outline'))
+    return outlineOf(repositoryId, analysis, {
+      current: entry.watcher !== undefined,
+      analysedAt: entry.analysedAt ?? Date.now()
+    })
   }
 
   /** A Source File's text for the code viewer, if the analysis lists it as one. */
   async sourceFile(repositoryId: string, root: string, path: string): Promise<SourceFileResult> {
-    const entry = this.entryOf(repositoryId, root)
-    const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
-    return readSourceFile(entry.root, path, analysis)
+    const analysis = await this.opened(repositoryId, root)
+    return readSourceFile(root, path, analysis)
   }
 
-  /** The Structure the last analysis found, to plan against. */
+  /** The Structure as it is now, to plan against. */
   async structureOf(repositoryId: string, root: string): Promise<Structure> {
     const entry = this.entryOf(repositoryId, root)
-    return (entry.analysis ?? (await this.run(repositoryId, entry))).structure
+    const current = entry.watcher ? entry.analysis : undefined
+    return (current ?? (await this.run(repositoryId, entry, 'structure'))).structure
+  }
+
+  /**
+   * The tab of this repository came to the front: its analysis goes ahead of those waiting,
+   * and those of other tabs that were only wanted for what the other modules show are dropped.
+   */
+  bringToFront(repositoryId: string | undefined): void {
+    this.front = repositoryId
+    for (const job of [...this.waiting]) {
+      if (job.repositoryId === repositoryId) {
+        this.waiting.splice(this.waiting.indexOf(job), 1)
+        this.waiting.unshift(job)
+      } else if (job.wanted === 'outline') {
+        this.waiting.splice(this.waiting.indexOf(job), 1)
+        job.reject(new AnalysisDropped())
+      }
+    }
+  }
+
+  /**
+   * Structure is opened: from now on the files are watched, and the analysis is kept current.
+   * The analysis made before, for the other modules, may be older than the files.
+   */
+  private opened(repositoryId: string, root: string): Promise<Analysis> {
+    const entry = this.entryOf(repositoryId, root)
+    if (entry.watcher) {
+      return entry.analysis ? Promise.resolve(entry.analysis) : this.run(repositoryId, entry)
+    }
+    entry.watcher = this.watchFiles
+      ? this.watchFiles(root, () => this.refresh(repositoryId))
+      : { close: async () => undefined }
+    // One that is running already began before the watcher, and runs again once it is done.
+    const begun = entry.running && !this.waiting.some((job) => job.entry === entry)
+    if (begun) entry.again = true
+    return this.run(repositoryId, entry)
   }
 
   /** Analyse again soon, if the repository was analysed at all. */
@@ -110,7 +191,7 @@ export class Structures {
     entry.timer = setTimeout(() => {
       if (entry.running) entry.again = true
       else
-        void this.run(repositoryId, entry).then(
+        void this.run(repositoryId, entry, entry.watcher ? 'structure' : 'outline').then(
           () => this.onChanged(repositoryId),
           () => undefined
         )
@@ -122,6 +203,10 @@ export class Structures {
     if (!entry) return
     this.entries.delete(repositoryId)
     clearTimeout(entry.timer)
+    for (const job of this.waiting.filter((waiting) => waiting.entry === entry)) {
+      this.waiting.splice(this.waiting.indexOf(job), 1)
+      job.reject(new AnalysisDropped())
+    }
     await entry.watcher?.close()
   }
 
@@ -138,22 +223,29 @@ export class Structures {
       }
       entry = { root, again: false }
       this.entries.set(repositoryId, entry)
-      if (this.watchFiles) {
-        entry.watcher = watch(root, {
-          ignoreInitial: true,
-          ignored: (path) => UNWATCHED.test(path.slice(root.length))
-        }).on('all', () => this.refresh(repositoryId))
-      }
     }
     return entry
   }
 
-  private run(repositoryId: string, entry: Entry): Promise<Analysis> {
-    if (entry.running) return entry.running
-    const running = this.analyser(entry.root).then(
+  private run(repositoryId: string, entry: Entry, wanted: Wanted = 'structure'): Promise<Analysis> {
+    if (entry.running) {
+      // Wanted for Structure now: it is no longer dropped when another tab comes to the front.
+      const job = this.waiting.find((waiting) => waiting.entry === entry)
+      if (job && wanted === 'structure') job.wanted = 'structure'
+      return entry.running
+    }
+    const asked = Date.now()
+    const running = new Promise<Analysis>((resolve, reject) => {
+      const job: Job = { repositoryId, entry, wanted, resolve, reject }
+      if (repositoryId === this.front) this.waiting.unshift(job)
+      else this.waiting.push(job)
+    }).then(
       (analysis) => {
         entry.running = undefined
-        if (this.entries.get(repositoryId) === entry) entry.analysis = analysis
+        if (this.entries.get(repositoryId) === entry) {
+          entry.analysis = analysis
+          entry.analysedAt = asked
+        }
         if (entry.again) {
           entry.again = false
           this.refresh(repositoryId)
@@ -166,7 +258,22 @@ export class Structures {
       }
     )
     entry.running = running
+    this.next()
     return running
+  }
+
+  /** The next analysis that waits, once the one before it is done. */
+  private next(): void {
+    if (this.busy) return
+    const job = this.waiting.shift()
+    if (!job) return
+    this.busy = true
+    this.analyser(job.entry.root)
+      .then(job.resolve, job.reject)
+      .finally(() => {
+        this.busy = false
+        this.next()
+      })
   }
 }
 
@@ -299,10 +406,15 @@ export function viewOf(
 }
 
 /** What the analysis knows of the whole repository, for the views across the modules. */
-export function outlineOf(repositoryId: string, analysis: Analysis): StructureOutline {
+export function outlineOf(
+  repositoryId: string,
+  analysis: Analysis,
+  when: Pick<StructureOutline, 'current' | 'analysedAt'> = { current: true, analysedAt: 0 }
+): StructureOutline {
   const { structure } = analysis
   return {
     repositoryId,
+    ...when,
     origin: structure.origin,
     components: everyComponent(structure.components).map(({ id, name }) => ({ id, name })),
     sourceFiles: structure.sourceFiles.map((file) => ({

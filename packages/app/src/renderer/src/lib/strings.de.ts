@@ -127,6 +127,10 @@ export const de: typeof en = {
       'Alle Probleme dieses Repositorys in einer Liste: seiner Decision Logs, der Deklaration seiner Komponenten und der Traces dazwischen',
     counting:
       'Die Struktur analysiert den Code noch; ihre Probleme werden gezählt, sobald sie fertig ist.',
+    asOf: (at: number): string =>
+      `Gezählt mit der Analyse des Codes um ${new Date(at).toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })} Uhr. Beim Öffnen der Liste wird er erneut analysiert.`,
+    asOfShort: (at: number): string =>
+      `Stand der Analyse des Codes um ${new Date(at).toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })} Uhr.`,
     check: 'Prüfen',
     heading: 'Probleme des Repositorys',
     lead: 'Alle Probleme, die die Suite in diesem Repository kennt. Ein Klick öffnet, worum es geht, in seinem Modul; eine Reparatur sehen Sie, bevor etwas geschrieben wird.',

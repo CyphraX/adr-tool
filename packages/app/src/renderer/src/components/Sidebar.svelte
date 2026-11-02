@@ -62,12 +62,17 @@
 {#snippet repositoryRow()}
   {@const count = app.repositoryProblems?.count ?? 0}
   {@const counting = app.repositoryProblems?.structure.state === 'reading'}
+  {@const known = app.active?.outline.known}
   <!-- Every Problem of the repository, of every module, in one list (docs/plan-vision.md, part 2). -->
   <button
     class="row"
     class:current={view === 'repository-problems'}
     aria-pressed={view === 'repository-problems'}
-    title={counting ? t.repositoryProblems.counting : t.repositoryProblems.entryHint}
+    title={counting && !known
+      ? t.repositoryProblems.counting
+      : known && !known.current
+        ? t.repositoryProblems.asOf(known.analysedAt)
+        : t.repositoryProblems.entryHint}
     onclick={() => app.showRepositoryProblems()}
   >
     <span class="label all">{t.repositoryProblems.entry}</span>
