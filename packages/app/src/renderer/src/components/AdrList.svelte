@@ -25,7 +25,8 @@
   }
 </script>
 
-<div class="list">
+<!-- A date prefix (2021-04-15) needs about twice the room of a number (0042). -->
+<div class="list" style:--prefix={app.log?.naming === 'date' ? '10.5ch' : '5.5ch'}>
   <div class="tools">
     <button class="search" onclick={() => app.startSearching()}>
       {t.search}
@@ -136,7 +137,7 @@
   .head,
   .row {
     display: grid;
-    grid-template-columns: 5.5ch minmax(0, 1fr) 12.5ch 10.5ch;
+    grid-template-columns: var(--prefix) minmax(0, 1fr) 12.5ch 10.5ch;
     column-gap: 12px;
     align-items: center;
     padding: 0 14px;
@@ -146,7 +147,7 @@
   @container (max-width: 520px) {
     .head,
     .row {
-      grid-template-columns: 5.5ch minmax(0, 1fr) 12.5ch;
+      grid-template-columns: var(--prefix) minmax(0, 1fr) 12.5ch;
     }
 
     .decided {
@@ -181,6 +182,7 @@
 
   .prefix {
     color: var(--ink-soft);
+    white-space: nowrap;
   }
 
   .title {

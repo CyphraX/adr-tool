@@ -6,6 +6,7 @@ import {
   type DecisionLog,
   type FileChange,
   type ForeignFormat,
+  type ForeignSign,
   type Relation,
   type RelationType,
   type Repair,
@@ -116,12 +117,27 @@ export function repairLabel(repair: Repair, log: DecisionLog): string {
   }
 }
 
-/** What tells the tool that a file is in a foreign format, and what it takes from there. */
-const FOREIGN_SIGN: Record<ForeignFormat, string> = {
-  'adr-tools':
-    'no frontmatter, and a Status section in its text. Its Status, its Relations and Back-references and the day it was created are taken from there',
-  madr: 'a Status that names a successor, the Status in the list under the title, or "deciders" for the decision-makers. They are read as MADR means them'
+/** What told the tool that a file is in a foreign format (docs/file-format.md, section 8). */
+const FOREIGN_SIGN: Record<ForeignSign, string> = {
+  'status-section': 'no frontmatter, and a Status section in its text',
+  'successor-in-status': 'a Status that names a successor',
+  deciders: '"deciders" for the decision-makers',
+  'listed-status': 'its Status in the list under the title',
+  'listed-deciders': 'its Deciders in the list under the title'
 }
+
+/** What the tool takes from a file of a foreign format. */
+const FOREIGN_READING: Record<ForeignFormat, string> = {
+  'adr-tools':
+    'Its Status, its Relations and Back-references and the day it was created are taken from there.',
+  madr: 'That is read as MADR means it.',
+  'madr-2':
+    "What its list under the title says — Status, Deciders, log4brains' Tags — is taken from there, unless the frontmatter says it already, and its Relations from the links of its Links section."
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+const listed = (parts: readonly string[]): string =>
+  parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
 
 /** On the button that migrates every foreign ADR of the Decision Log in view. */
 export const MIGRATE_LOG_HINT =
@@ -133,7 +149,8 @@ export const IMPLIED_NOTE = 'recorded in that file, not in this one'
 /** In the header of an ADR that is written in a foreign format. */
 export function describeForeign(adr: Adr): string {
   if (!adr.foreign) return ''
-  const read = `Read as a file of ${FOREIGN_FORMAT_NAMES[adr.foreign]}: ${FOREIGN_SIGN[adr.foreign]}. The tool never writes this format.`
+  const signs = listed((adr.foreignSigns ?? []).map((sign) => FOREIGN_SIGN[sign]))
+  const read = `Read as a file of ${FOREIGN_FORMAT_NAMES[adr.foreign]}${signs ? `: ${signs}` : ''}. ${FOREIGN_READING[adr.foreign]} The tool never writes this format.`
   return adr.noMigration === undefined
     ? `${read} Migration rewrites the file into the tool's own, and shows the change first.`
     : `${read} This one ${adr.noMigration}`

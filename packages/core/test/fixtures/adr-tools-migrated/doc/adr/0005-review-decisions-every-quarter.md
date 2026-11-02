@@ -2,6 +2,7 @@
 status: accepted
 created: 2017-09-11
 amends: [0001-record-architecture-decisions]
+relates-to: [0003-deploy-to-two-regions]
 ---
 
 # 5. Review decisions every quarter

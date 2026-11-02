@@ -31,7 +31,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 ## Next — the first follow-ups after v1
 
 1. ~~**`adr lint` CLI for CI.** Checks that Metadata is valid, that Relations and Back-references are consistent, and that no numbers collide. Built on `core`; this is what carries the tool into teams.~~ Built on 2026-11-02 ([cli.md](cli.md); [plan-roadmap.md](plan-roadmap.md), part 4).
-2. **More foreign formats:** the rest of MADR 2.x and log4brains (v1 reads their Status, from the list under the title, and nothing else).
+2. ~~**More foreign formats:** the rest of MADR 2.x and log4brains (v1 reads their Status, from the list under the title, and nothing else).~~ Built on 2026-11-02 ([file-format.md, section 8](file-format.md#8-foreign-formats); [plan-roadmap.md](plan-roadmap.md), part 5).
 
 ## Later
 
@@ -62,9 +62,9 @@ With `adr lint`, because `core` has to say it first:
 
 With more foreign formats:
 
-- The header of a MADR file names all three signs the tool knows the format by, not the one that applied.
-- A Status section that Migration leaves in the text is named by the first thing that keeps it only.
-- Links in adr-tools files with words other than supersede and amend (`Clarifies`) are not Relations; they stay Markdown links in the text.
+- ~~The header of a MADR file names all three signs the tool knows the format by, not the one that applied.~~ Closed on 2026-11-02 (part 5): it names the signs that applied.
+- ~~A Status section that Migration leaves in the text is named by the first thing that keeps it only.~~ Closed on 2026-11-02 (part 5): the preview names everything that keeps it.
+- ~~Links in adr-tools files with words other than supersede and amend (`Clarifies`) are not Relations; they stay Markdown links in the text.~~ Closed on 2026-11-02 (part 5): they are read as `relates-to`, and the line stays in the text.
 
 Later, when a repository shows the need:
 

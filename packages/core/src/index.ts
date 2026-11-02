@@ -18,7 +18,7 @@ export {
 export { openRepository, type DecisionLog, type OpenOptions, type Repository } from './log/load'
 export { DEFAULT_LOG_PATHS } from './log/discover'
 export type { NamingScheme } from './log/naming'
-export { FOREIGN_FORMAT_NAMES, type Adr, type ForeignFormat } from './adr/adr'
+export { FOREIGN_FORMAT_NAMES, type Adr, type ForeignFormat, type ForeignSign } from './adr/adr'
 export { correctionsIn, type Correction, type Metadata } from './metadata/read'
 export { METADATA_KEYS, type MetadataKey } from './metadata/keys'
 export { hasBeenAccepted, type Relation, type RelationState } from './relations/graph'

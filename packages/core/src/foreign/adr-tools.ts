@@ -4,20 +4,25 @@ import type { RelationType } from '../relation'
 import { STATUSES, isStatus, type Status } from '../status'
 import { headingOf, proseLinesIn, type ProseLine } from '../text/prose'
 import type { SourceView, Span } from '../text/source'
-import { linkLine, targetOf } from './links'
+import { linkLine, namesAdr, targetOf } from './links'
 
 const DATE_LINE = /^Date:[ \t]*(\S+)[ \t]*$/
 
-type ListKey = RelationType | BackReferenceKey
+/** The first word of some words, in lower case and without the punctuation behind it. */
+const firstWord = (words: string): string => /^[^\s,;:.]*/.exec(words.trim())![0].toLowerCase()
+
+export type ListKey = RelationType | BackReferenceKey
 
 /** What the words of a link line mean; adr-tools itself spells both directions with a "c". */
-const LINK_WORDS = new Map<string, ListKey>([
+export const LINK_WORDS: ReadonlyMap<string, ListKey> = new Map<string, ListKey>([
   ['supersedes', 'supersedes'],
   ['supercedes', 'supersedes'],
   ['superseded by', 'superseded-by'],
   ['superceded by', 'superseded-by'],
   ['amends', 'amends'],
-  ['amended by', 'amended-by']
+  ['amended by', 'amended-by'],
+  // What `relates-to` says, in the words log4brains' template suggests.
+  ['relates to', 'relates-to']
 ])
 
 /** A file of adr-tools taken apart: what its Status section and its `Date:` line say. */
@@ -30,10 +35,10 @@ export interface AdrToolsFile {
   /** The Status section, from its heading to the next heading or the end of the file. */
   readonly section: Span
   /**
-   * The first thing in the section that the Metadata does not hold, as it is written.
-   * `undefined`: the Metadata holds all of it, and Migration takes the section out.
+   * What in the section the Metadata does not hold, as it is written, in the order of the
+   * text. Empty: the Metadata holds all of it, and Migration takes the section out.
    */
-  readonly keeps?: string
+  readonly keeps: readonly string[]
 }
 
 /**
@@ -48,7 +53,7 @@ export function parseAdrTools(view: SourceView): AdrToolsFile | undefined {
   const heading = lines.findIndex((line) => isStatusHeading(line.content))
   if (heading === -1) return undefined
 
-  const lists = new Map<ListKey, string[]>()
+  const lists = new Map<ListKey, Set<string>>()
   const statusText: ProseLine[] = []
   // What the Metadata does not hold, with where it stands: the first of them is named.
   const kept: { at: number; what: string }[] = []
@@ -70,18 +75,20 @@ export function parseAdrTools(view: SourceView): AdrToolsFile | undefined {
     const content = line.content.trim()
     if (!content) continue
     const link = linkLine(content)
-    if (!link) {
+    const words = link && LINK_WORDS.get(link.words.replace(/\s+/g, ' ').toLowerCase())
+    // `Deprecated, see [5. E](0005-e.md)` is Status text with a link in it, not a link line.
+    if (!link || (!words && isStatus(firstWord(link.words)))) {
       statusText.push(line)
       continue
     }
-    const key = LINK_WORDS.get(link.words.replace(/\s+/g, ' ').toLowerCase())
     const target = targetOf(link.target)
-    if (!key || !target) {
-      kept.push({ at: line.start, what: content })
-      continue
-    }
-    const list = lists.get(key) ?? []
-    if (!list.includes(target)) lists.set(key, [...list, target])
+    // Other words relate the two ADRs; what they say is not in the Metadata, so the line stays.
+    if (!words || !target) kept.push({ at: line.start, what: content })
+    // Without words of the format, only a link to an ADR is a Relation.
+    if (!target || (!words && !namesAdr(target))) continue
+    const key = words ?? 'relates-to'
+    const list = lists.get(key) ?? new Set<string>()
+    lists.set(key, list.add(target))
   }
   if (end === view.text.length && previous.next !== end) {
     kept.push({ at: previous.next, what: 'a code block' })
@@ -101,16 +108,16 @@ export function parseAdrTools(view: SourceView): AdrToolsFile | undefined {
   if (written && (known === undefined || known !== status)) {
     kept.push({ at: statusText[0]!.start, what: statusText[0]!.content.trim() })
   }
-  const uncaptured = kept.sort((one, other) => one.at - other.at)[0]?.what
+  const keeps = kept.sort((one, other) => one.at - other.at).map((one) => one.what)
 
   const created = createdOn(lines.slice(0, heading))
   return {
     status,
     ...(rawStatus !== undefined && { rawStatus }),
     ...(created !== undefined && { created }),
-    lists,
+    lists: new Map([...lists].map(([key, targets]) => [key, [...targets]])),
     section: { start: lines[heading]!.start, end },
-    ...(uncaptured !== undefined && { keeps: uncaptured })
+    keeps
   }
 }
 
@@ -140,7 +147,8 @@ export function readAdrTools(
       relations: {
         ...defaults.relations,
         supersedes: file.lists.get('supersedes') ?? [],
-        amends: file.lists.get('amends') ?? []
+        amends: file.lists.get('amends') ?? [],
+        'relates-to': file.lists.get('relates-to') ?? []
       },
       backReferences: {
         'superseded-by': file.lists.get('superseded-by') ?? [],

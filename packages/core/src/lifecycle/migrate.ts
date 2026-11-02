@@ -2,6 +2,7 @@ import { FOREIGN_FORMAT_NAMES, type Adr } from '../adr/adr'
 import type { Plan } from '../plan'
 import { parseAdrTools } from '../foreign/adr-tools'
 import { migrationOfMadr } from '../foreign/madr'
+import { parseMadrList, readOf } from '../foreign/madr-list'
 import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { MetadataNotWritableError, addToList, renameKey, setScalar } from '../metadata/write'
@@ -132,9 +133,9 @@ async function migrate(
     await pending.write(adr.path, (view) => {
       const file = parseAdrTools(view)
       if (!file) throw new Refusal(`${adr.id} changed on disk. Look at it again.`)
-      if (file.keeps !== undefined) {
+      if (file.keeps.length > 0) {
         warnings.push(
-          `The Status section of ${adr.id} stays in its text: the Metadata does not hold "${file.keeps}".`
+          `The Status section of ${adr.id} stays in its text: the Metadata does not hold ${quoted(file.keeps)}.`
         )
         return [emptyFrontmatter(view, view.bodyStart)]
       }
@@ -148,6 +149,8 @@ async function migrate(
       const created = metadata.created
       await pending.write(adr.path, (view) => setScalar(view, 'created', created))
     }
+  } else if (adr.foreign === 'madr-2') {
+    await migrateListed(pending, adr, warnings)
   } else {
     const todo = migrationOfMadr(viewSource(await pending.read(adr.path)))
     if (todo.deciders) {
@@ -164,13 +167,83 @@ async function migrate(
     }
   }
   for (const written of metadata.backReferences['superseded-by']) {
-    if (adr.foreign === 'madr' && log && !log.adrs.some((other) => other.id === written)) {
+    if (adr.foreign !== 'adr-tools' && log && !log.adrs.some((other) => other.id === written)) {
       warnings.push(
         `${adr.id} names "${written}" as its successor, which is no ADR of this Decision Log. It is written as it is, and stays a Problem.`
       )
     }
   }
 }
+
+/**
+ * MADR 2 and log4brains: the items of the list under the title that the Metadata holds go,
+ * and so does the Links section when it holds nothing else; then the Metadata is written.
+ */
+async function migrateListed(pending: PendingFiles, adr: Adr, warnings: string[]): Promise<void> {
+  const { metadata } = adr
+  let renamesDeciders = false
+  // What the items say that were read, to be written where they were not written before.
+  let deciders: string | undefined
+  let tags: readonly string[] | undefined
+  await pending.write(adr.path, (view) => {
+    const file = parseMadrList(view)
+    if (!file) throw new Refusal(`${adr.id} changed on disk. Look at it again.`)
+    const read = readOf(view, file, () => undefined)
+    renamesDeciders = read.renamesDeciders
+    if (file.deciders && read.read.includes(file.deciders)) deciders = file.deciders.value
+    if (file.tags && read.read.includes(file.tags)) tags = read.tags
+    if (file.status && read.rawStatus !== undefined) {
+      warnings.push(
+        `The Status of ${adr.id} stays in the list under its title: the tool does not know "${read.rawStatus}".`
+      )
+    }
+    for (const [name, item] of [
+      ['Status', file.status],
+      ['Deciders', file.deciders],
+      ['Tags', file.tags]
+    ] as const) {
+      if (item?.repeated) {
+        warnings.push(
+          `The list under the title of ${adr.id} says ${name} twice: both items stay in its text.`
+        )
+      }
+    }
+    const going = read.read.filter((item) => !item.continued && !item.repeated)
+    const spans: Span[] =
+      going.length === file.list.items ? [file.list.whole] : going.map((item) => item.line)
+    if (file.links && file.links.keeps.length === 0) {
+      spans.push(file.links.section)
+    } else if (file.links) {
+      warnings.push(
+        `The Links section of ${adr.id} stays in its text: the Metadata does not hold ${quoted(file.links.keeps)}.`
+      )
+    }
+    const edits = deletions(view, spans)
+    if (!view.frontmatter) {
+      const first = edits.find((edit) => edit.start === view.bodyStart)
+      edits.push(emptyFrontmatter(view, first ? first.end : view.bodyStart))
+    }
+    return edits
+  })
+  // Always a Status, also `accepted`: it is what makes the file one of the tool's own.
+  const status = metadata.status ?? metadata.rawStatus ?? 'accepted'
+  await pending.write(adr.path, (view) => setScalar(view, 'status', status))
+  if (renamesDeciders) {
+    await pending.write(adr.path, (view) => renameKey(view, 'deciders', 'decision-makers'))
+  }
+  // One value, as it is written: the tool does not split what a person wrote.
+  const named = deciders
+  if (named !== undefined) {
+    await pending.write(adr.path, (view) => setScalar(view, 'decision-makers', named))
+  }
+  const tagged = tags
+  if (tagged !== undefined && tagged.length > 0) {
+    await pending.write(adr.path, (view) => addToList(view, 'tags', tagged))
+  }
+}
+
+/** What keeps a section in the text, in a sentence: `"Proposed", "Clarifies […](…)"`. */
+const quoted = (what: readonly string[]): string => what.map((one) => `"${one}"`).join(', ')
 
 /**
  * The two fence lines of a frontmatter that has no key yet, and a blank line between it and
@@ -182,6 +255,26 @@ function emptyFrontmatter(view: SourceView, textAt: number): TextEdit {
   const from = Math.max(textAt, at)
   const blank = from >= text.length || text.startsWith('\n', from) || text.startsWith('\r\n', from)
   return { start: at, end: at, insert: `---${eol}---${eol}${blank ? '' : eol}` }
+}
+
+/**
+ * What `spans` take out of the text, joined where they meet: the list under the title and
+ * the Links section after it may — and at the end of the file, the blank lines in front of
+ * what goes go with it.
+ */
+function deletions(view: SourceView, spans: readonly Span[]): TextEdit[] {
+  const joined: Span[] = []
+  const join = (span: Span): void => {
+    const last = joined.at(-1)
+    if (last && span.start <= last.end)
+      joined[joined.length - 1] = { ...last, end: Math.max(last.end, span.end) }
+    else joined.push(span)
+  }
+  for (const span of [...spans].sort((one, other) => one.start - other.start)) join(span)
+  const atEnd = joined.map((span) => withoutSection(view, span))
+  joined.length = 0
+  for (const edit of atEnd) join(edit)
+  return joined.map((span) => ({ start: span.start, end: span.end, insert: '' }))
 }
 
 /**

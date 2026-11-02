@@ -2,6 +2,7 @@ import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import { isMap, isSeq, parseDocument, type Node, type YAMLMap } from 'yaml'
 import type { Adr } from '../adr/adr'
 import { parseAdrTools } from '../foreign/adr-tools'
+import { parseMadrList } from '../foreign/madr-list'
 import type { DecisionLog } from '../log/load'
 import { scalarText } from '../metadata/scalar'
 import { viewSource } from '../text/source'
@@ -100,26 +101,32 @@ function fileLines(text: string, adr: Adr | undefined): FileLines {
 
   // Where the Status is written, and the links of a foreign format with it: the `status` key,
   // the `* Status:` item of the list under the title (MADR 2), or the Status section (adr-tools).
-  const statusLines = ((): number[] => {
-    const own = key('status')
-    if (own !== undefined) return [own]
-    const listed = listedStatus(text, front ? lineAt(front.end) : 0)
-    if (listed !== undefined) return [listed]
-    if (front) return []
-    const section = parseAdrTools(view)?.section
-    if (!section) return []
+  /** The lines of a section that are not blank, from the line after its heading. */
+  const sectionLines = (section: { start: number; end: number }): number[] => {
     const lines: number[] = []
-    // From the line after the heading to the last line of the section.
-    for (
-      let line = lineAt(section.start) + 1;
-      line <= lineAt(Math.max(section.end - 1, 0));
-      line++
-    ) {
+    const last = lineAt(Math.max(section.end - 1, 0))
+    for (let line = lineAt(section.start) + 1; line <= last; line++) {
       if (lineText(line).trim() !== '') lines.push(line)
     }
     return lines
+  }
+  const { status, statusLines } = ((): { status?: number; statusLines: number[] } => {
+    const own = key('status')
+    if (own !== undefined) return { status: own, statusLines: [own] }
+    if (adr?.foreign !== 'adr-tools') {
+      // MADR 2 and log4brains: the Status item, and the links of the Links section.
+      const listed = parseMadrList(view)
+      if (listed) {
+        const at = listed.status && lineAt(listed.status.line.start)
+        const links = listed.links ? sectionLines(listed.links.section) : []
+        return { status: at, statusLines: at === undefined ? links : [at, ...links] }
+      }
+    }
+    if (front) return { statusLines: [] }
+    const section = parseAdrTools(view)?.section
+    const lines = section ? sectionLines(section) : []
+    return { status: lines[0], statusLines: lines }
   })()
-  const status = statusLines[0]
   /** In a foreign format: the line of the Status that links to `id`, or the Status itself. */
   const link = (id: string): number | undefined =>
     adr?.foreign === undefined && front
@@ -171,16 +178,4 @@ function pairOf(
   name: string
 ): { key: unknown; value: unknown } | undefined {
   return map?.items.find((pair) => scalarText(pair.key) === name)
-}
-
-/** The line of `* Status: …` in the first list below the frontmatter, as MADR 2 writes it. */
-function listedStatus(text: string, after: number): number | undefined {
-  const lines = text.split('\n')
-  for (let index = after; index < lines.length; index++) {
-    const line = lines[index]!
-    if (/^\s*[*-]\s+Status\s*:/i.test(line)) return index + 1
-    // The list under the title ends at the first heading after it.
-    if (/^#{2,6}\s/.test(line)) return undefined
-  }
-  return undefined
 }
