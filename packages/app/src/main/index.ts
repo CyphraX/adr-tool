@@ -11,6 +11,7 @@ import {
   type OpenRepository,
   type Session
 } from '../shared/ipc'
+import { isLanguage } from '../shared/language'
 import { analysisHost } from './analysis-host'
 import { ASSET_SCHEME, assetHandler } from './assets'
 import { exportPdf, writeExport } from './export'
@@ -25,7 +26,7 @@ import {
   structureRepairRequest
 } from './requests'
 import { readSession, writeSession } from './session-store'
-import { t } from './strings'
+import { setLanguage, t } from './strings'
 import { Structures, cacheName } from './structures'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
@@ -346,6 +347,13 @@ function registerIpc(): void {
   ipcMain.handle(CHANNEL.openExternal, async (_, url: unknown) => {
     if (typeof url === 'string' && isWebLink(url)) await shell.openExternal(url)
   })
+
+  ipcMain.handle(CHANNEL.setLanguage, (_, language: unknown) => {
+    if (isLanguage(language)) setLanguage(language)
+  })
+
+  // A reload from the page is a navigation, which the window refuses (`will-navigate` below).
+  ipcMain.handle(CHANNEL.reloadWindow, (event) => event.sender.reload())
 
   ipcMain.handle(CHANNEL.setUnsaved, (event, holdsText: unknown) => {
     if (holdsText === true) unsaved.add(event.sender.id)

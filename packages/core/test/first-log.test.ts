@@ -22,7 +22,7 @@ describe('where the first ADR of a repository goes (docs/file-format.md, section
   })
 
   it('goes nowhere while the configuration cannot be used', async () => {
-    expect(await firstLog(memoryFileSystem({ '.adr-dir': '../elsewhere\n' }))).toEqual({
+    expect(await firstLog(memoryFileSystem({ '.adr-dir': '../elsewhere\n' }))).toMatchObject({
       reason:
         '.adr-dir cannot be used: The directory must be a relative path inside the repository. Repair it first.'
     })

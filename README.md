@@ -72,6 +72,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 - **Export.** **Export → Web pages…** writes the Decision Logs as HTML pages for people who do not use the tool: an index by Status and a page per ADR, with its Relations as links. The pages open from disk, from a file share or from any web host. They run no script and fetch nothing. **PDF…** prints the same ADRs as a PDF, one ADR per page ([ADR-0014](docs/adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
 - **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 2, 3 and 4, for [log4brains](https://github.com/thomvaill/log4brains) and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
+- **English and German.** The window speaks German when the system does, and English otherwise; the menu at the top right overrides that. What the tool says about ADRs and code — Problems, refusals, the warnings of a change — is said in the same language. `adr lint` and the MCP server stay English.
 
 <details>
 <summary>More screenshots: timeline, dashboard, Metadata, search, history, Migration</summary>
@@ -292,7 +293,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 - **Language.** Code and documents use the terms of [CONTEXT.md](CONTEXT.md) (Decisions) and [docs/contexts/structure/CONTEXT.md](docs/contexts/structure/CONTEXT.md) (Structure). [CONTEXT-MAP.md](CONTEXT-MAP.md) maps the two.
 - **Decisions.** Every decision of consequence is recorded as an ADR in [docs/adr/](docs/adr/), written in the suite's own format.
 - **Bytes.** Prettier never formats Markdown in this repository. The fixtures under `packages/core/test/fixtures` are exempt from git's line-ending normalization. The tool promises never to change a byte it was not asked to change, and this repository is its first test case.
-- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.ts` and `wording.ts`, ready for translation. A test checks that no component carries text of its own.
+- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.en.ts` and `wording.en.ts`, with the German beside them (`strings.de.ts`, `wording.de.ts`); the main process has its own in `packages/app/src/main/strings.ts`. What `core` and `structure` say in sentences carries a code, and the window words it by that code. Tests check that no component carries text of its own and that nothing English is left in the German.
 
 ## Documentation
 
@@ -324,7 +325,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
   - an MCP server for agents (built);
   - an export as web pages and PDF (built);
   - timeline, board and dashboard, and tables in the live editor (built);
-  - a German translation, and the repositories in the window seen together.
+  - the window in German (built), and the repositories in the window seen together.
 - **Deferred:** distribution — installers, code signing and auto-update.
 
 The details are in [docs/roadmap.md](docs/roadmap.md).

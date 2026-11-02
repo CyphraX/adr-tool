@@ -88,7 +88,13 @@ describe('affects', () => {
     const { log } = await repository({ '0001-a': adr('affects: {core: yes}') })
     expect(log.adrs[0]!.metadata.affects).toEqual([])
     expect(log.problems).toEqual([
-      { kind: 'invalid-metadata', adr: '0001-a', key: 'affects', detail: 'Expected a list' }
+      {
+        kind: 'invalid-metadata',
+        adr: '0001-a',
+        key: 'affects',
+        detail: 'Expected a list',
+        said: { code: 'expected-list', values: {} }
+      }
     ])
   })
 })
@@ -144,7 +150,7 @@ describe('a Trace to a Component that is not declared', () => {
     const { fs, log } = await repository(broken)
     const repair = repairsOf(log, log.problems[0]!)[0]!
     const { log: later } = await repository(broken, [...COMPONENTS, 'core/storage', 'ui'])
-    expect(await planRepair(fs, later, repair)).toEqual({
+    expect(await planRepair(fs, later, repair)).toMatchObject({
       ok: false,
       reason: 'This Problem is no longer there.'
     })
@@ -181,11 +187,13 @@ describe('editing affects', () => {
 
   it('only adds a Component that is declared', async () => {
     const { fs, log } = await repository(files)
-    expect(await planEditMetadata(fs, log, '0001-a', { affects: ['ui'] }, COMPONENTS)).toEqual({
+    expect(
+      await planEditMetadata(fs, log, '0001-a', { affects: ['ui'] }, COMPONENTS)
+    ).toMatchObject({
       ok: false,
       reason: 'There is no declared Component ui.'
     })
-    expect(await planEditMetadata(fs, log, '0001-a', { affects: ['core'] })).toEqual({
+    expect(await planEditMetadata(fs, log, '0001-a', { affects: ['core'] })).toMatchObject({
       ok: false,
       reason: 'No Component is declared in this repository, so none can be named.'
     })
@@ -273,7 +281,9 @@ describe('renaming a Component in the Traces', () => {
       '0001-a': adr('affects: [core]'),
       '0002-b': '---\nstatus: [\naffects: [core]\n---\n# T\n'
     })
-    expect(await planRenameTraces(unreadable.fs, unreadable.repository.logs, 'core', 'x')).toEqual({
+    expect(
+      await planRenameTraces(unreadable.fs, unreadable.repository.logs, 'core', 'x')
+    ).toMatchObject({
       ok: false,
       reason:
         'The frontmatter of 0002-b cannot be read, and it has a list "affects". Fix it before core is renamed.'

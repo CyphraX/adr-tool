@@ -7,8 +7,10 @@ import type {
   RelationType,
   Repair,
   Repository,
+  Said,
   Templates
 } from '@adr-tool/core'
+import type { Language as WindowLanguage } from './language'
 import type {
   Cycle,
   Dependency,
@@ -93,6 +95,11 @@ export interface PlannedChange {
   readonly changeSet: ChangeSet
   /** What the person should look at before confirming. */
   readonly warnings: readonly string[]
+  /**
+   * The warnings as codes, where the module that warns has one: `warned[i]` is `warnings[i]`.
+   * What the main process adds of its own comes after them, without a code.
+   */
+  readonly warned?: readonly Said[]
   /** The ID of the ADR the change creates. */
   readonly createdId?: string
   /** The new ID of the ADR the change renumbers. */
@@ -382,7 +389,8 @@ export type CommitResult =
 
 export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
-  | { readonly ok: false; readonly reason: string }
+  /** `said`: the reason as a code, where `core` or `structure` gave it one. */
+  | { readonly ok: false; readonly reason: string; readonly said?: Said }
 
 /** An export that was written: where it is, to open, and how many ADRs it holds. */
 export type ExportResult =
@@ -490,6 +498,13 @@ export interface Api {
   planRename(repositoryId: string, component: string, segment: string): Promise<PlanResult>
   /** Say whether the window holds text that is not on disk. While it does, closing it asks first. */
   setUnsaved(unsaved: boolean): Promise<void>
+  /** Say the language of the window, so that what the main process says is said in it too. */
+  setLanguage(language: WindowLanguage): Promise<void>
+  /**
+   * Load the window again, as after a change of its language. The window cannot do that itself:
+   * the main process lets nothing navigate inside it.
+   */
+  reloadWindow(): Promise<void>
   /** Called when the window is to close while it holds unsaved text. Nothing closes until it was answered. */
   onCloseRequested(listener: () => void): () => void
   /** What the person said: close the window, whatever it holds — or keep it, and forget that anything was to quit. */
@@ -529,6 +544,8 @@ export const CHANNEL = {
   discardChange: 'change:discard',
   openExternal: 'shell:open-external',
   setUnsaved: 'window:set-unsaved',
+  setLanguage: 'window:set-language',
+  reloadWindow: 'window:reload',
   closeRequested: 'window:close-requested',
   answerCloseRequest: 'window:answer-close-request'
 } as const

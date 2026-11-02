@@ -1,3 +1,4 @@
+import type { Problem } from '@adr-tool/core'
 import type { LintedGroup, LintedProblem, LintReport } from './lint'
 
 export const FORMATS = ['text', 'json', 'github'] as const
@@ -74,7 +75,7 @@ function json(report: LintReport): object {
     path,
     ...(line !== undefined && { line }),
     ...(log !== undefined && { log }),
-    problem
+    problem: withoutSaid(problem)
   })
   return {
     logs: report.logs,
@@ -83,6 +84,17 @@ function json(report: LintReport): object {
       consequences: group.consequences.map(one)
     }))
   }
+}
+
+/**
+ * The Problem as the document gives it (docs/cli.md): what `core` reports, without the code of
+ * its detail that a window in another language words it by. The message is in English.
+ */
+function withoutSaid(problem: Problem): Problem {
+  if (!('said' in problem)) return problem
+  const rest: Record<string, unknown> = { ...problem }
+  delete rest['said']
+  return rest as Problem
 }
 
 /** Escaped as the workflow commands of GitHub Actions want it. */

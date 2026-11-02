@@ -20,7 +20,10 @@ import type {
   SourceFileText,
   StructureView
 } from '../../../shared/ipc'
+import type { Language } from '../../../shared/language'
 import { recordedIn } from './history'
+import { chooseLanguage } from './language'
+import { wordOf } from './said'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
 import { moveOf, type StatusKey } from './views'
@@ -366,6 +369,21 @@ class AppState {
     })
   }
 
+  /**
+   * Speak another language, or the system's when `language` is left out. The window reloads in
+   * it; text that is not saved is asked about first, and `declined` is called if it is kept.
+   */
+  speak(language: Language | undefined, declined: () => void): void {
+    this.leaveDialogs(
+      () =>
+        this.leaveEditor(() => {
+          chooseLanguage(language)
+          void window.api.reloadWindow()
+        }, declined),
+      declined
+    )
+  }
+
   /** Switch the repository in front to another module. The editor is a Decisions thing. */
   showModule(module: Module): void {
     const tab = this.active
@@ -450,7 +468,7 @@ class AppState {
             applying: false,
             renames: { from: id, to }
           }
-        : { kind: 'refused', title: texts.refused(id), reason: plan.reason }
+        : { kind: 'refused', title: texts.refused(id), reason: wordOf(plan.said, plan.reason) }
     )
   }
 
@@ -547,7 +565,7 @@ class AppState {
             change: plan.change,
             applying: false
           }
-        : { kind: 'refused', title: texts.refused, reason: plan.reason }
+        : { kind: 'refused', title: texts.refused, reason: wordOf(plan.said, plan.reason) }
     )
   }
 
@@ -566,7 +584,11 @@ class AppState {
             change: plan.change,
             applying: false
           }
-        : { kind: 'refused', title: texts.refused(problem.component), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: texts.refused(problem.component),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -747,7 +769,11 @@ class AppState {
     this.present(
       plan.ok
         ? { kind: 'change', title, action: texts.action, change: plan.change, applying: false }
-        : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: texts.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -900,7 +926,11 @@ class AppState {
             applying: false,
             caution: texts.caution
           }
-        : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: texts.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -929,7 +959,7 @@ class AppState {
             applying: false,
             caution: texts.caution
           }
-        : { kind: 'refused', title: refused, reason: plan.reason }
+        : { kind: 'refused', title: refused, reason: wordOf(plan.said, plan.reason) }
     )
   }
 
@@ -977,7 +1007,11 @@ class AppState {
             change: plan.change,
             applying: false
           }
-        : { kind: 'refused', title: t.review.create.refused, reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: t.review.create.refused,
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -1033,7 +1067,11 @@ class AppState {
             applying: false,
             saves: true
           }
-        : { kind: 'refused', title: t.review.metadata.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: t.review.metadata.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -1078,7 +1116,11 @@ class AppState {
             saves: true,
             caution: t.review.body.caution
           }
-        : { kind: 'refused', title: t.review.body.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: t.review.body.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 

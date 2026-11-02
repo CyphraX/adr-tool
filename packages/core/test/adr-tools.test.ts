@@ -120,7 +120,11 @@ describe('a repository written with adr-tools', () => {
         kind: 'invalid-metadata',
         adr: '0007-graphql-for-partners',
         key: 'status',
-        detail: expect.stringContaining('"On hold until the partner programme starts"')
+        detail: expect.stringContaining('"On hold until the partner programme starts"'),
+        said: {
+          code: 'unknown-status',
+          values: { status: expect.stringContaining('On hold until the partner programme starts') }
+        }
       }
     ])
     // A link that leads out of the directory names no ADR.
@@ -369,7 +373,7 @@ describe('writing to an ADR in a foreign format', () => {
     // Not everything that names a foreign ADR is a Repair that was withheld.
     expect(
       await planRepair(fs, log, { kind: 'remove-item', adr: '0005-e', key: 'amends', item: 'x' })
-    ).toEqual({ ok: false, reason: 'This Problem is no longer there.' })
+    ).toMatchObject({ ok: false, reason: 'This Problem is no longer there.' })
   })
 
   it('lets Renumber rename a foreign file, which writes nothing into it', async () => {

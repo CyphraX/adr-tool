@@ -1,6 +1,7 @@
 import { applyEdits, type TextEdit } from '../text/edit'
 import type { FileSystem } from '../fs/port'
 import type { ChangeSet, Plan } from './change-set'
+import { KERNEL_SENTENCES, sentenceOf, type KernelSaid, type Said } from './said'
 
 interface PendingFile {
   before: string
@@ -9,8 +10,22 @@ interface PendingFile {
   renameTo?: string
 }
 
-/** Why an operation cannot be done, in words for the person who asked for it. */
-export class Refusal extends Error {}
+/**
+ * Why an operation cannot be done, in words for the person who asked for it: the English
+ * sentence, and what was said as a code for a window in another language.
+ */
+export class Refusal extends Error {
+  constructor(
+    message: string,
+    readonly said?: Said
+  ) {
+    super(message)
+  }
+}
+
+function refuse(said: KernelSaid): never {
+  throw new Refusal(sentenceOf(KERNEL_SENTENCES, said), said)
+}
 
 /**
  * The files an operation is about to change. Every write is a set of splice edits against
@@ -32,7 +47,7 @@ export class PendingFiles<View = string> {
   async create(path: string, text: string): Promise<void> {
     const taken = [...this.texts.values()].some((file) => file.renameTo === path)
     if (taken || this.texts.has(path) || (await this.fs.readText(path)) !== undefined) {
-      throw new Refusal(`${path} already exists.`)
+      refuse({ code: 'already-exists', values: { path } })
     }
     this.texts.set(path, { before: '', after: text, creates: true })
   }
@@ -41,7 +56,7 @@ export class PendingFiles<View = string> {
   async rename(path: string, to: string): Promise<void> {
     const taken = [...this.texts.values()].some((file) => file.renameTo === to)
     if (taken || this.texts.has(to) || (await this.fs.readText(to)) !== undefined) {
-      throw new Refusal(`${to} already exists.`)
+      refuse({ code: 'already-exists', values: { path: to } })
     }
     const file = await this.file(path)
     file.renameTo = to
@@ -61,7 +76,7 @@ export class PendingFiles<View = string> {
     let file = this.texts.get(path)
     if (!file) {
       const before = await this.fs.readText(path)
-      if (before === undefined) throw new Refusal(`${path} no longer exists.`)
+      if (before === undefined) refuse({ code: 'no-longer-exists', values: { path } })
       file = { before, after: before }
       this.texts.set(path, file)
     }
@@ -88,7 +103,9 @@ export async function plan<View>(
   try {
     await build(pending)
   } catch (error) {
-    if (error instanceof Refusal) return { ok: false, reason: error.message }
+    if (error instanceof Refusal) {
+      return { ok: false, reason: error.message, ...(error.said && { said: error.said }) }
+    }
     throw error
   }
   return { ok: true, changeSet: pending.changeSet() }

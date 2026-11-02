@@ -2,7 +2,7 @@
   import { problemsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { STATUS_LABEL, prefixOf } from '../lib/wording'
+  import { STATUS_LABEL, STATUS_WIDTH, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   const selectedId = $derived(app.selected?.id)
@@ -26,7 +26,11 @@
 </script>
 
 <!-- A date prefix (2021-04-15) needs about twice the room of a number (0042). -->
-<div class="list" style:--prefix={app.log?.naming === 'date' ? '10.5ch' : '5.5ch'}>
+<div
+  class="list"
+  style:--prefix={app.log?.naming === 'date' ? '10.5ch' : '5.5ch'}
+  style:--status={STATUS_WIDTH}
+>
   <div class="tools">
     <button class="search" onclick={() => app.startSearching()}>
       {t.search}
@@ -137,7 +141,7 @@
   .head,
   .row {
     display: grid;
-    grid-template-columns: var(--prefix) minmax(0, 1fr) 12.5ch 10.5ch;
+    grid-template-columns: var(--prefix) minmax(0, 1fr) var(--status) 10.5ch;
     column-gap: 12px;
     align-items: center;
     padding: 0 14px;
@@ -147,7 +151,7 @@
   @container (max-width: 520px) {
     .head,
     .row {
-      grid-template-columns: var(--prefix) minmax(0, 1fr) 12.5ch;
+      grid-template-columns: var(--prefix) minmax(0, 1fr) var(--status);
     }
 
     .decided {

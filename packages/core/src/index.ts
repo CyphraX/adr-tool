@@ -8,13 +8,18 @@ export {
   joinPath,
   memoryFileSystem,
   normalizePath,
+  sentenceOf,
   type Applied,
   type ChangeSet,
   type DirectoryEntry,
   type FileChange,
   type FileSystem,
+  type Said,
+  type SaidValue,
+  type Sentences,
   type WritableFileSystem
 } from '@adr-tool/kernel'
+export { SENTENCES, englishOf, type CoreSaid } from './sentences'
 
 export { openRepository, type DecisionLog, type OpenOptions, type Repository } from './log/load'
 export { DEFAULT_LOG_PATHS } from './log/discover'
