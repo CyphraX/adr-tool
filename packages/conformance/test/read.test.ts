@@ -195,6 +195,54 @@ describe('the Problems of the file (docs/conformance-format.md, section 5)', () 
     expect(readRules('rules: x\n').rules).toEqual([])
   })
 
+  it('cannot read a file with a key written twice at its top', () => {
+    // The second list of Rules would go unchecked, and CI would stay green.
+    expect(
+      said(
+        yaml(
+          'rules:',
+          '  - {id: a, why: W., kind: must-not-depend, from: x, to: y}',
+          'exceptions: []',
+          'rules:',
+          '  - {id: b, why: W., kind: must-not-depend, from: y, to: x}'
+        )
+      )
+    ).toEqual(['4: unreadable-rules: .arch/rules.yml cannot be read: "rules" is written twice.'])
+  })
+
+  it('names the key written twice in a Rule, an Exception or an applied Pattern', () => {
+    // The review's probe: the first "to" names a Component that does not matter.
+    expect(
+      said(
+        yaml(
+          'rules:',
+          '  - id: a-not-b',
+          '    why: a is the core and must not use b.',
+          '    kind: must-not-depend',
+          '    from: a',
+          '    to: c-does-not-matter',
+          '    to: b',
+          'exceptions:',
+          '  - rule: a-not-b',
+          '    from: a',
+          '    from: x',
+          '    to: b',
+          '    reason: R.',
+          'patterns:',
+          '  - id: p',
+          '    pattern: layered',
+          '    roles:',
+          '      top: a',
+          '      top: b'
+        )
+      )
+    ).toEqual([
+      '7: invalid-rule: The Rule a-not-b cannot be checked: "to" is written twice.',
+      '11: invalid-exception: An Exception from the Rule a-not-b cannot be read: "from" is written twice.',
+      '19: invalid-applied-pattern: The applied Pattern p cannot be read: "top" is written twice.'
+    ])
+  })
+
   it('names a Rule without a kind, or with one it does not know, and goes on', () => {
     expect(
       said(

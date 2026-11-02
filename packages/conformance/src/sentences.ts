@@ -86,6 +86,7 @@ export const SENTENCES = {
   'not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
   'top-not-map': (): string => 'its top level must be a map',
   'key-not-list': (v: { key: string }): string => `"${v.key}" must be a list`,
+  'key-twice': (v: { key: string }): string => `"${v.key}" is written twice`,
   'item-not-map': (): string => 'it must be a map of its keys',
   'missing-key': (v: { key: string }): string => `it has no "${v.key}"`,
   'not-text': (v: { key: string }): string => `"${v.key}" must be a text`,

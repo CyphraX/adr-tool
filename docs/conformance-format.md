@@ -50,6 +50,7 @@ A file without any of them, or an empty file, has no Rules. A repository without
 
 - **One item per Rule, in block style**, as above: a Rule is a list item that begins with `- id:`, and its keys stand below it. That is what a form adds, changes and removes from part 4 on: a new Rule is appended to the end of `rules`, a changed Rule changes the lines of its keys, a removed Rule takes its lines and nothing else. The same holds for Exceptions and applied Patterns. A blank line between items is kept where it is.
 - **Read tolerantly.** A list may also be written in flow style (`[a, b]`), a single value where a list is expected is read as a list of one, values may be quoted or not, and comments stand anywhere. Keys the suite does not know are preserved and ignored, at the top and inside every item, as foreign keys are in an ADR's frontmatter: a later version of the suite adds keys, and an earlier one leaves them alone.
+- **No key twice.** A key written twice in one map is a Problem, whatever the key: at the top, the file cannot be read; in a Rule, an Exception or an applied Pattern, that item cannot (section 5). YAML does not say which of the two counts, and a second `rules:` or `to:` must not leave a Rule unchecked while CI stays green.
 - **The suite writes only by splicing** (from part 4 on): it finds where an item stands and edits the text there. Where the file is written in a way a splice cannot serve — an item in braces, an anchor or alias, a document end marker — the form refuses with a sentence and leaves the change to an editor. Whatever the suite hands out has been checked to read back as what was meant.
 - A pattern that begins with `*` is a YAML alias when it stands unquoted, and is quoted: `from: '*'`, `to: ['**']`. `ui/**` needs no quotes.
 
@@ -278,19 +279,19 @@ Conformance adds these **Problems** about `.arch/rules.yml`. Each has a code and
 
 | Code | The Problem |
 | ---- | ----------- |
-| `unreadable-rules` | The file cannot be read: it is not YAML, its top level is not a map, or `rules`, `exceptions` or `patterns` is not a list. Nothing in it is evaluated |
+| `unreadable-rules` | The file cannot be read: it is not YAML, its top level is not a map, a key of its top level is written twice, or `rules`, `exceptions` or `patterns` is not a list. Nothing in it is evaluated |
 | `rules-without-declaration` | The file has Rules, and `.arch/components.yml` declares no Components that can be read. No Rule is evaluated: the Draft's IDs are no names to write down |
 | `unknown-rule-kind` | A Rule has no `kind`, or one the suite does not know |
-| `invalid-rule` | A key of a Rule is missing or has a value of the wrong form: no `id`, no `why`, an ID that is no valid Rule ID, `from` without `to`, fewer than two layers, a metric the suite does not know, `max` that is no number, … The sentence names the key |
+| `invalid-rule` | A key of a Rule is missing, is written twice or has a value of the wrong form: no `id`, no `why`, an ID that is no valid Rule ID, `from` without `to`, fewer than two layers, a metric the suite does not know, `max` that is no number, … The sentence names the key |
 | `duplicate-rule` | Two Rules have the same ID. The first is evaluated, the second is not |
 | `unknown-component` | A Rule, or an applied Pattern, names a Component ID that `.arch/components.yml` does not declare |
 | `no-component-matches` | A Component pattern with a wildcard matches no declared Component |
-| `invalid-exception` | A key of an Exception is missing or has a value of the wrong form: no `rule`, no `reason`, a fingerprint that does not fit the kind of its Rule |
+| `invalid-exception` | A key of an Exception is missing, is written twice or has a value of the wrong form: no `rule`, no `reason`, a fingerprint that does not fit the kind of its Rule |
 | `exception-unknown-rule` | An Exception names a Rule that the file does not have |
 | `unmatched-exception` | An Exception matches no Violation: the Violation is gone, and so should the Exception be |
 | `duplicate-exception` | Two Exceptions name the same fingerprint. The first one matches |
 | `unknown-justification` | `justified-by` names an ADR that the repository does not have |
-| `invalid-applied-pattern` | An applied Pattern has no `id` or no `pattern`, or `roles` is not a map of Component patterns (part 5) |
+| `invalid-applied-pattern` | An applied Pattern has no `id` or no `pattern`, has a key or a role written twice, or `roles` is not a map of Component patterns (part 5) |
 
 There is no Repair for any of them yet; the Repairs arrive with the window in part 4 — the one for an Exception that matches nothing takes its lines out. Problems of Conformance appear in the Problems of the repository beside those of the Decision Logs and of the declaration, grouped by module.
 

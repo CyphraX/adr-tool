@@ -170,6 +170,11 @@ export function readRules(text: string | undefined): RulesFile {
   if (doc.contents === null || isEmpty(doc.contents)) return { ...NOTHING, present: true }
   if (!isMap(doc.contents)) return unreadable({ code: 'top-not-map', values: {} }, 1)
   const top = doc.contents
+  // A key written twice would hide what it says first: a second list of Rules goes unchecked.
+  const twice = repeatedKey(top)
+  if (twice !== undefined) {
+    return unreadable({ code: 'key-twice', values: { key: twice.key } }, lineOf(twice.node))
+  }
 
   const lists: Record<'rules' | 'exceptions' | 'patterns', readonly unknown[]> = {
     rules: [],
@@ -234,7 +239,12 @@ export function readRules(text: string | undefined): RulesFile {
       patterns.push(readAppliedPattern(item, line, lineOf))
     } catch (error) {
       if (!(error instanceof Wrong)) throw error
-      problems.push({ kind: 'invalid-applied-pattern', pattern: id, detail: error.said, line })
+      problems.push({
+        kind: 'invalid-applied-pattern',
+        pattern: id,
+        detail: error.said,
+        line: error.at
+      })
     }
   }
 
@@ -258,6 +268,7 @@ function readRule(
   lineOf: LineOf
 ): { rule: Rule } | { problem: ConformanceProblem } {
   const at = (key: string): number => lineOf(keyNodeOf(map, key), line)
+  noKeyTwice(map, lineOf)
   const id = requiredText(map, 'id', line, lineOf)
   if (!isRuleId(id)) throw new Wrong({ code: 'not-rule-id', values: { id } }, at('id'))
   const why = requiredText(map, 'why', line, lineOf)
@@ -352,6 +363,7 @@ function readRule(
 }
 
 function readException(map: YAMLMap, line: number, lineOf: LineOf): WrittenException {
+  noKeyTwice(map, lineOf)
   const rule = requiredText(map, 'rule', line, lineOf)
   const reason = requiredText(map, 'reason', line, lineOf)
   const from = text(map, 'from', lineOf)
@@ -385,6 +397,7 @@ function readException(map: YAMLMap, line: number, lineOf: LineOf): WrittenExcep
 }
 
 function readAppliedPattern(map: YAMLMap, line: number, lineOf: LineOf): AppliedPattern {
+  noKeyTwice(map, lineOf)
   const id = requiredText(map, 'id', line, lineOf)
   if (!isRuleId(id)) throw new Wrong({ code: 'not-rule-id', values: { id } }, line)
   const pattern = requiredText(map, 'pattern', line, lineOf)
@@ -393,6 +406,7 @@ function readAppliedPattern(map: YAMLMap, line: number, lineOf: LineOf): Applied
   const roles: { role: string; components: string[] }[] = []
   if (node !== undefined && node !== null && !isEmpty(node)) {
     if (!isMap(node)) throw new Wrong({ code: 'roles-not-map', values: {} }, line)
+    noKeyTwice(node, lineOf)
     for (const pair of node.items) {
       const role = scalarText(pair.key)
       if (role === undefined || pair.value === null) {
@@ -418,6 +432,26 @@ function componentPatterns(node: unknown, key: string, names: Naming[], lineOf: 
     names.push({ pattern: value, key, line: lineOf(item, lineOf(node)) })
     return value
   })
+}
+
+/** The first key of a map that is written again, at its second place; `undefined` if none is. */
+function repeatedKey(map: YAMLMap): { key: string; node: unknown } | undefined {
+  const seen = new Set<string>()
+  for (const pair of map.items) {
+    const key = scalarText(pair.key)
+    if (key === undefined) continue
+    if (seen.has(key)) return { key, node: pair.key }
+    seen.add(key)
+  }
+  return undefined
+}
+
+/** A Rule, an Exception or an applied Pattern with a key written twice cannot be read. */
+function noKeyTwice(map: YAMLMap, lineOf: LineOf): void {
+  const twice = repeatedKey(map)
+  if (twice !== undefined) {
+    throw new Wrong({ code: 'key-twice', values: { key: twice.key } }, lineOf(twice.node))
+  }
 }
 
 /** The key node of a key, `undefined` when the key is not there. The first one counts. */
