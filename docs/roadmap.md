@@ -26,7 +26,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 - Distribution: installers for all three platforms, code signing, auto-update
 - Windows and macOS back into CI. They were switched off on 2026-11-02 to save runs; until then a Windows-only failure — a path, a CRLF fixture, a file held open — shows up only by hand
 - ~~Final product name.~~ Decided on 2026-11-02: Softarch Suite ([ADR-0011](adr/0011-the-product-is-called-softarch-suite.md)); the check for clashes in trademark registers, domains, npm and GitHub is still due
-- Three known gaps of v1 that a first-time user can meet at once (see "Known gaps of v1" below): images with relative paths, the Metadata dialog that can outgrow the window, and the dialogs the window closes over without asking
+- ~~Three known gaps of v1 that a first-time user can meet at once (see "Known gaps of v1" below): images with relative paths, the Metadata dialog that can outgrow the window, and the dialogs the window closes over without asking~~ Closed on 2026-11-02 ([plan-roadmap.md](plan-roadmap.md), part 2), except for the run on a Mac
 
 ## Next — the first follow-ups after v1
 
