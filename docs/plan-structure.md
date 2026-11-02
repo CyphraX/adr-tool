@@ -172,6 +172,18 @@ A read-only viewer on CodeMirror 6, which the app already carries: syntax highli
 - **The opposite direction is computed where it is shown.** The Component page lists the ADRs that name it, then those that name a Component inside it, marked so; the ADR's header links each of its Components to its page. Neither is stored anywhere.
 - **One picker for ADRs and Components.** The Metadata dialog's picker is generic now (`Picker.svelte`); the Components appear in the order of the declaration, indented by depth, with their ID where it differs from the name.
 
+### Part 8 — Directories below a Component
+
+Asked for after part 7: the levels go down as deep as the folders do. Below a Component without children, the views no longer show all its Source Files on one level, but its directories and the files directly in it, level by level (specification, sections 4 and 5).
+
+- `structure` derives the **directory nodes** from the Source Files a Component without children owns: its base, the directories below it, a directory that only holds one directory passed over. Levels, Cycles, the matrix and the metrics work on them as on Components; they are never declared, and Adopt does not write them.
+- The app opens a directory node like a Component: from the graph, the matrix and the metrics, with the way back up. Its page shows the directory, its metrics, its Dependencies and Cycles — no Rename, and no ADRs, since no Trace names a directory.
+- Glossary: **Directory node**.
+
+*Done when:* in this repository, the leaf Component `app/renderer` opens onto its directories `components` and `lib` and its own files, `lib` opens onto its Source Files, each level has its graph, matrix and metrics, and `.arch/components.yml` stays as it is.
+
+*Status (2026-11-02):* built. `withDirectories` in `structure` derives the directory nodes in a copy of the Structure that the levels, the matrix and the metrics read, and that nothing writes (`packages/structure/src/directories.ts`); its fixture has a directory that is passed over, a Cycle between two directories, a directory of test files only, and a Component whose code lies in one directory and so has none (`packages/structure/test/directories.test.ts`). The metrics of the directory nodes are checked against the definitions for this repository like those of the Components. In the running app, on this repository: `app/renderer` opens onto `components/`, `lib/` and its own files `App.svelte`, `env.d.ts` and `main.ts`, `lib/` onto its 13 Source Files, and the way above reads All Components › app › renderer › lib. The page of `lib/` names its path and has its metrics — Ce 8, Ca 23, I 0.26, used by `components/` through 68 Source File Dependencies — and no Rename and no Decisions (`docs/screenshots/s8-directories.png`); in the matrix `components/` expands into its files (`docs/screenshots/s8-matrix.png`), and the metrics table opens a directory with a double click as well. `.arch/components.yml` was byte for byte the same afterwards; the app's test pins the same levels (`packages/app/test/structures.test.ts`).
+
 ## Open implementation decisions
 
 1. **tree-sitter as WASM in three hosts.** Spike (a). **Verified (2026-09-20):** it runs in plain Node, in Electron's main process, in a worker thread and in a utility process, from bytes the caller hands in. What remains is packaging: electron-builder has to ship the two `.wasm` files outside the archive (`asarUnpack` or `extraResources`), and the CLI finds them with `import.meta.resolve`. That is decided with distribution.

@@ -5,16 +5,20 @@
 import { findCycles, type Cycle } from './cycles'
 import type { DeclaredComponent } from './declaration'
 import type { Dependency } from './dependencies'
+import { isDirectoryNode, withDirectories } from './directories'
 import type { Structure } from './structure'
 
 export interface LevelNode {
   /**
    * A Component of the level; the Source Files a parent owns itself, beside its children;
-   * the Unassigned Source Files, at the top level; a Source File, below a Component without
-   * children. The second and third exist so that every Dependency is visible.
+   * the Unassigned Source Files, at the top level; a Source File or a directory, below a
+   * Component without children. The second and third exist so that every Dependency is visible.
    */
-  readonly kind: 'component' | 'own-files' | 'unassigned' | 'source-file'
-  /** The Component ID; the parent's ID for its own files; `(unassigned)`; the path of the file. */
+  readonly kind: 'component' | 'own-files' | 'unassigned' | 'source-file' | 'directory'
+  /**
+   * The Component ID; the parent's ID for its own files; `(unassigned)`; the path of the file;
+   * for a directory, the Component's ID and the directory's path below the Component's base.
+   */
   readonly id: string
   /** The Source Files it stands for, in the order of their paths. */
   readonly files: readonly string[]
@@ -32,7 +36,10 @@ export interface LevelEdge {
 }
 
 export interface Level {
-  /** The Component whose children, or whose Source Files, are shown; `undefined` at the top. */
+  /**
+   * The Component or directory whose children, or whose Source Files, are shown; `undefined`
+   * at the top.
+   */
   readonly parent: string | undefined
   readonly nodes: readonly LevelNode[]
   /** In the order of `from`, then `to`. */
@@ -60,6 +67,8 @@ export function levelOf(
   parent?: string,
   options: LevelOptions = {}
 ): Level | undefined {
+  // Below a Component without children, its directories, as deep as they go.
+  structure = withDirectories(structure)
   const owned = new Map<string | undefined, string[]>()
   for (const file of structure.sourceFiles) {
     if (file.test && !options.tests) continue
@@ -72,10 +81,12 @@ export function levelOf(
     ...component.children.flatMap(contained)
   ]
   const componentNode = (component: DeclaredComponent): LevelNode => ({
-    kind: 'component',
+    kind: isDirectoryNode(component) ? 'directory' : 'component',
     id: component.id,
     files: contained(component).sort(compare)
   })
+  const fileNodes = (paths: readonly string[]): LevelNode[] =>
+    paths.map((path) => ({ kind: 'source-file' as const, id: path, files: [path] }))
 
   let nodes: LevelNode[]
   if (parent === undefined) {
@@ -92,13 +103,19 @@ export function levelOf(
     const own = owned.get(component.id) ?? []
     nodes =
       component.children.length === 0
-        ? own.map((path) => ({ kind: 'source-file' as const, id: path, files: [path] }))
-        : [
-            ...(own.length > 0
-              ? [{ kind: 'own-files' as const, id: component.id, files: own }]
-              : []),
-            ...component.children.map(componentNode)
-          ]
+        ? fileNodes(own)
+        : component.children.every(isDirectoryNode)
+          ? // A directory with nothing counted in it, test files left out, is not shown.
+            [
+              ...fileNodes(own),
+              ...component.children.map(componentNode).filter((node) => node.files.length > 0)
+            ]
+          : [
+              ...(own.length > 0
+                ? [{ kind: 'own-files' as const, id: component.id, files: own }]
+                : []),
+              ...component.children.map(componentNode)
+            ]
   }
 
   const edges = edgesAmong(nodes, dependencies)

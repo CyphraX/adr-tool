@@ -14,6 +14,7 @@ export {
   type DeclaredComponent
 } from './declaration'
 export type { OwnedSourceFile } from './ownership'
+export { isDirectoryNode, withDirectories, type DirectoryNode } from './directories'
 export type { Language, SourceFile } from './source-files'
 export { DECLARATION_PATH, wordingOf, type PatternKey, type StructureProblem } from './problems'
 export { hasRepair, planAdopt, planRename, planRepair, type RenamePlan } from './operations'

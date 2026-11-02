@@ -5,6 +5,7 @@
  */
 import type { DeclaredComponent } from './declaration'
 import type { Dependency } from './dependencies'
+import { withDirectories } from './directories'
 import type { LevelOptions } from './levels'
 import type { Structure } from './structure'
 
@@ -21,9 +22,9 @@ export interface Metrics extends Size {
   readonly afferent: number
   /** I = Ce / (Ca + Ce); `undefined` when both are zero. */
   readonly instability: number | undefined
-  /** Components with the same parent that this one depends on. */
+  /** Components with the same parent, or directories of the same level, that it depends on. */
   readonly fanOut: number
-  /** Components with the same parent that depend on this one. */
+  /** Components with the same parent, or directories of the same level, that depend on it. */
   readonly fanIn: number
   /** H = (R + 1) / N: R Dependencies among the N Source Files inside. */
   readonly cohesion: number
@@ -51,8 +52,8 @@ interface Tally {
 }
 
 /**
- * The metrics of every Component that contains a Source File, in the order of the
- * declaration, parents before their children. Test files are left out unless asked for;
+ * The metrics of every Component that contains a Source File, and of every directory node,
+ * in the order of the declaration, parents before their children. Test files are left out unless asked for;
  * Unassigned files count as outside.
  */
 export function metricsOf(
@@ -61,6 +62,8 @@ export function metricsOf(
   lineCounts: ReadonlyMap<string, number>,
   options: LevelOptions = {}
 ): Map<string, Metrics> {
+  // The directories below a Component without children have metrics as well.
+  structure = withDirectories(structure)
   // The Components from the top down to each one: the chain a file's owner stands at the end of.
   const chains = new Map<string, readonly string[]>()
   const tallies = new Map<string, Tally>()

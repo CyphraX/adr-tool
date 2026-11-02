@@ -45,6 +45,10 @@ A line number in the details opens the Source File in a read-only viewer, with t
 
 ![The import of core in app's main process, opened from the line between app and core](docs/screenshots/s6-code.png)
 
+Below a Component without children the levels go on through its directories, as deep as the folders do: each directory has its graph, its row in the matrix, its metrics and its page, down to the Source Files. The directories are the view's own — nothing declares them, and nothing writes them.
+
+![The directory lib below the renderer, with its metrics and what uses it](docs/screenshots/s8-directories.png)
+
 Once the Components are declared, an ADR names those it affects in its Metadata dialog — the first Trace from Decisions into Structure, kept on the ADR alone ([ADR-0009](docs/adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)). The ADR links to them, the page of a Component lists the ADRs that affect it, and **Rename** gives a Component a new segment, rewriting the declaration and every ADR that names it in one previewed change. This repository declares its Components in `.arch/components.yml`, its Draft adopted.
 
 ![Renaming structure: one line in the declaration, one in the ADR that affects it](docs/screenshots/s7-rename.png)

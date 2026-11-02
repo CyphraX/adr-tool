@@ -2,7 +2,7 @@
   import type { StructureNode, StructureView } from '../../../shared/ipc'
   import { app } from '../lib/state.svelte'
   import { METRICS, t, type MetricKey } from '../lib/strings'
-  import { nodeLabel } from '../lib/structure'
+  import { nodeLabel, opens } from '../lib/structure'
 
   // The metrics of the nodes of the level, one row each, with every definition in the
   // tooltip of its heading. Only a Component has metrics beyond its size.
@@ -43,13 +43,13 @@
                 aria-pressed={selected}
                 title={node.kind === 'source-file' ? node.id : nodeLabel(node)}
                 onclick={() => app.selectInStructure({ kind: 'node', id: node.id })}
-                ondblclick={() => node.kind === 'component' && app.openComponent(node.id)}
+                ondblclick={() => opens(node) && app.openComponent(node.id)}
                 >{nodeLabel(node)}</button
               >
             </th>
             {#each METRICS as key (key)}
               {@const value = valueOf(node, key)}
-              {#if node.kind !== 'component' && key !== 'files' && key !== 'lines'}
+              {#if !opens(node) && key !== 'files' && key !== 'lines'}
                 <td></td>
               {:else if value === undefined}
                 <td class="undefined" title={t.structure.undefinedValue}
@@ -139,6 +139,11 @@
     font-family: var(--code);
     font-size: 12px;
     font-weight: 400;
+  }
+
+  tr.directory th button {
+    font-family: var(--code);
+    font-size: 12px;
   }
 
   tr.own-files th button,

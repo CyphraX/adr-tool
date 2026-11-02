@@ -10,13 +10,14 @@
   } from '../../../shared/ipc'
   import { app, statusKey } from '../lib/state.svelte'
   import { METRICS, t } from '../lib/strings'
-  import { commonDirectory, nodeLabel } from '../lib/structure'
+  import { commonDirectory, nodeLabel, opens } from '../lib/structure'
   import { codeSpans, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   // What the selection in the Structure view stands for: a Component with its page — the
   // declaration, the ADRs that affect it, the metrics, the Dependencies at its level, its
-  // Cycles — another node with its Dependencies, a line or a cell with the Source File
+  // Cycles —, a directory below a Component with the same page less what only a Component
+  // has, another node with its Dependencies, a line or a cell with the Source File
   // Dependencies behind it, a Cycle with its example round trip, or one of the lists of what
   // the analysis could not do.
   let { view }: { view: StructureView } = $props()
@@ -182,10 +183,56 @@
   {/if}
 {/snippet}
 
+{#snippet declared(page: StructureComponent)}
+  <h3>{t.structure.page.decisions}</h3>
+  {@const decisions = affecting(page.id)}
+  {#if decisions.length === 0}
+    <p class="faint">{t.structure.page.noDecision}</p>
+  {:else}
+    <ul class="decisions">
+      {#each decisions as { log, adr, inside } (`${log.path}\n${adr.id}`)}
+        <li>
+          <button class="link" onclick={() => app.jumpTo(log.path, adr.id)}>
+            <StatusMark status={statusKey(adr)} />
+            <span class="prefix">{prefixOf(adr)}</span>
+            {adr.title ?? adr.id}
+          </button>
+          {#if inside !== undefined}
+            <span class="tag">{t.structure.page.inside(nameOfComponent(inside))}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  <h3>{t.structure.page.patterns}</h3>
+  <dl class="patterns">
+    <dt>{t.structure.page.paths}</dt>
+    <dd>
+      {#each page.paths as pattern (pattern)}<code>{pattern}</code>{:else}<span class="faint"
+          >{t.structure.page.none}</span
+        >{/each}
+    </dd>
+    <dt>{t.structure.page.tests}</dt>
+    <dd>
+      {#each page.tests as pattern (pattern)}<code>{pattern}</code>{:else}<span class="faint"
+          >{t.structure.page.none}</span
+        >{/each}
+    </dd>
+  </dl>
+{/snippet}
+
 {#snippet componentPage(page: StructureComponent)}
-  <p class="kind">{t.structure.page.component}</p>
-  <h2>{page.name}</h2>
-  <p><span class="faint">{t.structure.page.id}</span> <code>{page.id}</code></p>
+  {@const component = page.directory === undefined}
+  {#if component}
+    <p class="kind">{t.structure.page.component}</p>
+    <h2>{page.name}</h2>
+    <p><span class="faint">{t.structure.page.id}</span> <code>{page.id}</code></p>
+  {:else}
+    <p class="kind">{t.structure.page.directory}</p>
+    <h2>{t.structure.graph.directory(page.name)}</h2>
+    <p><span class="faint">{t.structure.page.path}</span> <code>{page.directory}/</code></p>
+  {/if}
   {#if page.description}<p class="description">{page.description}</p>{/if}
   {#if page.metrics}
     <p class="faint">
@@ -198,12 +245,12 @@
   {:else}
     <p class="faint">{t.structure.page.empty}</p>
   {/if}
-  {#if view.origin === 'declared' && renaming?.id !== page.id}
+  {#if component && view.origin === 'declared' && renaming?.id !== page.id}
     <button class="action" onclick={() => (renaming = { id: page.id, segment: segmentOf(page.id) })}
       >{t.structure.page.rename}</button
     >
   {/if}
-  {#if view.origin === 'declared' && renaming?.id === page.id}
+  {#if component && view.origin === 'declared' && renaming?.id === page.id}
     {@const form = renaming}
     {@const valid = isSegment(form.segment)}
     <form
@@ -245,42 +292,11 @@
     </form>
   {/if}
 
-  <h3>{t.structure.page.decisions}</h3>
-  {@const decisions = affecting(page.id)}
-  {#if decisions.length === 0}
-    <p class="faint">{t.structure.page.noDecision}</p>
+  {#if !component}
+    <p class="faint note">{t.structure.page.notAComponent}</p>
   {:else}
-    <ul class="decisions">
-      {#each decisions as { log, adr, inside } (`${log.path}\n${adr.id}`)}
-        <li>
-          <button class="link" onclick={() => app.jumpTo(log.path, adr.id)}>
-            <StatusMark status={statusKey(adr)} />
-            <span class="prefix">{prefixOf(adr)}</span>
-            {adr.title ?? adr.id}
-          </button>
-          {#if inside !== undefined}
-            <span class="tag">{t.structure.page.inside(nameOfComponent(inside))}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    {@render declared(page)}
   {/if}
-
-  <h3>{t.structure.page.patterns}</h3>
-  <dl class="patterns">
-    <dt>{t.structure.page.paths}</dt>
-    <dd>
-      {#each page.paths as pattern (pattern)}<code>{pattern}</code>{:else}<span class="faint"
-          >{t.structure.page.none}</span
-        >{/each}
-    </dd>
-    <dt>{t.structure.page.tests}</dt>
-    <dd>
-      {#each page.tests as pattern (pattern)}<code>{pattern}</code>{:else}<span class="faint"
-          >{t.structure.page.none}</span
-        >{/each}
-    </dd>
-  </dl>
 
   {#if page.files.length > 0}
     {@const directory = commonDirectory(page.files)}
@@ -324,7 +340,9 @@
     {#if page.java}<p class="faint note">{t.structure.metrics.javaLowerBound}</p>{/if}
   {/if}
 
-  <p class="faint note">{t.structure.page.atItsLevel}</p>
+  <p class="faint note">
+    {component ? t.structure.page.atItsLevel : t.structure.page.atItsDirectoryLevel}
+  </p>
   <h3>{t.structure.detail.dependsOn}</h3>
   {@render neighbours(page, page.dependsOn, true)}
   <h3>{t.structure.detail.usedBy}</h3>
@@ -376,7 +394,7 @@
   {#if selection?.kind === 'node' && (nodeOf(selection.id) || pageOf(selection.id))}
     {@const node = nodeOf(selection.id)}
     {@const page = pageOf(selection.id)}
-    {#if page && (!node || node.kind === 'component')}
+    {#if page && (!node || opens(node))}
       {@render componentPage(page)}
     {:else if node}
       {@render nodeDetail(node)}

@@ -281,11 +281,12 @@ export const t = {
       top: 'All Components',
       way: 'Where you are',
       ownFiles: (name: string): string => `${name} (own files)`,
+      directory: (name: string): string => `${name}/`,
       unassigned: 'Unassigned',
       files: (count: number): string => many(count, 'one file', `${count} files`),
       draft: 'Draft',
       howToRead:
-        'Read it from left to right: a Component stands to the right of what it depends on, and its arrow points there. Double-click a Component to see its parts.',
+        'Read it from left to right: a Component stands to the right of what it depends on, and its arrow points there. Double-click a Component or a directory to see its parts.',
       empty: 'There is nothing to show here: no Source File lies below this Component.',
       legend: 'What the lines mean',
       dependency: 'Dependency',
@@ -408,7 +409,11 @@ export const t = {
 
     page: {
       component: 'Component',
+      directory: 'Directory',
       id: 'ID',
+      path: 'Path',
+      notAComponent:
+        'A directory below a Component without children: no Component, so nothing declares it, no ADR names it and it has no name of its own. Its Source Files belong to the Component.',
       patterns: 'Patterns',
       paths: 'paths',
       tests: 'tests',
@@ -426,6 +431,7 @@ export const t = {
       cycles: 'Cycles it is part of',
       noCycle: 'None at its level.',
       atItsLevel: 'At its own level, among the Components beside it.',
+      atItsDirectoryLevel: 'At its own level, among the directories and Source Files beside it.',
       decisions: 'Decisions',
       noDecision: 'No ADR affects it.',
       inside: (name: string): string => `through ${name}`,

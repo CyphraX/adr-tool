@@ -8,10 +8,19 @@ export function nodeLabel(node: Pick<StructureNode, 'kind' | 'name'>): string {
       return t.structure.graph.ownFiles(node.name)
     case 'unassigned':
       return t.structure.graph.unassigned
+    case 'directory':
+      return t.structure.graph.directory(node.name)
     default:
       return node.name
   }
 }
+
+/**
+ * Whether a node opens onto a level of its own and has the metrics of a Component: a Component,
+ * or a directory below one without children.
+ */
+export const opens = (node: Pick<StructureNode, 'kind'>): boolean =>
+  node.kind === 'component' || node.kind === 'directory'
 
 /**
  * The directory all the paths lie in, with its trailing slash, so that a list can name it once

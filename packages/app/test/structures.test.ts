@@ -239,9 +239,13 @@ describe('a level as the window gets it', () => {
 // The done-when of part 5 (docs/plan-structure.md): what the window gets for this repository
 // are the numbers `structure` computes, which its own tests check against the definitions.
 describe('this repository, as the window gets it', () => {
-  it('shows the metrics structure computes for each Component', async () => {
-    const own = fileURLToPath(new URL('../../../', import.meta.url))
-    const { analysis } = await analyse(own, undefined)
+  let analysis: Analysis
+  beforeAll(async () => {
+    analysis = (await analyse(fileURLToPath(new URL('../../../', import.meta.url)), undefined))
+      .analysis
+  })
+
+  it('shows the metrics structure computes for each Component', () => {
     const { structure, dependencies } = analysis
     const metrics = metricsOf(structure, dependencies.dependencies, dependencies.lineCounts)
     const view = viewOf('repo', analysis, undefined, false)
@@ -260,6 +264,51 @@ describe('this repository, as the window gets it', () => {
     const rows = view.matrix.rows.map((row) => row.id)
     expect(
       view.matrix.cells.filter((cell) => rows.indexOf(cell.from) < rows.indexOf(cell.to))
+    ).toEqual([])
+  })
+
+  // The done-when of part 8: below a Component without children, its directories.
+  it('opens the renderer onto its directories and its own files, and those onto theirs', () => {
+    const renderer = viewOf('repo', analysis, 'app/renderer', false)
+    const kinds = (nodes: readonly { kind: string; name: string }[]) =>
+      nodes.map((node) => `${node.kind} ${node.name}`)
+    expect(kinds(renderer.nodes).sort()).toEqual(
+      [
+        'directory components',
+        'directory lib',
+        'source-file App.svelte',
+        'source-file env.d.ts',
+        'source-file main.ts'
+      ].sort()
+    )
+    for (const node of renderer.nodes.filter((node) => node.kind === 'directory')) {
+      expect(node.metrics).toBeDefined()
+    }
+    const lib = renderer.components.find((page) => page.id === 'app/renderer/lib')!
+    expect(lib).toMatchObject({
+      name: 'lib',
+      directory: 'packages/app/src/renderer/src/lib',
+      level: 'app/renderer',
+      paths: [],
+      tests: []
+    })
+    expect(lib.files).toContain('packages/app/src/renderer/src/lib/strings.ts')
+
+    const inside = viewOf('repo', analysis, 'app/renderer/lib', false)
+    expect(inside.parent).toBe('app/renderer/lib')
+    expect(inside.path).toEqual([
+      { id: 'app', name: 'app' },
+      { id: 'app/renderer', name: 'renderer' },
+      { id: 'app/renderer/lib', name: 'lib' }
+    ])
+    expect(inside.nodes.every((node) => node.kind === 'source-file')).toBe(true)
+    expect(inside.nodes.map((node) => node.name)).toContain('strings.ts')
+    // The directories are the view's: what the window gets of the declaration stays as it is.
+    expect(analysis.structure.components.find((c) => c.id === 'app')!.children).toHaveLength(4)
+    expect(
+      analysis.structure.components
+        .find((c) => c.id === 'app')!
+        .children.find((c) => c.id === 'app/renderer')!.children
     ).toEqual([])
   })
 })
