@@ -56,6 +56,54 @@ For Lena and Aylin. What a window with six modules needs before the third one ar
 
 *Done when:* on this repository, a Trace of an ADR to a Component that does not exist and a broken Relation stand in one list of Problems, each opening in its module; "kernel" finds the Component and its Source Files; an ADR with a flowchart shows it drawn, and a broken one shows its error.
 
+*Status (2026-11-02):* built.
+
+- **The module switcher** is made from a list (`packages/app/src/renderer/src/lib/modules.ts`), as are the frames of the modules in `App.svelte` (`FRAMES`). A module joins with one entry there, its name in `strings.*.ts`, its frame, and its section of the Problems of the repository. A tab already kept the view of Decisions and that of Structure apart, so nothing was added for that.
+- **The Problems of the repository** are put together by `repositoryProblems` (`lib/repository-problems.ts`) from what the window holds, in three sections:
+  - each Decision Log's Problems, by log, each root cause once with the Repairs `core` offers;
+  - every Trace to a Component that is not declared, set apart and listed once;
+  - the Problems of the declaration.
+  
+  The last come from a new request, `structureOutline` (`main/structures.ts`), which answers from the analysis that Structure keeps for the repository with every Component, Source File, Problem and hint. `RepositoryProblems.svelte` stands in the middle of Decisions and of Structure, and both sidebars hold the row **Repository Problems** with its red count. While Structure analyses, the count carries a "…" and the list says the section follows. On a Draft, what the checks find are hints, with no Repair. A Repair goes through the preview that already exists for it, and the Problems view of a log stays (`packages/app/test/repository-problems.test.ts`).
+- **The search** gained `searchComponents` and `searchSourceFiles` (`lib/search.ts`). Every word has to match: the ID or name of a Component, or the path of a Source File, where the file name counts most. Case and accents are ignored, as for ADRs (`packages/app/test/search-artefacts.test.ts`). The palette lists ADRs as before, with the same ranking and at most 12. Below them come at most 6 Components and 8 Source Files, each section under its heading and each hit named by its kind in words, all in one list for the keyboard. While Structure analyses, the palette says whether it searches the last analysis or nothing yet.
+- **Mermaid** is [ADR-0016](adr/0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image.md), which amends ADR-0014.
+  - The code: `lib/mermaid.ts` is pure (configuration, the scrubbing of CSS and addresses, Mermaid's sentence, a cache of drawings). `lib/diagrams.ts` loads Mermaid and DOMPurify lazily and draws one block at a time.
+  - Where blocks are drawn: `MarkdownDocument.svelte` replaces a block with its drawing and puts its source below it, in the reading view and the preview. In the live mode a block is a widget while the cursor is outside it (`liveDiagrams`, `lib/editor.ts`).
+  - The export: `ExportOptions.diagrams` in `core` and `ExportRequest.diagrams` in `packages/cli/src/export.ts` carry the drawings, and `mermaidSources` finds the blocks. The app draws every block light and passes the drawings in, and main checks each one again (`diagramsRequest`).
+  - Tests: `packages/core/test/export.test.ts`, `packages/app/test/mermaid.test.ts`, `live.test.ts` and `requests.test.ts`. DOMPurify needs a DOM, which the tests in Node do not have, so it is checked in the running app.
+
+In the running app, in English and in German, on a copy of this repository set up as follows:
+
+- `plugins` added to `affects` of ADR 0006;
+- `depends-on: [0099-a-decision-that-is-gone]` added to ADR 0012;
+- a pattern `packages/gone/**` added to `cli`;
+- an ADR 0016 with a flowchart, and an ADR 0017 whose block does not parse.
+
+What the app showed:
+
+- Both sidebars say "Repository Problems 3". The list holds the broken Relation under Decisions, the Trace under Traces, and the pattern that matches nothing under Structure.
+- 0012 opens in Decisions with the list beside it, and `cli` opens its page in Structure.
+- The Repair of the Trace previews "Remove plugins from affects" on one file, and Cancel writes nothing.
+- "kernel" finds ADRs 0006, 0009 and 0015, then the Components `kernel`, `kernel/change`, `kernel/fs` and `kernel/text`, then the best 8 of 10 Source Files under `packages/kernel/`. A Component opens on its page, and "kernel change-set" opens `packages/kernel/src/change/change-set.ts` in the code viewer.
+- ADR 0016 shows the flowchart drawn in the reading view and the live mode, with no script, `foreignObject` or handler in it. With the cursor in the block, its source shows.
+- ADR 0017 keeps its code, with "This Mermaid diagram cannot be drawn. Mermaid says: Parse error on line 2: Expecting 'SQE', 'DOUBLECIRCLEEND', 'PE', '-)', …, got 'PS'" beside it.
+- **Export → Web pages…** wrote 19 pages and one drawing, `docs/adr/0016-….diagram-1.svg`. No page holds a script, and the content security policy is ADR-0014's. The page of 0016, opened from disk, shows the drawing, and 0017's block stays code.
+- The copy changed only as it was set up.
+
+What changed on the way:
+
+- The app takes `mermaidSources` from `core`'s index, as it takes all of `core`.
+- The sidebar row is "Repository Problems", since "Problems of the repository" did not fit.
+- A drawing is a "Mermaid diagram": Diagram is the Diagrams module's term.
+
+What remains:
+
+- The search finds the Components and Source Files of the repository in front only. It finds ADRs, as before, in every repository that is open.
+- To count the Problems of the declaration, the window asks for Structure's analysis as soon as a repository is in front. Before, that happened when Structure was opened; the analysis now runs in its worker in the background.
+- What Mermaid says is in English, in a German window too.
+- A drawing in the export is always light. `adr export` does not draw.
+- Structure's catch-up with [design.md](design.md) is part 4's.
+
 ### Part 3 — Conformance: Rules, Violations and `adr check`
 
 For Lena and Jonas. The core of the third module, without a window yet: [conformance-format.md](conformance-format.md), written first, and `packages/conformance`.
