@@ -216,6 +216,8 @@ export const SENTENCES = {
   'decided-while-proposed': (): string => 'A proposed ADR has not been decided yet',
   'adr-dir-outside': (): string => 'The directory must be a relative path inside the repository',
   'expected-mapping': (): string => 'Expected a mapping',
+  'repository-name': (): string =>
+    '"name" must be made of letters, digits, ".", "_" and "-", and start with a letter or a digit',
   'logs-not-a-list': (): string => '"logs" must be a list',
   'log-needs-path': (): string =>
     'Every log needs a "path" that is relative and inside the repository',

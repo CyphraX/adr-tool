@@ -72,4 +72,46 @@ describe('discoverLogs', () => {
       ])
     }
   })
+
+  it('reads the name a repository gives itself, with or without Decision Logs configured', async () => {
+    const named = memoryFileSystem({
+      '.adr/config.yml': 'name: payments\nlogs:\n  - path: docs/adr\n'
+    })
+    expect((await discoverLogs(named)).name).toBe('payments')
+    const nameOnly = memoryFileSystem({
+      '.adr/config.yml': 'name: shop.web\n',
+      'docs/adr/0001-a.md': ADR
+    })
+    expect(await discoverLogs(nameOnly)).toEqual({
+      by: 'default',
+      locations: [{ path: 'docs/adr' }],
+      problems: [],
+      name: 'shop.web'
+    })
+    // A name that cannot be one is a Problem; the Decision Logs are found all the same.
+    for (const name of ['"-shop"', '"a b"', '[x]', '"pay:ments"']) {
+      const wrong = memoryFileSystem({
+        '.adr/config.yml': `name: ${name}\n`,
+        'docs/adr/0001-a.md': ADR
+      })
+      const found = await discoverLogs(wrong)
+      expect(found.problems, name).toMatchObject([
+        {
+          kind: 'invalid-configuration',
+          path: '.adr/config.yml',
+          said: { code: 'repository-name' }
+        }
+      ])
+      expect([found.locations, found.name]).toEqual([[{ path: 'docs/adr' }], undefined])
+    }
+    const configured = memoryFileSystem({
+      '.adr/config.yml': 'name: "My Shop"\nlogs:\n  - path: decisions\n'
+    })
+    expect((await discoverLogs(configured)).locations).toEqual([{ path: 'decisions' }])
+    // An empty name is none.
+    for (const empty of ['name:\n', 'name: ~\n']) {
+      const none = memoryFileSystem({ '.adr/config.yml': empty, 'docs/adr/0001-a.md': ADR })
+      expect((await discoverLogs(none)).problems, empty).toEqual([])
+    }
+  })
 })

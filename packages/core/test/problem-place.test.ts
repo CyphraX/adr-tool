@@ -47,6 +47,24 @@ describe('where a Problem is', () => {
     ).toEqual(['docs/adr/0001-a.md:5 unknown-target', 'docs/adr/0001-a.md:6 unknown-target'])
   })
 
+  it('is the line of the item that names another repository where it may not', async () => {
+    expect(
+      await places({
+        'docs/adr/0001-a.md': [
+          '---',
+          'status: proposed',
+          'supersedes:',
+          '  - 0002-b',
+          '  - payments:docs/adr/0001-x',
+          '---',
+          '',
+          '# A'
+        ].join('\n'),
+        'docs/adr/0002-b.md': '---\nstatus: accepted\n---\n\n# B\n'
+      })
+    ).toEqual(['docs/adr/0001-a.md:5 other-repository'])
+  })
+
   it('is the line of the Status for what is wrong with the Status', async () => {
     expect(
       await places({

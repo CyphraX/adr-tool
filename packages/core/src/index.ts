@@ -41,14 +41,23 @@ export {
 } from './adr/adr'
 export { correctionsIn, type Correction, type Metadata } from './metadata/read'
 export { METADATA_KEYS, type MetadataKey } from './metadata/keys'
-export { hasBeenAccepted, type Relation, type RelationState } from './relations/graph'
+export {
+  hasBeenAccepted,
+  stateOf as relationStateOf,
+  type Relation,
+  type RelationState
+} from './relations/graph'
 export {
   absoluteReference,
   isQualified,
   normalReference,
+  outsideReference,
+  outsideTo,
   parseReference,
   qualified,
   referenceTo,
+  REPOSITORY_NAME,
+  type OutsideReference,
   type Reference
 } from './relations/reference'
 export type { BackReferenceKey, Problem } from './problems/problem'

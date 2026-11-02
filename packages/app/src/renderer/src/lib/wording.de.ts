@@ -175,6 +175,8 @@ export const de: Wording = {
         return `${problem.path} ist nicht verwendbar: ${detailOf(problem)}`
       case 'missing-log-directory':
         return `Der konfigurierte Ordner ${problem.path} existiert nicht.`
+      case 'other-repository':
+        return `${problem.key} nennt ${problem.target}, ein ADR eines anderen Repositorys. Nur depends-on und relates-to dürfen aus dem Repository hinausführen.`
     }
   },
 

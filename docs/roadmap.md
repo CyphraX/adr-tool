@@ -43,7 +43,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 - ~~UI translations~~ German built on 2026-11-02, beside English: the system's language chooses, a setting in the window overrides it; what `core` and `structure` say in sentences has codes, so the window words it in its language, and `adr lint` and the MCP server stay English ([plan-roadmap.md](plan-roadmap.md), part 12).
 - ~~Read-only export for non-technical readers (static site or PDF)~~ Built on 2026-11-02 ([ADR-0014](adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md); [cli.md](cli.md); [plan-roadmap.md](plan-roadmap.md), part 10).
 - ADR → code links ("which ADRs affect this file?"): closed by the first Trace of Structure, part 7 — an ADR names the Components it affects in `affects`, and a Component lists its ADRs ([plan-structure.md](plan-structure.md)). From a file it is one step: its Component.
-- Aggregation across repositories, including Relations that cross repository boundaries
+- ~~Aggregation across repositories, including Relations that cross repository boundaries~~ Built on 2026-11-02: the repositories open in the window share one search, a list of every ADR and one of every Problem; `depends-on` and `relates-to` may name an ADR of another repository as `<name>:<log>/<ID>` ([file-format.md, section 3](file-format.md#3-metadata); [plan-roadmap.md](plan-roadmap.md), part 13).
 - ~~Timeline, Kanban by Status, dashboards~~ Built on 2026-11-02 ([plan-roadmap.md](plan-roadmap.md), part 11).
 
 ## Known gaps of v1

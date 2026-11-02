@@ -6,6 +6,7 @@ import {
   absoluteReference,
   isQualified,
   normalReference,
+  outsideReference,
   referenceTo
 } from '../relations/reference'
 import type { BackReferenceKey, Problem } from './problem'
@@ -52,6 +53,10 @@ export function checkConsistency(
     // … and every Back-reference needs a Relation in effect behind it.
     for (const adr of adrs) {
       for (const written of adr.metadata.backReferences[key]) {
+        if (outsideReference(written)) {
+          problems.push({ kind: 'other-repository', adr: adr.id, key, target: written })
+          continue
+        }
         const source = normalReference(log.path, written)
         if (source === adr.id) problems.push({ kind: 'self-reference', adr: adr.id, key })
         else if (!byId.has(source) && !guests.has(source)) {

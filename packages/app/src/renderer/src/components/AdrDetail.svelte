@@ -15,8 +15,10 @@
     describeProblem,
     prefixOf,
     relationLabel,
+    relationWord,
     repairLabel
   } from '../lib/wording'
+  import { outsideOf } from '../lib/together'
   import { baseOf } from '../lib/markdown'
   import BodyEditor from './BodyEditor.svelte'
   import MarkdownDocument from './MarkdownDocument.svelte'
@@ -70,6 +72,15 @@
       ...log.relations.filter((relation) => relation.to === adr.id).map((r) => line(r, 'to'))
     ].filter((entry) => entry !== undefined)
   })
+
+  // Relations that lead into another repository, and those that lead here from one (part 13).
+  const outside = $derived(
+    app.active
+      ? outsideOf(app.outside, app.active.repository.id, log.path, adr.id)
+      : { outgoing: [], incoming: [] }
+  )
+  const isOpen = (repository: string): boolean =>
+    app.tabs.some((tab) => tab.repository.name === repository)
 
   // What can be decided depends on where the ADR stands. `superseded` is never set by hand.
   // Nothing is decided on an ADR in a foreign format: that would write to its file.
@@ -176,6 +187,55 @@
             </button>
             {#if relation.void}<span class="note">{t.neverTookEffect}</span>{/if}
             {#if relation.implied}<span class="note">{IMPLIED_NOTE}</span>{/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    {#if outside.outgoing.length + outside.incoming.length > 0}
+      <ul class="relations outside" aria-label={t.detail.otherRepositories}>
+        {#each outside.outgoing as relation, index (`to ${index}`)}
+          {@const to = relation.to}
+          <li class:void={relation.state === 'void'}>
+            <span class="kind">{relationWord(relation.type, 'from')}</span>
+            {#if to}
+              <button
+                title={t.detail.showIn(to.repository)}
+                onclick={() => app.jumpTo(to.log, to.adr.id, to.repositoryId)}
+              >
+                <StatusMark status={statusKey(to.adr)} />
+                <span class="log">{to.repository}</span>
+                <span class="prefix">{prefixOf(to.adr)}</span>
+                {to.adr.title ?? to.adr.id}
+              </button>
+              {#if relation.state === 'void'}<span class="note">{t.neverTookEffect}</span>{/if}
+            {:else}
+              {@const repository = relation.written.slice(0, relation.written.indexOf(':'))}
+              <code class="written">{relation.written}</code>
+              <span class="note">
+                {isOpen(repository)
+                  ? t.detail.notInRepository(repository)
+                  : t.detail.repositoryNotOpen(repository)}
+              </span>
+            {/if}
+          </li>
+        {/each}
+        {#each outside.incoming as relation, index (`from ${index}`)}
+          {@const from = relation.from}
+          <li class:void={relation.state === 'void'}>
+            <span class="kind">{relationWord(relation.type, 'to')}</span>
+            <button
+              title={t.detail.showIn(from.repository)}
+              onclick={() => app.jumpTo(from.log, from.adr.id, from.repositoryId)}
+            >
+              <StatusMark status={statusKey(from.adr)} />
+              <span class="log">{from.repository}</span>
+              <span class="prefix">{prefixOf(from.adr)}</span>
+              {from.adr.title ?? from.adr.id}
+            </button>
+            <span class="note">
+              {relation.state === 'void' ? t.neverTookEffect : IMPLIED_NOTE}
+            </span>
           </li>
         {/each}
       </ul>
@@ -432,6 +492,12 @@
 
   .relations .prefix {
     color: var(--ink-soft);
+  }
+
+  .relations .written {
+    font-family: var(--code);
+    font-size: 12px;
+    overflow-wrap: anywhere;
   }
 
   /* An ADR of another Decision Log says which one, in front of its number. */

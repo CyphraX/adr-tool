@@ -62,6 +62,7 @@ function candidatesOf(log: DecisionLog, problem: Problem): Repair[] {
     case 'status-not-lowercase':
       return [{ kind: 'lowercase-status', adr: problem.adr }]
     case 'unknown-target':
+    case 'other-repository':
       return [{ kind: 'remove-item', adr: problem.adr, key: problem.key, item: problem.target }]
     case 'self-reference':
       return [{ kind: 'remove-item', adr: problem.adr, key: problem.key, item: problem.adr }]
