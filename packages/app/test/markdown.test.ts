@@ -31,3 +31,36 @@ describe('renderMarkdown', () => {
     expect(html).toContain('href="0002-other.md"')
   })
 })
+
+// docs/plan-roadmap.md, part 2: an image next to the ADR is shown, and nothing else is read.
+describe('the images of an ADR', () => {
+  const base = { repositoryId: 'repo-1', directory: 'docs/adr' }
+
+  it('come from the repository, relative to the ADR, through the protocol of the main process', () => {
+    const html = renderMarkdown(
+      '![A](img/diagram.png) ![B](./my%20chart.svg) ![C](../shared/c.png) ![D](/assets/d.png)',
+      base
+    )
+    expect(html).toContain('src="adr-asset://repo-1/docs/adr/img/diagram.png"')
+    expect(html).toContain('src="adr-asset://repo-1/docs/adr/my%20chart.svg"')
+    expect(html).toContain('src="adr-asset://repo-1/docs/shared/c.png"')
+    // A leading slash means the root of the repository, as on GitHub.
+    expect(html).toContain('src="adr-asset://repo-1/assets/d.png"')
+  })
+
+  it('lose a source that leads out of the repository, and keep one with a scheme', () => {
+    const html = renderMarkdown(
+      '![X](../../../etc/passwd.png) ![Y](https://example.com/y.png)',
+      base
+    )
+    expect(html).not.toContain('passwd')
+    expect(html).toContain('src="https://example.com/y.png"')
+    expect(renderMarkdown('![Z](z.png)', { repositoryId: 'repo-1', directory: '' })).toContain(
+      'src="adr-asset://repo-1/z.png"'
+    )
+  })
+
+  it('are left as written where there is no repository to read them from', () => {
+    expect(renderMarkdown('![A](img/diagram.png)')).toContain('src="img/diagram.png"')
+  })
+})

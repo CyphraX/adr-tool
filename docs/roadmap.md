@@ -52,9 +52,9 @@ Found while the milestones were built, written down in [plan.md](plan.md), and l
 
 Before the first public release:
 
-- **Images with relative paths in an ADR do not load.** The renderer has no file access, by design: an ADR is untrusted input. It needs a protocol of its own in the main process that serves files from below the repository's root and nothing else — security-relevant, so it gets its own pull request and review.
-- **A Metadata dialog with very many Relations can grow taller than the window.** The dialog lets a picker's matches hang out over its edge, so it cannot simply scroll; the lists need their own scrolling area.
-- **Closing the window asks about unsaved text in the editor, not about an open Metadata dialog or a title typed into the New ADR dialog.** What is lost there is a few picks or a line, never a paragraph — but it is lost without a word. And quitting on a Mac with unsaved text has to be run once on a Mac.
+- ~~**Images with relative paths in an ADR do not load.**~~ Closed on 2026-11-02 ([plan-roadmap.md](plan-roadmap.md), part 2). The renderer has no file access, by design: an ADR is untrusted input. It needs a protocol of its own in the main process that serves files from below the repository's root and nothing else — security-relevant, so it gets its own pull request and review.
+- ~~**A Metadata dialog with very many Relations can grow taller than the window.**~~ Closed on 2026-11-02 (part 2). The dialog lets a picker's matches hang out over its edge, so it cannot simply scroll; the lists need their own scrolling area.
+- ~~**Closing the window asks about unsaved text in the editor, not about an open Metadata dialog or a title typed into the New ADR dialog.**~~ Closed on 2026-11-02 (part 2), except for the run on a Mac. What is lost there is a few picks or a line, never a paragraph — but it is lost without a word. And quitting on a Mac with unsaved text has to be run once on a Mac.
 
 With `adr lint`, because `core` has to say it first:
 

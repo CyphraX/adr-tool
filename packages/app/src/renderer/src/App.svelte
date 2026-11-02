@@ -30,8 +30,9 @@
 
   onMount(() => void app.start())
 
-  // The main process holds the window open while there is text to lose, and asks back.
-  $effect(() => void window.api.setUnsaved(app.dirty))
+  // The main process holds the window open while there is something to lose — text in the
+  // editor, what a dialog holds — and asks back.
+  $effect(() => void window.api.setUnsaved(app.holdsUnsaved))
 
   const repository = $derived(app.active?.repository.repository)
 

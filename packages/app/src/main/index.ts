@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, protocol, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -11,6 +11,7 @@ import {
   type Session
 } from '../shared/ipc'
 import { analysisHost } from './analysis-host'
+import { ASSET_SCHEME, assetHandler } from './assets'
 import { nodeFileSystem } from './node-file-system'
 import { Repositories } from './repositories'
 import {
@@ -26,6 +27,13 @@ import { t } from './strings'
 import { Structures, cacheName } from './structures'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
+
+// The images of an ADR come through a protocol of their own (main/assets.ts). It has to be
+// known before the app is ready; it is a standard scheme so that its URLs have a host, the
+// repository, and a path.
+protocol.registerSchemesAsPrivileged([
+  { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true } }
+])
 
 const repositories = new Repositories((repository) => {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -355,6 +363,10 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  protocol.handle(
+    ASSET_SCHEME,
+    assetHandler((id) => repositories.rootOf(id))
+  )
   registerIpc()
   createWindow()
 

@@ -255,6 +255,14 @@ class AppState {
       )
   )
 
+  /** Whether a dialog holds what was entered and not yet carried out: picks, a typed title. */
+  readonly dialogDirty = $derived(
+    this.metadataDirty || (this.creating !== undefined && this.creating.title.trim() !== '')
+  )
+
+  /** Whether closing the window now would lose anything that was typed or picked. */
+  readonly holdsUnsaved = $derived(this.dirty || this.dialogDirty)
+
   async start(): Promise<void> {
     window.api.onRepositoryChanged((repository) => this.replace(repository))
     window.api.onStructureChanged((repositoryId) => {
@@ -893,10 +901,29 @@ class AppState {
     // question, asked before, a "no" to it would tell the main process that no quit waits.
     if (this.review?.kind === 'confirm') this.review = undefined
     else this.dismissReview()
-    this.leaveEditor(
-      () => void window.api.answerCloseRequest(true),
-      () => void window.api.answerCloseRequest(false)
-    )
+    const answer = (close: boolean) => (): void => void window.api.answerCloseRequest(close)
+    this.leaveDialogs(() => this.leaveEditor(answer(true), answer(false)), answer(false))
+  }
+
+  /**
+   * Close the dialogs for a new ADR and for Metadata. With something entered in one of them,
+   * the author is asked first, as for unsaved text in the editor.
+   */
+  private leaveDialogs(then: () => void, declined: () => void): void {
+    const proceed = (): void => {
+      this.creating = undefined
+      this.editingMetadata = undefined
+      then()
+    }
+    if (!this.dialogDirty) return proceed()
+    this.review = {
+      kind: 'confirm',
+      title: t.review.discardDialog.title,
+      reason: t.review.discardDialog.reason,
+      action: t.review.discardDialog.action,
+      proceed,
+      declined
+    }
   }
 
   /** Do something that takes the editor away. With unsaved text the author is asked first. */

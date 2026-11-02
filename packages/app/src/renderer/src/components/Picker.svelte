@@ -42,6 +42,34 @@
   })
   const open = $derived(focused && matches.length > 0)
 
+  // The matches stand over everything around the field, also over the edge of a dialog whose
+  // lists scroll: they are placed in the window, below the field, or above it where the space
+  // below is short, and follow it while anything scrolls.
+  let field = $state<HTMLInputElement | undefined>(undefined)
+  let place = $state<{ left: number; width: number; top?: number; bottom?: number }>()
+  const ROOM = 200
+
+  function measure(): void {
+    if (!field) return
+    const box = field.getBoundingClientRect()
+    const below = window.innerHeight - box.bottom
+    place =
+      below >= ROOM || below >= box.top
+        ? { left: box.left, width: box.width, top: box.bottom + 2 }
+        : { left: box.left, width: box.width, bottom: window.innerHeight - box.top + 2 }
+  }
+
+  $effect(() => {
+    if (!open) return
+    measure()
+    window.addEventListener('scroll', measure, true)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('scroll', measure, true)
+      window.removeEventListener('resize', measure)
+    }
+  })
+
   function pick(candidate: T | undefined): void {
     if (!candidate) return
     onpick(candidate.id)
@@ -67,6 +95,7 @@
 
 <div class="picker">
   <input
+    bind:this={field}
     bind:value={query}
     type="text"
     role="combobox"
@@ -82,7 +111,14 @@
     {onkeydown}
   />
   {#if open}
-    <ul id={`${uid}-matches`} role="listbox">
+    <ul
+      id={`${uid}-matches`}
+      role="listbox"
+      style:left="{place?.left ?? 0}px"
+      style:width="{place?.width ?? 0}px"
+      style:top={place?.top === undefined ? undefined : `${place.top}px`}
+      style:bottom={place?.bottom === undefined ? undefined : `${place.bottom}px`}
+    >
       {#each matches as candidate, position (candidate.id)}
         <!-- mousedown, not click: the input must not lose the focus before the pick. -->
         <li
@@ -123,11 +159,8 @@
   }
 
   ul {
-    position: absolute;
+    position: fixed;
     z-index: 1;
-    top: calc(100% + 2px);
-    left: 0;
-    right: 0;
     padding: 3px;
     list-style: none;
     border: 1px solid var(--line-strong);

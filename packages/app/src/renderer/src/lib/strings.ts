@@ -592,6 +592,12 @@ export const t = {
       reason: 'The text in the editor has not been saved. Leaving the editor now loses it.',
       action: 'Discard changes',
       stay: 'Keep editing'
+    },
+    discardDialog: {
+      title: 'Discard what you entered?',
+      reason:
+        'A dialog holds what you entered, and it has not been carried out. Closing the window now loses it.',
+      action: 'Discard and close'
     }
   }
 }
