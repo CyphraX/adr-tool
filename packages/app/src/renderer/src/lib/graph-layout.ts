@@ -21,6 +21,8 @@ export interface LayoutOptions<E extends LayoutEdge> {
   readonly decidesLayer?: (edge: E) => boolean
   /** Draw the nodes no edge touches as well, instead of only counting them. */
   readonly keepUnconnected?: boolean
+  /** Nodes drawn even when no edge touches them: the ADR that is selected, say. */
+  readonly keep?: readonly string[]
   /**
    * Nodes that share a layer, whatever their edges say among themselves: the members of a
    * Cycle. Their edges to each other are drawn as between two nodes of one layer.
@@ -91,7 +93,10 @@ export function layoutGraph<E extends LayoutEdge>(
   const known = new Set(ids)
   const connections = given.filter(({ from, to }) => known.has(from) && known.has(to))
   const related = new Set(connections.flatMap(({ from, to }) => [from, to]))
-  const shown = options.keepUnconnected ? [...ids] : ids.filter((id) => related.has(id))
+  const kept = new Set(options.keep)
+  const shown = options.keepUnconnected
+    ? [...ids]
+    : ids.filter((id) => related.has(id) || kept.has(id))
   const unrelated = ids.length - shown.length
   if (shown.length === 0) return { nodes: [], edges: [], width: 0, height: 0, unrelated }
 
@@ -302,4 +307,85 @@ export function pathOf({ points, sameLayer }: GraphEdge<LayoutEdge>): string {
     if (passing) path += `L${from.x} ${from.y}`
   })
   return path
+}
+
+/**
+ * What the Relations graph draws of a Decision Log: the Relations of the types that are
+ * shown, the ADRs of other logs that those lead to or come from, and the log's own ADRs. Of
+ * these, the layout leaves out the ones that no Relation shown touches, unless one is kept.
+ */
+export function relationsShown<R extends LayoutEdge & { readonly type: string }>(
+  own: readonly string[],
+  guests: readonly string[],
+  relations: readonly R[],
+  types: readonly string[]
+): { ids: string[]; relations: R[] } {
+  const shown = relations.filter((relation) => types.includes(relation.type))
+  const touched = new Set(shown.flatMap(({ from, to }) => [from, to]))
+  return { ids: [...guests.filter((guest) => touched.has(guest)), ...own], relations: shown }
+}
+
+/** How far the drawing can be made smaller and larger, and how much one step does. */
+export const ZOOM = { min: 0.1, max: 2, step: 1.25 }
+
+/** A scale within the limits. */
+export function clampScale(scale: number): number {
+  return Math.min(ZOOM.max, Math.max(ZOOM.min, scale))
+}
+
+/** The scales a step stops at: the powers of the step about 100 %, to whole percents, and the limits. */
+const STOPS = [
+  ...new Set([
+    ZOOM.min,
+    ...Array.from({ length: 30 }, (_, power) => Math.round(ZOOM.step ** (power - 15) * 100) / 100),
+    ZOOM.max
+  ])
+]
+  .filter((scale) => scale >= ZOOM.min && scale <= ZOOM.max)
+  .sort((a, b) => a - b)
+
+/**
+ * One step larger (1) or smaller (-1): to the next of the same scales, from wherever the
+ * wheel or Fit left it, so that steps back and forth meet again, and 100 % is on the way.
+ */
+export function stepScale(scale: number, direction: 1 | -1): number {
+  const next =
+    direction === 1
+      ? STOPS.find((stop) => stop > scale + 0.005)
+      : STOPS.findLast((stop) => stop < scale - 0.005)
+  return next ?? (direction === 1 ? ZOOM.max : ZOOM.min)
+}
+
+/** The scale after a turn of the wheel, as smooth as the wheel or the trackpad turns. */
+export function wheelScale(scale: number, deltaY: number, deltaMode = 0): number {
+  // A wheel that counts in lines turns by about 40 pixels a line.
+  const pixels = deltaMode === 1 ? deltaY * 40 : deltaY
+  return clampScale(scale * Math.exp(-pixels / 500))
+}
+
+/** The scale at which all of a drawing fits a pane: never larger than as drawn. */
+export function fitScale(
+  drawing: { readonly width: number; readonly height: number },
+  pane: { readonly width: number; readonly height: number }
+): number {
+  if (drawing.width <= 0 || drawing.height <= 0) return 1
+  const fits = Math.min(1, pane.width / drawing.width, pane.height / drawing.height)
+  return clampScale(Math.floor(fits * 100) / 100)
+}
+
+/**
+ * Where a pane scrolls to when the scale of the drawing in it changes from `from` to `to`, so
+ * that the point at `at` — measured from the pane's top left corner, under the cursor —
+ * stays where it is.
+ */
+export function scrollAfterZoom(
+  scroll: { readonly left: number; readonly top: number },
+  at: { readonly x: number; readonly y: number },
+  from: number,
+  to: number
+): { left: number; top: number } {
+  return {
+    left: Math.max(0, ((scroll.left + at.x) / from) * to - at.x),
+    top: Math.max(0, ((scroll.top + at.y) / from) * to - at.y)
+  }
 }

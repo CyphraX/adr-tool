@@ -17,6 +17,7 @@ export {
   type Said,
   type SaidValue,
   type Sentences,
+  type Stranded,
   type WritableFileSystem
 } from '@adr-tool/kernel'
 export { SENTENCES, englishOf, type CoreSaid } from './sentences'

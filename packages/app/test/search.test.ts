@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem, openRepository, type Adr } from '@adr-tool/core'
-import { fold, search, searchLogs } from '../src/renderer/src/lib/search'
+import { fold, foldWithPlaces, search, searchLogs } from '../src/renderer/src/lib/search'
 
 const adr = (frontmatter: string[], title: string, ...body: string[]): string =>
   ['---', ...frontmatter, '---', '', `# ${title}`, '', ...body, ''].join('\n')
@@ -88,8 +88,61 @@ describe('full-text search', () => {
     expect(ids(search(await adrs(), 'fur alle falle'))).toEqual(['0012'])
     expect(ids(search(await adrs(), 'FÜR'))).toEqual(['0012'])
     expect(ids(search(await adrs(), 'istanbul'))).toEqual(['0012'])
-    // Folded text is exactly as long as the text: that is what an excerpt relies on.
-    expect(fold('Für İstanbul, Straße')).toBe('fur istanbul, straße')
+    expect(fold('Für İstanbul, Straße')).toBe('fur istanbul, strasse')
+  })
+
+  it('reads "ß" as "ss", either way round, and marks the match in the text as written', async () => {
+    const repository = await openRepository(
+      memoryFileSystem({
+        'docs/adr/0001-strasse.md': adr(
+          ['status: accepted'],
+          'Die Straße zum Release',
+          'Die Maße stimmen, über die Hauptstraße geht es zum Kunden.'
+        ),
+        'docs/adr/0002-routing.md': adr(
+          ['status: proposed'],
+          'Routing',
+          'In der Schweiz schreibt man die Strasse ohne Eszett.'
+        ),
+        'docs/adr/0003-gross.md': adr(['status: proposed'], 'GROSSE DATEIEN', 'Kein Text.')
+      })
+    )
+    const [log] = repository.logs
+    const found = (query: string): string[] => ids(search(log!.adrs, query))
+    for (const query of ['strasse', 'STRASSE', 'Straße', 'STRAẞE']) {
+      expect(found(query), query).toEqual(['0001', '0002'])
+    }
+    expect(found('große')).toEqual(['0003'])
+
+    const marked = (query: string): string[] =>
+      search(log!.adrs, query)[0]!
+        .excerpt.filter((part) => part.match)
+        .map((part) => part.text)
+    // Folded, the text is one character longer than written for every "ß" before the match.
+    expect(marked('stimmen')).toEqual(['stimmen'])
+    expect(marked('kunden')).toEqual(['Kunden'])
+    expect(marked('hauptstrasse')).toEqual(['Hauptstraße'])
+    // Half of a "ß" is all of it.
+    expect(marked('hauptstras')).toEqual(['Hauptstraß'])
+    expect(marked('eszett')).toEqual(['Eszett'])
+    // The excerpt is the line as written, from a word some way before the match.
+    expect(
+      search(log!.adrs, 'kunden')[0]!
+        .excerpt.map((part) => part.text)
+        .join('')
+    ).toBe('… über die Hauptstraße geht es zum Kunden.')
+  })
+
+  it('knows where every folded character came from', () => {
+    expect(foldWithPlaces('aßb')).toEqual({ text: 'assb', from: [0, 1, 1, 2], to: [1, 2, 2, 3] })
+    // Text written decomposed: the mark folds to nothing and belongs to its letter.
+    expect(foldWithPlaces('für')).toEqual({ text: 'fur', from: [0, 1, 3], to: [1, 3, 4] })
+    // A letter outside the first plane is one character, two code units long.
+    expect(foldWithPlaces('𝐀b')).toEqual({ text: '𝐀b', from: [0, 0, 2], to: [2, 2, 3] })
+    // A Hangul syllable stays one letter: "가" is not the start of "강".
+    expect(foldWithPlaces('강남')).toEqual({ text: '강남', from: [0, 1], to: [1, 2] })
+    expect(fold('가')).not.toBe(fold('강').slice(0, 1))
+    expect(fold('Éé')).toBe('ee')
   })
 
   it('marks the match where it is, whatever stands before it', async () => {

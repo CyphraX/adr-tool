@@ -25,6 +25,21 @@ export function memoryFileSystem(initial: Readonly<Record<string, string>>): Wri
       if (text === undefined) throw new Error(`No such file: ${from}`)
       files.delete(from)
       files.set(to, text)
+    },
+    async link(from, to) {
+      const text = files.get(from)
+      if (text === undefined) throw new Error(`No such file: ${from}`)
+      if (files.has(to)) throw new Error(`${to} already exists.`)
+      files.set(to, text)
+    },
+    async remove(path) {
+      files.delete(path)
+    },
+    async removeDirectory(path) {
+      // A directory is there while files are in it, and gone with the last of them.
+      if ([...files.keys()].some((file) => file.startsWith(`${path}/`))) {
+        throw new Error(`${path} is not empty.`)
+      }
     }
   }
 }

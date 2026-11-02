@@ -21,7 +21,7 @@ import type {
   StructureView
 } from '../../../shared/ipc'
 import type { Language } from '../../../shared/language'
-import { recordedIn } from './history'
+import { followHistory, recordedIn } from './history'
 import { chooseLanguage } from './language'
 import { wordOf } from './said'
 import { t } from './strings'
@@ -112,6 +112,8 @@ interface Tab {
   selectedId: string | undefined
   structure: StructureTab
   branches: BranchesTab
+  /** How the Relations graph is shown: the Relation types it draws, and its scale. */
+  graph: { types: RelationType[]; scale: number }
 }
 
 /** What the dialog shows after an action was asked for. */
@@ -175,15 +177,23 @@ interface Editing {
 
 /** The history of one ADR's file, as git has it, and the entry being looked at. */
 interface History {
+  repositoryId: string
+  logPath: string
   adrId: string
   title: string
-  /** `undefined` while git is being asked. */
+  /** The Correction, by its position in the ADR's list, that the history was opened from. */
+  correction: number | undefined
+  /** `undefined` while git is being asked for the first time. */
   entries: readonly HistoryEntry[] | undefined
   selectedId: string | undefined
   /** `undefined` while it is being read; `null` when git could not say. */
   change: FileChange | null | undefined
   /** Set when the history was opened from a Correction that no entry recorded. */
   notFound: boolean
+  /** How often git was asked for the entries: only the answer to the latest question counts. */
+  asked: number
+  /** How often git was asked what an entry did: only the answer to the latest question counts. */
+  changeAsked: number
 }
 
 /** A commit of one ADR's files, as the dialog shows it (docs/adr/0012-…). */
@@ -640,6 +650,17 @@ class AppState {
     this.active.view = 'adrs'
   }
 
+  /** Draw the Relations of a type in the graph, or leave them out. */
+  showRelationType(type: RelationType, shown: boolean): void {
+    const graph = this.active?.graph
+    if (!graph) return
+    graph.types = RELATION_TYPES.filter((one) => (one === type ? shown : graph.types.includes(one)))
+  }
+
+  zoomGraph(scale: number): void {
+    if (this.active) this.active.graph.scale = scale
+  }
+
   show(view: MiddleView): void {
     const tab = this.active
     if (!tab) return
@@ -809,37 +830,79 @@ class AppState {
   async showHistory(correction?: number): Promise<void> {
     const [tab, log, adr] = [this.active, this.log, this.selected]
     if (!tab || !log || !adr) return
-    const history: History = {
+    this.history = {
+      repositoryId: tab.repository.id,
+      logPath: log.path,
       adrId: adr.id,
       title: t.history.title(prefixOf(adr)),
+      correction,
       entries: undefined,
       selectedId: undefined,
       change: undefined,
-      notFound: false
+      notFound: false,
+      asked: 0,
+      changeAsked: 0
     }
-    this.history = history
-    const entries = await window.api.history(tab.repository.id, log.path, adr.id)
-    // The dialog may have been closed, or opened for another ADR, in the meantime.
-    if (this.history?.adrId !== adr.id) return
+    await this.readHistory()
+  }
+
+  /**
+   * Ask git for the entries of the history in the dialog — when it opens, and again whenever
+   * the files or git move while it is open. The first answer selects the entry the dialog
+   * was opened at; a later one stays with the entry that is selected (`followHistory`).
+   */
+  private async readHistory(): Promise<void> {
+    const history = this.history
+    if (!history) return
+    const asked = ++history.asked
+    const { repositoryId, logPath, adrId } = history
+    const entries = await window.api.history(repositoryId, logPath, adrId).catch(() => undefined)
+    // The dialog may have been closed, opened again, or asked again in the meantime.
+    const now = this.history
+    if (now !== history || now.asked !== asked) return
+
+    if (now.entries !== undefined) {
+      if (!entries) return
+      const { selectedId, reread } = followHistory(entries, now.selectedId)
+      now.entries = entries
+      now.selectedId = selectedId
+      if (reread) await this.readHistoryChange(selectedId)
+      return
+    }
+    const corrections =
+      this.tabs
+        .find((tab) => tab.repository.id === repositoryId)
+        ?.repository.repository.logs.find((log) => log.path === logPath)
+        ?.adrs.find((adr) => adr.id === adrId)?.metadata.corrections ?? []
     const recorded =
-      correction === undefined
+      now.correction === undefined
         ? undefined
-        : recordedIn(entries, adr.metadata.corrections, correction)
-    this.history.entries = entries
-    this.history.notFound = correction !== undefined && !recorded
-    await this.showHistoryEntry((recorded ?? entries[0])?.id)
+        : recordedIn(entries ?? [], corrections, now.correction)
+    now.entries = entries ?? []
+    now.notFound = now.correction !== undefined && !recorded
+    await this.showHistoryEntry((recorded ?? now.entries[0])?.id)
   }
 
   async showHistoryEntry(id: string | undefined): Promise<void> {
-    const [tab, log, history] = [this.active, this.log, this.history]
-    if (!tab || !log || !history || id === undefined) return
+    const history = this.history
+    if (!history || id === undefined) return
     history.selectedId = id
     history.change = undefined
+    await this.readHistoryChange(id)
+  }
+
+  /** Read what an entry did to the file; what is shown meanwhile stays. */
+  private async readHistoryChange(id: string | undefined): Promise<void> {
+    const history = this.history
+    if (!history || id === undefined) return
+    const asked = ++history.changeAsked
     const change = await window.api
-      .historyChange(tab.repository.id, log.path, history.adrId, id)
+      .historyChange(history.repositoryId, history.logPath, history.adrId, id)
       .catch(() => undefined)
-    if (this.history?.adrId === history.adrId && this.history.selectedId === id) {
-      this.history.change = change ?? null
+    // The dialog may have been closed, opened again — for an ADR of the same ID in another
+    // repository, say —, or asked again since: an older answer is no answer.
+    if (this.history === history && history.changeAsked === asked && history.selectedId === id) {
+      history.change = change ?? null
     }
   }
 
@@ -1197,7 +1260,8 @@ class AppState {
         this.edit()
       }
     } else {
-      this.review = { kind: 'refused', title: t.review.notWritten, reason: result.reason }
+      const title = result.inPart ? t.review.writtenInPart : t.review.notWritten
+      this.review = { kind: 'refused', title, reason: result.reason }
     }
   }
 
@@ -1326,6 +1390,13 @@ class AppState {
     this.rebaseMetadata(repository)
     // A commit or a checkout changes what the other branches have that this one has not.
     void this.loadBranches(tab)
+    // The history follows the file and git while it is open; of an ADR that is gone from
+    // the log, it keeps what it last read.
+    const history = this.history
+    const stillThere = repository.repository.logs
+      .find((log) => log.path === history?.logPath)
+      ?.adrs.some((adr) => adr.id === history?.adrId)
+    if (history?.repositoryId === repository.id && stillThere) void this.readHistory()
 
     const editing = this.editing
     if (editing?.repositoryId !== repository.id) return
@@ -1369,7 +1440,14 @@ function newTab(repository: OpenRepository): Tab {
       error: undefined,
       selection: undefined
     },
-    branches: { overview: undefined, loading: false, asked: 0, selected: undefined, adr: undefined }
+    branches: {
+      overview: undefined,
+      loading: false,
+      asked: 0,
+      selected: undefined,
+      adr: undefined
+    },
+    graph: { types: [...RELATION_TYPES], scale: 1 }
   }
 }
 

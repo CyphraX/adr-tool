@@ -163,4 +163,22 @@ describe('the language of the window (part 12)', () => {
     setLanguage('en')
     expect(t.commit.noMessage).toBe('A commit needs a message.')
   })
+
+  it('says what the file system said when it refused a change, as a sentence of its own', () => {
+    expect(t.writeFailed('ENOSPC: no space left on device, write')).toBe(
+      'Nothing was written. ENOSPC: no space left on device, write. Every file is as it was before.'
+    )
+    const stranded = [
+      { path: 'docs/adr/0001-a.md', textAt: 'docs/adr/.0001-a.md.k2x9q10.old' },
+      { path: 'docs/adr/0002-b.md' }
+    ]
+    expect(t.writtenInPart('EIO: i/o error.', stranded)).toBe(
+      'The change is written in part. EIO: i/o error. Undoing it failed as well, and these files are not as they were: docs/adr/0001-a.md, whose text is now in docs/adr/.0001-a.md.k2x9q10.old and docs/adr/0002-b.md, which is new. Put them back by hand before you try again.'
+    )
+    setLanguage('de')
+    expect(t.writtenInPart('EIO: i/o error', stranded)).toContain(
+      'docs/adr/0001-a.md (der frühere Text steht jetzt in docs/adr/.0001-a.md.k2x9q10.old) und docs/adr/0002-b.md (neu angelegt)'
+    )
+    setLanguage('en')
+  })
 })

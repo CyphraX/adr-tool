@@ -31,20 +31,61 @@ const WEIGHT = {
 /** How much of a line is shown in front of a match. */
 const LEAD = 40
 
+/** Text as it is compared, and where in the original each of its characters came from. */
+export interface FoldedText {
+  readonly text: string
+  /**
+   * For each character of `text`, where the character it came from starts and ends in the
+   * original. Both characters of an "ss" from "ß" have the range of the "ß"; a mark that
+   * folds to nothing belongs to the range of the letter before it.
+   */
+  readonly from: readonly number[]
+  readonly to: readonly number[]
+}
+
 /**
- * Text as it is compared: lowercase and without accents — "fur" finds "für" — and, which
- * is what makes an excerpt possible, exactly as long as the original: every character
- * folds to one character or stays what it is ("ß" stays "ß"; "strasse" does not find it).
+ * One character as it is compared: lowercase, without accents, "ß" and "ẞ" as "ss". What
+ * is left is composed again: a Hangul syllable comes apart into letters that are no marks,
+ * and "가" is to find "가", not the first letters of "강".
  */
-export function fold(text: string): string {
+function foldCharacter(character: string): string {
+  const lower = character.toLowerCase()
+  return lower === 'ß' ? 'ss' : lower.normalize('NFD').replace(/\p{M}/gu, '').normalize('NFC')
+}
+
+/**
+ * Text as it is compared: lowercase and without accents — "fur" finds "für" — with "ß" as
+ * "ss", so that "strasse" finds "Straße" and "Straße" finds "Strasse". That changes the
+ * length, so the folded text keeps where each of its characters came from: a match is
+ * marked in the original, whatever stands before it.
+ */
+export function foldWithPlaces(text: string): FoldedText {
   let folded = ''
-  for (let position = 0; position < text.length; position++) {
-    const character = text[position]!
-    const lower = character.toLowerCase()
-    const bare = lower.normalize('NFD').replace(/\p{M}/gu, '')
-    folded += bare.length === 1 ? bare : lower.length === 1 ? lower : character
+  const from: number[] = []
+  const to: number[] = []
+  let last = 0
+  let position = 0
+  for (const character of text) {
+    const end = position + character.length
+    const bare = foldCharacter(character)
+    if (bare === '') {
+      // A mark of its own, as in text written decomposed: part of the letter before it.
+      for (let place = last; place < to.length; place++) to[place] = end
+    } else {
+      last = folded.length
+      folded += bare
+      for (let count = 0; count < bare.length; count++) {
+        from.push(position)
+        to.push(end)
+      }
+    }
+    position = end
   }
-  return folded
+  return { text: folded, from, to }
+}
+
+export function fold(text: string): string {
+  return foldWithPlaces(text).text
 }
 
 /** "adr-4", "adr 4", "ADR4" and "#4" are how people say "ADR 4": one word, the number. */
@@ -58,7 +99,7 @@ function wordsOf(query: string): string[] {
 interface Folded {
   readonly title: string
   readonly id: string
-  readonly body: string
+  readonly body: FoldedText
   readonly tags: readonly string[]
   readonly people: readonly string[]
   readonly status: string
@@ -76,7 +117,7 @@ function foldedOf(adr: Adr): Folded {
     folded = {
       title: fold(adr.title ?? ''),
       id: fold(adr.id),
-      body: fold(adr.body),
+      body: foldWithPlaces(adr.body),
       tags: tags.map(fold),
       people: decisionMakers.map(fold),
       status: fold(rawStatus ?? status ?? ''),
@@ -107,7 +148,7 @@ export function search(adrs: readonly Adr[], query: string): SearchHit[] {
 
     for (const word of words) {
       const outside = scoreOutsideText(adr, folded, word)
-      const found = outside > 0 ? outside : folded.body.includes(word) ? WEIGHT.body : 0
+      const found = outside > 0 ? outside : folded.body.text.includes(word) ? WEIGHT.body : 0
       if (found === 0) {
         score = 0
         break
@@ -145,11 +186,14 @@ function scoreOutsideText(adr: Adr, folded: Folded, word: string): number {
 
 /**
  * The line of the text in which the word first occurs, from a little before the match.
- * `folded` is as long as `body`, so where the word is in the one, it is in the other.
+ * `folded` says where each of its characters is in `body`, so the match is marked in the
+ * original: all of a "ß" that "ss" or half of it matched, a letter with its accent.
  */
-function excerptOf(body: string, folded: string, word: string): ExcerptPart[] {
-  const at = folded.indexOf(word)
-  if (at === -1) return []
+function excerptOf(body: string, folded: FoldedText, word: string): ExcerptPart[] {
+  const found = folded.text.indexOf(word)
+  if (found === -1) return []
+  const at = folded.from[found]!
+  const length = folded.to[found + word.length - 1]! - at
   const lineStart = body.lastIndexOf('\n', at) + 1
   const lineEnd = body.indexOf('\n', at)
   const line = body.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).replace(/\r$/, '')
@@ -163,8 +207,8 @@ function excerptOf(body: string, folded: string, word: string): ExcerptPart[] {
   }
   return [
     { text: (from > 0 ? '… ' : '') + line.slice(from, inLine), match: false },
-    { text: line.slice(inLine, inLine + word.length), match: true },
-    { text: line.slice(inLine + word.length), match: false }
+    { text: line.slice(inLine, inLine + length), match: true },
+    { text: line.slice(inLine + length), match: false }
   ].filter((part) => part.text !== '')
 }
 

@@ -49,7 +49,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [11, '0011-the-product-is-called-softarch-suite', 'accepted'],
     [12, '0012-committing-an-adr-runs-git-commit-for-its-files-only', 'accepted'],
     [13, '0013-agents-write-adrs-through-the-mcp-server-as-previewed-change', 'accepted'],
-    [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted']
+    [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted'],
+    [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -106,6 +107,12 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       from: '0009-traces-are-recorded-on-the-source-only-unlike-back',
       to: '0006-one-core-package-per-module-on-a-shared-kernel',
       state: log.adrs[8]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
+    },
+    {
+      type: 'depends-on',
+      from: '0015-a-change-set-is-written-beside-its-files-and-renamed-into',
+      to: '0004-operations-return-change-sets',
+      state: 'in-effect'
     }
   ])
 })

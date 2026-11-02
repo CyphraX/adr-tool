@@ -1,5 +1,21 @@
 import type { Correction } from '@adr-tool/core'
-import type { HistoryEntry } from '../../../shared/ipc'
+import { WORKING_TREE, type HistoryEntry } from '../../../shared/ipc'
+
+/**
+ * Where the history dialog stays when it reads the history again, because the file or git
+ * moved while it was open: at the entry that was selected while that is still there, and
+ * otherwise at the newest — a change that was not committed and now is, is the commit on top.
+ * `reread`: whether what the entry did has to be read again. What a commit did stays what it
+ * was; what is on disk and not committed changes with the file.
+ */
+export function followHistory(
+  entries: readonly HistoryEntry[],
+  selectedId: string | undefined
+): { selectedId: string | undefined; reread: boolean } {
+  const stays = entries.some((entry) => entry.id === selectedId)
+  const next = stays ? selectedId : entries[0]?.id
+  return { selectedId: next, reread: next !== undefined && (!stays || next === WORKING_TREE) }
+}
 
 const same = (a: Correction, b: Correction): boolean =>
   a.date === b.date && a.author === b.author && a.note === b.note

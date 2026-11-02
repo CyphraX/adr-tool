@@ -402,7 +402,12 @@ export type ExportResult =
 
 export type ApplyResult =
   | { readonly applied: true; readonly repository: OpenRepository }
-  | { readonly applied: false; readonly reason: string }
+  | {
+      readonly applied: false
+      readonly reason: string
+      /** Undoing failed as well: some files are not as they were (ADR-0015). */
+      readonly inPart?: true
+    }
 
 export interface Api {
   /** `win32`, `darwin` or `linux`. */

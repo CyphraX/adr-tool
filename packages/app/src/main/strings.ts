@@ -1,4 +1,5 @@
 import type { Language } from '../shared/language'
+import type { Stranded } from '@adr-tool/core'
 
 /**
  * The texts the main process puts in front of a person: what it says when it refuses, the
@@ -15,6 +16,9 @@ const list = (items: readonly string[]): string =>
 /** `a`, `a und b`, `a, b und c`. */
 const liste = (items: readonly string[]): string =>
   items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} und ${items.at(-1)}`
+
+/** What a file system said, as a sentence of its own: in its words, with a full stop. */
+const sentence = (said: string): string => (/[.!?]$/.test(said) ? said : `${said}.`)
 
 const en = {
   openRepository: 'Open repository',
@@ -37,6 +41,19 @@ const en = {
     `${path} cannot be read. It may have been moved or deleted since the code was analysed.`,
   changedSincePreview: (files: string): string =>
     `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`,
+  /**
+   * A step of the change was refused, with what the file system said, and what was done is
+   * undone (ADR-0015).
+   */
+  writeFailed: (error: string): string =>
+    `Nothing was written. ${sentence(error)} Every file is as it was before.`,
+  /** … and undoing failed too: each file that is not as it was, with where its text is kept. */
+  writtenInPart: (error: string, stranded: readonly Stranded[]): string =>
+    `The change is written in part. ${sentence(error)} Undoing it failed as well, and these files are not as they were: ${list(
+      stranded.map(({ path, textAt }) =>
+        textAt === undefined ? `${path}, which is new` : `${path}, whose text is now in ${textAt}`
+      )
+    )}. Put them back by hand before you try again.`,
   commit: {
     noGit: 'This folder is not in a git repository, so there is nothing to commit to.',
     noAdr: (id: string): string => `There is no ADR ${id} in this Decision Log any more.`,
@@ -89,6 +106,16 @@ const de: typeof en = {
     `${path} lässt sich nicht lesen. Vielleicht wurde die Datei verschoben oder gelöscht, seit der Code analysiert wurde.`,
   changedSincePreview: (files: string): string =>
     `Nichts wurde geschrieben, denn seit der Vorschau hat sich auf der Festplatte etwas geändert: ${files}. Versuchen Sie es noch einmal, um die Änderung gegen die aktuellen Dateien zu sehen.`,
+  writeFailed: (error: string): string =>
+    `Nichts wurde geschrieben. ${sentence(error)} Jede Datei ist so, wie sie vorher war.`,
+  writtenInPart: (error: string, stranded: readonly Stranded[]): string =>
+    `Die Änderung ist nur zum Teil geschrieben. ${sentence(error)} Auch das Rückgängigmachen ist fehlgeschlagen, und diese Dateien sind nicht, wie sie waren: ${liste(
+      stranded.map(({ path, textAt }) =>
+        textAt === undefined
+          ? `${path} (neu angelegt)`
+          : `${path} (der frühere Text steht jetzt in ${textAt})`
+      )
+    )}. Stellen Sie sie von Hand wieder her, bevor Sie es noch einmal versuchen.`,
   commit: {
     noGit:
       'Dieser Ordner liegt in keinem git-Repository, es gibt also nichts, wohin committet werden könnte.',

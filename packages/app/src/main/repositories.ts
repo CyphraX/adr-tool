@@ -427,11 +427,12 @@ export class Repositories {
 
     const result = await applyChangeSet(nodeFileSystem(entry.root), planned.changeSet)
     if (!result.applied) {
-      const files = result.conflicts.join(', ')
-      return {
-        applied: false,
-        reason: t.changedSincePreview(files)
+      if ('conflicts' in result) {
+        return { applied: false, reason: t.changedSincePreview(result.conflicts.join(', ')) }
       }
+      return result.stranded.length === 0
+        ? { applied: false, reason: t.writeFailed(result.failed) }
+        : { applied: false, reason: t.writtenInPart(result.failed, result.stranded), inPart: true }
     }
     return { applied: true, repository: await this.load(entry) }
   }

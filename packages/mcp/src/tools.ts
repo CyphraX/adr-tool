@@ -626,12 +626,30 @@ export function toolsFor(options: ToolOptions): Tool[] {
             'There is no planned change with this changeId: it was applied or discarded already, or the server was restarted. Plan it again.'
           )
         }
-        // Held until it is written or refused: a write that fails half-way can be asked about.
+        // Held until it is written or refused. A change the disk refused stays held: nothing
+        // of it is written, and it can be applied again once the disk lets it.
         const result = await applyChangeSet(fs, held.changeSet)
-        planned.delete(changeId)
-        if (!result.applied) {
+        if (result.applied || 'conflicts' in result) planned.delete(changeId)
+        if (!result.applied && 'conflicts' in result) {
           throw new Refusal(
             `Nothing was written: ${result.conflicts.join(', ')} changed on disk after the change was planned. Plan it again to see the change against the current files.`
+          )
+        }
+        // What the file system said, as a sentence of its own.
+        const said = (failed: string): string => (/[.!?]$/.test(failed) ? failed : `${failed}.`)
+        if (!result.applied && result.stranded.length === 0) {
+          throw new Refusal(
+            `Nothing was written. ${said(result.failed)} Every file is as it was before; apply_change with this changeId tries again.`
+          )
+        }
+        if (!result.applied) {
+          const files = result.stranded.map(({ path, textAt }) =>
+            textAt === undefined
+              ? `${path}, which is new`
+              : `${path}, whose text is now in ${textAt}`
+          )
+          throw new Refusal(
+            `The change is written in part. ${said(result.failed)} Undoing it failed as well, and these files are not as they were: ${files.join('; ')}. Put them back by hand before planning it again.`
           )
         }
         return {

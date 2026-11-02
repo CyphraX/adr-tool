@@ -1,4 +1,4 @@
-import type { RelationType } from '@adr-tool/core'
+import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 import type { MetricKey, MetricWording, ReviewWording, en } from './strings.en'
 import type { Refusal } from './views'
@@ -15,6 +15,14 @@ const many = (count: number, one: string, more: string): string => (count === 1 
 
 /** A count as the window writes it: 9.115. */
 const count = (value: number): string => value.toLocaleString('de')
+
+/** What a line of the Relations graph says, read out, with the verb where German puts it. */
+const LINE: Record<RelationType, (from: string, to: string) => string> = {
+  supersedes: (from, to) => `${from} ersetzt ${to}`,
+  amends: (from, to) => `${from} ergänzt ${to}`,
+  'depends-on': (from, to) => `${from} hängt von ${to} ab`,
+  'relates-to': (from, to) => `${from} bezieht sich auf ${to}`
+}
 
 export const de: typeof en = {
   cancel: 'Abbrechen',
@@ -631,7 +639,29 @@ export const de: typeof en = {
         count,
         'Ein ADR hat keine Relation und wird nicht gezeichnet.',
         `${count} ADRs haben keine Relation und werden nicht gezeichnet.`
-      )
+      ),
+    unrelatedShown: (count: number): string =>
+      many(
+        count,
+        'Ein ADR hat keine Relation der gezeigten Typen und wird nicht gezeichnet.',
+        `${count} ADRs haben keine Relation der gezeigten Typen und werden nicht gezeichnet.`
+      ),
+    noneShown:
+      'Keine Relation der unten angehakten Typen. Haken Sie einen Typ an, um seine Relationen zu zeichnen.',
+    filterHint: 'Die Relationen dieses Typs zeigen oder ausblenden',
+    zoom: (mac: boolean): string =>
+      `Größe der Zeichnung. ${mac ? '⌘' : 'Strg'} und das Mausrad ändern sie ebenfalls.`,
+    smaller: 'Kleiner',
+    larger: 'Größer',
+    percent: (percent: number): string => `${percent} %`,
+    actualSize: 'In Originalgröße zeigen',
+    fit: 'Einpassen',
+    fitHint: 'Die ganze Zeichnung im Bereich zeigen',
+    spoken: 'Die Relationen in der Zeichnung',
+    adrName: (prefix: string, title: string, log: string | undefined): string =>
+      log === undefined ? `ADR ${prefix} (${title})` : `ADR ${prefix} (${title}) aus ${log}`,
+    line: (from: string, type: RelationType, to: string, state: RelationState): string =>
+      `${LINE[type](from, to)}${state === 'pending' ? ', vorgeschlagen' : state === 'void' ? ', nie wirksam geworden' : ''}`
   },
 
   searching: {
@@ -733,6 +763,7 @@ export const de: typeof en = {
       }
     },
     notWritten: 'Die Änderung wurde nicht geschrieben',
+    writtenInPart: 'Einige Dateien sind nicht, wie sie waren',
     discard: {
       title: 'Ihre Änderungen verwerfen?',
       reason:
