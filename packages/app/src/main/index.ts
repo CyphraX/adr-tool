@@ -288,7 +288,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 560,
     show: false,
-    title: 'ADR Tool',
+    title: 'Softarch Suite',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

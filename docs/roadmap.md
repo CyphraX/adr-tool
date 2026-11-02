@@ -3,7 +3,7 @@
 Records what was deliberately left out of v1, so that it does not drop out of focus.
 Agreed in the design session of 2026-09-19. Vocabulary follows [CONTEXT.md](../CONTEXT.md).
 
-This is the plan of the ADR tool, which becomes the Decisions module of a larger suite; where the project as a whole is heading is in [vision.md](vision.md).
+This is the plan of the Decisions module of Softarch Suite — the ADR tool of v1; where the project as a whole is heading is in [vision.md](vision.md). How what is left of it gets built is in [plan-roadmap.md](plan-roadmap.md).
 
 ## v1
 
@@ -22,10 +22,10 @@ This is the plan of the ADR tool, which becomes the Decisions module of a larger
 ## Before the first public release
 
 - Editor mode 3, the live editor, in its light form: headings, emphasis, links, lists and code are rendered inline; tables stay source
-- Licence and business model (open source or commercial). Until that is decided the app stays local-only: no backend, no accounts, no telemetry
+- ~~Licence and business model (open source or commercial).~~ Decided on 2026-11-02: MIT, and no business model in the code ([ADR-0010](adr/0010-the-suite-is-open-source-under-the-mit-licence.md)). The app stays local-only: no backend, no accounts, no telemetry
 - Distribution: installers for all three platforms, code signing, auto-update
 - Windows and macOS back into CI. They were switched off on 2026-11-02 to save runs; until then a Windows-only failure — a path, a CRLF fixture, a file held open — shows up only by hand
-- Final product name; the working title is Softarch Suite (see [vision.md](vision.md))
+- ~~Final product name.~~ Decided on 2026-11-02: Softarch Suite ([ADR-0011](adr/0011-the-product-is-called-softarch-suite.md)); the check for clashes in trademark registers, domains, npm and GitHub is still due
 - Three known gaps of v1 that a first-time user can meet at once (see "Known gaps of v1" below): images with relative paths, the Metadata dialog that can outgrow the window, and the dialogs the window closes over without asking
 
 ## Next — the first follow-ups after v1

@@ -1,6 +1,6 @@
 # File format
 
-The on-disk contract of ADR Tool: what an ADR file looks like, which parts the tool owns, and what each operation writes. `core` implements exactly this document, `adr lint` will check against it, and an agent or a person who follows it can write valid ADRs without the app.
+The on-disk contract of the Decisions module of Softarch Suite: what an ADR file looks like, which parts the tool owns, and what each operation writes. `core` implements exactly this document, `adr lint` will check against it, and an agent or a person who follows it can write valid ADRs without the app.
 
 Vocabulary follows [CONTEXT.md](../CONTEXT.md). The reasons behind the contract are in [ADR-0002](adr/0002-never-reserialize-markdown.md) and [ADR-0003](adr/0003-on-disk-contract.md).
 

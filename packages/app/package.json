@@ -1,9 +1,10 @@
 {
   "name": "@adr-tool/app",
-  "productName": "ADR Tool",
+  "productName": "Softarch Suite",
   "version": "0.0.0",
   "private": true,
-  "description": "The ADR Tool desktop app",
+  "license": "MIT",
+  "description": "The Softarch Suite desktop app",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

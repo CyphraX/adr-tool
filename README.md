@@ -1,28 +1,29 @@
-# ADR Tool
+# Softarch Suite
 
 [![CI](https://github.com/CyphraX/adr-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/CyphraX/adr-tool/actions/workflows/ci.yml)
 ![Status: early development](https://img.shields.io/badge/status-early%20development-orange)
 ![Node.js ≥ 22.12](https://img.shields.io/badge/node-%E2%89%A5%2022.12-339933?logo=node.js&logoColor=white)
 ![pnpm 11](https://img.shields.io/badge/pnpm-11-F69220?logo=pnpm&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A desktop app for the architecture that lives in a git repository: its Architecture Decision Records, and the structure of its code.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/readme/decisions-dark.png">
-  <img alt="ADR Tool showing a Decision Log: the ADRs with their Status on the left, one ADR with its Relations and its text on the right" src="docs/screenshots/readme/decisions.png">
+  <img alt="Softarch Suite showing a Decision Log: the ADRs with their Status on the left, one ADR with its Relations and its text on the right" src="docs/screenshots/readme/decisions.png">
 </picture>
 
-ADR Tool reads ADRs where they already are: Markdown files in a repository, written by people, by agents or by other tools. It lists them, shows how they relate, finds what is inconsistent, and writes new ones and changes to existing ones. Every change is shown as a diff before it is written, and nothing is changed beyond the lines it was asked to change. Markdown is never re-serialized ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)).
+Softarch Suite reads ADRs where they already are: Markdown files in a repository, written by people, by agents or by other tools. It lists them, shows how they relate, finds what is inconsistent, and writes new ones and changes to existing ones. Every change is shown as a diff before it is written, and nothing is changed beyond the lines it was asked to change. Markdown is never re-serialized ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)).
 
-The tool is the first module of a planned suite for software architects ([vision](docs/vision.md)):
+The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built:
 
-- **Decisions** covers the ADRs.
-- **Structure** is the second module. It shows the Components of the code and the Dependencies between them, and links them to the ADRs that affect them.
+- **Decisions** covers the ADRs. It was called ADR Tool until the suite got its name.
+- **Structure** shows the Components of the code and the Dependencies between them, and links them to the ADRs that affect them.
 
 The app runs locally: there is no backend, no account and no telemetry.
 
 > [!NOTE]
-> Early development, working title. v1 of the Decisions module is accepted, and the Structure module is being built part by part. There are no installers yet: the app runs from source.
+> Early development. v1 of the Decisions module is accepted and the Structure module is built; the rest of the roadmap is being built part by part ([plan-roadmap.md](docs/plan-roadmap.md)). There are no installers yet: the app runs from source.
 
 ## Table of Contents
 
@@ -60,7 +61,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 - **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body.
 - **git, read-only.** The app shows the branch that is checked out and the ADRs with uncommitted changes. For each ADR it shows its history, commit by commit, with the diff.
-- **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 3 and 4 and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the tool's format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
+- **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 3 and 4 and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
 
 <details>
@@ -159,7 +160,7 @@ The test fixtures are useful for exploring the app. They are test data, so copy 
 | `packages/core/test/fixtures/madr`, `…/adr-tools` | Foreign formats, offered for Migration |
 | `packages/structure/test/fixtures/shop` | A Cycle between two Components with its weakest Dependency, and one between two files |
 | `packages/structure/test/fixtures/maven-shop` | Java: a Maven project of three modules, with one package spread over two of them |
-| this repository | Its own nine ADRs, and its packages as declared Components |
+| this repository | Its own ADRs, and its packages as declared Components |
 
 ### Where ADRs are found
 
@@ -234,7 +235,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 ### Conventions
 
 - **Language.** Code and documents use the terms of [CONTEXT.md](CONTEXT.md) (Decisions) and [docs/contexts/structure/CONTEXT.md](docs/contexts/structure/CONTEXT.md) (Structure). [CONTEXT-MAP.md](CONTEXT-MAP.md) maps the two.
-- **Decisions.** Every decision of consequence is recorded as an ADR in [docs/adr/](docs/adr/), written in the tool's own format.
+- **Decisions.** Every decision of consequence is recorded as an ADR in [docs/adr/](docs/adr/), written in the suite's own format.
 - **Bytes.** Prettier never formats Markdown in this repository. The fixtures under `packages/core/test/fixtures` are exempt from git's line-ending normalization. The tool promises never to change a byte it was not asked to change, and this repository is its first test case.
 - **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.ts` and `wording.ts`, ready for translation. A test checks that no component carries text of its own.
 
@@ -242,10 +243,11 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 
 | Document | Contents |
 | --- | --- |
-| [docs/vision.md](docs/vision.md) | Where the project is heading: the ADR tool as the first module of an architect's suite |
+| [docs/vision.md](docs/vision.md) | Where the project is heading: Decisions as the first module of an architect's suite |
 | [docs/roadmap.md](docs/roadmap.md) | What is in v1, what comes before the first public release, and what comes after |
 | [docs/plan.md](docs/plan.md) | The milestones of the Decisions module, with their status |
 | [docs/plan-structure.md](docs/plan-structure.md) | The parts of the Structure module, with their status |
+| [docs/plan-roadmap.md](docs/plan-roadmap.md) | The parts of the rest of the roadmap, with their status |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
@@ -255,15 +257,15 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 
 - **Decisions:** v1 is built and accepted ([plan.md](docs/plan.md)).
 - **Structure:** parts 1 to 8 are built ([plan-structure.md](docs/plan-structure.md)).
-- **Before the first public release:**
-  - the live editor;
-  - the licence;
-  - installers for Windows, macOS and Linux;
-  - the final product name.
-- **After that:**
+- **The rest of the roadmap** is being built part by part ([plan-roadmap.md](docs/plan-roadmap.md)):
+  - the known gaps before the first release and the live editor;
   - an `adr lint` CLI for CI;
+  - MADR 2.x and log4brains;
+  - Relations across Decision Logs, committing an ADR, a branch overview;
   - an MCP server for agents;
-  - more foreign formats.
+  - export, timeline, board and dashboard;
+  - a German translation, and the repositories in the window seen together.
+- **Deferred:** distribution — installers, code signing and auto-update.
 
 The details are in [docs/roadmap.md](docs/roadmap.md).
 
@@ -278,4 +280,4 @@ Changes go through pull requests against `main`, and CI must pass. Before you op
 
 ## License
 
-No licence has been chosen yet. Whether the project will be open source or commercial is decided before the first public release ([roadmap](docs/roadmap.md)). Until then, no licence is granted.
+[MIT](LICENSE) © 2026 Philipp Saal ([ADR-0010](docs/adr/0010-the-suite-is-open-source-under-the-mit-licence.md)).
