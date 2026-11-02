@@ -42,6 +42,8 @@ components:
         paths: [packages/kernel/src/change/**]
       fs:
         paths: [packages/kernel/src/fs/**]
+      git:
+        paths: [packages/kernel/src/git/**]
       text:
         paths: [packages/kernel/src/text/**]
   mcp:
