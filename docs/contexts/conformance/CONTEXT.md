@@ -16,6 +16,10 @@ _Avoid_: Template (that is the blueprint of an ADR), preset, style, design patte
 One place where the code breaks a Rule. It is derived from the code and never stored; it is identified by the Rule and by what it connects, not by line numbers.
 _Avoid_: Problem (that is an inconsistency in the suite's own artefacts), Finding (that is a human judgement), error, issue
 
+**Fingerprint**:
+The name of a Violation that stays when lines move: its Rule and what it is about — the source and target Component of a Dependency, the members of a Cycle, the Component of a metric. Exceptions, the Baseline and Findings name a Violation by it.
+_Avoid_: ID, hash, key (a fingerprint has no line number and is not a hash of the code)
+
 **Exception**:
 A Violation the architect has accepted, recorded next to the Rules with a reason. It can carry a Trace to the ADR that justifies it.
 _Avoid_: Waiver, suppression, ignore
