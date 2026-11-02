@@ -18,11 +18,12 @@ export function dayOf(date: string | undefined): number | undefined {
   const match = date === undefined ? null : DATE.exec(date)
   if (!match) return undefined
   const [, year, month, day] = match.map(Number) as [number, number, number, number]
-  const time = Date.UTC(year, month - 1, day)
-  const back = new Date(time)
+  // `Date.UTC` takes a year below 100 for one of the 1900s; `setUTCFullYear` does not.
+  const back = new Date(0)
+  back.setUTCFullYear(year, month - 1, day)
   // 2026-02-31 is no day.
   if (back.getUTCMonth() !== month - 1 || back.getUTCDate() !== day) return undefined
-  return time / 86_400_000
+  return back.getTime() / 86_400_000
 }
 
 /** Today in the person's own time zone, as `YYYY-MM-DD`: the day a decision would record. */
@@ -102,14 +103,18 @@ function monthStart(day: number, add = 0): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + add, 1) / 86_400_000
 }
 
-/** Every month while that leaves room for a label; every quarter, or every year, beyond that. */
+/**
+ * Every month while that leaves room for a label; every quarter, or every year, beyond that —
+ * and over decades every few years, so that there are no more than about ten.
+ */
 function ticksBetween(from: number, to: number): number[] {
   const months = Math.round((to - from) / 30.44)
-  const step = months <= 18 ? 1 : months <= 60 ? 3 : 12
+  const step = months <= 18 ? 1 : months <= 60 ? 3 : 12 * Math.ceil(months / 120)
   const ticks: number[] = []
   for (let tick = from; tick < to; tick = monthStart(tick, 1)) {
-    const month = new Date(tick * 86_400_000).getUTCMonth()
-    if (month % step === 0) ticks.push(tick)
+    const date = new Date(tick * 86_400_000)
+    const counted = date.getUTCFullYear() * 12 + date.getUTCMonth()
+    if (counted % step === 0) ticks.push(tick)
   }
   return ticks
 }
@@ -142,6 +147,8 @@ export function boardOf(adrs: readonly Adr[]): BoardColumn[] {
 export type Refusal =
   /** Written in a foreign format, which the tool reads and never writes. */
   | 'foreign'
+  /** Written in a foreign format, and it cannot be migrated as it stands. */
+  | 'unmigratable'
   /** Its frontmatter cannot be read. */
   | 'unreadable'
   /** Its Status is none of the five values. */
@@ -168,12 +175,14 @@ export type Move =
  * other. `superseded` is never set by hand; it follows when an ADR that supersedes is accepted.
  */
 export function moveOf(
-  adr: Pick<Adr, 'metadata' | 'foreign' | 'metadataWritable'>,
+  adr: Pick<Adr, 'metadata' | 'foreign' | 'metadataWritable' | 'noMigration'>,
   to: StatusKey
 ): Move {
   const from = statusOf(adr)
   if (from === to) return { kind: 'stay' }
-  if (adr.foreign) return { kind: 'refused', why: 'foreign' }
+  if (adr.foreign) {
+    return { kind: 'refused', why: adr.noMigration === undefined ? 'foreign' : 'unmigratable' }
+  }
   if (!adr.metadataWritable) return { kind: 'refused', why: 'unreadable' }
   switch (from) {
     case 'unknown':

@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language'
-import { Compartment, EditorState, Facet, StateField, type Range } from '@codemirror/state'
+import { Compartment, EditorState, Facet, Prec, StateField, type Range } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -13,7 +13,7 @@ import {
   type ViewUpdate
 } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import { liveMarks, liveTables } from './live'
+import { liveMarks, liveTables, stepIntoTable, type LiveTable } from './live'
 
 // The source of an ADR is its raw material: monospace, quiet, with just enough emphasis to
 // find one's way. The colours come from the app's tokens, so light and dark follow.
@@ -189,10 +189,12 @@ class Table extends WidgetType {
     const box = document.createElement('div')
     box.className = 'cm-live-table'
     box.innerHTML = this.render(this.source)
-    // A link in the table is text to edit here, as everywhere in the editor.
-    box.addEventListener('click', (event) => {
-      if ((event.target as Element).closest('a')) event.preventDefault()
-    })
+    // A link in the table is text to edit here, as everywhere in the editor: neither a click,
+    // nor a click of the middle button, nor a drag opens it.
+    const inert = (event: Event): void => {
+      if ((event.target as Element).closest('a, img')) event.preventDefault()
+    }
+    for (const type of ['click', 'auxclick', 'dragstart']) box.addEventListener(type, inert)
     return box
   }
   override ignoreEvent(): boolean {
@@ -228,7 +230,34 @@ const tables = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field)
 })
 
-const live = [livePlugin, tables, liveTheme, EditorView.editorAttributes.of({ class: 'cm-live' })]
+/** The cursor moves a line down or up into a table, rather than over it. */
+const intoTable =
+  (direction: 1 | -1) =>
+  (view: EditorView): boolean => {
+    const drawn: LiveTable[] = []
+    view.state.field(tables).between(0, view.state.doc.length, (from, to) => {
+      drawn.push({ from, to })
+    })
+    const to = stepIntoTable(view.state, drawn, direction)
+    if (to === undefined) return false
+    view.dispatch({ selection: { anchor: to }, scrollIntoView: true })
+    return true
+  }
+
+const tableKeys = Prec.high(
+  keymap.of([
+    { key: 'ArrowDown', run: intoTable(1) },
+    { key: 'ArrowUp', run: intoTable(-1) }
+  ])
+)
+
+const live = [
+  livePlugin,
+  tables,
+  tableKeys,
+  liveTheme,
+  EditorView.editorAttributes.of({ class: 'cm-live' })
+]
 
 /** Where the live mode is switched on and off, per editor. */
 const liveMode = new Compartment()

@@ -232,7 +232,7 @@ export class Repositories {
     if (logPath === undefined && logs.length === 0) {
       // The first ADR goes where the configuration says, or to a well-known directory.
       const first = await firstLog(fs)
-      if ('reason' in first) return { ok: false, reason: first.reason }
+      if ('reason' in first) return { ok: false, reason: first.reason, said: first.said }
       log = first.log
     } else log = logs.find((candidate) => candidate.path === (logPath ?? logs[0]?.path))
     if (!log) return { ok: false, reason: t.noLogAt(logPath) }
@@ -244,7 +244,8 @@ export class Repositories {
     if (!plan.ok || numbered === undefined || log.naming !== 'sequential') {
       return this.hold(repositoryId, plan)
     }
-    // Without what the branches have, the plan goes without the warning.
+    // Without what the branches have, the plan goes without the warning. It comes after
+    // those of `core`, which keep their codes in `warned`.
     const overview = await this.overviewOf(entry).catch(() => undefined)
     const taken = overview ? numberWarnings(overview, log.path, numbered, log.naming) : []
     return this.hold(
@@ -303,6 +304,7 @@ export class Repositories {
     const changeId = randomUUID()
     this.planned.set(changeId, { repositoryId, changeSet: plan.changeSet })
     const warnings = plan.warnings ?? []
+    const warned = plan.warned ?? []
     const createdId = plan.created?.id
     const renamedId = plan.renamed?.to
     return {
@@ -311,6 +313,7 @@ export class Repositories {
         changeId,
         changeSet: plan.changeSet,
         warnings,
+        ...(warned.length > 0 && { warned }),
         ...(createdId !== undefined && { createdId }),
         ...(renamedId !== undefined && { renamedId })
       }

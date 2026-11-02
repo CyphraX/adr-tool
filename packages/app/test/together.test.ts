@@ -13,14 +13,26 @@ import {
 
 const adr = (front: string, body: string): string => `---\n${front}\n---\n\n${body}`
 
-async function open(id: string, name: string, files: Record<string, string>): Promise<OpenRepository> {
-  return { id, root: `/work/${name}`, name, repository: await openRepository(memoryFileSystem(files)) }
+async function open(
+  id: string,
+  name: string,
+  files: Record<string, string>
+): Promise<OpenRepository> {
+  return {
+    id,
+    root: `/work/${name}`,
+    name,
+    repository: await openRepository(memoryFileSystem(files))
+  }
 }
 
 async function twoRepositories(): Promise<OpenRepository[]> {
   return [
     await open('a', 'shop', {
-      'docs/adr/0001-modular-monolith.md': adr('status: accepted', '# Start as a modular monolith\n'),
+      'docs/adr/0001-modular-monolith.md': adr(
+        'status: accepted',
+        '# Start as a modular monolith\n'
+      ),
       'docs/adr/0002-payments-by-ledger.md': adr(
         'status: proposed\ndepends-on: [payments:docs/adr/0001-ledger]\nrelates-to: [billing:docs/adr/0009-x, payments:docs/adr/0042-gone]',
         '# Pay by the ledger\n\nThe shop books every payment.\n'
@@ -45,7 +57,12 @@ describe('the repositories seen together (part 13)', () => {
         relation.to && `${relation.to.repository}:${relation.to.adr.id}`
       ])
     ).toEqual([
-      ['depends-on', '0002-payments-by-ledger', 'payments:docs/adr/0001-ledger', 'payments:0001-ledger'],
+      [
+        'depends-on',
+        '0002-payments-by-ledger',
+        'payments:docs/adr/0001-ledger',
+        'payments:0001-ledger'
+      ],
       // A repository that is not open, and an ADR the open one does not have, lead nowhere.
       ['relates-to', '0002-payments-by-ledger', 'billing:docs/adr/0009-x', undefined],
       ['relates-to', '0002-payments-by-ledger', 'payments:docs/adr/0042-gone', undefined]

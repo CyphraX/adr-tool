@@ -4,20 +4,13 @@ import { readMadrList } from '../foreign/madr-list'
 import { numberOf, type AdrFileName, type NamingScheme } from '../log/naming'
 import { readMetadata, type Metadata } from '../metadata/read'
 import type { Problem } from '../problems/problem'
+import { englishOf, type CoreSaid } from '../sentences'
 import { viewSource, type Eol } from '../text/source'
 import { titleOf } from '../text/title'
+import type { ForeignFormat } from './formats'
 
-/** A format the tool reads and never writes (docs/file-format.md, section 8). */
-export type ForeignFormat = 'adr-tools' | 'madr' | 'madr-2'
-
+export { FOREIGN_FORMAT_NAMES, type ForeignFormat } from './formats'
 export type { ForeignSign }
-
-/** What each foreign format is called, in a sentence. */
-export const FOREIGN_FORMAT_NAMES: Record<ForeignFormat, string> = {
-  'adr-tools': 'adr-tools',
-  madr: 'MADR',
-  'madr-2': 'MADR 2 or log4brains'
-}
 
 /** An ADR as read from its file. */
 export interface Adr {
@@ -45,6 +38,8 @@ export interface Adr {
    * It stays read-only until a person has changed the file by hand.
    */
   readonly noMigration?: string
+  /** `noMigration` as a code, for a window in another language; always set together with it. */
+  readonly noMigrationSaid?: CoreSaid
   /**
    * The ADRs this one supersedes because their files say so and its own does not: MADR
    * records a supersession on the superseded ADR only. Not part of the Metadata, which is
@@ -73,10 +68,10 @@ export interface GuestAdr extends Omit<Adr, 'body'> {
   readonly root?: Problem
 }
 
+/** Why a foreign ADR has no Migration, by what its file says. */
 const NO_MIGRATION = {
-  successorInText:
-    'names its successor in its Status text, where adr-tools writes a link. As a `status` that would be read the way MADR means it, and say something else than it says now. Make it a link line by hand — Superseded by [2. Title](0002-title.md) — and it can be migrated.'
-}
+  successorInText: { code: 'successor-in-status-text', values: {} }
+} satisfies Record<string, CoreSaid>
 
 export function readAdr(
   name: AdrFileName,
@@ -104,7 +99,7 @@ export function readAdr(
     : (listed ?? madr)?.signs
   const { metadata, problems } = adrTools ?? listed?.reading ?? madr?.reading ?? own
   const successor = (listed ?? madr)?.successor
-  const noMigration =
+  const noMigrationSaid: CoreSaid | undefined =
     adrTools && metadata.rawStatus !== undefined && namesSuccessor(metadata.rawStatus)
       ? NO_MIGRATION.successorInText
       : undefined
@@ -119,7 +114,10 @@ export function readAdr(
     body,
     eol: view.eol,
     ...(foreign && { foreign, foreignSigns: signs ?? [] }),
-    ...(noMigration !== undefined && { noMigration }),
+    ...(noMigrationSaid !== undefined && {
+      noMigration: englishOf(noMigrationSaid),
+      noMigrationSaid
+    }),
     metadata,
     metadataWritable: own.writable
   }

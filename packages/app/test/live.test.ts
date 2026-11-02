@@ -2,7 +2,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree } from '@codemirror/language'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import { describe, expect, it } from 'vitest'
-import { liveMarks, liveTables, type LiveMark } from '../src/renderer/src/lib/live'
+import { liveMarks, liveTables, stepIntoTable, type LiveMark } from '../src/renderer/src/lib/live'
 
 /** The text with the cursor at `‸`, as the live mode sees it. */
 function stateOf(text: string): EditorState {
@@ -122,6 +122,25 @@ describe('the live mode of the editor (docs/plan-roadmap.md, part 3)', () => {
     expect(tablesOf(`${table}\n\n${table}\n\n| x |\n| - |\n| y‸ |`)).toEqual([table, table])
     // Without a delimiter row, it is no table.
     expect(tablesOf('| a | b |\n| 1 | 2 |\n\n‸')).toEqual([])
+    // In a quote or a list, a table stays text, as the lines around it do.
+    expect(tablesOf('> | a |\n> | - |\n> | 1 |\n\nAfter.‸')).toEqual([])
+    expect(tablesOf('- item\n\n  | a |\n  | - |\n  | 1 |\n\nAfter.‸')).toEqual([])
+  })
+
+  it('moves the cursor a line down or up into a table, not over it', () => {
+    const table = '| a | b |\n| - | - |\n| 1 | 2 |'
+    const step = (text: string, direction: 1 | -1): number | undefined => {
+      const state = stateOf(text)
+      return stepIntoTable(state, liveTables(state), direction)
+    }
+    const doc = `Above‸\n${table}\nBelow`
+    // Down from the line above: the start of the table's first line.
+    expect(step(doc, 1)).toBe('Above\n'.length)
+    // Up from the blank line below: the start of its last line.
+    expect(step(`Above\n${table}\n‸\nBelow`, -1)).toBe(`Above\n${table}`.lastIndexOf('\n') + 1)
+    // Away from a table, or with a selection, it is an ordinary move.
+    expect(step(doc, -1)).toBeUndefined()
+    expect(step(`Ab‸ove\n\n${table}`, 1)).toBeUndefined()
   })
 
   it('hides a closing sequence of a heading with the space before it', () => {

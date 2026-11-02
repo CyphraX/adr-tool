@@ -23,6 +23,7 @@ import type {
 import type { Language } from '../../../shared/language'
 import { recordedIn } from './history'
 import { chooseLanguage } from './language'
+import { wordOf } from './said'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
 import { outsideRelations } from './together'
@@ -480,7 +481,7 @@ class AppState {
             applying: false,
             renames: { from: id, to }
           }
-        : { kind: 'refused', title: texts.refused(id), reason: plan.reason }
+        : { kind: 'refused', title: texts.refused(id), reason: wordOf(plan.said, plan.reason) }
     )
   }
 
@@ -577,7 +578,7 @@ class AppState {
             change: plan.change,
             applying: false
           }
-        : { kind: 'refused', title: texts.refused, reason: plan.reason }
+        : { kind: 'refused', title: texts.refused, reason: wordOf(plan.said, plan.reason) }
     )
   }
 
@@ -596,7 +597,11 @@ class AppState {
             change: plan.change,
             applying: false
           }
-        : { kind: 'refused', title: texts.refused(problem.component), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: texts.refused(problem.component),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -731,10 +736,7 @@ class AppState {
       const drawn = this.log?.relations.some(({ from, to }) => from === id || to === id)
       // The timeline and the board show every ADR of the log.
       const shown =
-        across ||
-        tab.view === 'timeline' ||
-        tab.view === 'board' ||
-        (tab.view === 'graph' && drawn)
+        across || tab.view === 'timeline' || tab.view === 'board' || (tab.view === 'graph' && drawn)
       if (!shown) tab.view = 'adrs'
       const adr = this.log?.adrs.find((candidate) => candidate.id === id)
       if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
@@ -792,7 +794,11 @@ class AppState {
     this.present(
       plan.ok
         ? { kind: 'change', title, action: texts.action, change: plan.change, applying: false }
-        : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: texts.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -945,7 +951,11 @@ class AppState {
             applying: false,
             caution: texts.caution
           }
-        : { kind: 'refused', title: texts.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: texts.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -974,7 +984,7 @@ class AppState {
             applying: false,
             caution: texts.caution
           }
-        : { kind: 'refused', title: refused, reason: plan.reason }
+        : { kind: 'refused', title: refused, reason: wordOf(plan.said, plan.reason) }
     )
   }
 
@@ -1022,7 +1032,11 @@ class AppState {
             change: plan.change,
             applying: false
           }
-        : { kind: 'refused', title: t.review.create.refused, reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: t.review.create.refused,
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -1078,7 +1092,11 @@ class AppState {
             applying: false,
             saves: true
           }
-        : { kind: 'refused', title: t.review.metadata.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: t.review.metadata.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 
@@ -1123,7 +1141,11 @@ class AppState {
             saves: true,
             caution: t.review.body.caution
           }
-        : { kind: 'refused', title: t.review.body.refused(prefixOf(adr)), reason: plan.reason }
+        : {
+            kind: 'refused',
+            title: t.review.body.refused(prefixOf(adr)),
+            reason: wordOf(plan.said, plan.reason)
+          }
     )
   }
 

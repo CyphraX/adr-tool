@@ -3,11 +3,11 @@ import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList, setScalar } from '../metadata/write'
-import { carries, groupProblems } from '../problems/group'
-import { describeCause } from '../problems/wording'
+import { carries, groupProblems, unreadableFrontmatter } from '../problems/group'
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import { BACK_REFERENCE_KEYS } from '../relation'
 import { plan } from './pending'
+import { englishOf, Warnings, type CoreSaid } from '../sentences'
 import { planRenumber } from './renumber'
 import { isQualified, normalReference, referenceTo } from '../relations/reference'
 import { logOf, nameOf, named, requireOwnFormat, writable } from './rules'
@@ -129,10 +129,13 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
     )
     if (foreign && withheld) return plan(fs, async () => requireOwnFormat(foreign))
     const root = groups.find(({ consequences }) => consequences.some(offered))?.problem
-    return {
-      ok: false,
-      reason: root ? `${describeCause(root)} Fix that first.` : 'This Problem is no longer there.'
-    }
+    const said: CoreSaid = root
+      ? {
+          code: unreadableFrontmatter(root) ? 'fix-frontmatter-first' : 'fix-status-first',
+          values: { adr: 'adr' in root ? root.adr : '' }
+        }
+      : { code: 'problem-gone', values: {} }
+    return { ok: false, reason: englishOf(said), said }
   }
 
   if (repair.kind === 'renumber') return planRenumber(fs, log, repair.adr)
@@ -167,8 +170,9 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
       }
     })
   })
-  const warnings = premiseOf(log, repair)
-  return planned.ok && warnings.length > 0 ? { ...planned, warnings } : planned
+  const warnings = new Warnings()
+  warnings.push(...premiseOf(log, repair))
+  return planned.ok ? { ...planned, ...warnings.outcome() } : planned
 }
 
 /**
@@ -177,11 +181,9 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
  * what the other ADR says, so that a successor that needs fixing is not mistaken for a
  * stale Back-reference.
  */
-function premiseOf(log: DecisionLog, repair: Repair): string[] {
+function premiseOf(log: DecisionLog, repair: Repair): CoreSaid[] {
   if (repair.kind === 'set-status' && repair.status === 'accepted') {
-    return [
-      `${repair.adr} becomes accepted. If it had been deprecated before it was marked as superseded, deprecate it again afterwards.`
-    ]
+    return [{ code: 'deprecate-again', values: { adr: repair.adr } }]
   }
   if (repair.kind !== 'remove-item') return []
   const type = (Object.keys(BACK_REFERENCE_KEYS) as (keyof typeof BACK_REFERENCE_KEYS)[]).find(
@@ -196,12 +198,8 @@ function premiseOf(log: DecisionLog, repair: Repair): string[] {
   const self = referenceTo(logOf(log, source), log.path, repair.adr)
   const name = nameOf(source)
   if (!carries(source, type, self)) {
-    return [
-      `${name} does not name ${repair.adr} in ${type}. If it should, cancel and add it to ${name} by hand: the Back-reference is right then.`
-    ]
+    return [{ code: 'source-does-not-name', values: { source: name, adr: repair.adr, type } }]
   }
-  if (status === 'proposed') {
-    return [`${name} is still proposed. When it is accepted, the Back-reference is written again.`]
-  }
-  return status === 'rejected' ? [`${name} was rejected: its Relations never take effect.`] : []
+  if (status === 'proposed') return [{ code: 'source-still-proposed', values: { source: name } }]
+  return status === 'rejected' ? [{ code: 'source-rejected', values: { source: name } }] : []
 }

@@ -24,15 +24,15 @@ export function planAccept(
 ): Promise<Plan> {
   return plan(fs, async (pending) => {
     const adr = writable(log, id)
-    requireStatus(adr, ['proposed'], 'Only a proposed ADR can be accepted.')
+    requireStatus(adr, ['proposed'], 'accept-needs-proposed')
 
     const superseded = adr.metadata.relations.supersedes.map((target) => {
-      const old = writableTarget(log, target, `${id} supersedes ${target}`)
+      const old = writableTarget(log, target, { adr: id, type: 'supersedes' })
       requireTarget('supersedes', old)
       return old
     })
     const amended = adr.metadata.relations.amends.map((target) => {
-      const base = writableTarget(log, target, `${id} amends ${target}`)
+      const base = writableTarget(log, target, { adr: id, type: 'amends' })
       requireTarget('amends', base)
       return base
     })
@@ -61,7 +61,7 @@ export function planReject(
 ): Promise<Plan> {
   return plan(fs, async (pending) => {
     const adr = writable(log, id)
-    requireStatus(adr, ['proposed'], 'Only a proposed ADR can be rejected.')
+    requireStatus(adr, ['proposed'], 'reject-needs-proposed')
     await pending.write(adr.path, (view) => setScalar(view, 'status', 'rejected'))
     await pending.write(adr.path, (view) => setScalar(view, 'decided', date(when)))
   })
@@ -71,7 +71,7 @@ export function planReject(
 export function planDeprecate(fs: FileSystem, log: DecisionLog, id: string): Promise<Plan> {
   return plan(fs, async (pending) => {
     const adr = writable(log, id)
-    requireStatus(adr, ['accepted'], 'Only an accepted ADR can be deprecated.')
+    requireStatus(adr, ['accepted'], 'deprecate-needs-accepted')
     await pending.write(adr.path, (view) => setScalar(view, 'status', 'deprecated'))
   })
 }

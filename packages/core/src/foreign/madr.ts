@@ -3,7 +3,8 @@ import type { Adr } from '../adr/adr'
 import type { Metadata, MetadataReading } from '../metadata/read'
 import { scalarText } from '../metadata/scalar'
 import type { Problem } from '../problems/problem'
-import { STATUSES, isStatus, type Status } from '../status'
+import { detailed } from '../sentences'
+import { isStatus, type Status } from '../status'
 import type { SourceView } from '../text/source'
 import { linkLine, targetOf } from './links'
 
@@ -70,8 +71,11 @@ export function readMadr(
       }
     }
     if (status.rawStatus !== undefined) {
-      const detail = `"${status.rawStatus}" is not one of ${STATUSES.join(', ')}`
-      problems = [...problems, { kind: 'invalid-metadata', adr, key: 'status', detail } as Problem]
+      const detail = detailed({ code: 'unknown-status', values: { status: status.rawStatus } })
+      problems = [
+        ...problems,
+        { kind: 'invalid-metadata', adr, key: 'status', ...detail } as Problem
+      ]
     }
   }
   return {

@@ -1,5 +1,5 @@
 import type { FileSystem } from '@adr-tool/kernel'
-import { describeProblem } from '../problems/wording'
+import { englishOf, type CoreSaid } from '../sentences'
 import { DEFAULT_LOG_PATHS, discoverLogs } from './discover'
 import type { DecisionLog } from './load'
 
@@ -11,11 +11,20 @@ import type { DecisionLog } from './load'
  */
 export async function firstLog(
   fs: FileSystem
-): Promise<{ readonly log: DecisionLog } | { readonly reason: string }> {
+): Promise<{ readonly log: DecisionLog } | { readonly reason: string; readonly said: CoreSaid }> {
   const discovery = await discoverLogs(fs)
-  const problem = discovery.problems[0]
-  if (problem)
-    return { reason: `${describeProblem(problem).replace(/\.?$/, '.')} Repair it first.` }
+  // Configuration that cannot be used is the one Problem discovery reports.
+  const problem = discovery.problems.find((one) => one.kind === 'invalid-configuration')
+  if (problem) {
+    const said: CoreSaid = {
+      code: 'configuration-first',
+      values: {
+        path: problem.path,
+        detail: problem.said ?? problem.detail
+      }
+    }
+    return { reason: englishOf(said), said }
+  }
   const location = discovery.locations[0]
   return {
     log: {

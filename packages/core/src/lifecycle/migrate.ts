@@ -1,4 +1,4 @@
-import { FOREIGN_FORMAT_NAMES, type Adr } from '../adr/adr'
+import type { Adr } from '../adr/adr'
 import type { Plan } from '../plan'
 import { parseAdrTools } from '../foreign/adr-tools'
 import { migrationOfMadr } from '../foreign/madr'
@@ -10,6 +10,7 @@ import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
 import type { TextEdit } from '@adr-tool/kernel'
 import { viewSource, type SourceView, type Span } from '../text/source'
 import { Refusal, pendingFiles, plan, type PendingFiles } from './pending'
+import { refuse, Warnings, type CoreSaid } from '../sentences'
 
 const LIST_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
 
@@ -19,22 +20,16 @@ const LIST_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
  * written is what was read: the Metadata of the ADR as the log shows it.
  */
 export function planMigration(fs: FileSystem, log: DecisionLog, id?: string): Promise<Plan> {
-  const warnings: string[] = []
+  const warnings = new Warnings()
   const planned = plan(fs, async (pending) => {
     const asked = id === undefined ? undefined : log.adrs.find((adr) => adr.id === id)
-    if (id !== undefined && !asked) throw new Refusal(`There is no ADR ${id} in this Decision Log.`)
+    if (id !== undefined && !asked) refuse({ code: 'no-adr', values: { id } })
     if (asked && !asked.metadataWritable) {
-      throw new Refusal(
-        `The frontmatter of ${asked.id} cannot be read, so nobody can tell which format it is in. Fix it first.`
-      )
+      refuse({ code: 'migrate-unreadable', values: { adr: asked.id } })
     }
-    if (asked && !asked.foreign) {
-      throw new Refusal(`${asked.id} is in the tool's own format already.`)
-    }
+    if (asked && !asked.foreign) refuse({ code: 'own-format-already', values: { adr: asked.id } })
     const foreign = asked ? [asked] : log.adrs.filter((adr) => adr.foreign)
-    if (foreign.length === 0) {
-      throw new Refusal('There is no ADR in a foreign format in this Decision Log.')
-    }
+    if (foreign.length === 0) refuse({ code: 'nothing-foreign', values: {} })
 
     // MADR names a successor on the superseded ADR only; Migration writes it into both files.
     const successors = new Map<string, Adr>()
@@ -46,11 +41,11 @@ export function planMigration(fs: FileSystem, log: DecisionLog, id?: string): Pr
 
     // An ADR and the successor it names go together, or not at all: a Back-reference without
     // the Relation behind it would be a Problem that Migration made.
-    const leftOut = new Map<string, string>()
+    const leftOut = new Map<string, CoreSaid>()
     for (const adr of foreign) {
       const reason = await whyNot(fs, adr, successors.get(adr.id), asked === undefined)
       if (reason === undefined) continue
-      if (asked) throw new Refusal(reason)
+      if (asked) refuse(reason)
       leftOut.set(adr.id, reason)
     }
     // Leaving one out leaves out the one that names it as its successor, and so on.
@@ -59,23 +54,24 @@ export function planMigration(fs: FileSystem, log: DecisionLog, id?: string): Pr
       for (const adr of foreign) {
         const successor = successors.get(adr.id)
         if (leftOut.has(adr.id) || !successor || !leftOut.has(successor.id)) continue
-        leftOut.set(adr.id, `${adr.id} waits for its successor ${successor.id}.`)
+        leftOut.set(adr.id, {
+          code: 'waits-for-successor',
+          values: { adr: adr.id, successor: successor.id }
+        })
         settled = false
       }
     }
 
     const migrated = foreign.filter((adr) => !leftOut.has(adr.id))
     if (migrated.length === 0) {
-      throw new Refusal(['Nothing can be migrated.', ...leftOut.values()].join(' '))
+      refuse({ code: 'nothing-migrated', values: { reasons: [...leftOut.values()] } })
     }
     warnings.push(...leftOut.values())
     for (const adr of migrated) await migrate(pending, log, adr, warnings)
     // The successors last: by now each of them has the frontmatter its own Migration gave it.
     for (const adr of migrated) await writeSuccessor(pending, adr, successors.get(adr.id))
   })
-  return planned.then((result) =>
-    result.ok && warnings.length > 0 ? { ...result, warnings } : result
-  )
+  return planned.then((result) => (result.ok ? { ...result, ...warnings.outcome() } : result))
 }
 
 /**
@@ -87,26 +83,31 @@ async function whyNot(
   adr: Adr,
   successor: Adr | undefined,
   wholeLog: boolean
-): Promise<string | undefined> {
-  if (adr.noMigration !== undefined) return `${adr.id} ${adr.noMigration}`
-  if (successor && !successor.metadataWritable) {
-    return `${adr.id} is superseded by ${successor.id}, whose frontmatter cannot be read. Fix that file first.`
+): Promise<CoreSaid | undefined> {
+  if (adr.noMigrationSaid !== undefined) {
+    return { code: 'no-migration', values: { adr: adr.id, why: adr.noMigrationSaid } }
   }
-  if (successor?.noMigration !== undefined) return undefined // the settling takes care of it
+  if (successor && !successor.metadataWritable) {
+    return { code: 'successor-unreadable', values: { adr: adr.id, successor: successor.id } }
+  }
+  if (successor?.noMigrationSaid !== undefined) return undefined // the settling takes care of it
   if (successor?.foreign && !wholeLog) {
-    return `${adr.id} is superseded by ${successor.id}, which is written in the format of ${FOREIGN_FORMAT_NAMES[successor.foreign]} itself. Migrate ${successor.id} first, or the whole Decision Log.`
+    return {
+      code: 'successor-foreign',
+      values: { adr: adr.id, successor: successor.id, format: successor.foreign }
+    }
   }
 
   // Try it on its own first: a file the writer cannot write is named, and does not take the
   // Migration of all the others down with it.
   try {
     const trial = pendingFiles(fs)
-    await migrate(trial, undefined, adr, [])
+    await migrate(trial, undefined, adr, new Warnings())
     await writeSuccessor(trial, adr, successor)
     return undefined
   } catch (error) {
     if (error instanceof Refusal || error instanceof MetadataNotWritableError) {
-      return `${adr.id} cannot be migrated: ${error.message}`
+      return { code: 'cannot-migrate', values: { adr: adr.id, why: error.said ?? error.message } }
     }
     throw error
   }
@@ -126,17 +127,15 @@ async function migrate(
   pending: PendingFiles,
   log: DecisionLog | undefined,
   adr: Adr,
-  warnings: string[]
+  warnings: Warnings
 ): Promise<void> {
   const { metadata } = adr
   if (adr.foreign === 'adr-tools') {
     await pending.write(adr.path, (view) => {
       const file = parseAdrTools(view)
-      if (!file) throw new Refusal(`${adr.id} changed on disk. Look at it again.`)
+      if (!file) refuse({ code: 'changed-on-disk', values: { adr: adr.id } })
       if (file.keeps.length > 0) {
-        warnings.push(
-          `The Status section of ${adr.id} stays in its text: the Metadata does not hold ${quoted(file.keeps)}.`
-        )
+        warnings.push({ code: 'status-section-stays', values: { adr: adr.id, keeps: file.keeps } })
         return [emptyFrontmatter(view, view.bodyStart)]
       }
       const removed = withoutSection(view, file.section)
@@ -168,9 +167,7 @@ async function migrate(
   }
   for (const written of metadata.backReferences['superseded-by']) {
     if (adr.foreign !== 'adr-tools' && log && !log.adrs.some((other) => other.id === written)) {
-      warnings.push(
-        `${adr.id} names "${written}" as its successor, which is no ADR of this Decision Log. It is written as it is, and stays a Problem.`
-      )
+      warnings.push({ code: 'successor-not-in-log', values: { adr: adr.id, successor: written } })
     }
   }
 }
@@ -179,7 +176,7 @@ async function migrate(
  * MADR 2 and log4brains: the items of the list under the title that the Metadata holds go,
  * and so does the Links section when it holds nothing else; then the Metadata is written.
  */
-async function migrateListed(pending: PendingFiles, adr: Adr, warnings: string[]): Promise<void> {
+async function migrateListed(pending: PendingFiles, adr: Adr, warnings: Warnings): Promise<void> {
   const { metadata } = adr
   let renamesDeciders = false
   // What the items say that were read, to be written where they were not written before.
@@ -187,15 +184,16 @@ async function migrateListed(pending: PendingFiles, adr: Adr, warnings: string[]
   let tags: readonly string[] | undefined
   await pending.write(adr.path, (view) => {
     const file = parseMadrList(view)
-    if (!file) throw new Refusal(`${adr.id} changed on disk. Look at it again.`)
+    if (!file) refuse({ code: 'changed-on-disk', values: { adr: adr.id } })
     const read = readOf(view, file, () => undefined)
     renamesDeciders = read.renamesDeciders
     if (file.deciders && read.read.includes(file.deciders)) deciders = file.deciders.value
     if (file.tags && read.read.includes(file.tags)) tags = read.tags
     if (file.status && read.rawStatus !== undefined) {
-      warnings.push(
-        `The Status of ${adr.id} stays in the list under its title: the tool does not know "${read.rawStatus}".`
-      )
+      warnings.push({
+        code: 'listed-status-stays',
+        values: { adr: adr.id, status: read.rawStatus }
+      })
     }
     for (const [name, item] of [
       ['Status', file.status],
@@ -203,9 +201,7 @@ async function migrateListed(pending: PendingFiles, adr: Adr, warnings: string[]
       ['Tags', file.tags]
     ] as const) {
       if (item?.repeated) {
-        warnings.push(
-          `The list under the title of ${adr.id} says ${name} twice: both items stay in its text.`
-        )
+        warnings.push({ code: 'listed-twice', values: { adr: adr.id, item: name } })
       }
     }
     const going = read.read.filter((item) => !item.continued && !item.repeated)
@@ -214,9 +210,10 @@ async function migrateListed(pending: PendingFiles, adr: Adr, warnings: string[]
     if (file.links && file.links.keeps.length === 0) {
       spans.push(file.links.section)
     } else if (file.links) {
-      warnings.push(
-        `The Links section of ${adr.id} stays in its text: the Metadata does not hold ${quoted(file.links.keeps)}.`
-      )
+      warnings.push({
+        code: 'links-section-stays',
+        values: { adr: adr.id, keeps: file.links.keeps }
+      })
     }
     const edits = deletions(view, spans)
     if (!view.frontmatter) {
@@ -241,9 +238,6 @@ async function migrateListed(pending: PendingFiles, adr: Adr, warnings: string[]
     await pending.write(adr.path, (view) => addToList(view, 'tags', tagged))
   }
 }
-
-/** What keeps a section in the text, in a sentence: `"Proposed", "Clarifies […](…)"`. */
-const quoted = (what: readonly string[]): string => what.map((one) => `"${one}"`).join(', ')
 
 /**
  * The two fence lines of a frontmatter that has no key yet, and a blank line between it and

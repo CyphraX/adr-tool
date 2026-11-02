@@ -30,7 +30,12 @@ describe('Relations across repositories (docs/file-format.md, section 3)', () =>
     expect(outsideTo('payments', 'docs/adr', '0003-ledger')).toBe('payments:docs/adr/0003-ledger')
     expect(outsideTo('payments', '', '0001-x')).toBe('payments:./0001-x')
     // An ID of this repository, or of another log of it, is none.
-    for (const reference of ['0003-ledger', 'docs/adr/0003-ledger', ':docs/adr/0001-x', '-x:0001-y']) {
+    for (const reference of [
+      '0003-ledger',
+      'docs/adr/0003-ledger',
+      ':docs/adr/0001-x',
+      '-x:0001-y'
+    ]) {
       expect(outsideReference(reference)).toBeUndefined()
     }
   })

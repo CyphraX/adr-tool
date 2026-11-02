@@ -7,6 +7,7 @@ import type {
   RelationType,
   Repair,
   Repository,
+  Said,
   Templates
 } from '@adr-tool/core'
 import type { Language as WindowLanguage } from './language'
@@ -97,6 +98,11 @@ export interface PlannedChange {
   readonly changeSet: ChangeSet
   /** What the person should look at before confirming. */
   readonly warnings: readonly string[]
+  /**
+   * The warnings as codes, where the module that warns has one: `warned[i]` is `warnings[i]`.
+   * What the main process adds of its own comes after them, without a code.
+   */
+  readonly warned?: readonly Said[]
   /** The ID of the ADR the change creates. */
   readonly createdId?: string
   /** The new ID of the ADR the change renumbers. */
@@ -386,7 +392,8 @@ export type CommitResult =
 
 export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
-  | { readonly ok: false; readonly reason: string }
+  /** `said`: the reason as a code, where `core` or `structure` gave it one. */
+  | { readonly ok: false; readonly reason: string; readonly said?: Said }
 
 /** An export that was written: where it is, to open, and how many ADRs it holds. */
 export type ExportResult =

@@ -1,12 +1,17 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 import type { Pair, Scalar, YAMLMap, YAMLSeq } from 'yaml'
 import { Refusal, type TextEdit } from '@adr-tool/kernel'
+import { englishOf, type CoreSaid } from '../sentences'
 import type { SourceView } from '../text/source'
 import { METADATA_KEYS, type MetadataKey } from './keys'
 import { scalarText } from './scalar'
 
 /** The file's Metadata is in a state the tool must not write into; a person has to fix it first. */
-export class MetadataNotWritableError extends Refusal {}
+export class MetadataNotWritableError extends Refusal {
+  constructor(said: CoreSaid) {
+    super(englishOf(said), said)
+  }
+}
 
 /**
  * Set a scalar Metadata key. Returns the edits; nothing outside them changes.
@@ -20,7 +25,7 @@ export function setScalar(view: SourceView, key: MetadataKey, value: string): Te
   const node = pair.value
   if (node === null || scalarText(node) === undefined) {
     if (node !== null && !isScalar(node)) {
-      throw new MetadataNotWritableError(`"${key}" is not a single value`)
+      throw new MetadataNotWritableError({ code: 'not-single-value', values: { key } })
     }
     return [fillEmptyValue(view, fm, pair, formatScalar(value))]
   }
@@ -35,9 +40,7 @@ export function setScalar(view: SourceView, key: MetadataKey, value: string): Te
  */
 function requireInline(key: string, node: Scalar): void {
   if (node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED') {
-    throw new MetadataNotWritableError(
-      `"${key}" is written as a block of several lines, which the tool cannot change where it stands. Write it on one line in an editor.`
-    )
+    throw new MetadataNotWritableError({ code: 'block-scalar', values: { key } })
   }
 }
 
@@ -54,7 +57,7 @@ export function addToList(
   const pair = fm.find(key)
   const node = pair?.value ?? null
   if (node !== null && !isScalar(node) && !isSeq(node)) {
-    throw new MetadataNotWritableError(`"${key}" is not a list`)
+    throw new MetadataNotWritableError({ code: 'not-a-list', values: { key } })
   }
 
   const there = isSeq(node)
@@ -90,7 +93,7 @@ export function addToList(
     return [{ start: end, end, insert: formatted.map((one) => `, ${one}`).join('') }]
   }
 
-  if (!last) throw new MetadataNotWritableError(`"${key}" is an empty block list`)
+  if (!last) throw new MetadataNotWritableError({ code: 'empty-block-list', values: { key } })
   const dash = view.text.lastIndexOf('-', fm.abs(last.range![0]))
   const indent = view.text.slice(lineStart(view.text, dash), dash)
   const at = fm.abs(last.range![2])
@@ -109,16 +112,14 @@ export function removeFromList(view: SourceView, key: MetadataKey, item: string)
   const node = pair?.value ?? null
   if (!pair || node === null) return []
   if (isScalar(node)) return scalarText(node) === item ? removeKey(view, key) : []
-  if (!isSeq(node)) throw new MetadataNotWritableError(`"${key}" is not a list`)
+  if (!isSeq(node)) throw new MetadataNotWritableError({ code: 'not-a-list', values: { key } })
 
   const items = node.items as (Scalar | YAMLMap | YAMLSeq)[]
   const leaves = (existing: Scalar | YAMLMap | YAMLSeq): boolean => scalarText(existing) === item
   if (!items.some(leaves)) return []
   if (items.every(leaves)) return removeKey(view, key)
 
-  const byHand = new MetadataNotWritableError(
-    `"${key}" is written in a way the tool cannot take an item out of. Remove "${item}" in an editor.`
-  )
+  const byHand = new MetadataNotWritableError({ code: 'item-by-hand', values: { key, item } })
   const span = (
     existing: Scalar | YAMLMap | YAMLSeq
   ): [start: number, end: number, next: number] => {
@@ -173,7 +174,7 @@ export function replaceInList(
   const node = fm.find(key)?.value ?? null
   if (node === null) return []
   const items = isScalar(node) ? [node] : isSeq(node) ? (node.items as unknown[]) : undefined
-  if (!items) throw new MetadataNotWritableError(`"${key}" is not a list`)
+  if (!items) throw new MetadataNotWritableError({ code: 'not-a-list', values: { key } })
   if (items.some((existing) => scalarText(existing) === replacement)) {
     return removeFromList(view, key, item)
   }
@@ -232,14 +233,18 @@ export function appendCorrection(view: SourceView, entry: CorrectionEntry): Text
   if (node === null || (isScalar(node) && scalarText(node) === undefined)) {
     return [...removeKey(view, 'corrections'), fm.insertKey('corrections', '', asBlock('  '))]
   }
-  if (!isSeq(node)) throw new MetadataNotWritableError('"corrections" is not a list')
+  if (!isSeq(node)) {
+    throw new MetadataNotWritableError({ code: 'not-a-list', values: { key: 'corrections' } })
+  }
 
   const last = node.items.at(-1) as Scalar | YAMLMap | undefined
   if (node.flow) {
     const at = last ? fm.abs(last.range![1]) : fm.abs(node.range![0]) + 1
     return [{ start: at, end: at, insert: `${last ? ', ' : ''}{${fields.join(', ')}}` }]
   }
-  if (!last) throw new MetadataNotWritableError('"corrections" is an empty block list')
+  if (!last) {
+    throw new MetadataNotWritableError({ code: 'empty-block-list', values: { key: 'corrections' } })
+  }
 
   const dash = view.text.lastIndexOf('-', fm.abs(last.range![0]))
   const indent = view.text.slice(lineStart(view.text, dash), dash)
@@ -264,7 +269,7 @@ export function appendCorrection(view: SourceView, entry: CorrectionEntry): Text
  */
 export function renameKey(view: SourceView, from: string, to: MetadataKey): TextEdit[] {
   const fm = readFrontmatter(view)
-  if (fm.find(to)) throw new MetadataNotWritableError(`"${to}" is there already`)
+  if (fm.find(to)) throw new MetadataNotWritableError({ code: 'key-taken', values: { key: to } })
   const pair = fm.find(from)
   if (!pair) return []
   return [{ start: fm.abs(pair.key.range![0]), end: fm.abs(pair.key.range![1]), insert: to }]
@@ -303,7 +308,7 @@ function keyLines(
 
 function readFrontmatter(view: SourceView): Frontmatter {
   if (view.unterminatedFrontmatter) {
-    throw new MetadataNotWritableError('The frontmatter is never closed')
+    throw new MetadataNotWritableError({ code: 'frontmatter-never-closed', values: {} })
   }
   const { text, eol } = view
 
@@ -324,12 +329,13 @@ function readFrontmatter(view: SourceView): Frontmatter {
   const span = view.frontmatter
   const doc = parseDocument(text.slice(span.start, span.end))
   if (doc.errors.length > 0) {
-    throw new MetadataNotWritableError(
-      `The frontmatter is not valid YAML: ${doc.errors[0]!.message}`
-    )
+    throw new MetadataNotWritableError({
+      code: 'frontmatter-not-yaml',
+      values: { message: doc.errors[0]!.message }
+    })
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    throw new MetadataNotWritableError('The frontmatter is not a mapping')
+    throw new MetadataNotWritableError({ code: 'frontmatter-not-mapping', values: {} })
   }
   const pairs = ((doc.contents?.items ?? []) as KeyedPair[]).filter((pair) => isScalar(pair.key))
   const abs = (offset: number): number => span.start + offset

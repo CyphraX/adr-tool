@@ -78,7 +78,10 @@ describe('discoverLogs', () => {
       '.adr/config.yml': 'name: payments\nlogs:\n  - path: docs/adr\n'
     })
     expect((await discoverLogs(named)).name).toBe('payments')
-    const nameOnly = memoryFileSystem({ '.adr/config.yml': 'name: shop.web\n', 'docs/adr/0001-a.md': ADR })
+    const nameOnly = memoryFileSystem({
+      '.adr/config.yml': 'name: shop.web\n',
+      'docs/adr/0001-a.md': ADR
+    })
     expect(await discoverLogs(nameOnly)).toEqual({
       by: 'default',
       locations: [{ path: 'docs/adr' }],

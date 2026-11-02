@@ -1,7 +1,8 @@
 import { isCalendarDate, type Metadata, type MetadataReading } from '../metadata/read'
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import type { RelationType } from '../relation'
-import { STATUSES, isStatus, type Status } from '../status'
+import { detailed } from '../sentences'
+import { isStatus, type Status } from '../status'
 import { headingOf, proseLinesIn, type ProseLine } from '../text/prose'
 import type { SourceView, Span } from '../text/source'
 import { linkLine, namesAdr, targetOf } from './links'
@@ -135,8 +136,8 @@ export function readAdrTools(
 
   const problems: Problem[] = []
   if (file.rawStatus !== undefined) {
-    const detail = `"${file.rawStatus}" is not one of ${STATUSES.join(', ')}`
-    problems.push({ kind: 'invalid-metadata', adr, key: 'status', detail })
+    const detail = detailed({ code: 'unknown-status', values: { status: file.rawStatus } })
+    problems.push({ kind: 'invalid-metadata', adr, key: 'status', ...detail })
   }
   return {
     metadata: {

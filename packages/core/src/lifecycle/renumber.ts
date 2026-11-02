@@ -8,7 +8,8 @@ import { replaceInList } from '../metadata/write'
 import { BACK_REFERENCE_KEYS, RELATION_TYPES } from '../relation'
 import { normalReference, qualified } from '../relations/reference'
 import { titleOf } from '../text/title'
-import { Refusal, plan } from './pending'
+import { plan } from './pending'
+import { refuse, Warnings } from '../sentences'
 import { requireOwnFormat } from './rules'
 
 /** Every Metadata key whose items are IDs of other ADRs. */
@@ -51,24 +52,20 @@ function mentions(text: string | undefined, reference: string): boolean {
  */
 export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Promise<Plan> {
   let renamed: { from: string; to: string } | undefined
-  const warnings: string[] = []
+  const warnings = new Warnings()
 
   const planned = plan(fs, async (pending) => {
     const adr = log.adrs.find((candidate) => candidate.id === id)
-    if (!adr) throw new Refusal(`There is no ADR ${id} in this Decision Log.`)
+    if (!adr) refuse({ code: 'no-adr', values: { id } })
     if (log.naming !== 'sequential' || adr.number === undefined) {
-      throw new Refusal('Only an ADR of a sequential Decision Log has a number.')
+      refuse({ code: 'renumber-needs-sequential', values: {} })
     }
     if (!log.adrs.some((other) => other.id !== id && other.number === adr.number)) {
-      throw new Refusal(
-        `Renumber is for an ADR that shares its number with another one. ${id} has its number to itself, and its ID stays as it is.`
-      )
+      refuse({ code: 'number-not-shared', values: { adr: id } })
     }
     const own = naming(adr, log.path, id)
     if (own.length > 0) {
-      throw new Refusal(
-        `${id} names itself in ${own[0]!.key}. Remove that before it is renumbered.`
-      )
+      refuse({ code: 'names-itself', values: { adr: id, key: own[0]!.key } })
     }
 
     const digits = /^\d+/.exec(id)![0]
@@ -80,9 +77,7 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
       if (!other.metadataWritable) {
         // Nobody can tell what this file says about the old ID, so nothing may be left behind in it.
         if (mentions(await fs.readText(other.path), id)) {
-          throw new Refusal(
-            `The frontmatter of ${other.id} cannot be read, and the file mentions ${id}. Fix it before ${id} is renumbered.`
-          )
+          refuse({ code: 'unreadable-mentions', values: { adr: other.id, mentioned: id, id } })
         }
         continue
       }
@@ -90,15 +85,18 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
       // MADR 4 names an ADR by its number: the one that is about to be free, or to be taken.
       for (const number of [adr.number, Number(/^\d+/.exec(to)![0])]) {
         if (namesNumber(other, number)) {
-          requireOwnFormat(
-            other,
-            ` It names its successor by the number ${number}, which would mean another ADR afterwards. Migrate it first.`
-          )
+          requireOwnFormat(other, (foreign) => ({
+            code: 'foreign-format-names-number',
+            values: { ...foreign, number }
+          }))
         }
       }
       const items = naming(other, log.path, id)
       if (other.foreign && (items.length > 0 || mentions(await fs.readText(other.path), id))) {
-        requireOwnFormat(other, ` It mentions ${id}: migrate it first, or renumber the other ADR.`)
+        requireOwnFormat(other, (foreign) => ({
+          code: 'foreign-format-mentions',
+          values: { ...foreign, id }
+        }))
       }
       for (const { key, written } of items) {
         await pending.write(other.path, (view) =>
@@ -113,14 +111,18 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
       const items = naming(guest, guest.log, before)
       if (!guest.metadataWritable) {
         if (mentions(await fs.readText(guest.path), before)) {
-          throw new Refusal(
-            `The frontmatter of ${guest.reference} cannot be read, and the file mentions ${before}. Fix it before ${id} is renumbered.`
-          )
+          refuse({
+            code: 'unreadable-mentions',
+            values: { adr: guest.reference, mentioned: before, id }
+          })
         }
         continue
       }
       if (guest.foreign && items.length > 0) {
-        requireOwnFormat(guest, ` It mentions ${before}: migrate it first.`)
+        requireOwnFormat(guest, (foreign) => ({
+          code: 'foreign-format-mentions-elsewhere',
+          values: { ...foreign, reference: before }
+        }))
       }
       for (const { key, written } of items) {
         await pending.write(guest.path, (view) =>
@@ -130,17 +132,17 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
     }
 
     if (titleOf(adr.body) !== titleOf(adr.body, adr.number)) {
-      warnings.push(
-        `The heading of ${id} carries the number ${adr.number}. It stays as it is, and is shown as part of the title from now on.`
-      )
+      warnings.push({ code: 'heading-carries-number', values: { adr: id, number: adr.number! } })
     }
     for (const candidate of log.adrs) {
-      if (candidate.body.includes(id)) warnings.push(`${candidate.id} mentions ${id} in its text.`)
+      if (candidate.body.includes(id)) {
+        warnings.push({ code: 'mentioned-in-text', values: { adr: candidate.id, id } })
+      }
     }
     renamed = { from: id, to }
   })
 
   return planned.then((result) =>
-    result.ok && renamed ? { ...result, renamed, ...(warnings.length > 0 && { warnings }) } : result
+    result.ok && renamed ? { ...result, renamed, ...warnings.outcome() } : result
   )
 }

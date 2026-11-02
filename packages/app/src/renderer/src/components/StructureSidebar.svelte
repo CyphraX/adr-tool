@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { hasRepair, wordingOf } from '@adr-tool/structure/model'
+  import { hasRepair } from '@adr-tool/structure/model'
+  import { wordStructureProblem } from '../lib/said'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import { codeSpans } from '../lib/wording'
@@ -78,7 +79,7 @@
         <ul class="findings">
           {#each [...view.problems, ...view.hints] as problem, position (position)}
             <li class:problem={view.origin === 'declared'}>
-              <span>{@render withCode(wordingOf(problem))}</span>
+              <span>{@render withCode(wordStructureProblem(problem))}</span>
               {#if view.origin === 'declared' && hasRepair(problem)}
                 <button onclick={() => app.repairStructure(problem)}>{t.structure.repair}</button>
               {/if}

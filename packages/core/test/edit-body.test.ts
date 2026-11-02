@@ -105,7 +105,9 @@ describe('an edit that started from something else than what is on disk', () => 
   it('is refused, so that nobody overwrites what they have not seen', async () => {
     const { fs, log, adr } = await repository(PROPOSED)
     await fs.writeText('docs/adr/0001-a.md', PROPOSED.replace('Three.', 'Three, edited elsewhere.'))
-    expect(await planEditBody(fs, log, adr.id, { base: adr.body, body: 'Mine\n', today })).toEqual({
+    expect(
+      await planEditBody(fs, log, adr.id, { base: adr.body, body: 'Mine\n', today })
+    ).toMatchObject({
       ok: false,
       reason: '0001-a changed on disk after this edit began.'
     })

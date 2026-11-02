@@ -3,6 +3,7 @@ import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import { scalarText } from '../metadata/scalar'
 import type { Problem } from '../problems/problem'
 import { REPOSITORY_NAME } from '../relations/reference'
+import { detailed, type CoreSaid } from '../sentences'
 import type { NamingScheme } from './naming'
 
 export const CONFIG_PATH = '.adr/config.yml'
@@ -48,8 +49,11 @@ async function discoverElsewhere(fs: FileSystem): Promise<Discovery> {
   if (adrDir !== undefined) {
     const path = normalizePath(adrDir.split(/\r?\n/)[0] ?? '')
     if (path === undefined) {
-      const detail = 'The directory must be a relative path inside the repository'
-      const problem: Problem = { kind: 'invalid-configuration', path: ADR_DIR_PATH, detail }
+      const problem: Problem = {
+        kind: 'invalid-configuration',
+        path: ADR_DIR_PATH,
+        ...detailed({ code: 'adr-dir-outside', values: {} })
+      }
       return { by: 'adr-dir', locations: [], problems: [problem] }
     }
     return { by: 'adr-dir', locations: [{ path }], problems: [] }
@@ -63,39 +67,46 @@ async function discoverElsewhere(fs: FileSystem): Promise<Discovery> {
 }
 
 function readConfig(text: string): Pick<Discovery, 'locations' | 'problems' | 'name'> {
-  const invalid = (detail: string): Pick<Discovery, 'locations' | 'problems'> => ({
+  const invalid = (said: CoreSaid): Pick<Discovery, 'locations' | 'problems'> => ({
     locations: [],
-    problems: [{ kind: 'invalid-configuration', path: CONFIG_PATH, detail }]
+    problems: [{ kind: 'invalid-configuration', path: CONFIG_PATH, ...detailed(said) }]
   })
 
   const doc = parseDocument(text)
-  if (doc.errors.length > 0) return invalid(doc.errors[0]!.message.split('\n')[0]!)
+  if (doc.errors.length > 0) {
+    return invalid({
+      code: 'yaml-error',
+      values: { message: doc.errors[0]!.message.split('\n')[0]! }
+    })
+  }
   if (doc.contents === null) return { locations: [], problems: [] }
-  if (!isMap(doc.contents)) return invalid('Expected a mapping')
+  if (!isMap(doc.contents)) return invalid({ code: 'expected-mapping', values: {} })
 
   const named = doc.contents.get('name', true)
   const name = scalarText(named)
-  if (named !== undefined && named !== null && (name === undefined || !REPOSITORY_NAME.test(name))) {
-    return invalid(
-      '"name" must be made of letters, digits, ".", "_" and "-", and start with a letter or a digit'
-    )
+  if (
+    named !== undefined &&
+    named !== null &&
+    (name === undefined || !REPOSITORY_NAME.test(name))
+  ) {
+    return invalid({ code: 'repository-name', values: {} })
   }
   const withName = name === undefined ? {} : { name }
 
   const logs = doc.contents.get('logs', true)
   if (logs === undefined || logs === null) return { locations: [], problems: [], ...withName }
-  if (!isSeq(logs)) return invalid('"logs" must be a list')
+  if (!isSeq(logs)) return invalid({ code: 'logs-not-a-list', values: {} })
 
   const locations: LogLocation[] = []
   for (const entry of logs.items) {
     const written = isMap(entry) ? scalarText(entry.get('path', true)) : undefined
     const path = written === undefined ? undefined : normalizePath(written)
     if (!isMap(entry) || path === undefined) {
-      return invalid('Every log needs a "path" that is relative and inside the repository')
+      return invalid({ code: 'log-needs-path', values: {} })
     }
     const naming = scalarText(entry.get('naming', true))
     if (naming !== undefined && naming !== 'sequential' && naming !== 'date') {
-      return invalid(`"naming" must be sequential or date, not "${naming}"`)
+      return invalid({ code: 'naming-unknown', values: { naming } })
     }
     // A directory listed twice is one Decision Log; the first entry for it counts.
     if (locations.some((location) => location.path === path)) continue

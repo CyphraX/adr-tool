@@ -6,6 +6,7 @@ import type { FileSystem } from '@adr-tool/kernel'
 import { extractorOf, type Extract, type Extraction } from './extraction'
 import type { JavaOutline } from './java/outline'
 import { resolveJava } from './java/resolve'
+import type { StructureSaid } from './sentences'
 import type { SourceFile } from './source-files'
 import { prepareResolver } from './typescript/resolution'
 
@@ -41,6 +42,8 @@ export interface NotAnalysed {
   readonly file: string
   readonly line?: number
   readonly message?: string
+  /** `message` as a code, for a window in another language: where the suite says it. */
+  readonly said?: StructureSaid
 }
 
 export interface Dependencies {
@@ -117,7 +120,8 @@ export async function analyseDependencies(
       continue
     }
     if (!extraction.analysed) {
-      notAnalysed.push({ file: path, line: extraction.line, message: extraction.message })
+      const { line, message, said } = extraction
+      notAnalysed.push({ file: path, line, message, ...(said && { said }) })
       continue
     }
     if ('java' in extraction) {
