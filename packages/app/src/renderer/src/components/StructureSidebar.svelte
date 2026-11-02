@@ -41,6 +41,9 @@
         {t.structure.libraries(view.libraries)}<br />
         <span class="faint">{t.structure.analysedIn(view.milliseconds)}</span>
       </p>
+      {#if view.javaFiles > 0}
+        <p class="about faint">{t.structure.javaLowerBound}</p>
+      {/if}
       <label class="toggle">
         <input
           type="checkbox"
@@ -106,6 +109,7 @@
 
   .about,
   .facts {
+    margin-bottom: 6px;
     padding: 0 14px;
     color: var(--ink-soft);
     line-height: 1.5;

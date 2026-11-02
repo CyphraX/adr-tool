@@ -176,6 +176,7 @@ export function viewOf(
     hints: structure.hints,
     sourceFiles: structure.sourceFiles.length,
     testFiles: structure.sourceFiles.filter((file) => file.test).length,
+    javaFiles: structure.sourceFiles.filter((file) => file.language === 'java').length,
     dependencies: dependencies.dependencies.length,
     libraries: new Set(dependencies.libraries.map((use) => use.library)).size,
     notResolvedCount: dependencies.notResolved.length,

@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
 import {
   EXTRACTION_VERSION,
   analyseDependencies,
-  extractUses,
+  extractorOf,
   openStructure,
+  prepareJava,
   type Dependencies,
   type Extraction,
+  type JavaReader,
   type Structure
 } from '@adr-tool/structure'
 import { nodeFileSystem } from './node-file-system'
@@ -33,6 +36,29 @@ export interface ExtractionCache {
   >
 }
 
+let java: Promise<JavaReader | undefined> | undefined
+
+/**
+ * The reader for Java, prepared once per thread and only for a repository that has Java. The
+ * two `.wasm` files lie next to their packages; where they lie in a packaged app is decided
+ * with distribution. Without them, Java files are not read.
+ */
+function javaReader(): Promise<JavaReader | undefined> {
+  java ??= (async () => {
+    const require = createRequire(import.meta.url)
+    try {
+      return await prepareJava({
+        runtime: await readFile(require.resolve('web-tree-sitter/web-tree-sitter.wasm')),
+        grammar: await readFile(require.resolve('tree-sitter-java/tree-sitter-java.wasm'))
+      })
+    } catch (error) {
+      console.error(error)
+      return undefined
+    }
+  })()
+  return java
+}
+
 /**
  * Read a repository, parse what changed since the cache was written, resolve everything.
  * Never writes into the repository.
@@ -46,18 +72,22 @@ export async function analyse(
   const files = await repositoryFiles(root)
   const structure = await openStructure(fs, files)
 
+  const hasJava = structure.sourceFiles.some((file) => file.language === 'java')
+  const read = extractorOf(hasJava ? await javaReader() : undefined)
+
   const previous = cache?.version === EXTRACTION_VERSION ? cache.files : {}
   const next: Record<string, { hash: string; extraction: Extraction }> = {}
   let parsed = 0
-  const extract = (path: string, text: string): Extraction => {
+  const extract = (path: string, text: string): Extraction | undefined => {
     const hash = createHash('sha256').update(text).digest('base64url')
     const known = previous[path]
     if (known?.hash === hash) {
       next[path] = known
       return known.extraction
     }
+    const extraction = read(path, text)
+    if (extraction === undefined) return undefined
     parsed++
-    const extraction = extractUses(path, text)
     next[path] = { hash, extraction }
     return extraction
   }

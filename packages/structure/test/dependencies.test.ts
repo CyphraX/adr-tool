@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem } from '@adr-tool/kernel'
-import { analyseDependencies, type Extract } from '../src/dependencies'
+import { analyseDependencies } from '../src/dependencies'
+import type { Extract } from '../src/extraction'
 import { sourceFilesAmong } from '../src/source-files'
 import { extractUses } from '../src/typescript/extract'
 
@@ -97,7 +98,7 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
     ])
   })
 
-  it('do not read Java yet: its Dependencies arrive with part 4', async () => {
+  it('do not read Java without a reader for it, which needs the WebAssembly of tree-sitter', async () => {
     const result = await analyse({ 'src/main/java/a/A.java': 'package a; import b.B;' })
     expect(result).toEqual({ dependencies: [], notResolved: [], libraries: [], notAnalysed: [] })
   })

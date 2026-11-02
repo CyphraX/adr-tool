@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { Worker } from 'node:worker_threads'
 import { describe, expect, it } from 'vitest'
-import { prepareJavaOutline } from '../src/java-outline'
+import { prepareJava } from '../../src/java/outline'
 
 const require = createRequire(import.meta.url)
 const wasm = async () => ({
@@ -51,32 +51,39 @@ enum Kind { A, B }
 @interface Audited {}
 `
 
-describe('tree-sitter-java as WebAssembly, in plain Node', async () => {
-  const outlineOf = await prepareJavaOutline(await wasm())
+describe('a Java file, read with tree-sitter-java as WebAssembly in plain Node', async () => {
+  const read = await prepareJava(await wasm())
+  const outlineOf = (text: string) => {
+    const extraction = read(text)
+    if (!extraction.analysed || !('java' in extraction)) throw new Error('not analysed')
+    return extraction.java
+  }
   const outline = outlineOf(HOSTILE)
+  const names = (list: readonly { name: string }[]) => list.map(({ name }) => name)
 
   it('reads the package, not what comments and strings say', () => {
     expect(outline.package).toBe('com.example.shop.cart')
-    expect(outline.hasErrors).toBe(false)
+    expect(outlineOf('class InTheDefaultPackage {}').package).toBe('')
   })
 
   it('reads every kind of import, with its line', () => {
     expect(outline.imports).toEqual([
-      { name: 'java.util.List', isStatic: false, onDemand: false, line: 7 },
-      { name: 'java.util', isStatic: false, onDemand: true, line: 8 },
-      { name: 'java.util.Objects.requireNonNull', isStatic: true, onDemand: false, line: 9 },
-      { name: 'org.junit.Assert', isStatic: true, onDemand: true, line: 10 },
-      { name: 'com.example.shop.pricing.Money', isStatic: false, onDemand: false, line: 11 }
+      { name: 'java.util.List', isStatic: false, onDemand: false, line: 8 },
+      { name: 'java.util', isStatic: false, onDemand: true, line: 9 },
+      { name: 'java.util.Objects.requireNonNull', isStatic: true, onDemand: false, line: 10 },
+      { name: 'org.junit.Assert', isStatic: true, onDemand: true, line: 11 },
+      { name: 'com.example.shop.pricing.Money', isStatic: false, onDemand: false, line: 12 }
     ])
   })
 
-  it('reads the top-level types of every kind, and not the nested ones', () => {
-    expect(outline.topLevelTypes).toEqual(['Cart', 'Priced', 'Line', 'Kind', 'Audited'])
+  it('reads the top-level types of every kind, and the nested ones and type parameters as local', () => {
+    expect(outline.types).toEqual(['Cart', 'Priced', 'Line', 'Kind', 'Audited'])
+    expect([...outline.local].sort()).toEqual(['Inner', 'Nested', 'T'])
   })
 
   it('reads the simple names that stand where a type stands', () => {
     // What the own-package rule of the specification needs.
-    expect(outline.typeNames).toEqual(
+    expect(names(outline.typeNames)).toEqual(
       expect.arrayContaining([
         'Item',
         'Basket',
@@ -95,29 +102,32 @@ describe('tree-sitter-java as WebAssembly, in plain Node', async () => {
         'Audited'
       ])
     )
-    expect(outline.typeNames).not.toContain('NotAType')
-    expect(outline.typeNames).not.toContain('AlsoNotAType')
-    expect(outline.typeNames).not.toContain('Javadoc')
+    expect(names(outline.typeNames)).not.toContain('NotAType')
+    expect(names(outline.typeNames)).not.toContain('AlsoNotAType')
+    expect(names(outline.typeNames)).not.toContain('Javadoc')
+    // Each name once, with the line it is first used on.
+    expect(outline.typeNames.find(({ name }) => name === 'Money')).toEqual({
+      name: 'Money',
+      line: 25
+    })
   })
 
   it('offers the qualifiers of static access as candidates, which only the symbol table can confirm', () => {
     // `Totals.sum(…)` and `Money.of(…)` use classes; `discount.rate()` uses a variable.
     // The syntax is the same, so all three are candidates and nothing more.
-    expect(outline.qualifierNames).toEqual(expect.arrayContaining(['Totals', 'Money', 'discount']))
-    expect(outline.typeNames).not.toContain('Totals')
+    expect(names(outline.qualifiers)).toEqual(
+      expect.arrayContaining(['Totals', 'Money', 'discount'])
+    )
+    expect(names(outline.typeNames)).not.toContain('Totals')
   })
 
-  it('keeps what it could read of a file with syntax errors', () => {
-    const broken = outlineOf(
-      'package a.b;\nimport a.c.D;\nclass Broken { void x( { }\nclass Next {}\n'
-    )
-    expect(broken.hasErrors).toBe(true)
-    expect(broken.package).toBe('a.b')
-    expect(broken.imports.map((entry) => entry.name)).toEqual(['a.c.D'])
+  it('does not analyse a file with syntax errors, and says where the first one is', () => {
+    const broken = read('package a.b;\nimport a.c.D;\nclass Broken { void x( { }\nclass Next {}\n')
+    expect(broken).toMatchObject({ analysed: false, line: 3 })
   })
 
   it('parses a second file with the same parser', () => {
-    expect(outlineOf('package x; class Y {}').topLevelTypes).toEqual(['Y'])
+    expect(outlineOf('package x; class Y {}').types).toEqual(['Y'])
   })
 })
 

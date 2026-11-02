@@ -228,6 +228,8 @@ export const t = {
     libraries: (count: number): string => many(count, 'One Library', `${count} Libraries`),
     analysedIn: (milliseconds: number): string =>
       `Analysed in ${(milliseconds / 1000).toFixed(1)} s`,
+    javaLowerBound:
+      'Java is read without a classpath, so its Dependencies are a lower bound: reflection, fully qualified names in code and members inherited from a type a file does not name are not seen.',
     includeTests: 'Include test files',
     notResolved: 'Not resolved',
     notAnalysed: 'Not analysed',

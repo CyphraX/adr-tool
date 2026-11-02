@@ -27,9 +27,9 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
   expect(structure.hints).toEqual([])
   expect(structure.canAdopt).toBe(true)
 
-  // The packages of the workspace are the top level. `spikes` is there as long as it exists.
+  // The packages of the workspace are the top level.
   const top = structure.components.map((component) => component.id)
-  expect(top.filter((id) => id !== 'spikes')).toEqual(['app', 'core', 'kernel', 'structure'])
+  expect(top).toEqual(['app', 'core', 'kernel', 'structure'])
   expect(structure.components.find((component) => component.id === 'core')!.paths).toEqual([
     'packages/core/**'
   ])
@@ -49,8 +49,9 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
       'kernel/text'
     ])
   )
-  // `structure` keeps most of its files directly under src, beside the adapter of a language.
+  // `structure` keeps most of its files directly under src, beside the adapters of its languages.
   expect(ids(structure.components).filter((id) => id.startsWith('structure/'))).toEqual([
+    'structure/java',
     'structure/typescript'
   ])
 

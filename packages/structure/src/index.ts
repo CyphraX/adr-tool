@@ -1,3 +1,5 @@
 export * from './model'
-export { analyseDependencies, type Extract } from './dependencies'
-export { EXTRACTION_VERSION, extractUses, type Extraction, type Use } from './typescript/extract'
+export { analyseDependencies } from './dependencies'
+export { EXTRACTION_VERSION, extractorOf, type Extract, type Extraction } from './extraction'
+export { prepareJava, type JavaOutline, type JavaReader } from './java/outline'
+export { extractUses, type Use } from './typescript/extract'

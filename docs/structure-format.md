@@ -172,16 +172,19 @@ A component named through an alias or a package (`$lib/Row.svelte`) resolves as 
 
 ### Java (part 4)
 
-Files are parsed with `tree-sitter-java`. There is no classpath and no build tool; resolution works on what the repository's own files declare.
+Files are parsed with `tree-sitter-java` ([ADR-0008](adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)). There is no classpath and no build tool; resolution works on what the repository's own files declare.
 
-- Every `.java` file contributes its package and its top-level types. Together they form one symbol table per package, across the whole repository.
+- Every `.java` file contributes its package and its top-level types. Together they form one symbol table per package, across the whole repository. Files without a package declaration form the default package, from which nothing can be imported.
+- A file **cannot be parsed** when tree-sitter finds syntax it cannot read, or has to assume something missing.
 - What counts as a use:
-  - a single-type import;
-  - an on-demand import (`import a.b.*`), for every simple type name in the file that the imported package declares;
+  - a single-type import — of a nested type as well (`import a.b.Outer.Inner`), as a use of the file that declares its outer type;
+  - an on-demand import (`import a.b.*`), for every simple type name in the file that the imported package declares; the on-demand import of a class's nested types (`import a.b.Outer.*`) is a use of that class;
   - a static import, as a use of the class it names;
   - a simple type name that the file's **own package** declares — this is how Dependencies within a package are found. A simple type name counts where it stands in the position of a type (declarations, `extends`, `implements`, generics, casts, `new`, annotations) or as the qualifier of a static access (`Foo.bar()`, `Foo.BAZ`). The syntax cannot tell that qualifier from a variable (`lines.size()`), so a qualifier counts only when it resolves to a type; a variable that carries the name of a type of its own package is counted wrongly, and knowingly.
-- Resolution order for a simple name follows the language: single-type import, own package, on-demand imports.
-- A name that two files of the repository declare in the same package (possible across Maven modules) is not resolved, and nothing is counted.
+- Resolution order for a simple name follows the language: single-type import, own package, on-demand imports. A nested type or a type parameter of the file hides a type of the same name in its package.
+- A name that two files of the repository declare in the same package (possible across Maven modules) is not resolved, and nothing is counted. So is a name that two packages imported on demand both declare, and an import of a type that a package of the repository does not declare. A qualifier that might be either of two types is not listed: it may be a variable.
+- A use is on the line of its import; a simple name of the own package on the line it is first used on.
+- The package of a Library is taken from the import up to the first segment written like a type, as Java's naming has it: `org.slf4j` for `org.slf4j.Logger`, `com.x` for `com.x.Outer.Inner`, the class's package for a static import.
 - A package spread over several Components is fine: a use across that boundary is a real Dependency.
 - Java has no type-only Dependencies.
 - **Not seen, by design:** reflection, fully qualified names written inside code, members inherited from a type the file does not name, nested types used without their outer type's import. Metrics for Java are therefore a lower bound.
