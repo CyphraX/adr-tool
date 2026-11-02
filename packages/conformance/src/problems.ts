@@ -33,7 +33,7 @@ export type ConformanceProblem = {
   | { readonly kind: 'unmatched-exception'; readonly fingerprint: Fingerprint }
   | { readonly kind: 'duplicate-exception'; readonly fingerprint: Fingerprint }
   | {
-      readonly kind: 'unknown-justification'
+      readonly kind: 'unknown-justification' | 'invalid-justification'
       readonly fingerprint: Fingerprint
       readonly adr: string
     }
@@ -60,11 +60,30 @@ export const CONFORMANCE_PROBLEM_CODES: readonly ConformanceProblemCode[] = [
   'unmatched-exception',
   'duplicate-exception',
   'unknown-justification',
+  'invalid-justification',
   'invalid-applied-pattern'
 ]
 
-/** What a Problem says, as a code: its kind, with the values of its sentence. */
-export function saidOf(problem: ConformanceProblem): ConformanceSaid {
+/**
+ * What could be better in `.arch/rules.yml` and fails nothing (docs/conformance-format.md,
+ * section 5): an Exception that accepts less than it names.
+ */
+export type ConformanceNote = {
+  readonly line: number
+  readonly kind: 'exception-can-shrink'
+  /** What the Exception names. */
+  readonly fingerprint: Fingerprint
+  /** The members of the Cycles it accepts, sorted: what it can be narrowed to. */
+  readonly members: readonly string[]
+}
+
+export type ConformanceNoteCode = ConformanceNote['kind']
+
+/** Every code a note of Conformance can have. */
+export const CONFORMANCE_NOTE_CODES: readonly ConformanceNoteCode[] = ['exception-can-shrink']
+
+/** What a Problem or a note says, as a code: its kind, with the values of its sentence. */
+export function saidOf(problem: ConformanceProblem | ConformanceNote): ConformanceSaid {
   switch (problem.kind) {
     case 'unreadable-rules':
       return { code: problem.kind, values: { path: RULES_PATH, detail: problem.detail } }
@@ -93,17 +112,23 @@ export function saidOf(problem: ConformanceProblem): ConformanceSaid {
     case 'duplicate-exception':
       return { code: problem.kind, values: { fingerprint: fingerprintText(problem.fingerprint) } }
     case 'unknown-justification':
+    case 'invalid-justification':
       return {
         code: problem.kind,
         values: { fingerprint: fingerprintText(problem.fingerprint), adr: problem.adr }
       }
     case 'invalid-applied-pattern':
       return { code: problem.kind, values: { pattern: problem.pattern, detail: problem.detail } }
+    case 'exception-can-shrink':
+      return {
+        code: problem.kind,
+        values: { fingerprint: fingerprintText(problem.fingerprint), members: problem.members }
+      }
   }
 }
 
-/** What a Problem says to a person, in English. The app and the command line say the same. */
-export function wordingOf(problem: ConformanceProblem): string {
+/** What a Problem or a note says to a person, in English. The app and the command line say the same. */
+export function wordingOf(problem: ConformanceProblem | ConformanceNote): string {
   return englishOf(saidOf(problem))
 }
 

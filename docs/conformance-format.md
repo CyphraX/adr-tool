@@ -91,6 +91,8 @@ A Source File is contained by a chain of Components, from the top-level one down
 
 So `billing` stands for everything it contains, its children included — `from: billing` is broken by a file in `billing/invoices` as well; a Rule on `features/*` sees each feature as one; and a Dependency within one Component is never one between two. Choosing the outermost Component keeps a Violation where it is when a child Component is declared later beneath one side.
 
+That holds for a side the Rule names. **Other changes of the declaration can change a fingerprint**: where a Violation names the parent itself because `g` lies in the parent's own files (`may-only-depend`, below), declaring a child over those files moves the target to the child, `a` becomes `a/core`; moving `paths` from one Component to another moves the Violations with them. The Exception that named the old fingerprint then matches no Violation any more, and says so (section 5). Rename alone rewrites the fingerprints it changes (section 7).
+
 ### `must-not-depend`
 
 ```yaml
@@ -225,7 +227,7 @@ The **fingerprint** names a Violation without line numbers, so that it stays the
 | Kind | Fingerprint | Written as |
 | ---- | ----------- | ---------- |
 | `must-not-depend`, `may-only-depend`, `layers` | the Rule, the source Component, the target Component | `rule`, `from`, `to` |
-| `no-cycles` | the Rule, and the members of the Cycle: Component IDs for `among`, the paths of Source Files for `inside`, in any order | `rule`, `cycle` |
+| `no-cycles` | the Rule, and the members of the Cycle: Component IDs for `among`, the paths of Source Files for `inside`, in any order; an Exception may name more (section 4) | `rule`, `cycle` |
 | `threshold` | the Rule, and the Component | `rule`, `component` |
 | `threshold` on a metric per function or per class (part 13) | the Rule, the Source File, and the qualified name of the function or class | `rule`, `file`, `name` |
 
@@ -276,8 +278,9 @@ exceptions:
 | `justified-by` | optional: the ADR that justifies it — a Trace from the Exception to Decisions |
 
 - An Exception **matches** the Violation whose fingerprint it names. A Violation that an Exception matches is accepted: it is listed, with its Exception, and it does not fail `adr check`.
+- **An Exception of a Cycle accepts the Cycles inside it.** `cycle: [a, b, c]` matches every Cycle of its Rule whose members are all among `a`, `b` and `c`: a Cycle that shrank while it is being untangled — `b` no longer uses `c` — or broke into smaller ones stays accepted, with a note that the Exception can be narrowed to what it accepts now (section 5); the note fails nothing. A Cycle that grew — a member the Exception does not name, `d` joined it — is not accepted: it fails, and the Exception matches no Violation any more. Where one Exception names a Cycle exactly and another names more, the exact one matches; otherwise the first in the file.
 - **`justified-by`** names an ADR as the repository names it from outside a Decision Log ([file-format.md](file-format.md), section 3): the directory of its log and its ID, joined by `/` — `docs/adr/0012-invoices-format-dates-like-the-web`, `./0001-x` for a log at the root of the repository. Where the repository has one Decision Log, its bare ID names an ADR of it too. An ADR of another repository is named `<name>:<log>/<ID>`; whether it exists is known only where that repository is open too, and it is taken as written. The Trace is recorded on the Exception alone; which Exceptions an ADR justifies is computed ([ADR-0009](adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)).
-- An Exception that matches no Violation is a Problem: the Violation is gone — the code was fixed, or the Rule changed — and the Exception goes with it. So is an Exception whose ADR does not exist (section 5).
+- An Exception that matches no Violation is a Problem: the Violation is gone — the code was fixed, or the Rule changed — or it changed, a Cycle that grew, and the Exception goes with it or is written anew. So is an Exception whose ADR does not exist, and one whose `justified-by` is a web address, which names no ADR (section 5).
 
 ## 5. Problems (part 3)
 
@@ -294,12 +297,19 @@ Conformance adds these **Problems** about `.arch/rules.yml`. Each has a code and
 | `no-component-matches` | A Component pattern with a wildcard matches no declared Component |
 | `invalid-exception` | A key of an Exception is missing, is written twice or has a value of the wrong form: no `rule`, no `reason`, a fingerprint that does not fit the kind of its Rule |
 | `exception-unknown-rule` | An Exception names a Rule that the file does not have |
-| `unmatched-exception` | An Exception matches no Violation: the Violation is gone, and so should the Exception be |
+| `unmatched-exception` | An Exception matches no Violation any more: the Violation is gone, and so should the Exception be, or it is another now — a Cycle that grew — and the Exception names it anew |
 | `duplicate-exception` | Two Exceptions name the same fingerprint. The first one matches |
 | `unknown-justification` | `justified-by` names an ADR that the repository does not have |
+| `invalid-justification` | `justified-by` is a web address (`https://…`), which names no ADR. An ADR of another repository is `<name>:<log>/<ID>`, with no `//` after the colon |
 | `invalid-applied-pattern` | An applied Pattern has no `id` or no `pattern`, has a key or a role written twice, or `roles` is not a map of Component patterns (part 5) |
 
 There is no Repair for any of them yet; the Repairs arrive with the window in part 4 — the one for an Exception that matches nothing takes its lines out. Problems of Conformance appear in the Problems of the repository beside those of the Decision Logs and of the declaration, grouped by module.
+
+Conformance also has **notes**: what could be better in the file and fails nothing. Each has a code and a sentence, at its line, as a Problem does.
+
+| Code | The note |
+| ---- | -------- |
+| `exception-can-shrink` | An Exception of a Cycle accepts Cycles of fewer members than it names (section 4): it can be narrowed to them |
 
 ## 6. Applied Patterns (part 5)
 

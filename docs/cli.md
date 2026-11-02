@@ -142,7 +142,7 @@ src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/b
 - **The code** is the ID of the Rule, which the architect chose and which stays as long as the Rule does. A Problem has its code, as in `adr lint`.
 - **The message** is the sentence of the Violation ([conformance-format.md, section 3](conformance-format.md#3-violations-and-their-fingerprint-part-3)), the import that causes it, and the reason the Rule gives, in the architect's words.
 
-A Violation that an Exception accepts is not printed; it is counted. After an empty line, the last lines count: one for the Decision Logs, as `adr lint` counts them, or `No Decision Log.`; one for the declaration when it has Problems, `1 Problem in .arch/components.yml.`; and one for the Rules:
+A Violation that an Exception accepts is not printed; it is counted. A note about `.arch/rules.yml` — an Exception of a Cycle that can be narrowed — is printed among the Problems of the file, at its line, and fails nothing. After an empty line, the last lines count: one for the Decision Logs, as `adr lint` counts them, or `No Decision Log.`; one for the declaration when it has Problems, `1 Problem in .arch/components.yml.`; and one for the Rules:
 
 | Last line | When |
 | --------- | ---- |
@@ -162,6 +162,7 @@ Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem i
 {
   "logs": ["docs/adr"],
   "problems": [],
+  "notes": [],
   "rules": [
     { "id": "billing-not-web", "kind": "must-not-depend", "why": "Billing is the domain; …", "path": ".arch/rules.yml", "line": 3 }
   ],
@@ -182,10 +183,11 @@ Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem i
 }
 ```
 
+- **`notes`** holds the notes of `.arch/rules.yml`, each with `module`, `code`, `message`, `path`, `line` and `note` as Conformance reports it; they fail nothing.
 - **`problems`** holds the Problems of every module, each with `module`: `decisions` (as `adr lint` writes them), `structure` (of `.arch/components.yml`) or `conformance` (of `.arch/rules.yml`), with `code`, `message`, `path`, `line` where there is one, and `problem` as the module reports it.
 - **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, or of the Rule when there is none; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
 
-`--format github` prints one `::error` [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message) for each line of the text format, so that a pull request shows each Violation on the line of its import, titled with the ID of the Rule, and each Problem titled with its code; the Problems of the Decision Logs are written as `adr lint` writes them. The counts come last, as lines of their own. The files are named from the directory the command runs in, as with `adr lint`:
+`--format github` prints one `::error` [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message) for each line of the text format, so that a pull request shows each Violation on the line of its import, titled with the ID of the Rule, and each Problem titled with its code — a note as a `::notice`; the Problems of the Decision Logs are written as `adr lint` writes them. The counts come last, as lines of their own. The files are named from the directory the command runs in, as with `adr lint`:
 
 ```
 ::error file=src/billing/invoice.ts,line=3,title=billing-not-web::billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
@@ -206,7 +208,8 @@ The Problems of the Decision Logs have the codes of `adr lint`, above. The other
 | Code | The Problem |
 | ---- | ----------- |
 | `unreadable-declaration`, `invalid-segment`, `duplicate-component`, `dead-pattern`, `pattern-outside-repository`, `overlapping-components`, `empty-component` | The Problems of `.arch/components.yml` ([structure-format.md, section 6](structure-format.md#6-problems-part-2)), as Structure names them (`packages/structure/src/problems.ts`) |
-| `unreadable-rules`, `rules-without-declaration`, `unknown-rule-kind`, `invalid-rule`, `duplicate-rule`, `unknown-component`, `no-component-matches`, `invalid-exception`, `exception-unknown-rule`, `unmatched-exception`, `duplicate-exception`, `unknown-justification`, `invalid-applied-pattern` | The Problems of `.arch/rules.yml` ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)) |
+| `unreadable-rules`, `rules-without-declaration`, `unknown-rule-kind`, `invalid-rule`, `duplicate-rule`, `unknown-component`, `no-component-matches`, `invalid-exception`, `exception-unknown-rule`, `unmatched-exception`, `duplicate-exception`, `unknown-justification`, `invalid-justification`, `invalid-applied-pattern` | The Problems of `.arch/rules.yml` ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)) |
+| `exception-can-shrink` | A note of `.arch/rules.yml`, which fails nothing (the same section) |
 
 A Violation is named by the ID of its Rule, and in JSON its `code` is the kind of the Rule: `must-not-depend`, `may-only-depend`, `layers`, `no-cycles`, `threshold`. The same rule for new codes holds as for `adr lint`.
 

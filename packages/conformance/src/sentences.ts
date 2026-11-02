@@ -94,13 +94,19 @@ export const SENTENCES = {
   'exception-unknown-rule': (v: { rule: string }): string =>
     `An Exception names the Rule ${v.rule}, which is not in this file.`,
   'unmatched-exception': (v: Printed): string =>
-    `The Exception ${v.fingerprint} matches no Violation: the Violation is gone. Remove the Exception.`,
+    `The Exception ${v.fingerprint} matches no Violation any more. Remove it, or name the Violation as it is now.`,
   'duplicate-exception': (v: Printed): string =>
     `There is an Exception ${v.fingerprint} already. The first one counts.`,
   'unknown-justification': (v: Printed & { adr: string }): string =>
     `The Exception ${v.fingerprint} is justified by ${v.adr}, which is not an ADR of this repository. An ADR is named by the directory of its Decision Log and its ID: docs/adr/0001-example.`,
+  'invalid-justification': (v: Printed & { adr: string }): string =>
+    `The Exception ${v.fingerprint} is justified by ${v.adr}, which is a web address, not an ADR. An ADR is named by the directory of its Decision Log and its ID: docs/adr/0001-example.`,
   'invalid-applied-pattern': (v: { pattern: string; detail: Said }): string =>
     `${v.pattern === '' ? 'An applied Pattern' : `The applied Pattern ${v.pattern}`} cannot be read: ${english(v.detail)}.`,
+
+  // A note: what could be better in the file, and fails nothing.
+  'exception-can-shrink': (v: Printed & { members: readonly string[] }): string =>
+    `The Exception ${v.fingerprint} accepts a Cycle of ${listed(v.members)} only now, and can be narrowed to ${v.members.length > LISTED_AT_MOST ? 'those' : 'them'}.`,
 
   // Why the file, a Rule, an Exception or an applied Pattern cannot be read: the rest of a sentence.
   'not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,

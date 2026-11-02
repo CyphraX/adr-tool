@@ -197,11 +197,49 @@ describe('adr check (docs/cli.md)', () => {
     )
     expect(code).toBe(1)
     expect(lines(out)).toEqual([
-      '.arch/rules.yml:15: unmatched-exception: The Exception billing-not-web: billing -> web matches no Violation: the Violation is gone. Remove the Exception.',
-      '.arch/rules.yml:20: unmatched-exception: The Exception layered: billing -> web matches no Violation: the Violation is gone. Remove the Exception.',
+      '.arch/rules.yml:15: unmatched-exception: The Exception billing-not-web: billing -> web matches no Violation any more. Remove it, or name the Violation as it is now.',
+      '.arch/rules.yml:20: unmatched-exception: The Exception layered: billing -> web matches no Violation any more. Remove it, or name the Violation as it is now.',
       '',
       'No Problems in 1 Decision Log.',
       '2 Rules hold; 2 Problems in .arch/rules.yml.'
+    ])
+  })
+
+  it('passes on a Cycle that shrank under its Exception, and notes that it can be narrowed', async () => {
+    const root = copyOf(undefined, {
+      '.arch/components.yml':
+        'components:\n  a:\n    paths: [src/a/**]\n  b:\n    paths: [src/b/**]\n  c:\n    paths: [src/c/**]\n',
+      '.arch/rules.yml': [
+        'rules:',
+        '  - id: no-cycles',
+        '    why: Cycles hurt.',
+        '    kind: no-cycles',
+        "    among: '*'",
+        'exceptions:',
+        '  - rule: no-cycles',
+        '    cycle: [a, b, c]',
+        '    reason: Legacy, being untangled.',
+        ''
+      ].join('\n'),
+      'src/a/a.ts': "import { b } from '../b/b'\n",
+      'src/b/b.ts': "import { c } from '../c/c'\nimport { a } from '../a/a'\n",
+      'src/c/c.ts': 'export const c = 1\n'
+    })
+    const note =
+      'The Exception no-cycles: a, b, c accepts a Cycle of a and b only now, and can be narrowed to them.'
+    expect(await adrIn(root, 'check')).toEqual({
+      code: 0,
+      out: `.arch/rules.yml:7: exception-can-shrink: ${note}\n\nNo Decision Log.\n1 Rule holds, but for 1 Violation accepted as an Exception.\n`,
+      err: ''
+    })
+    const github = await adrIn(root, 'check', '--format', 'github')
+    expect([github.code, lines(github.out)[0]]).toEqual([
+      0,
+      `::notice file=.arch/rules.yml,line=7,title=exception-can-shrink::${note}`
+    ])
+    const report = JSON.parse((await adrIn(root, 'check', '--format', 'json')).out)
+    expect(report.notes).toMatchObject([
+      { module: 'conformance', code: 'exception-can-shrink', line: 7 }
     ])
   })
 

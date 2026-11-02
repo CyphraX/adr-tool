@@ -27,6 +27,8 @@ interface Entry {
   /** The code of a Problem; the ID of the Rule of a Violation. */
   readonly code: string
   readonly message: string
+  /** A note fails nothing: GitHub shows it as a notice. */
+  readonly note?: true
 }
 
 /**
@@ -72,6 +74,13 @@ function entries(report: CheckReport): Entry[] {
       code: problem.kind,
       message: wordingOf(problem)
     })),
+    ...conformance.notes.map((note) => ({
+      path: RULES_PATH,
+      line: note.line,
+      code: note.kind,
+      message: wordingOf(note),
+      note: true as const
+    })),
     ...conformance.violations
       .filter((violation) => violation.exception === undefined)
       .flatMap(violationEntries)
@@ -110,7 +119,7 @@ function command(entry: Entry, checkout: string): string {
     ...(entry.line === undefined ? [] : [`line=${entry.line}`]),
     `title=${property(entry.code)}`
   ]
-  return `::error ${properties.join(',')}::${data(entry.message)}`
+  return `::${entry.note ? 'notice' : 'error'} ${properties.join(',')}::${data(entry.message)}`
 }
 
 const counted = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`
@@ -169,6 +178,14 @@ function json(report: CheckReport): object {
         problem
       }))
     ],
+    notes: conformance.notes.map((note) => ({
+      module: 'conformance',
+      code: note.kind,
+      message: wordingOf(note),
+      path: RULES_PATH,
+      line: note.line,
+      note
+    })),
     rules: conformance.rules.map(({ id, kind, why, line }) => ({
       id,
       kind,

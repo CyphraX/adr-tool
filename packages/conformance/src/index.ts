@@ -6,11 +6,14 @@
 export { matcherOf as componentMatcher, hasWildcard } from './component-patterns'
 export { fingerprintKey, fingerprintText, type Fingerprint } from './fingerprint'
 export {
+  CONFORMANCE_NOTE_CODES,
   CONFORMANCE_PROBLEM_CODES,
   RULE_KIND_NAMES,
   RULES_PATH,
   saidOf,
   wordingOf,
+  type ConformanceNote,
+  type ConformanceNoteCode,
   type ConformanceProblem,
   type ConformanceProblemCode
 } from './problems'
@@ -34,6 +37,7 @@ export { evaluate, type Model, type Violation } from './evaluate'
 export {
   adrExists,
   checkConformance,
+  justification,
   needsModel,
   openConformance,
   type CheckedViolation,

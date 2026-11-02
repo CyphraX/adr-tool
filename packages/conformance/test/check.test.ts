@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { adrExists, fingerprintText, wordingOf, type ConformanceReport } from '../src'
+import {
+  adrExists,
+  fingerprintText,
+  justification,
+  wordingOf,
+  type ConformanceReport
+} from '../src'
 import { checked, found, shop, yaml } from './repository'
 
 const problems = (report: ConformanceReport) =>
@@ -65,12 +71,13 @@ describe('the Components a Rule names', () => {
   })
 })
 
-describe('Exceptions (docs/conformance-format.md, section 4)', () => {
-  const exception = (...lines: string[]) => [
-    '  - rule: billing-not-web',
-    ...lines.map((line) => `    ${line}`)
-  ]
+/** An Exception from billing-not-web, its keys in block style. */
+const exception = (...lines: string[]) => [
+  '  - rule: billing-not-web',
+  ...lines.map((line) => `    ${line}`)
+]
 
+describe('Exceptions (docs/conformance-format.md, section 4)', () => {
   it('accept the Violation whose fingerprint they name', async () => {
     const report = await checked(
       shop,
@@ -116,7 +123,7 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
       decisions
     )
     expect(problems(report)).toEqual([
-      '8: unmatched-exception: The Exception billing-not-web: web -> billing matches no Violation: the Violation is gone. Remove the Exception.',
+      '8: unmatched-exception: The Exception billing-not-web: web -> billing matches no Violation any more. Remove it, or name the Violation as it is now.',
       '16: unknown-justification: The Exception billing-not-web: billing -> web is justified by docs/adr/0099-never-written, which is not an ADR of this repository. An ADR is named by the directory of its Decision Log and its ID: docs/adr/0001-example.',
       '17: duplicate-exception: There is an Exception billing-not-web: billing -> web already. The first one counts.'
     ])
@@ -165,6 +172,56 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
     expect(found(report)).toEqual([
       'features: features/a features/b (accepted)',
       'small: billing (accepted)'
+    ])
+  })
+
+  it('of a Cycle accept a Cycle that shrank, with a note, and not one that grew', async () => {
+    // The review's probe: a uses b, b uses a and c; c uses nothing. The Cycle is a and b.
+    const files = {
+      '.arch/components.yml':
+        'components:\n  a:\n    paths: [src/a/**]\n  b:\n    paths: [src/b/**]\n  c:\n    paths: [src/c/**]\n',
+      'src/a/a.ts': "import { b } from '../b/b'\n",
+      'src/b/b.ts': "import { c } from '../c/c'\nimport { a } from '../a/a'\n",
+      'src/c/c.ts': 'export const c = 1\n'
+    }
+    const rules = (cycle: string) =>
+      yaml(
+        'rules:',
+        "  - {id: no-cycles, why: W., kind: no-cycles, among: '*'}",
+        'exceptions:',
+        `  - {rule: no-cycles, cycle: ${cycle}, reason: Legacy, being untangled.}`
+      )
+    const shrank = await checked(files, rules('[a, b, c]'))
+    expect(shrank.problems).toEqual([])
+    expect(found(shrank)).toEqual(['no-cycles: a b (accepted)'])
+    expect(shrank.notes.map((note) => `${note.line}: ${note.kind}: ${wordingOf(note)}`)).toEqual([
+      '4: exception-can-shrink: The Exception no-cycles: a, b, c accepts a Cycle of a and b only now, and can be narrowed to them.'
+    ])
+    // Named exactly, it has nothing to say.
+    expect((await checked(files, rules('[b, a]'))).notes).toEqual([])
+
+    const grown = { ...files, 'src/c/c.ts': "import { a } from '../a/a'\n" }
+    const grew = await checked(grown, rules('[a, b]'))
+    expect(found(grew)).toEqual(['no-cycles: a b c'])
+    expect(problems(grew)).toEqual([
+      '4: unmatched-exception: The Exception no-cycles: a, b matches no Violation any more. Remove it, or name the Violation as it is now.'
+    ])
+  })
+
+  it('of a Cycle that names it exactly comes before one that names more', async () => {
+    const report = await checked(
+      shop,
+      yaml(
+        'rules:',
+        "  - {id: top, why: W., kind: no-cycles, among: 'features/*'}",
+        'exceptions:',
+        '  - {rule: top, cycle: [features/a, features/b, web], reason: Wider.}',
+        '  - {rule: top, cycle: [features/b, features/a], reason: Exact.}'
+      )
+    )
+    expect(report.violations.map((violation) => violation.exception?.reason)).toEqual(['Exact.'])
+    expect(problems(report)).toEqual([
+      '4: unmatched-exception: The Exception top: features/a, features/b, web matches no Violation any more. Remove it, or name the Violation as it is now.'
     ])
   })
 
@@ -229,7 +286,34 @@ describe('justified-by names an ADR as the repository names it from outside a lo
     expect(adrExists('0001-a', { logs: ['docs/adr'], adrs: two.adrs })).toBe(true)
     // Another repository's ADR is taken as written.
     expect(adrExists('payments:docs/adr/0003-ledger', two)).toBe(true)
+    expect(adrExists('payments:./0003-ledger', two)).toBe(true)
     expect(adrExists('payments:0003-ledger', two)).toBe(false)
+    // A web address is no repository, and no ADR.
+    expect(justification('https://example.com/adr/0001-a', two)).toBe('url')
+    expect(justification('payments:docs/adr/0003-ledger', two)).toBe('exists')
+    expect(justification('docs/adr/0099-gone', two)).toBe('missing')
+  })
+
+  it('is a Problem of its own when it is a web address', async () => {
+    const report = await checked(
+      shop,
+      yaml(
+        ...billingNotWeb,
+        'exceptions:',
+        ...exception(
+          'from: billing',
+          'to: web',
+          'reason: R.',
+          'justified-by: https://wiki.example.com/adr/12'
+        )
+      ),
+      decisions
+    )
+    expect(problems(report)).toEqual([
+      '12: invalid-justification: The Exception billing-not-web: billing -> web is justified by https://wiki.example.com/adr/12, which is a web address, not an ADR. An ADR is named by the directory of its Decision Log and its ID: docs/adr/0001-example.'
+    ])
+    // The Exception still accepts its Violation; what justifies it is to be fixed.
+    expect(found(report)).toEqual(['billing-not-web: billing -> web (accepted)'])
   })
 
   it('is not checked when the checker is not told about the Decision Logs', async () => {

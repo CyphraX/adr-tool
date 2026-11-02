@@ -3,12 +3,12 @@
  * Components its Rules name against the declaration, evaluate the Rules on Structure's model,
  * and let the Exceptions accept what they name. Reads only; never writes.
  */
-import type { FileSystem } from '@adr-tool/kernel'
+import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import { everyComponent, type Structure } from '@adr-tool/structure/model'
 import { hasWildcard, matcherOf } from './component-patterns'
 import { evaluate, type Model, type Violation } from './evaluate'
-import { fingerprintKey, type Fingerprint } from './fingerprint'
-import { RULES_PATH, type ConformanceProblem } from './problems'
+import { fingerprintKey, membersOf, type Fingerprint } from './fingerprint'
+import { RULES_PATH, type ConformanceNote, type ConformanceProblem } from './problems'
 import { readRules, type Naming, type Rule, type RulesFile, type WrittenException } from './rules'
 
 /**
@@ -37,6 +37,8 @@ export interface ConformanceReport {
   readonly violations: readonly CheckedViolation[]
   /** In the order of their lines in `.arch/rules.yml`. */
   readonly problems: readonly ConformanceProblem[]
+  /** What could be better in `.arch/rules.yml` and fails nothing, in the order of their lines. */
+  readonly notes: readonly ConformanceNote[]
 }
 
 /**
@@ -58,15 +60,19 @@ export function checkConformance(
   decisions?: Decisions
 ): ConformanceReport {
   const problems: ConformanceProblem[] = [...file.problems]
+  const notes: ConformanceNote[] = []
+  const byLine = <T extends { line: number }>(list: readonly T[]): T[] =>
+    list
+      .map((item, order) => ({ item, order }))
+      .sort((a, b) => a.item.line - b.item.line || a.order - b.order)
+      .map(({ item }) => item)
   const report = (violations: CheckedViolation[], evaluated: boolean): ConformanceReport => ({
     present: file.present,
     rules: file.rules,
     evaluated,
     violations,
-    problems: problems
-      .map((problem, order) => ({ problem, order }))
-      .sort((a, b) => a.problem.line - b.problem.line || a.order - b.order)
-      .map(({ problem }) => problem)
+    problems: byLine(problems),
+    notes: byLine(notes)
   })
 
   if (structure.origin !== 'declared') {
@@ -107,7 +113,9 @@ export function checkConformance(
   )
   const rules = new Map(file.rules.map((rule) => [rule.id, rule]))
 
+  // The Exceptions that can match, each with its fingerprint; first the Problems of the others.
   const taken = new Set<string>()
+  const matching: { exception: WrittenException; fingerprint: Fingerprint }[] = []
   for (const exception of file.exceptions) {
     const rule = rules.get(exception.rule)
     if (rule === undefined) {
@@ -140,15 +148,60 @@ export function checkConformance(
       continue
     }
     taken.add(key)
-    const index = byKey.get(key)
-    if (index === undefined) {
-      problems.push({ kind: 'unmatched-exception', fingerprint, line: exception.line })
-    } else {
-      violations[index] = { ...violations[index]!, exception }
-    }
+    matching.push({ exception, fingerprint })
     const adr = exception.justifiedBy
-    if (adr !== undefined && decisions !== undefined && !adrExists(adr.adr, decisions)) {
-      problems.push({ kind: 'unknown-justification', fingerprint, adr: adr.adr, line: adr.line })
+    if (adr !== undefined && decisions !== undefined) {
+      const found = justification(adr.adr, decisions)
+      if (found !== 'exists') {
+        problems.push({
+          kind: found === 'url' ? 'invalid-justification' : 'unknown-justification',
+          fingerprint,
+          adr: adr.adr,
+          line: adr.line
+        })
+      }
+    }
+  }
+
+  // What each Exception accepts: the Violation it names; and for a Cycle, failing that, every
+  // Cycle of its Rule whose members are all among its own (section 4) — a Cycle that shrank.
+  const accepts = new Map<WrittenException, number[]>(
+    matching.map(({ exception }) => [exception, []])
+  )
+  const accept = (index: number, exception: WrittenException): void => {
+    violations[index] = { ...violations[index]!, exception }
+    accepts.get(exception)!.push(index)
+  }
+  for (const { exception, fingerprint } of matching) {
+    const index = byKey.get(fingerprintKey(fingerprint))
+    if (index !== undefined) accept(index, exception)
+  }
+  for (const { exception, fingerprint } of matching) {
+    if (fingerprint.kind !== 'cycle') continue
+    const own = new Set(fingerprint.cycle)
+    violations.forEach((violation, index) => {
+      const found = violation.fingerprint
+      if (violation.exception !== undefined || found.kind !== 'cycle') return
+      if (found.rule === fingerprint.rule && found.cycle.every((member) => own.has(member))) {
+        accept(index, exception)
+      }
+    })
+  }
+  for (const { exception, fingerprint } of matching) {
+    const accepted = accepts.get(exception)!
+    if (accepted.length === 0) {
+      problems.push({ kind: 'unmatched-exception', fingerprint, line: exception.line })
+      continue
+    }
+    if (fingerprint.kind !== 'cycle') continue
+    const members = membersOf(
+      accepted.flatMap((index) => {
+        const found = violations[index]!.fingerprint
+        return found.kind === 'cycle' ? found.cycle : []
+      })
+    )
+    if (members.length < membersOf(fingerprint.cycle).length) {
+      notes.push({ kind: 'exception-can-shrink', fingerprint, members, line: exception.line })
     }
   }
   return report(violations, evaluating)
@@ -200,16 +253,48 @@ function fingerprintOf(exception: WrittenException, rule: Rule): Fingerprint | u
   }
 }
 
-/** The name of a repository, before the colon of a reference that leads out of this one. */
-const OUTSIDE = /^[A-Za-z0-9][A-Za-z0-9._-]*:.+\/.+$/
+/** A web address, or anything else with a scheme and `//`: no name of an ADR. */
+const URL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//
+/** What a repository is named, before the colon (docs/file-format.md, section 3). */
+const REPOSITORY_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
 /**
- * Whether `justified-by` names an ADR of the repository (docs/conformance-format.md, section 4):
- * `<log>/<ID>`, `./<ID>` for a log at the root, a bare ID where there is one Decision Log. An
- * ADR of another repository is taken as written.
+ * Whether a reference names an ADR of another repository, as `core` reads one: a name, a
+ * colon, the directory of a log as the tool writes it (`.` for the root) and an ID. A web
+ * address is none: its `//` is no directory of a log.
  */
+function outside(reference: string): boolean {
+  const colon = reference.indexOf(':')
+  if (colon <= 0 || !REPOSITORY_NAME.test(reference.slice(0, colon))) return false
+  const rest = reference.slice(colon + 1)
+  const slash = rest.lastIndexOf('/')
+  if (slash === -1) return false
+  const written = rest.slice(0, slash)
+  const id = rest.slice(slash + 1)
+  const log = written === '.' ? '' : normalizePath(written)
+  if (log === undefined || (written !== '.' && (log === '' || log !== written))) return false
+  return id !== '' && !id.includes(':') && !/\.md$/i.test(id)
+}
+
+/**
+ * What `justified-by` names (docs/conformance-format.md, section 4): an ADR of the repository
+ * — `<log>/<ID>`, `./<ID>` for a log at the root, a bare ID where there is one Decision Log —
+ * or of another one, taken as written; or nothing that exists; or a web address, which names
+ * no ADR at all.
+ */
+export function justification(
+  reference: string,
+  decisions: Decisions
+): 'exists' | 'missing' | 'url' {
+  if (URL.test(reference)) return 'url'
+  if (outside(reference)) return 'exists'
+  return adrExists(reference, decisions) ? 'exists' : 'missing'
+}
+
+/** Whether `justified-by` names an ADR of this repository, or one of another, taken as written. */
 export function adrExists(reference: string, decisions: Decisions): boolean {
-  if (OUTSIDE.test(reference)) return true
+  if (URL.test(reference)) return false
+  if (outside(reference)) return true
   const slash = reference.lastIndexOf('/')
   const id = reference.slice(slash + 1)
   const written = slash === -1 ? undefined : reference.slice(0, slash)
