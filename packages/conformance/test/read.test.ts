@@ -3,7 +3,9 @@ import { readRules, wordingOf } from '../src'
 import { yaml } from './repository'
 
 const said = (text: string) =>
-  readRules(text).problems.map((problem) => `${problem.line}: ${problem.kind}: ${wordingOf(problem)}`)
+  readRules(text).problems.map(
+    (problem) => `${problem.line}: ${problem.kind}: ${wordingOf(problem)}`
+  )
 
 describe('reading .arch/rules.yml (docs/conformance-format.md, section 1)', () => {
   it('has no Rules where the file is not there, or says nothing', () => {
@@ -210,14 +212,17 @@ describe('the Problems of the file (docs/conformance-format.md, section 5)', () 
         )
       )
     ).toEqual([
-      '2: unknown-rule-kind: The Rule a has no kind. A Rule\'s kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold.',
+      "2: unknown-rule-kind: The Rule a has no kind. A Rule's kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold.",
       '6: unknown-rule-kind: The Rule b has the kind "only-uses-library", which the suite does not know. A Rule\'s kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold.'
     ])
-    expect(readRules('rules:\n  - {id: c, why: W., kind: no-cycles, inside: x}\n').rules).toHaveLength(1)
+    expect(
+      readRules('rules:\n  - {id: c, why: W., kind: no-cycles, inside: x}\n').rules
+    ).toHaveLength(1)
   })
 
   it('names the key of a Rule that is missing or has the wrong form', () => {
-    const rule = (...lines: string[]) => said(yaml('rules:', ...lines.map((line, i) => (i === 0 ? `  - ${line}` : `    ${line}`))))
+    const rule = (...lines: string[]) =>
+      said(yaml('rules:', ...lines.map((line, i) => (i === 0 ? `  - ${line}` : `    ${line}`))))
     expect(rule('why: W.', 'kind: layers')).toEqual([
       '2: invalid-rule: A Rule cannot be checked: it has no "id".'
     ])
@@ -242,12 +247,14 @@ describe('the Problems of the file (docs/conformance-format.md, section 5)', () 
     expect(rule('id: a', 'why: W.', 'kind: no-cycles', 'among: x', 'inside: y')).toEqual([
       '2: invalid-rule: The Rule a cannot be checked: it must have either "among" or "inside".'
     ])
-    expect(rule('id: a', 'why: W.', 'kind: threshold', 'metric: complexity', 'max: 3', 'of: x')).toEqual([
+    expect(
+      rule('id: a', 'why: W.', 'kind: threshold', 'metric: complexity', 'max: 3', 'of: x')
+    ).toEqual([
       '5: invalid-rule: The Rule a cannot be checked: "complexity" is no metric the suite knows; a metric is one of files, lines, efferent-coupling, afferent-coupling, instability, fan-out, fan-in, relational-cohesion, internal-share.'
     ])
-    expect(rule('id: a', 'why: W.', 'kind: threshold', 'metric: lines', 'max: "2000"', 'of: x')).toEqual([
-      '6: invalid-rule: The Rule a cannot be checked: "max" must be a number.'
-    ])
+    expect(
+      rule('id: a', 'why: W.', 'kind: threshold', 'metric: lines', 'max: "2000"', 'of: x')
+    ).toEqual(['6: invalid-rule: The Rule a cannot be checked: "max" must be a number.'])
     expect(rule('id: a', 'why: W.', 'kind: threshold', 'metric: lines', 'of: x')).toEqual([
       '2: invalid-rule: The Rule a cannot be checked: it must have "max", "min" or both.'
     ])
@@ -264,7 +271,9 @@ describe('the Problems of the file (docs/conformance-format.md, section 5)', () 
         '  - {id: a, why: W., kind: must-not-depend, from: y, to: x}'
       )
     )
-    expect(file.rules.map((rule) => (rule.kind === 'must-not-depend' ? rule.from : []))).toEqual([['x']])
+    expect(file.rules.map((rule) => (rule.kind === 'must-not-depend' ? rule.from : []))).toEqual([
+      ['x']
+    ])
     expect(file.problems.map((problem) => `${problem.line}: ${wordingOf(problem)}`)).toEqual([
       '3: There is a Rule a already. The first one is checked, this one is not.'
     ])

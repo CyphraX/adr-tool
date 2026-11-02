@@ -32,7 +32,12 @@ describe('must-not-depend (docs/conformance-format.md, section 2)', () => {
       shop,
       rules(
         rule('no-persistence', 'kind: must-not-depend', "from: ['**']", 'to: persistence'),
-        rule('not-from-invoices', 'kind: must-not-depend', 'from: billing/invoices', 'to: [persistence]')
+        rule(
+          'not-from-invoices',
+          'kind: must-not-depend',
+          'from: billing/invoices',
+          'to: [persistence]'
+        )
       )
     )
     // `billing/invoices` stands within `billing`: the first Rule sees `billing`, the second its child.
@@ -48,7 +53,12 @@ describe('must-not-depend (docs/conformance-format.md, section 2)', () => {
       shop,
       rules(
         rule('features-apart', 'kind: must-not-depend', 'from: features/*', 'to: features/*'),
-        rule('web-and-billing-apart', 'kind: must-not-depend', 'from: [web, billing]', 'to: [web, billing]')
+        rule(
+          'web-and-billing-apart',
+          'kind: must-not-depend',
+          'from: [web, billing]',
+          'to: [web, billing]'
+        )
       )
     )
     expect(found(report)).toEqual([
@@ -115,7 +125,14 @@ describe('may-only-depend', () => {
   it('forbids what it does not allow, an Unassigned file included', async () => {
     const report = await checked(
       shop,
-      rules(rule('billing-uses-persistence', 'kind: may-only-depend', 'from: billing', 'to: [persistence]'))
+      rules(
+        rule(
+          'billing-uses-persistence',
+          'kind: may-only-depend',
+          'from: billing',
+          'to: [persistence]'
+        )
+      )
     )
     expect(found(report)).toEqual([
       'billing-uses-persistence: billing -> (unassigned)',
@@ -145,7 +162,12 @@ describe('may-only-depend', () => {
     const report = await checked(
       shop,
       rules(
-        rule('invoices-in-billing', 'kind: may-only-depend', 'from: billing/invoices', 'to: [billing, persistence]')
+        rule(
+          'invoices-in-billing',
+          'kind: may-only-depend',
+          'from: billing/invoices',
+          'to: [billing, persistence]'
+        )
       )
     )
     expect(found(report)).toEqual([])
@@ -186,7 +208,10 @@ describe('layers', () => {
   })
 
   it('lets Components of one layer use each other, and leaves those outside every layer alone', async () => {
-    const report = await checked(shop, rules(rule('two', 'kind: layers', 'layers: [[features/*], web]')))
+    const report = await checked(
+      shop,
+      rules(rule('two', 'kind: layers', 'layers: [[features/*], web]'))
+    )
     expect(found(report)).toEqual([])
   })
 })
@@ -265,7 +290,14 @@ describe('threshold', () => {
     const report = await checked(
       shop,
       rules(
-        rule('small', 'kind: threshold', 'metric: files', 'max: 3', 'of: billing', 'tests: included'),
+        rule(
+          'small',
+          'kind: threshold',
+          'metric: files',
+          'max: 3',
+          'of: billing',
+          'tests: included'
+        ),
         rule('share', 'kind: threshold', 'metric: internal-share', 'max: 0', "of: ['**']")
       )
     )

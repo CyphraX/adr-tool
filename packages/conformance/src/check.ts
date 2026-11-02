@@ -69,18 +69,6 @@ export function checkConformance(
       .map(({ problem }) => problem)
   })
 
-  const applied = new Set(file.patterns.map((pattern) => pattern.id))
-  for (const rule of file.rules) {
-    if (rule.pattern !== undefined && !applied.has(rule.pattern.id)) {
-      problems.push({
-        kind: 'unknown-applied-pattern',
-        rule: rule.id,
-        pattern: rule.pattern.id,
-        line: rule.pattern.line
-      })
-    }
-  }
-
   if (structure.origin !== 'declared') {
     if (file.written > 0) problems.push({ kind: 'rules-without-declaration', line: file.rulesLine })
     return report([], false)

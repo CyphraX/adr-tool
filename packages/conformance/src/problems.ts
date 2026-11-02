@@ -42,7 +42,6 @@ export type ConformanceProblem = {
       readonly pattern: string
       readonly detail: ConformanceSaid
     }
-  | { readonly kind: 'unknown-applied-pattern'; readonly rule: string; readonly pattern: string }
 )
 
 export type ConformanceProblemCode = ConformanceProblem['kind']
@@ -61,8 +60,7 @@ export const CONFORMANCE_PROBLEM_CODES: readonly ConformanceProblemCode[] = [
   'unmatched-exception',
   'duplicate-exception',
   'unknown-justification',
-  'invalid-applied-pattern',
-  'unknown-applied-pattern'
+  'invalid-applied-pattern'
 ]
 
 /** What a Problem says, as a code: its kind, with the values of its sentence. */
@@ -101,8 +99,6 @@ export function saidOf(problem: ConformanceProblem): ConformanceSaid {
       }
     case 'invalid-applied-pattern':
       return { code: problem.kind, values: { pattern: problem.pattern, detail: problem.detail } }
-    case 'unknown-applied-pattern':
-      return { code: problem.kind, values: { rule: problem.rule, pattern: problem.pattern } }
   }
 }
 

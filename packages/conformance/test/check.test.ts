@@ -55,14 +55,12 @@ describe('the Components a Rule names', () => {
     expect(problems(report)).toEqual([
       '2: rules-without-declaration: .arch/rules.yml has Rules, and .arch/components.yml declares no Components that can be read, so no Rule is checked. Declare the Components, or adopt the Draft, first.'
     ])
-    const unreadable = await checked({ ...draft, '.arch/components.yml': 'components: [x]\n' }, yaml(...billingNotWeb))
-    expect(unreadable.problems.map((problem) => problem.kind)).toEqual(['rules-without-declaration'])
-  })
-
-  it('a Rule says it was written by an applied Pattern that is in the file', async () => {
-    const report = await checked(shop, yaml(...billingNotWeb, '    pattern: shop-layers'))
-    expect(problems(report)).toEqual([
-      '7: unknown-applied-pattern: The Rule billing-not-web says it was written by the applied Pattern shop-layers, which is not in this file.'
+    const unreadable = await checked(
+      { ...draft, '.arch/components.yml': 'components: [x]\n' },
+      yaml(...billingNotWeb)
+    )
+    expect(unreadable.problems.map((problem) => problem.kind)).toEqual([
+      'rules-without-declaration'
     ])
   })
 })
@@ -107,7 +105,12 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
         ...billingNotWeb,
         'exceptions:',
         ...exception('from: web', 'to: billing', 'reason: Gone.'),
-        ...exception('from: billing', 'to: web', 'reason: R.', 'justified-by: docs/adr/0099-never-written'),
+        ...exception(
+          'from: billing',
+          'to: web',
+          'reason: R.',
+          'justified-by: docs/adr/0099-never-written'
+        ),
         ...exception('from: billing', 'to: web', 'reason: Twice.')
       ),
       decisions

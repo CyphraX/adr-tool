@@ -11,7 +11,7 @@ const before = yaml(
   '    why: Billing is the domain.',
   '    kind: must-not-depend',
   '    from: billing/**   # and its children',
-  "    to: ['web', \"billing-web\", web/format]",
+  '    to: [\'web\', "billing-web", web/format]',
   '  - id: layered',
   '    why: Top down.',
   '    kind: layers',
@@ -73,7 +73,7 @@ describe('Rename of a Component in .arch/rules.yml (docs/conformance-format.md, 
 
   it('keeps the quoting of a value, and renames a Component below the one renamed', () => {
     const after = applyEdits(before, renameInRules(before, 'web', 'site'))
-    expect(after).toContain("to: ['site', \"billing-web\", site/format]")
+    expect(after).toContain('to: [\'site\', "billing-web", site/format]')
     expect(after).toContain('      - site\n')
     const nested = applyEdits(before, renameInRules(before, 'billing/invoices', 'billing/bills'))
     expect(nested).toContain('of: [bill*, billing/bills]')
@@ -114,7 +114,11 @@ describe('Rename of a Component in .arch/rules.yml (docs/conformance-format.md, 
       '    from: &core billing',
       '    to: *core'
     )
-    const refused = await planRenameInRules(memoryFileSystem({ [RULES_PATH]: aliased }), 'billing', 'x')
+    const refused = await planRenameInRules(
+      memoryFileSystem({ [RULES_PATH]: aliased }),
+      'billing',
+      'x'
+    )
     expect(refused.ok === false && refused.said?.code).toBe('cannot-rename-in-rules')
   })
 })

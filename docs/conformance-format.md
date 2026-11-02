@@ -8,7 +8,7 @@ Three rules stand above everything else, as for the declaration of Components ([
 
 - **The suite never changes a byte it was not asked to change** ([ADR-0002](adr/0002-never-reserialize-markdown.md)). `.arch/rules.yml` is edited by people, by agents and — from part 4 on — by the suite alike; whatever the suite writes there, nothing else in the file moves.
 - **Rules are declarative** ([ADR-0007](adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)). A Rule says what holds; no Rule is a script, and nothing in the file is run.
-- **Violations are derived and never stored.** What enters the file is what a person decides: a Rule, an Exception, an applied Pattern.
+- **Violations are derived and never stored.** What enters the file is what a person decides: a Rule, an Exception, an applied Pattern — whose Rules are derived from it.
 
 ## 1. The file (part 3)
 
@@ -42,7 +42,7 @@ Three keys at the top, each optional:
 | ------------ | ---------------- | ---------------------------------------------------------------------- |
 | `rules`      | list of Rules    | What the code may look like (section 2).                               |
 | `exceptions` | list of Exceptions | Violations the architect has accepted (section 4).                   |
-| `patterns`   | list of applied Patterns | Which Pattern was applied to which Components (section 6, part 5). |
+| `patterns`   | list of applied Patterns | Which Pattern was applied, and which Components fill its roles (section 6, part 5). |
 
 A file without any of them, or an empty file, has no Rules. A repository without the file has no Rules: `adr check` checks its Decision Logs and its declaration, and says that there are no Rules.
 
@@ -62,7 +62,6 @@ A file without any of them, or an empty file, has no Rules. A repository without
 | `kind` | one of the kinds of section 2, required | What the Rule says. |
 | `tests` | `excluded` (default) or `included` | Whether test files count (structure-format.md, section 2, "Tests"). As in Structure's views, Cycles and metrics, they are left out unless the Rule takes them in. |
 | `type-only` | `counted` (default) or `ignored` | Whether type-only Dependencies count (structure-format.md, section 3). They count, as in Structure's metrics: a type couples code at compile time too. A Rule that is only about run time ignores them. Not for `threshold`, whose metric says what it counts. |
-| `pattern` | the `id` of an applied Pattern | The Rule was written by applying that Pattern (section 6, part 5). |
 
 `tests` and `type-only` are read for every kind that counts Dependencies: `must-not-depend`, `may-only-depend`, `layers` and `no-cycles`. `tests` is read for `threshold` too.
 
@@ -215,7 +214,7 @@ A **Violation** is one place where the code breaks a Rule. It is derived wheneve
 
 - its **Rule**, and the sentence of its `why`;
 - what it is about: its **source** and **target** Components, the **members** of its Cycle, or its **Component** and the value of its metric;
-- the **Source File Dependencies behind it** — each with its file, the file it uses, and the lines of the imports that cause it — except for a threshold;
+- the **Source File Dependencies behind it** — each a pair of Source Files, the one that uses and the one it uses, with the lines of the imports that cause it — except for a threshold;
 - its **fingerprint**.
 
 ### The fingerprint
@@ -292,13 +291,12 @@ Conformance adds these **Problems** about `.arch/rules.yml`. Each has a code and
 | `duplicate-exception` | Two Exceptions name the same fingerprint. The first one matches |
 | `unknown-justification` | `justified-by` names an ADR that the repository does not have |
 | `invalid-applied-pattern` | An applied Pattern has no `id` or no `pattern`, or `roles` is not a map of Component patterns (part 5) |
-| `unknown-applied-pattern` | A Rule's `pattern` names no applied Pattern of the file |
 
 There is no Repair for any of them yet; the Repairs arrive with the window in part 4 — the one for an Exception that matches nothing takes its lines out. Problems of Conformance appear in the Problems of the repository beside those of the Decision Logs and of the declaration, grouped by module.
 
 ## 6. Applied Patterns (part 5)
 
-A **Pattern** is a named set of Rules written in roles — layered, hexagonal, clean architecture, modular monolith. Applying one to a repository assigns Components to its roles and writes the Rules it stands for. What was applied is kept, so that the Rules can be read as what they are and the Pattern can be applied again when the assignment changes:
+A **Pattern** is a named set of Rules written in roles — layered, hexagonal, clean architecture, modular monolith. Applying one to a repository records the **applied Pattern** in `.arch/rules.yml`: which Pattern it is, and which Components fill which of its roles. That is all that is written. The Rules the Pattern stands for are derived from it whenever the file is read, listed with the written Rules and evaluated, excepted from and reported as any other, each saying which applied Pattern and which role it comes from. Assigning a Component to another role changes the Rules with it; a Rule that should say something else is written as a Rule of its own.
 
 ```yaml
 patterns:
@@ -308,23 +306,16 @@ patterns:
       domain: [billing, shipping]
       ports: [billing/ports, shipping/ports]
       adapters: [web, persistence]
-
-rules:
-  - id: shop-hexagon-domain-inward
-    why: The domain depends on nothing outside itself (hexagonal, domain).
-    pattern: shop-hexagon
-    kind: may-only-depend
-    from: [billing, shipping]
-    to: [billing/ports, shipping/ports]
 ```
 
 | Key       | Value |
 | --------- | ----- |
-| `id`      | required: a name for the application, as a Rule ID is written |
+| `id`      | required: a name for the application, written as a Rule ID is |
 | `pattern` | required: which Pattern was applied |
-| `roles`   | a map from each role to the Component patterns assigned to it |
+| `roles`   | a map from each role to the Component patterns that fill it |
 
-The Rules a Pattern writes are ordinary Rules: they are read, evaluated and excepted from as any other, and changed by hand without asking the Pattern. Their `pattern` key says which application wrote them. Part 3 reads applied Patterns as far as this section goes — their form, the Component IDs of their roles, and a Rule's `pattern` that names none of them are checked —; part 5 defines the Patterns, their roles and the Rules each one writes.
+- A derived Rule has an ID of the applied Pattern's `id`, a `/`, and the Pattern's own name for the Rule: `shop-hexagon/domain-inward`. A written Rule's ID has no `/`, so the two never meet; an Exception names a derived Rule by that ID, as any other.
+- Part 3 reads applied Patterns as far as this section goes: their form, and the Component IDs of their roles, are checked as a Rule's are (section 5). Part 5 defines the Patterns, their roles and the Rules each one stands for; until then an applied Pattern derives no Rule, and an Exception that names one of its Rules names a Rule that is not there.
 
 ## 7. What changes the file
 

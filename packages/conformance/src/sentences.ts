@@ -81,8 +81,6 @@ export const SENTENCES = {
     `The Exception ${v.fingerprint} is justified by ${v.adr}, which is not an ADR of this repository. An ADR is named by the directory of its Decision Log and its ID: docs/adr/0001-example.`,
   'invalid-applied-pattern': (v: { pattern: string; detail: Said }): string =>
     `${v.pattern === '' ? 'An applied Pattern' : `The applied Pattern ${v.pattern}`} cannot be read: ${english(v.detail)}.`,
-  'unknown-applied-pattern': (v: { rule: string; pattern: string }): string =>
-    `The Rule ${v.rule} says it was written by the applied Pattern ${v.pattern}, which is not in this file.`,
 
   // Why the file, a Rule, an Exception or an applied Pattern cannot be read: the rest of a sentence.
   'not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,

@@ -48,8 +48,6 @@ interface CommonRule {
   readonly tests: boolean
   /** `type-only: ignored`: type-only Dependencies do not count. */
   readonly ignoreTypeOnly: boolean
-  /** The applied Pattern that wrote the Rule (part 5). */
-  readonly pattern?: { readonly id: string; readonly line: number }
   /** Every Component pattern the Rule names, where it names it. */
   readonly names: readonly Naming[]
 }
@@ -285,7 +283,6 @@ function readRule(
     }
     return value as T
   }
-  const applied = text(map, 'pattern', lineOf)
   const common = {
     id,
     why,
@@ -293,7 +290,6 @@ function readRule(
     tests: choice('tests', ['excluded', 'included'] as const) === 'included',
     ignoreTypeOnly:
       kind !== 'threshold' && choice('type-only', ['counted', 'ignored'] as const) === 'ignored',
-    ...(applied !== undefined && { pattern: { id: applied, line: at('pattern') } }),
     names
   }
 
