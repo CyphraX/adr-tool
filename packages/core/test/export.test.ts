@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem, openRepository } from '../src'
 import { EXPORT_MARKER, PRINT_PAGE, exportSite, pageOf } from '../src/export'
-import { mermaidSources, slugOf } from '../src/export/markdown'
+import { accessibleNameOf, mermaidSources, slugOf } from '../src/export/markdown'
+import { DIAGRAM_STYLE, STYLE } from '../src/export/style'
 
 // docs/plan-roadmap.md, part 10
 
@@ -282,6 +283,9 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
       )
       expect(page).not.toContain('<img')
       expect(files.some((file) => file.path.endsWith('.svg'))).toBe(false)
+      // The style sheet is the one of before drawings were there: the pages are byte-identical.
+      expect(fileOf(files, 'style.css')).toBe(STYLE)
+      expect(STYLE).not.toContain('diagram')
     })
 
     it('shows a drawn block as an image beside its page, and its source a click away', async () => {
@@ -303,6 +307,20 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
       expect(page).not.toContain('<svg')
       expect(page).toContain(`content="default-src 'none'; style-src 'self'; img-src 'self'"`)
       expect(JSON.parse(marker([]).text).files).toContain('docs/adr/0001-flow.diagram-1.svg')
+      expect(fileOf(files, 'style.css')).toBe(STYLE + DIAGRAM_STYLE)
+    })
+
+    it('names a drawing by what its block says it shows, for a reader who cannot see it', () => {
+      expect(accessibleNameOf(FLOW)).toBeUndefined()
+      expect(accessibleNameOf('flowchart LR\n  accTitle: The flow of a change\n  a --> b')).toBe(
+        'The flow of a change'
+      )
+      expect(
+        accessibleNameOf(
+          'flowchart LR\n  accTitle: Writes\n  accDescr {\n    From plan\n    to disk\n  }\n  a --> b'
+        )
+      ).toBe('Writes: From plan to disk')
+      expect(accessibleNameOf('pie\n  accDescr: Two shares\n  "a": 1')).toBe('Two shares')
     })
   })
 })

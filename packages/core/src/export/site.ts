@@ -5,7 +5,7 @@ import { isQualified, outsideReference } from '../relations/reference'
 import type { RelationType } from '../relation'
 import type { Status } from '../status'
 import { isImage, renderBody, type Links } from './markdown'
-import { STYLE } from './style'
+import { DIAGRAM_STYLE, STYLE } from './style'
 
 export interface ExportOptions {
   /** The Decision Logs to export, by their directories; every log when left out. */
@@ -232,6 +232,8 @@ export function exportSite(repository: Repository, options: ExportOptions): Expo
     // An image of the repository of that very name would be written over the drawing.
     images.delete(path)
   }
+  // The rules of drawings only where there are any: without, the style sheet is as it was.
+  if (drawings.size > 0) files[0] = { path: 'style.css', text: STYLE + DIAGRAM_STYLE }
   // What the export consists of: a later export into the directory removes what it no longer has.
   const marker = (copied: readonly string[]): ExportedFile => ({
     path: EXPORT_MARKER,

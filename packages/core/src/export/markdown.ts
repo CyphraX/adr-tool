@@ -63,7 +63,7 @@ export function mermaidSourceOf(node: HtmlNode): string | undefined {
  * nothing and fetches nothing, and keeps the content security policy of the page —, with its
  * source a click away.
  */
-function drawn(node: HtmlNode, href: string): void {
+function drawn(node: HtmlNode, href: string, source: string): void {
   const pre = { ...node }
   node.tagName = 'figure'
   node.properties = { className: ['diagram'] }
@@ -71,7 +71,7 @@ function drawn(node: HtmlNode, href: string): void {
     {
       type: 'element',
       tagName: 'img',
-      properties: { src: href, alt: 'Mermaid diagram' },
+      properties: { src: href, alt: accessibleNameOf(source) ?? 'Mermaid diagram' },
       children: []
     },
     {
@@ -89,6 +89,25 @@ function drawn(node: HtmlNode, href: string): void {
       ]
     }
   ]
+}
+
+/**
+ * What a Mermaid block says it shows, for a reader who cannot see it: its `accTitle`, and its
+ * `accDescr` of one line or in braces, as Mermaid gives them to its own drawing. `undefined`
+ * when it says neither.
+ */
+export function accessibleNameOf(source: string): string | undefined {
+  const title = /^\s*accTitle\s*:\s*(.+?)\s*$/m.exec(source)?.[1]
+  const description =
+    /^\s*accDescr\s*:\s*(.+?)\s*$/m.exec(source)?.[1] ??
+    /^\s*accDescr\s*\{([^}]*)\}/m
+      .exec(source)?.[1]
+      ?.split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(' ')
+  const said = [title, description].filter(Boolean).join(': ')
+  return said === '' ? undefined : said
 }
 
 /** A heading's slug as GitHub makes it: lower case, letters, digits, `-` and `_`, spaces as `-`. */
@@ -175,7 +194,7 @@ function rehypeExport() {
       const source = mermaidSourceOf(node)
       const href = source === undefined ? undefined : links.diagram?.(source)
       if (href !== undefined) {
-        drawn(node, href)
+        drawn(node, href, source!)
         return
       }
       const properties = node.properties
