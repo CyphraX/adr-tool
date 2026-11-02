@@ -20,6 +20,7 @@
   "devDependencies": {
     "@adr-tool/core": "workspace:*",
     "@adr-tool/kernel": "workspace:*",
+    "@adr-tool/review": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@types/node": "^24.13.5",
     "typescript": "^5.9.3",
