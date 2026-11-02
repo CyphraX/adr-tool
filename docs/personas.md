@@ -27,9 +27,9 @@ Each persona says what they come with, what they want from the suite, what makes
 **Independent software architect, hired for two weeks to assess a client's system.** A Java backend of 40 Maven modules she has never seen, and a TypeScript front end.
 
 - **Comes with:** a clone of a repository she does not trust, no build environment for it, and a report due to management in ten days.
-- **Wants:** to open the repository safely without running anything from it; a structure she can map to Components quickly; to leave remarks on code that survive the client's next commits; to rate quality scenarios with evidence she can point to; a report that a manager can read.
-- **Gives up when:** the suite runs `mvn`, needs network access, loses her remarks after a rebase, or produces a report that is a dump of numbers without her judgement in it.
-- **Scenario:** opens the clone, adopts a Draft of the Maven modules, finds two cycles and a hotspot with the history analysis, annotates the code that causes them, writes an Assessment that rates six Quality Scenarios with Findings that cite the Violations, the hotspot and her Annotations, records three Risks, and exports the report as a PDF for the client.
+- **Wants:** to open the repository safely without running anything from it; a structure she can map to Components quickly; to annotate code so that her Annotations survive the client's next commits; to rate Quality Scenarios with evidence she can point to; a report that a manager can read.
+- **Gives up when:** the suite runs `mvn`, needs network access, loses her Annotations after a rebase, or produces a report that is a dump of numbers without her judgement in it.
+- **Scenario:** opens the clone, adopts a Draft of the Maven modules, finds two Cycles and a hotspot with the history analysis, annotates the code that causes them, writes an Assessment that rates six Quality Scenarios with Findings that cite the Violations, the hotspot and her Annotations, records three Risks, and exports the report as a PDF for the client.
 
 ## Priya — the reader who never installs the suite
 
@@ -53,6 +53,6 @@ Each persona says what they come with, what they want from the suite, what makes
 
 - **Lena first.** When a part has to choose, it chooses for the single architect on her own repository; teams are served through files, git and CI, never through a server.
 - **Jonas sets the bar for every message the suite prints**: a sentence, a file and a line he can open, and nothing that was already true before his change.
-- **Aylin sets the bar for safety and for Java**: nothing from the analysed repository runs, nothing needs the network, and every remark survives a rebase.
+- **Aylin sets the bar for safety and for Java**: nothing from the analysed repository runs, nothing needs the network, and every Annotation survives a rebase.
 - **Priya sets the bar for exports**: they open from disk, in any browser, without the app.
 - **The agent sets the bar for the MCP server**: every module's artefacts can be read as data, and every write is a planned change that a person can see.
