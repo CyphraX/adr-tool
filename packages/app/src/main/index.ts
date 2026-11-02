@@ -1,6 +1,7 @@
-import { app, dialog, ipcMain, protocol, shell, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, protocol, session, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
@@ -364,13 +365,46 @@ function registerIpc(): void {
 }
 
 /**
- * A page of an export as a PDF, A4, one ADR per page: loaded in a window nobody sees, which
- * runs no script and navigates nowhere — the page itself fetches nothing from elsewhere.
+ * The session the PDF of an export is printed in, in memory and of its own: it loads a file of
+ * an export being printed and nothing else — no frame, nothing from the web. A path is compared
+ * as a path, so that `C:` and `c:` are one drive.
  */
-async function printToPdf(url: string): Promise<Buffer> {
+let print: { session: Electron.Session; sites: Set<string> } | undefined
+function printSession(): { session: Electron.Session; sites: Set<string> } {
+  if (print) return print
+  const sites = new Set<string>()
+  const allowed = (url: string): boolean => {
+    let path: string
+    try {
+      path = fileURLToPath(url)
+    } catch {
+      return false
+    }
+    return [...sites].some((site) => {
+      const rest = relative(site, path)
+      return rest !== '' && !rest.startsWith('..') && !isAbsolute(rest)
+    })
+  }
+  const printing = session.fromPartition('export-print')
+  printing.webRequest.onBeforeRequest((details, callback) =>
+    callback({ cancel: details.resourceType === 'subFrame' || !allowed(details.url) })
+  )
+  print = { session: printing, sites }
+  return print
+}
+
+/**
+ * A page of an export as a PDF, A4, one ADR per page: loaded in a window nobody sees, which
+ * runs no script, navigates nowhere, has no frames, and loads nothing but the files of the
+ * export in `site` — whatever the page asked for, nothing else of the disk ends up printed.
+ */
+async function printToPdf(url: string, site: string): Promise<Buffer> {
+  const printing = printSession()
+  printing.sites.add(site)
   const window = new BrowserWindow({
     show: false,
     webPreferences: {
+      session: printing.session,
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
@@ -388,6 +422,7 @@ async function printToPdf(url: string): Promise<Buffer> {
     })
   } finally {
     window.destroy()
+    printing.sites.delete(site)
   }
 }
 

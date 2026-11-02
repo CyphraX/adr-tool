@@ -8,6 +8,9 @@
   "bin": {
     "adr": "./dist/adr.mjs"
   },
+  "exports": {
+    "./export": "./src/export.ts"
+  },
   "scripts": {
     "build": "vite build",
     "test": "vitest run",

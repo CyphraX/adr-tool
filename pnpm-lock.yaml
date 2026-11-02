@@ -51,6 +51,9 @@ importers:
         specifier: ^0.27.0
         version: 0.27.0
     devDependencies:
+      '@adr-tool/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@adr-tool/core':
         specifier: workspace:*
         version: link:../core

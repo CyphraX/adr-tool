@@ -50,7 +50,10 @@ export const t = {
     notDirectory: (path: string): string => `${path} is not a folder.`,
     notEmpty: (path: string): string =>
       `${path} is not empty, and no export was written there. Choose an empty folder, or one an earlier export wrote.`,
-    outside: (path: string): string => `${path} lies outside the folder of the export.`
+    link: (out: string, path: string): string =>
+      `${path} in ${out} is a symbolic link, and the export writes nothing through one. Remove it, or choose another folder.`,
+    inTheWay: (out: string, path: string): string =>
+      `${path} in ${out} is in the way of the export. Remove it, or choose another folder.`
   },
   branches: {
     numberTaken: (number: number, branches: readonly string[], id: string): string =>

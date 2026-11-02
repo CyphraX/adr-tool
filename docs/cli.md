@@ -125,16 +125,18 @@ node packages/cli/dist/adr.mjs export services/billing --out site --log docs/adr
 
 | File | What it is |
 | ---- | ---------- |
-| `index.html` | Every exported ADR, by Decision Log and by Status — proposed, accepted, rejected, deprecated, superseded — with its number, title and the date it was decided or created |
+| `index.html` | Every exported ADR, by Decision Log and by Status — accepted, proposed, superseded, deprecated, rejected, and an unknown Status last — with its number, title and the date it was decided or created |
 | `<log>/<ADR>.html` | One page per ADR, at the path of its file with `.html` for `.md`: its Status, Metadata, Relations and Back-references as links, its Corrections, and its text. A link to the ADR before and after it in its Decision Log |
 | `print.html` | Every ADR on one page, each starting a printed page; its links lead within the page. It prints to PDF in any browser |
 | `style.css` | The style sheet of every page, light and dark as the system is, and for print |
-| the images | Each image an ADR shows that is a file of the repository, copied byte for byte to the same path |
+| the images | Each image an ADR shows that is a file of the repository, copied byte for byte to the same path: a file with the extension of an image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.avif`, `.apng`, `.bmp`, `.ico`), none of whose directories or name begins with `.` |
 | `softarch-export.json` | The marker: which tool wrote the export, when, of which Decision Logs, and the files it wrote |
 
-The pages run no script and fetch nothing: the text of an ADR is rendered as in the app, without HTML that could run, and each page allows only its own style sheet and images. A link in an ADR to another exported ADR leads to its page, a heading included; a web link stays a web link; a link to any other file of the repository becomes its text, with the path as its title. An image from the web becomes a link to it. An image that is no file of the repository — missing, outside it, or reached through a symbolic link that leads out — or that is larger than 20 MiB is left out, and standard error says so.
+The pages run no script and fetch nothing: the text of an ADR is rendered as in the app, without HTML that could run, and each page allows only its own style sheet and images. A link in an ADR to another exported ADR leads to its page, a heading included; a web link stays a web link; a link to any other file of the repository becomes its text, with the path as its title. An image from the web becomes a link to it, and a file of the repository that is no image, or a hidden one, its alt text. An image that is no file of the repository — missing, outside it, or reached through a symbolic link that leads out — a symbolic link with the name of an image that leads to a hidden file or to one that is no image, and an image larger than 20 MiB are left out, and standard error says so.
 
 `--out` is written into only when it is not there yet, is empty, or holds an earlier export, known by its marker. An export over an earlier one writes every file again and removes the files the earlier export wrote and this one does not — the page of an ADR that is gone; a file that someone put there stays. Any other directory is refused, and nothing is written.
+
+Nothing is written or removed through a symbolic link that stands in `--out`, and nothing over a directory where the export puts a file: such a thing may come from a checkout or a share, and must not lead the export elsewhere. The export stops there and says so. A file is written as a new file, so that a hard link to it elsewhere keeps what it had. The marker is written first, naming what the export will write beside what the earlier one wrote; then the files of the earlier export that this one no longer has are removed — before anything is written, so that where a file system does not tell `A.html` from `a.html` the new file is not the one removed — and then the pages and the images are written, and the marker again with what was written. An export that stopped halfway is one the next export writes over.
 
 The last line says what was written: `Exported 13 ADRs of 1 Decision Log to /home/me/site. Open /home/me/site/index.html.`
 
@@ -145,7 +147,7 @@ A PDF comes from the app (**Export → PDF…**), which prints `print.html` with
 | Exit code | When |
 | --------- | ---- |
 | 0 | The export was written |
-| 2 | Nothing was written: `path` is no directory, no Decision Log was found there, `--log` names none of them, `--out` is missing or holds something other than an export, or the command line is not understood. What went wrong is printed to standard error |
+| 2 | The export was not written: `path` is no directory, no Decision Log was found there, `--log` names none of them, `--out` is missing or holds something other than an export, or the command line is not understood — then nothing was written; or a symbolic link or something else in `--out` stood in the way, or writing failed — then what was written so far stays, and the next export writes over it. What went wrong is printed to standard error |
 
 ## In CI
 
