@@ -1,12 +1,13 @@
 /**
- * What `core` and `structure` say, in German: one sentence for every code they have, taking the
- * values their English sentence takes (docs/plan-roadmap.md, part 12). The compiler asks for a
- * sentence for every code; a code without one does not build.
+ * What `core`, `structure` and `diagrams` say, in German: one sentence for every code they have,
+ * taking the values their English sentence takes (docs/plan-roadmap.md, part 12). The compiler
+ * asks for a sentence for every code; a code without one does not build.
  *
  * The vocabulary of the tool stays as it is: ADR, Decision Log, Status, Relation, Problem,
- * Migration, Frontmatter; Metadaten, Rückverweis, Reparatur, Korrektur, Vorlage, Komponente,
- * Entwurf, Quelldatei. What names a value or a key of a file — proposed, accepted, supersedes,
- * affects — is written as the file writes it.
+ * Migration, Frontmatter, Drift; Metadaten, Rückverweis, Reparatur, Korrektur, Vorlage,
+ * Komponente, Entwurf, Quelldatei, Diagramm, Element, Verbindung. What names a value or a key of a
+ * file — proposed, accepted, supersedes, affects, container, scope — is written as the file
+ * writes it.
  */
 import {
   STATUSES,
@@ -15,12 +16,15 @@ import {
   type SENTENCES as CORE_SENTENCES
 } from '@adr-tool/core'
 import type { STRUCTURE_SENTENCES } from '@adr-tool/structure/model'
+import type { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
 
 /**
- * Every code of `core` and `structure`, with the values of its sentence. The kernel's codes are
- * in both; they are taken once.
+ * Every code of `core`, `structure` and `diagrams`, with the values of its sentence. The kernel's
+ * codes are in each of them; they are taken once.
  */
-type Codes = typeof CORE_SENTENCES & Omit<typeof STRUCTURE_SENTENCES, keyof typeof CORE_SENTENCES>
+type Codes = typeof CORE_SENTENCES &
+  Omit<typeof STRUCTURE_SENTENCES, keyof typeof CORE_SENTENCES> &
+  Omit<typeof DIAGRAMS_SENTENCES, keyof typeof CORE_SENTENCES>
 
 /** A sentence for every code, taking the values the English one takes. */
 type Wording<S> = { readonly [Code in keyof S]: S[Code] }
@@ -40,6 +44,19 @@ const RELATES: Record<'supersedes' | 'amends', string> = {
 
 const SEGMENT_RULE =
   'Ein Segment besteht aus Kleinbuchstaben, Ziffern und Bindestrichen und beginnt und endet mit einem Buchstaben oder einer Ziffer.'
+
+const ELEMENT_ID_RULE =
+  'Eine Element-ID besteht aus Kleinbuchstaben, Ziffern und Bindestrichen und beginnt und endet mit einem Buchstaben oder einer Ziffer.'
+
+const LEVELS = 'system-context, container oder component'
+
+/** A view level as a sentence names the Diagram that has it. */
+const VIEW: Record<string, string> = {
+  'system-context': 'ein Systemkontext',
+  container: 'eine Containersicht',
+  component: 'eine Komponentensicht'
+}
+const viewOf = (level: string): string => VIEW[level] ?? `ein Diagramm der Ebene „${level}“`
 
 /** The start every refusal to write a foreign file shares. */
 const foreign = (v: { adr: string; format: ForeignFormat }): string =>
@@ -274,7 +291,74 @@ export const DE: Wording<Codes> = {
 
   // Why a Java file cannot be read.
   'java-missing': (v) => `Es fehlt: ${v.what}.`,
-  'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.'
+  'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
+
+  // The Problems of Diagrams.
+  'unreadable-config': (v) =>
+    `${v.path} kann nicht gelesen werden: ${german(v.detail)}. Bis die Datei korrigiert ist, wird nach keinem Diagramm gesucht.`,
+  'invalid-diagrams-directory': (v) =>
+    `„diagrams“ in ${v.path} muss ein relativer Pfad innerhalb des Repositorys sein. Bis das korrigiert ist, wird nach keinem Diagramm gesucht.`,
+  'unreadable-diagram': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'no-level': () => `Das Diagramm hat keine Ebene. Eine Ebene ist ${LEVELS}.`,
+  'unknown-level': (v) =>
+    `Das Diagramm hat die Ebene „${v.level}“, die die Suite nicht kennt. Eine Ebene ist ${LEVELS}.`,
+  'no-scope': () =>
+    'Das Diagramm ist eine Komponentensicht und hat keinen scope: Es sagt nicht, in welche Komponente es hineinsieht.',
+  'scope-without-component-level': (v) =>
+    `Das Diagramm ist ${viewOf(v.level)} und hat einen scope, den nur eine Komponentensicht hat. Der scope wird nicht gelesen.`,
+  'invalid-element-id': (v) => `„${v.id}“ ist keine gültige Element-ID. ${ELEMENT_ID_RULE}`,
+  'duplicate-element': (v) => `${v.id} wird zweimal gezeigt. Gelesen wird das erste.`,
+  'self-connection': (v) =>
+    `Die Verbindung von ${v.id} zu ${v.id} wird nicht gezeichnet: Ein Element verwendet sich nicht selbst.`,
+  'unknown-element': (v) =>
+    `Die Verbindung von ${v.from} zu ${v.to} nennt ${v.id}, das kein Element des Diagramms ist. Sie wird nicht gezeichnet.`,
+  'duplicate-connection': (v) =>
+    `Das Diagramm verbindet ${v.from} zweimal mit ${v.to}. Gelesen wird die erste Verbindung.`,
+  'component-gone': (v) =>
+    `Das Diagramm zeigt ${v.component}, das keine deklarierte Komponente ist.`,
+  'unknown-scope': (v) =>
+    `Das Diagramm sieht in ${v.component} hinein, das keine deklarierte Komponente ist.`,
+  'component-does-not-fit': (v) =>
+    v.level === 'system-context'
+      ? `${v.component} gehört nicht in einen Systemkontext, der das Repository als einen Kasten und keine Komponente zeigt.`
+      : v.level === 'container'
+        ? `${v.component} gehört nicht in eine Containersicht, die die Komponenten an der Spitze der Hierarchie zeigt.`
+        : `${v.component} gehört nicht in die Komponentensicht von ${v.scope}, die die Teile von ${v.scope} zeigt und die Komponenten neben ihr und neben dem, was sie enthält.`,
+  'repository-does-not-fit': (v) =>
+    `Das Repository ${v.id} steht für jede Komponente, und nur ein Systemkontext zeigt es.`,
+
+  // Why .arch/config.yml or a Diagram cannot be read: the rest of a sentence about the file.
+  'config-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
+  'config-not-map': () => 'die oberste Ebene muss ein Mapping sein',
+  'diagram-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
+  'diagram-not-map': () => 'die oberste Ebene muss ein Mapping sein',
+  'diagram-key-not-text': (v) => `„${v.key}“ in Zeile ${v.line} muss ein Text sein`,
+  'diagram-key-not-list': (v) => `„${v.key}“ in Zeile ${v.line} muss eine Liste sein`,
+  'diagram-item-not-map': (v) =>
+    `der Eintrag von „${v.key}“ in Zeile ${v.line} muss ein Mapping sein`,
+  'element-without-kind': (v) =>
+    `das Element in Zeile ${v.line} sagt weder component noch external noch repository`,
+  'element-of-two-kinds': (v) =>
+    `das Element in Zeile ${v.line} sagt mehr als eines von component, external und repository`,
+  'element-without-position': (v) => `das Element in Zeile ${v.line} hat keine Position „at“`,
+  'position-not-a-point': (v) => `„at“ in Zeile ${v.line} muss aus zwei Zahlen bestehen, [x, y]`,
+  'size-not-positive': (v) =>
+    `„size“ in Zeile ${v.line} muss aus zwei positiven Zahlen bestehen, [Breite, Höhe]`,
+  'connection-without-end': (v) => `die Verbindung in Zeile ${v.line} hat kein „${v.key}“`,
+
+  // Drift.
+  'connection-not-in-code': (v) =>
+    `Das Diagramm verbindet ${v.from} mit ${v.to}, aber keine Quelldatei von ${v.from} hängt von einer von ${v.to} ab.`,
+  'dependency-not-in-diagram': (v) =>
+    `${v.from} hängt im Code von ${v.to} ab, über ${v.count === 1 ? 'eine Abhängigkeit zwischen Quelldateien' : `${v.count} Abhängigkeiten zwischen Quelldateien`}, und das Diagramm verbindet sie nicht.`,
+
+  // Diagrams: the Repair.
+  'no-diagram-repair': () =>
+    'Dieses Problem hat keine Reparatur: Die Suite kann nicht wissen, was gemeint war.',
+  'no-longer-shows': (v) =>
+    `${v.path} zeigt ${v.component} nicht mehr. Die Datei sollte neu angesehen werden.`,
+  'cannot-remove-element': (v) =>
+    `${v.path} ist so geschrieben, dass die Suite ${v.component} nicht herausnehmen kann. Es muss mit seinen Verbindungen in einem Editor entfernt werden.`
 }
 
 /** What a module said, in German; `undefined` for a code that has no German sentence. */
