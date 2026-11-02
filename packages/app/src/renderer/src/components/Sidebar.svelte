@@ -112,6 +112,26 @@
     {/if}
   </section>
 
+  <section>
+    <h2>{t.sidebar.export}</h2>
+    <button
+      class="row"
+      disabled={app.exporting || logs.length === 0}
+      title={t.sidebar.exportSiteHint}
+      onclick={() => app.exportAs('site')}
+    >
+      <span class="label all">{t.sidebar.exportSite}</span>
+    </button>
+    <button
+      class="row"
+      disabled={app.exporting || logs.length === 0}
+      title={t.sidebar.exportPdfHint}
+      onclick={() => app.exportAs('pdf')}
+    >
+      <span class="label all">{t.sidebar.exportPdf}</span>
+    </button>
+  </section>
+
   {#if git}
     <section>
       <h2>{t.sidebar.branches}</h2>

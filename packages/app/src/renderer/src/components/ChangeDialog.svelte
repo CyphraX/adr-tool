@@ -59,7 +59,7 @@
       <p class="reason">{review.reason}</p>
       <footer>
         <button bind:this={confirm} onclick={() => app.dismissReview()}
-          >{t.review.discard.stay}</button
+          >{review.stay ?? t.review.discard.stay}</button
         >
         <button class="primary" onclick={() => app.confirmReview()}>{review.action}</button>
       </footer>

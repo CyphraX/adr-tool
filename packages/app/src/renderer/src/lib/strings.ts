@@ -118,10 +118,26 @@ export const t = {
     branchHint: 'The branch that is checked out, and the ADR files with uncommitted changes',
     detached: 'detached HEAD',
     uncommitted: (files: number): string => `${files} uncommitted`,
+    export: 'Export',
+    exportSite: 'Web pages…',
+    exportSiteHint:
+      'Every Decision Log as web pages in a folder: an index by Status and a page per ADR, which open from disk in any browser',
+    exportPdf: 'PDF…',
+    exportPdfHint: 'Every ADR in one PDF, one ADR per page',
     branches: 'Branches',
     otherBranches: 'Other branches',
     otherBranchesHint:
       'ADRs that branches which are not checked out add or decide, read from git without checking anything out'
+  },
+
+  export: {
+    exporting: 'Exporting…',
+    siteTitle: 'Exported as web pages',
+    pdfTitle: 'Exported as PDF',
+    done: (adrs: number, path: string): string =>
+      `${adrs} ${adrs === 1 ? 'ADR' : 'ADRs'} exported to ${path}.`,
+    open: 'Open',
+    refused: 'Cannot export'
   },
 
   branches: {

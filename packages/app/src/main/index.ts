@@ -1,6 +1,7 @@
-import { app, dialog, ipcMain, protocol, shell, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, protocol, session, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
@@ -12,8 +13,9 @@ import {
 } from '../shared/ipc'
 import { analysisHost } from './analysis-host'
 import { ASSET_SCHEME, assetHandler } from './assets'
+import { exportPdf, writeExport } from './export'
 import { nodeFileSystem } from './node-file-system'
-import { Repositories } from './repositories'
+import { Repositories, localDate } from './repositories'
 import {
   createRequest,
   metadataEditRequest,
@@ -297,6 +299,50 @@ function registerIpc(): void {
     if (typeof changeId === 'string') repositories.discardChange(changeId)
   })
 
+  // An export goes where the person points in a dialog of the system, never where the
+  // renderer says; what it wrote is all the renderer may have opened.
+  const exported = new Set<string>()
+  ipcMain.handle(CHANNEL.exportSite, async (event, repositoryId: unknown) => {
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      title: t.export.siteTitle,
+      buttonLabel: t.export.siteButton,
+      properties: ['openDirectory' as const, 'createDirectory' as const]
+    }
+    const picked = await (window
+      ? dialog.showOpenDialog(window, options)
+      : dialog.showOpenDialog(options))
+    const out = picked.filePaths[0]
+    if (picked.canceled || out === undefined) return undefined
+    const result = await writeExport(root, out, localDate())
+    if (!result.ok) return result
+    exported.add(result.index)
+    return { ok: true, path: result.index, adrs: result.adrs }
+  })
+  ipcMain.handle(CHANNEL.exportPdf, async (event, repositoryId: unknown) => {
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      title: t.export.pdfTitle,
+      defaultPath: `${basename(root)} decisions.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    }
+    const picked = await (window
+      ? dialog.showSaveDialog(window, options)
+      : dialog.showSaveDialog(options))
+    if (picked.canceled || !picked.filePath) return undefined
+    const result = await exportPdf(root, picked.filePath, localDate(), printToPdf)
+    if (!result.ok) return result
+    exported.add(result.index)
+    return { ok: true, path: result.index, adrs: result.adrs }
+  })
+  ipcMain.handle(CHANNEL.openExported, async (_, path: unknown) => {
+    if (typeof path === 'string' && exported.has(path)) await shell.openPath(path)
+  })
+
   ipcMain.handle(CHANNEL.openExternal, async (_, url: unknown) => {
     if (typeof url === 'string' && isWebLink(url)) await shell.openExternal(url)
   })
@@ -316,6 +362,68 @@ function registerIpc(): void {
     BrowserWindow.fromWebContents(event.sender)?.close()
     if (resumeQuit) app.quit()
   })
+}
+
+/**
+ * The session the PDF of an export is printed in, in memory and of its own: it loads a file of
+ * an export being printed and nothing else — no frame, nothing from the web. A path is compared
+ * as a path, so that `C:` and `c:` are one drive.
+ */
+let print: { session: Electron.Session; sites: Set<string> } | undefined
+function printSession(): { session: Electron.Session; sites: Set<string> } {
+  if (print) return print
+  const sites = new Set<string>()
+  const allowed = (url: string): boolean => {
+    let path: string
+    try {
+      path = fileURLToPath(url)
+    } catch {
+      return false
+    }
+    return [...sites].some((site) => {
+      const rest = relative(site, path)
+      return rest !== '' && !rest.startsWith('..') && !isAbsolute(rest)
+    })
+  }
+  const printing = session.fromPartition('export-print')
+  printing.webRequest.onBeforeRequest((details, callback) =>
+    callback({ cancel: details.resourceType === 'subFrame' || !allowed(details.url) })
+  )
+  print = { session: printing, sites }
+  return print
+}
+
+/**
+ * A page of an export as a PDF, A4, one ADR per page: loaded in a window nobody sees, which
+ * runs no script, navigates nowhere, has no frames, and loads nothing but the files of the
+ * export in `site` — whatever the page asked for, nothing else of the disk ends up printed.
+ */
+async function printToPdf(url: string, site: string): Promise<Buffer> {
+  const printing = printSession()
+  printing.sites.add(site)
+  const window = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      session: printing.session,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      javascript: false
+    }
+  })
+  try {
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    window.webContents.on('will-navigate', (event) => event.preventDefault())
+    await window.loadURL(url)
+    return await window.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true
+    })
+  } finally {
+    window.destroy()
+    printing.sites.delete(site)
+  }
 }
 
 function createWindow(): void {

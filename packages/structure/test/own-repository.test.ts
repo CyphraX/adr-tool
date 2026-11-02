@@ -150,6 +150,8 @@ it('finds the Dependency from app to core, and the Source File Dependencies behi
   expect(
     behind.dependencies.every((dependency) => dependency.to === 'packages/core/src/index.ts')
   ).toBe(true)
+  // The export is written as `adr export` writes it, by the same code (part 10).
+  expect(edges).toContain('app > cli')
 })
 
 // The done-when of part 5, as far as `structure` goes: the app shows these numbers.
@@ -168,6 +170,7 @@ it('computes the metrics of this repository as their definitions say', async () 
   // of the scale.
   expect(metrics.get('kernel')!.instability).toBe(0)
   expect(metrics.get('app')!.instability).toBe(1)
-  // It uses the cores of both modules, and reaches the kernel only through them.
-  expect(metrics.get('app')).toMatchObject({ fanOut: 2, fanIn: 0 })
+  // It uses the cores of both modules and the export of the command line, and reaches the
+  // kernel only through them.
+  expect(metrics.get('app')).toMatchObject({ fanOut: 3, fanIn: 0 })
 })

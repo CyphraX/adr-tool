@@ -384,6 +384,11 @@ export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
   | { readonly ok: false; readonly reason: string }
 
+/** An export that was written: where it is, to open, and how many ADRs it holds. */
+export type ExportResult =
+  | { readonly ok: true; readonly path: string; readonly adrs: number }
+  | { readonly ok: false; readonly reason: string }
+
 export type ApplyResult =
   | { readonly applied: true; readonly repository: OpenRepository }
   | { readonly applied: false; readonly reason: string }
@@ -440,6 +445,15 @@ export interface Api {
   branches(repositoryId: string): Promise<BranchOverview | undefined>
   /** An ADR as the commit of a branch has it, read from git; `undefined` for any other file. */
   branchAdr(repositoryId: string, sha: string, path: string): Promise<Adr | undefined>
+  /**
+   * Export the Decision Logs as web pages into a folder the person picks; `undefined` when they
+   * pick none (docs/plan-roadmap.md, part 10).
+   */
+  exportSite(repositoryId: string): Promise<ExportResult | undefined>
+  /** Export them as a PDF, one ADR per page, to a file the person picks. */
+  exportPdf(repositoryId: string): Promise<ExportResult | undefined>
+  /** Open what an export wrote, as the system opens such a file; nothing else. */
+  openExported(path: string): Promise<void>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
   applyChange(changeId: string): Promise<ApplyResult>
   discardChange(changeId: string): Promise<void>
@@ -508,6 +522,9 @@ export const CHANNEL = {
   discardCommit: 'git:discard-commit',
   branches: 'git:branches',
   branchAdr: 'git:branch-adr',
+  exportSite: 'export:site',
+  exportPdf: 'export:pdf',
+  openExported: 'export:open',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
   openExternal: 'shell:open-external',

@@ -117,12 +117,14 @@ export type Review =
     }
   /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
-  /** A question before something is lost. */
+  /** A question before something is lost, or what can be done with what was made. */
   | {
       kind: 'confirm'
       title: string
       reason: string
       action: string
+      /** The button that does not proceed: "Keep editing" unless it says otherwise. */
+      stay?: string
       proceed: () => void
       /** Whoever asked may want to know that the answer was no. */
       declined?: () => void
@@ -250,6 +252,8 @@ class AppState {
   activeId = $state<string | undefined>(undefined)
   ready = $state(false)
   review = $state<Review | undefined>(undefined)
+  /** An export is being written: its dialog of the system is open, or git and disk are busy. */
+  exporting = $state(false)
   editing = $state<Editing | undefined>(undefined)
   creating = $state<Creating | undefined>(undefined)
   editingMetadata = $state<EditingMetadata | undefined>(undefined)
@@ -562,6 +566,34 @@ class AppState {
           }
         : { kind: 'refused', title: texts.refused(problem.component), reason: plan.reason }
     )
+  }
+
+  /**
+   * Export the Decision Logs, as web pages or as a PDF, to where the person picks in the
+   * system's dialog; then offer to open what was written.
+   */
+  async exportAs(kind: 'site' | 'pdf'): Promise<void> {
+    const tab = this.active
+    if (!tab || this.exporting) return
+    this.exporting = true
+    const id = tab.repository.id
+    const result = await (kind === 'site' ? window.api.exportSite(id) : window.api.exportPdf(id))
+      .catch((error: unknown) => ({ ok: false as const, reason: String(error) }))
+      .finally(() => (this.exporting = false))
+    if (result === undefined) return
+    if (!result.ok) {
+      this.review = { kind: 'refused', title: t.export.refused, reason: result.reason }
+      return
+    }
+    const path = result.path
+    this.review = {
+      kind: 'confirm',
+      title: kind === 'site' ? t.export.siteTitle : t.export.pdfTitle,
+      reason: t.export.done(result.adrs, path),
+      action: t.export.open,
+      stay: t.close,
+      proceed: () => void window.api.openExported(path)
+    }
   }
 
   /** Filtering is about ADRs: it leads back to their list. */

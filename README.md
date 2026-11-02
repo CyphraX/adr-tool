@@ -65,6 +65,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 - **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body.
 - **git.** The app shows the branch that is checked out and the ADRs with uncommitted changes. For each ADR it shows its history, commit by commit, with the diff. **Commit** commits an ADR's file — and, if you like, those of the ADRs it supersedes or amends — with a message you see and can change. Nothing else that is changed or staged is taken along, and nothing is pushed ([ADR-0012](docs/adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md)). **Other branches** lists the ADRs that branches which are not checked out add or decide, read from git without checking anything out, and a new ADR warns when another branch has given its number away already.
+- **Export.** **Export → Web pages…** writes the Decision Logs as HTML pages for people who do not use the tool: an index by Status and a page per ADR, with its Relations as links. The pages open from disk, from a file share or from any web host. They run no script and fetch nothing. **PDF…** prints the same ADRs as a PDF, one ADR per page ([ADR-0014](docs/adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
 - **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 2, 3 and 4, for [log4brains](https://github.com/thomvaill/log4brains) and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
 
@@ -169,6 +170,17 @@ docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-wri
 
 The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs it on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
 
+### Exporting for readers
+
+`adr export` writes the same pages as the app's **Export**, into a directory of your choice. It writes only into an empty directory or over an earlier export:
+
+```console
+$ node packages/cli/dist/adr.mjs export --out ../decisions
+Exported 14 ADRs of 1 Decision Log to /home/me/decisions. Open /home/me/decisions/index.html.
+```
+
+`--log docs/adr` limits the export to one Decision Log. What it writes is described in [docs/cli.md](docs/cli.md#adr-export-path---out-directory---log-directory).
+
 ### Agents over MCP
 
 `adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
@@ -250,6 +262,7 @@ The patterns, test files, the Draft, the Dependencies of each language and the d
 | `pnpm lint` | Runs ESLint |
 | `pnpm format` / `pnpm format:check` | Runs Prettier, writing or checking |
 | `pnpm adr lint` | Checks this repository's ADRs with the built command line |
+| `pnpm adr export --out <dir>` | Exports this repository's ADRs as HTML pages |
 
 CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr lint` on the repository itself.
 
@@ -262,7 +275,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets |
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
-| [`packages/cli`](packages/cli) | The command line, `adr lint`, built on both cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
+| [`packages/cli`](packages/cli) | The command line, `adr lint` and `adr export`, built on both cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
 | [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
@@ -284,7 +297,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [docs/plan-roadmap.md](docs/plan-roadmap.md) | The parts of the rest of the roadmap, with their status |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
-| [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint`, its output, its codes and exit codes |
+| [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` with its output, codes and exit codes, and `adr export` |
 | [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
 | [CONTEXT.md](CONTEXT.md), [CONTEXT-MAP.md](CONTEXT-MAP.md) | The domain language and how its contexts relate |
@@ -301,7 +314,8 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
   - committing an ADR (built);
   - a branch overview (built);
   - an MCP server for agents (built);
-  - export, timeline, board and dashboard;
+  - an export as web pages and PDF (built);
+  - timeline, board and dashboard;
   - a German translation, and the repositories in the window seen together.
 - **Deferred:** distribution — installers, code signing and auto-update.
 
