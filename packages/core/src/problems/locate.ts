@@ -110,18 +110,23 @@ function fileLines(text: string, adr: Adr | undefined): FileLines {
     }
     return lines
   }
-  const statusLines = ((): number[] => {
+  const { status, statusLines } = ((): { status?: number; statusLines: number[] } => {
     const own = key('status')
-    if (own !== undefined) return [own]
-    const listed = listedStatus(text, front ? lineAt(front.end) : 0)
-    // MADR 2 and log4brains keep their other links in a Links section.
-    const links = adr?.foreign === 'madr-2' ? parseMadrList(view)?.links?.section : undefined
-    if (listed !== undefined) return [listed, ...(links ? sectionLines(links) : [])]
-    if (front) return []
+    if (own !== undefined) return { status: own, statusLines: [own] }
+    if (adr?.foreign !== 'adr-tools') {
+      // MADR 2 and log4brains: the Status item, and the links of the Links section.
+      const listed = parseMadrList(view)
+      if (listed) {
+        const at = listed.status && lineAt(listed.status.line.start)
+        const links = listed.links ? sectionLines(listed.links.section) : []
+        return { status: at, statusLines: at === undefined ? links : [at, ...links] }
+      }
+    }
+    if (front) return { statusLines: [] }
     const section = parseAdrTools(view)?.section
-    return section ? sectionLines(section) : []
+    const lines = section ? sectionLines(section) : []
+    return { status: lines[0], statusLines: lines }
   })()
-  const status = statusLines[0]
   /** In a foreign format: the line of the Status that links to `id`, or the Status itself. */
   const link = (id: string): number | undefined =>
     adr?.foreign === undefined && front
@@ -173,16 +178,4 @@ function pairOf(
   name: string
 ): { key: unknown; value: unknown } | undefined {
   return map?.items.find((pair) => scalarText(pair.key) === name)
-}
-
-/** The line of `* Status: …` in the first list below the frontmatter, as MADR 2 writes it. */
-function listedStatus(text: string, after: number): number | undefined {
-  const lines = text.split('\n')
-  for (let index = after; index < lines.length; index++) {
-    const line = lines[index]!
-    if (/^\s*[*-]\s+Status\s*:/i.test(line)) return index + 1
-    // The list under the title ends at the first heading after it.
-    if (/^#{2,6}\s/.test(line)) return undefined
-  }
-  return undefined
 }

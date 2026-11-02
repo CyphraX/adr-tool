@@ -91,7 +91,7 @@ describe('a file of MADR 2 or log4brains', () => {
     })
     expect(said(log, '0002-postgres')).toEqual({
       foreign: 'madr-2',
-      signs: ['listed'],
+      signs: ['listed-status', 'listed-deciders'],
       status: 'accepted',
       // One value: the tool does not split what a person wrote.
       decisionMakers: ['Kim Becker, Alex Roth'],
@@ -453,5 +453,278 @@ describe('Migration of a file of adr-tools with a link of other words', () => {
     expect(await fs.readText('docs/adr/0001-a.md')).toMatch(
       /^---\nstatus: superseded\nrelates-to: \[0002-b\]\nsuperseded-by: \[0002-b\]\n---\n/
     )
+  })
+})
+
+describe('a file of MADR 2 or log4brains, as people really write it', () => {
+  it('takes the list and the Links section out together when they meet at the end of the file', async () => {
+    const { fs, log } = await open({
+      '0001-a': lines(
+        '# A',
+        '',
+        '* Status: accepted',
+        '',
+        '## Links',
+        '',
+        '* Supersedes [B](0002-b.md)',
+        ''
+      ),
+      '0002-b': lines('# B', '', '* Status: superseded by [A](0001-a.md)', '')
+    })
+    const plan = await planMigration(fs, log)
+    if (!plan.ok) throw new Error(plan.reason)
+    await applyChangeSet(fs, plan.changeSet)
+    expect(await fs.readText('docs/adr/0001-a.md')).toBe(
+      lines('---', 'status: accepted', 'supersedes: [0002-b]', '---', '', '# A', '')
+    )
+    expect(await fs.readText('docs/adr/0002-b.md')).toBe(
+      lines('---', 'status: superseded', 'superseded-by: [0001-a]', '---', '', '# B', '')
+    )
+    const after = (await openRepository(fs)).logs[0]!
+    expect(after.problems).toEqual([])
+  })
+
+  it('reads the Links section under the template’s commented heading, and links with a comment', async () => {
+    const { log } = await open({
+      '0002-b': lines(
+        '# B',
+        '',
+        '* Status: accepted',
+        '',
+        '## Links <!-- optional -->',
+        '',
+        '* Supersedes [A](0001-a.md)',
+        '* Refined by [C](0003-c.md) <!-- x -->',
+        ''
+      )
+    })
+    expect(said(log, '0002-b').relations).toEqual({
+      supersedes: ['0001-a'],
+      'relates-to': ['0003-c']
+    })
+  })
+
+  it('leaves an item that runs on — nested items, a lazy line, a code block — where it is', async () => {
+    const { fs, log } = await open({
+      '0001-a': lines(
+        '# A',
+        '',
+        '* Status: accepted',
+        '* Deciders: Team A',
+        '  * Kim',
+        '  * Alex',
+        '* Date: 2020-01-01',
+        '',
+        'Text.',
+        ''
+      ),
+      '0002-b': lines(
+        '# B',
+        '',
+        '* Status: accepted',
+        '* Deciders: Kim Becker,',
+        'Alex Roth',
+        '* Date: x',
+        ''
+      ),
+      '0003-c': lines(
+        '# C',
+        '',
+        '* Status: accepted',
+        '  ```',
+        '  code',
+        '  ```',
+        '* Deciders: Kim',
+        '',
+        'Text.',
+        ''
+      )
+    })
+    expect(said(log, '0001-a').decisionMakers).toEqual(['Team A'])
+    const plan = await planMigration(fs, log)
+    if (!plan.ok) throw new Error(plan.reason)
+    await applyChangeSet(fs, plan.changeSet)
+    expect(await fs.readText('docs/adr/0001-a.md')).toBe(
+      lines(
+        '---',
+        'status: accepted',
+        'decision-makers: Team A',
+        '---',
+        '',
+        '# A',
+        '',
+        '* Deciders: Team A',
+        '  * Kim',
+        '  * Alex',
+        '* Date: 2020-01-01',
+        '',
+        'Text.',
+        ''
+      )
+    )
+    expect(await fs.readText('docs/adr/0002-b.md')).toBe(
+      lines(
+        '---',
+        'status: accepted',
+        'decision-makers: "Kim Becker,"',
+        '---',
+        '',
+        '# B',
+        '',
+        '* Deciders: Kim Becker,',
+        'Alex Roth',
+        '* Date: x',
+        ''
+      )
+    )
+    expect(await fs.readText('docs/adr/0003-c.md')).toBe(
+      lines(
+        '---',
+        'status: accepted',
+        'decision-makers: Kim',
+        '---',
+        '',
+        '# C',
+        '',
+        '* Status: accepted',
+        '  ```',
+        '  code',
+        '  ```',
+        '',
+        'Text.',
+        ''
+      )
+    )
+  })
+
+  it('keeps a Status that the list says twice, and says so', async () => {
+    const { fs, log } = await open({
+      '0001-a': lines('# A', '', '* Status: accepted', '* Status: rejected', '* Deciders: Kim', '')
+    })
+    expect(said(log, '0001-a').status).toBe('accepted')
+    const plan = await planMigration(fs, log)
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.warnings).toEqual([
+      'The list under the title of 0001-a says Status twice: both items stay in its text.'
+    ])
+    await applyChangeSet(fs, plan.changeSet)
+    expect(await fs.readText('docs/adr/0001-a.md')).toBe(
+      lines(
+        '---',
+        'status: accepted',
+        'decision-makers: Kim',
+        '---',
+        '',
+        '# A',
+        '',
+        '* Status: accepted',
+        '* Status: rejected',
+        ''
+      )
+    )
+  })
+
+  it('keeps the paragraph in front of the list apart from the one after it', async () => {
+    const { fs, log } = await open({
+      '0001-d': lines('# D', 'Intro', '* Status: accepted', '', 'More text', '')
+    })
+    const plan = await planMigration(fs, log)
+    if (!plan.ok) throw new Error(plan.reason)
+    await applyChangeSet(fs, plan.changeSet)
+    expect(await fs.readText('docs/adr/0001-d.md')).toBe(
+      lines('---', 'status: accepted', '---', '', '# D', 'Intro', '', 'More text', '')
+    )
+  })
+
+  it('finds the same Problems after Migration as before, a decided draft among them', async () => {
+    const { fs, log } = await open({
+      '0001-a': lines(
+        '---',
+        'decided: 2020-01-01',
+        '---',
+        '# A',
+        '',
+        '* Status: draft',
+        '* Date: x',
+        ''
+      )
+    })
+    const before = log.problems.map((problem) => problem.kind)
+    expect(before).toEqual(['invalid-metadata'])
+    const plan = await planMigration(fs, log)
+    if (!plan.ok) throw new Error(plan.reason)
+    await applyChangeSet(fs, plan.changeSet)
+    const after = (await openRepository(fs)).logs[0]!
+    expect(after.problems).toEqual(log.problems)
+  })
+
+  it('reads a Deciders value with brackets in it, and only a whole one in brackets as a placeholder', async () => {
+    const { log } = await open({
+      '0001-a': lines('# A', '', '* Deciders: [Kim] and [Alex]', ''),
+      '0002-b': lines('# B', '', '* Deciders: [list everyone involved]', '')
+    })
+    expect(log.adrs.map((adr) => [adr.id, adr.foreign])).toEqual([
+      ['0001-a', 'madr-2'],
+      ['0002-b', undefined]
+    ])
+  })
+
+  it('reads no Relation from a link that names no ADR, nor from Status text with a link', async () => {
+    const { log } = await open({
+      '0001-a': lines(
+        '# A',
+        '',
+        '* Status: accepted',
+        '',
+        '## Links',
+        '',
+        '* See [the guide](guide.md)',
+        ''
+      ),
+      '0002-b': lines(
+        '# 2. B',
+        '',
+        'Date: 2020-01-01',
+        '',
+        '## Status',
+        '',
+        'Deprecated, see [5. E](0005-e.md)',
+        ''
+      )
+    })
+    expect(said(log, '0001-a').relations).toEqual({})
+    expect(said(log, '0002-b')).toMatchObject({
+      status: 'Deprecated, see [5. E](0005-e.md)',
+      relations: {}
+    })
+    expect(log.problems.map((problem) => problem.kind)).toEqual(['invalid-metadata'])
+  })
+
+  it('costs no more than the length of a long file', async () => {
+    const started = performance.now()
+    const comments = '<!---->'.repeat(50_000)
+    const links = Array.from(
+      { length: 20_000 },
+      (_, n) => `* Relates to [x](${String(n + 2).padStart(5, '0')}-x.md)`
+    )
+    await open({
+      '0001-a': lines('# A', '', `* Status: accepted ${comments}`, '', '## Links', '', ...links, '')
+    })
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+})
+
+describe('the signs of a file of MADR 2 or log4brains', () => {
+  it('name the item that applied', async () => {
+    const { log } = await open({
+      '0001-a': lines('# A', '', '* Status: accepted', ''),
+      '0002-b': lines('# B', '', '* Deciders: Kim', ''),
+      '0003-c': lines('# C', '', '* Status: accepted', '* Deciders: Kim', '')
+    })
+    expect(log.adrs.map((adr) => adr.foreignSigns)).toEqual([
+      ['listed-status'],
+      ['listed-deciders'],
+      ['listed-status', 'listed-deciders']
+    ])
   })
 })

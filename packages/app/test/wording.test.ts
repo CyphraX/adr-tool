@@ -91,7 +91,7 @@ describe('the header of an ADR in a foreign format', () => {
     )
     expect(logs[0]!.adrs.map(describeForeign)).toEqual([
       'Read as a file of MADR: a Status that names a successor and "deciders" for the decision-makers. That is read as MADR means it. The tool never writes this format. Migration rewrites the file into the tool\'s own, and shows the change first.',
-      "Read as a file of MADR 2 or log4brains: its Status or its Deciders in the list under the title. Its Status, its Deciders and log4brains' Tags are taken from that list, and its Relations from the links of its Links section. The tool never writes this format. Migration rewrites the file into the tool's own, and shows the change first.",
+      "Read as a file of MADR 2 or log4brains: its Status in the list under the title. What its list under the title says — Status, Deciders, log4brains' Tags — is taken from there, unless the frontmatter says it already, and its Relations from the links of its Links section. The tool never writes this format. Migration rewrites the file into the tool's own, and shows the change first.",
       "Read as a file of adr-tools: no frontmatter, and a Status section in its text. Its Status, its Relations and Back-references and the day it was created are taken from there. The tool never writes this format. Migration rewrites the file into the tool's own, and shows the change first."
     ])
   })
