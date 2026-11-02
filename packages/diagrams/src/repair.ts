@@ -107,9 +107,10 @@ function itemLines(text: string, item: unknown, cannot: Error): TextEdit {
   const start = lineStart(text, dash)
   const lead = text.slice(start, dash) + text.slice(dash + 1, valueStart)
   if (dash < 0 || lead.trim() !== '') throw cannot
-  // A block map ends behind the line break of its last key already; a flow map does not.
+  // A block map ends behind the line break of its last key already, with a comment behind that
+  // key; a flow map ends at its brace, and only a comment may follow it on its line.
   const end = text[valueEnd - 1] === '\n' ? valueEnd : lineEnd(text, valueEnd)
-  if (!/^[ \t]*\r?\n?$/.test(text.slice(valueEnd, end))) throw cannot
+  if (!/^[ \t]*(?:#[^\n]*)?\r?\n?$/.test(text.slice(valueEnd, end))) throw cannot
   return { start, end, insert: '' }
 }
 

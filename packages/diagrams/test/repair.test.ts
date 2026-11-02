@@ -85,7 +85,7 @@ describe('the Repair of an element whose Component is gone', () => {
   it('takes out every element that names the Component, and items written in braces', () => {
     const text = lines(
       'elements:',
-      '  - { component: billing, at: [0, 0] }',
+      '  - { component: billing, at: [0, 0] } # first',
       '  - component: web',
       '    at: [1, 1]',
       '  - component: billing',

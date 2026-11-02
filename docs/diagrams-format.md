@@ -28,7 +28,7 @@ diagrams: design/diagrams # optional; docs/architecture/diagrams when absent
 
 - `diagrams` is a path relative to the repository root, with forward slashes. Without the file, without the key, or with an empty `diagrams:`, the default applies.
 - Keys the suite does not know are preserved and ignored, so that the other modules can keep their own settings in the same file.
-- A file that is not YAML or whose top level is not a map, and a `diagrams` that is not a text, is absolute or leaves the repository, is a Problem (section 5), and **no Diagram is looked for** while it stands: looking in the default directory instead would hide the mistake, as it would for Decision Logs ([file-format.md](file-format.md), section 6).
+- A file that is not YAML or whose top level is not a map, and a `diagrams` that is not a text, is absolute, leaves the repository or is its root, is a Problem (section 5), and **no Diagram is looked for** while it stands: looking in the default directory instead would hide the mistake, as it would for Decision Logs ([file-format.md](file-format.md), section 6).
 
 ## 2. The file (part 6)
 
@@ -165,7 +165,7 @@ Diagrams adds these **Problems**. Each is reported at its file and, where it has
 | Problem                                                                       | Code                          | Sentence                                                                                                                | Repair |
 | ----------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------ |
 | The file cannot be read: it is not YAML, or its top level is not a map.       | `unreadable-config`           | .arch/config.yml cannot be read: its top level must be a map. No Diagram is looked for until it is fixed.               | —      |
-| `diagrams` is not a text, is absolute, or leaves the repository.              | `invalid-diagrams-directory`  | "diagrams" in .arch/config.yml must be a relative path inside the repository. No Diagram is looked for until it is fixed. | —      |
+| `diagrams` is not a text, is absolute, leaves the repository or is its root.  | `invalid-diagrams-directory`  | "diagrams" in .arch/config.yml must be a relative path inside the repository. No Diagram is looked for until it is fixed. | —      |
 
 ### Of a Diagram's file
 
@@ -195,10 +195,10 @@ Reported only where `.arch/components.yml` declares Components and can be read (
 
 A Repair is offered only where exactly one change is right. An element whose Component is gone was meant to show something that is no longer there; whether it was renamed, split or removed, the suite cannot tell — but the element cannot stay, so its Repair takes it out. It removes, as one previewed change:
 
-- the lines of the element's item, from its `-` to the end of its last key, for every element that names the Component;
+- the lines of the element's item, from its `-` to the end of the line of its last key, for every element that names the Component;
 - the lines of the item of every connection whose `from` or `to` is the Component ID — unless another element of the Diagram, an External System say, keeps that ID.
 
-Nothing else in the file changes: comments above and below an item stay where they are. Where an item does not have its lines to itself — a list in flow style, a comment or another item on the line of its `-` or behind its last key — the Repair is refused with the advice to use an editor. Whatever the suite hands out has been checked to read back as the same Diagram without those items.
+A comment inside an item, or behind it on its last line, goes with it; nothing else in the file changes, and comments above and below an item stay where they are. Where an item does not have its lines to itself — a list in flow style, a comment, a tag or an anchor on the line of its `-` in front of it, anything but a comment behind it — the Repair is refused with the advice to use an editor. Whatever the suite hands out has been checked to read back as the same Diagram without those items.
 
 Problems of Diagrams appear in the Problems view of the repository, grouped by module (part 7).
 
@@ -208,11 +208,11 @@ The `diagrams` package draws a Diagram as SVG itself, without a browser, so that
 
 ### What it draws
 
-- **A box per element**, at its `at`, in the order of `elements`; a later element of an ID that is there already is not drawn. A box has rounded corners and a solid border; an External System's border is dashed, because it is from elsewhere ([design.md](design.md), "Look"). In the box stand its name and, below, its description. A Component whose declaration is gone is drawn under its ID.
-- **An arrow per connection**, in the order of `connections`: a straight line from the middle of one box towards the middle of the other, starting and ending at their borders, its head at the element that is used. Where two elements are connected both ways, each line is moved 6 apart to its right, so that both show. A connection that is not drawn by section 5 is left out.
+- **A box per element**, at its `at`, in the order of `elements`; a later element of an ID that is there already is not drawn. A box has rounded corners and a solid border; an External System's border is dashed, because it is from elsewhere ([design.md](design.md), "Look"), and the repository's is drawn heavier. In the box stand its name and, below, its description. A Component whose declaration is gone is drawn under its ID.
+- **An arrow per connection**, in the order of `connections`: a straight line from the middle of one box towards the middle of the other, starting and ending at their borders, its head at the element that is used. Where two elements are connected both ways, each line is moved 6 px to its own right, so that both show. A connection that section 5 says is not drawn is left out, and so is one between two boxes with the same middle.
 - **A label** in the middle of each line, on a ground of the background's colour, so that it stays legible across a line.
 - **The title and the description** above the boxes; the Diagram ID in the picture's `<title>` where there is no title.
-- **The legend at the foot**, naming what the picture holds: Component, External System, the repository, and that an arrow points at what is used.
+- **The legend at the foot**, naming what the picture holds: "Component", "External System", "This repository", and "uses; the arrow points at what is used". It names only what the picture has.
 - The picture's `<desc>` holds the description and one sentence per connection — "app uses core: reads and plans ADRs." —, which a screen reader reads out ([design.md](design.md), "A graph is also a text").
 
 **Drift is not drawn**, and neither are Problems: the export is the picture as it is intended.
@@ -245,7 +245,7 @@ Text in bold is 5 % wider. The figures are on the wide side of the common sans s
 - A box without `size` is 12 px wider than its text on either side: at least 120 px wide, as wide as its name, and — with a description — as wide as the description on one line, up to 240 px. The description is wrapped at blanks to the width inside the box; a word longer than that stands on a line of its own.
 - Its height is 10 px above and below the name and the description, with 4 px between them, and at least 48 px. The text is centred in the box, also in a box with a `size`; text a `size` has no room for stands beyond its border.
 - A label's ground is 4 px wider than the label on either side, and one line high.
-- The picture is 24 px wider than what it holds on every side; the title stands 16 px above the highest box, and the legend 24 px below the lowest.
+- The picture is 24 px wider than what it holds on every side; the title and the description stand 16 px above the highest box or label, wrapped at the width of the boxes but at least at 360 px, and the legend 24 px below the lowest.
 
 ### What the file is
 
