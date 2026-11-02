@@ -3,7 +3,7 @@ import type { MermaidConfig } from 'mermaid'
 /**
  * What the window does with a Mermaid block before anything is drawn (docs/adr/0016-…): which
  * block is one, how Mermaid is set up — at its strictest, in the colours of the window —, what
- * is taken out of the SVG it draws beyond what the sanitizer takes, and how a block that cannot
+ * an address in what it draws may be (lib/sanitize.ts takes the rest out), and how a block that cannot
  * be drawn says why. Nothing here loads Mermaid; lib/diagrams.ts does, when a block is shown.
  */
 
@@ -45,8 +45,9 @@ export const DIAGRAM_TOKENS: Record<keyof DiagramColors, string> = {
 
 /**
  * The settings a diagram cannot change from its own text — `%%{init: …}%%` or a frontmatter of
- * the block —: Mermaid's own, and what keeps a label from becoming HTML or the sanitizer from
- * being loosened.
+ * the block —, at any depth: Mermaid's own, what keeps a label from becoming HTML or the
+ * sanitizer from being loosened, and everything that Mermaid writes into the CSS of a drawing
+ * as it is given — the fonts, the theme and its variables. The window decides the theme.
  */
 export const SECURE_KEYS = [
   'secure',
@@ -57,7 +58,17 @@ export const SECURE_KEYS = [
   'suppressErrorRendering',
   'htmlLabels',
   'dompurifyConfig',
-  'themeCSS'
+  'theme',
+  'themeCSS',
+  'themeVariables',
+  'darkMode',
+  'fontFamily',
+  'altFontFamily',
+  'fontSize',
+  'messageFontFamily',
+  'actorFontFamily',
+  'noteFontFamily',
+  'layout'
 ] as const
 
 /**
@@ -115,25 +126,6 @@ export function mermaidConfig(colors: DiagramColors, dark: boolean): MermaidConf
       sequenceNumberColor: colors.paper
     }
   }
-}
-
-/** `url(…)` with what it points to, quoted or not. */
-const URL_FUNCTION = /url\(\s*(['"]?)(.*?)\1\s*\)/gi
-
-/**
- * CSS of a drawing as it may stay: what points into the drawing itself — `url(#marker)` — and
- * nothing that would fetch: no `@import`, no `url()` to anywhere else, no `image-set()`. Mermaid
- * writes what a diagram's `classDef` and `style` lines say into its CSS, and an ADR is not
- * trusted; the window's policy would refuse the request, a file of the export opened on its own
- * would not.
- */
-export function scrubCss(css: string): string {
-  return css
-    .replace(/@import\b[^;]*;?/gi, '')
-    .replace(/(?:-webkit-)?image-set\([^)]*\)/gi, 'none')
-    .replace(URL_FUNCTION, (whole, _quote: string, target: string) =>
-      target.trim().startsWith('#') ? whole : 'none'
-    )
 }
 
 /**

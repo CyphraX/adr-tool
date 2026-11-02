@@ -7,7 +7,6 @@ import {
   keepsAddress,
   mermaidConfig,
   mermaidSaid,
-  scrubCss,
   type DiagramColors
 } from '../src/renderer/src/lib/mermaid'
 
@@ -51,9 +50,12 @@ describe('Mermaid, as the window sets it up', () => {
     expect(config.suppressErrorRendering).toBe(true)
   })
 
-  it('lets no diagram loosen that from its own text', () => {
+  it('lets no diagram loosen that from its own text, nor write its fonts or theme into the CSS', () => {
     const secure = mermaidConfig(COLORS, true).secure ?? []
-    for (const key of ['securityLevel', 'htmlLabels', 'dompurifyConfig', 'maxTextSize']) {
+    const keys = ['securityLevel', 'htmlLabels', 'dompurifyConfig', 'maxTextSize', 'themeCSS']
+    // The review of part 2: `%%{init: {"fontFamily": "x; filter: u\\72l(…)"}}%%` reached the CSS.
+    keys.push('fontFamily', 'altFontFamily', 'themeVariables', 'theme', 'layout')
+    for (const key of keys) {
       expect(secure).toContain(key)
     }
     expect(secure).toEqual([...SECURE_KEYS])
@@ -78,18 +80,6 @@ describe('Mermaid, as the window sets it up', () => {
 })
 
 describe('what is taken out of a drawing beyond the sanitizer', () => {
-  it('keeps what points into the drawing, and nothing that would fetch', () => {
-    expect(scrubCss('.a{marker-end:url(#arrow)}')).toBe('.a{marker-end:url(#arrow)}')
-    expect(scrubCss(".a{fill:url('#grad')}")).toBe(".a{fill:url('#grad')}")
-    expect(scrubCss('.a{background:url(https://evil.example/t.png)}')).toBe('.a{background:none}')
-    expect(scrubCss('.a{background:url( "//evil.example/x" )}')).toBe('.a{background:none}')
-    expect(scrubCss('@import url(https://evil.example/a.css); .b{}')).toBe(' .b{}')
-    // Without its semicolon, an @import takes the rest along: nothing of it is guessed at.
-    expect(scrubCss("@import 'x.css'\n.b{}")).toBe('')
-    expect(scrubCss('.a{background:image-set("a.png" 1x)}')).toBe('.a{background:none}')
-    expect(scrubCss('.a{background:URL(data:image/png;base64,AAAA)}')).toBe('.a{background:none}')
-  })
-
   it('keeps an address into the drawing, and a web link on a link', () => {
     expect(keepsAddress('use', '#node-1')).toBe(true)
     expect(keepsAddress('a', 'https://example.com')).toBe(true)

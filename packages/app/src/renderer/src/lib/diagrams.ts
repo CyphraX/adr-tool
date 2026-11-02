@@ -2,20 +2,19 @@ import type { DrawnDiagram } from '../../../shared/ipc'
 import {
   DIAGRAM_TOKENS,
   Drawings,
-  keepsAddress,
   mermaidConfig,
   mermaidSaid,
-  scrubCss,
   type DiagramColors,
   type Drawing
 } from './mermaid'
+import { sanitizedDrawing } from './sanitize'
 import { t } from './strings'
 
 /**
  * Mermaid blocks drawn in the window (docs/adr/0016-…): in the preview, in the live mode, and
  * for the export. Mermaid and the sanitizer are loaded the first time a block is shown, not at
  * start. An ADR is untrusted input: Mermaid draws at its strictest, and what it draws goes
- * through DOMPurify's SVG profile and `scrubCss` before it is shown or written anywhere.
+ * through lib/sanitize.ts before it is shown or written anywhere.
  */
 
 export type Theme = 'light' | 'dark'
@@ -69,32 +68,6 @@ function colorsOf(theme: Theme): DiagramColors {
   return colors
 }
 
-/**
- * The SVG of a drawing as it may be shown: through DOMPurify's SVG profile — no script, no
- * handler, no HTML —, then without an address that leads out of the drawing and without CSS
- * that would fetch. Serialized as XML, so that it reads the same in a page and in a file.
- */
-function sanitized(purify: Tools['purify'], svg: string): string | undefined {
-  const body: Node = purify.sanitize(svg, {
-    USE_PROFILES: { svg: true, svgFilters: true },
-    RETURN_DOM: true
-  })
-  const root = body instanceof Element ? body.querySelector('svg') : null
-  if (!root) return undefined
-  for (const element of [root, ...root.querySelectorAll('*')]) {
-    if (element.localName === 'style') element.textContent = scrubCss(element.textContent ?? '')
-    for (const attribute of [...element.attributes]) {
-      const { name, value } = attribute
-      if (/(?:^|:)href$/i.test(name) && !keepsAddress(element.localName, value)) {
-        element.removeAttribute(name)
-      } else if (/url\(|@import|image-set/i.test(value)) {
-        element.setAttribute(name, scrubCss(value))
-      }
-    }
-  }
-  return new XMLSerializer().serializeToString(root)
-}
-
 /** Draw a block, or say why it cannot be drawn. A block drawn before is not drawn again. */
 export function draw(source: string, theme: Theme = windowTheme()): Promise<Drawing> {
   // The light tokens are at hand in either theme; the dark ones only in a dark window.
@@ -110,7 +83,7 @@ export function draw(source: string, theme: Theme = windowTheme()): Promise<Draw
       const { mermaid, purify } = await tools()
       mermaid.initialize(mermaidConfig(colorsOf(theme), theme === 'dark'))
       const { svg } = await mermaid.render(id, source)
-      const clean = sanitized(purify, svg)
+      const clean = sanitizedDrawing(purify, svg)
       result = clean ? { kind: 'drawn', svg: clean } : { kind: 'failed', said: '' }
     } catch (error) {
       result = { kind: 'failed', said: mermaidSaid(error) }
