@@ -243,7 +243,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 
 | Document | Contents |
 | --- | --- |
-| [docs/vision.md](docs/vision.md) | Where the project is heading: the ADR tool as the first module of an architect's suite |
+| [docs/vision.md](docs/vision.md) | Where the project is heading: Decisions as the first module of an architect's suite |
 | [docs/roadmap.md](docs/roadmap.md) | What is in v1, what comes before the first public release, and what comes after |
 | [docs/plan.md](docs/plan.md) | The milestones of the Decisions module, with their status |
 | [docs/plan-structure.md](docs/plan-structure.md) | The parts of the Structure module, with their status |

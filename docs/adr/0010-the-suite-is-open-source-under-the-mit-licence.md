@@ -19,5 +19,5 @@ The roadmap kept licence and business model open until the first public release,
 ## Consequences
 
 - `LICENSE` holds the MIT text, and every package says `MIT`.
-- Every dependency the app ships has to be compatible with it. The ones used today are MIT, ISC or Apache-2.0; their notices go into the installers with distribution.
+- Every dependency the app ships has to be compatible with it. The code it ships today is under MIT, ISC, Apache-2.0 or BSD-3-Clause (`diff`), the IBM Plex fonts are under the SIL Open Font License 1.1, and Electron brings the notices of Chromium; all of them allow being shipped next to MIT code. Their notices go into the installers with distribution.
 - Code that comes in from elsewhere comes in under the same licence, or under one that is compatible with it.

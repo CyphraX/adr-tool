@@ -1,6 +1,6 @@
 # Vision — Softarch Suite
 
-Where this project is heading beyond the ADR tool: one desktop workbench for a software architect, in which decisions, code structure, rules, diagrams, review notes and assessments are connected to each other.
+Where this project is heading beyond its first module, Decisions: one desktop workbench for a software architect, in which decisions, code structure, rules, diagrams, review notes and assessments are connected to each other.
 Agreed in the design session of 2026-09-19. Vocabulary follows [CONTEXT-MAP.md](../CONTEXT-MAP.md) and the glossaries it points to.
 
 [roadmap.md](roadmap.md) and [plan.md](plan.md) remain the plan of the Decisions module and are not replaced by this document. ADR v1 was finished first (accepted on 2026-09-20); the first module after it, Structure, has its own plan in [plan-structure.md](plan-structure.md) and its contract in [structure-format.md](structure-format.md).
@@ -43,7 +43,7 @@ One module is one bounded context and, in code, one UI-free core package; a smal
 
 ### 1. Decisions
 
-The ADR tool as described in [roadmap.md](roadmap.md). What the suite adds:
+The Decisions module — the ADR tool of v1 — as described in [roadmap.md](roadmap.md). What the suite adds:
 
 - **Core:** the first Trace, "this ADR affects these Components", as an additive Metadata key. This is the roadmap's "ADR → code links" item, given its anchor. Mermaid blocks are rendered in the ADR preview.
 - **Later:** everything already listed under Later in the roadmap.
@@ -127,7 +127,7 @@ Architecture evaluation: a qualitative judgement, backed by what the other modul
 
 ### 7. Documentation
 
-- **Later:** an arc42 skeleton in Markdown whose chapters embed live views from the other modules — building-block view (Components, Diagrams), decisions (chapter 9, ADRs), quality scenarios (chapter 10), risks and technical debt (chapter 11). Export as a static site or PDF; this is the roadmap's "read-only export for non-technical readers".
+- **Later:** an arc42 skeleton in Markdown whose chapters embed live views from the other modules — building-block view (Components, Diagrams), decisions (chapter 9, ADRs), quality scenarios (chapter 10), risks and technical debt (chapter 11). Export as a static site or PDF, built on the read-only export of the Decisions module ([plan-roadmap.md](plan-roadmap.md), part 10), which covers ADRs only.
 - **Out:** a general documentation editor or wiki.
 
 ### Across all modules
@@ -150,7 +150,7 @@ Derived data enters the repository in exactly three places, each deliberately:
 
 ## On disk, in a user's repository
 
-Directory names in other people's repositories are hard to take back, and the product name is a working title. The names are therefore product-neutral.
+Directory names in other people's repositories are hard to take back, and should not depend on the product's name. The names are therefore product-neutral.
 
 - `.arch/` — configuration and model: Components, Rules, Exceptions, Baseline.
 - `docs/architecture/` (configurable) — what people read: Diagrams, Assessments, Risks, Technical Debt Items, Annotations, later the arc42 documents. Visible, so that it is found on GitHub.
@@ -161,13 +161,14 @@ Each module gets its own format specification, as [file-format.md](file-format.m
 
 ## Order after ADR v1
 
-1. **Structure** — Components, Dependency graph, cycles, core metrics, the code viewer, and the first Trace (ADR affects Component).
-2. **Conformance** — Rules, Patterns, Violations, Exceptions, `check` in CI. This is what carries the suite into teams.
-3. **Diagrams**
-4. **Review** — Annotations in the viewer that already exists.
-5. **Assessment** — needs modules 1 to 4 as sources of evidence.
-6. The Next tiers: history analysis, Library inventory, Baseline, MCP server.
-7. Later: Documentation, export, System.
+1. **Structure** — Components, Dependency graph, cycles, core metrics, the code viewer, and the first Trace (ADR affects Component). Built ([plan-structure.md](plan-structure.md)).
+2. **The rest of the Decisions roadmap** — decided by the author on 2026-11-02, ahead of Conformance: everything [roadmap.md](roadmap.md) lists apart from distribution, the MCP server and the export of ADRs included ([plan-roadmap.md](plan-roadmap.md)).
+3. **Conformance** — Rules, Patterns, Violations, Exceptions, `check` in CI. This is what carries the suite into teams.
+4. **Diagrams**
+5. **Review** — Annotations in the viewer that already exists.
+6. **Assessment** — needs modules 1 to 4 as sources of evidence.
+7. The Next tiers: history analysis, Library inventory, Baseline; the MCP server grows with each module.
+8. Later: Documentation, its export, System.
 
 **First public release:** the Decisions module alone, under the suite's name and with navigation built for further modules. The roadmap's list "Before the first public release" stays valid.
 

@@ -2,7 +2,7 @@
 
 How the rest of [roadmap.md](roadmap.md) gets built: what stands before the first public release, the follow-ups after v1, and the items under Later. Vocabulary follows [CONTEXT.md](../CONTEXT.md) and, where Components come in, the [Structure glossary](contexts/structure/CONTEXT.md). Agreed with the author on 2026-11-02.
 
-[plan.md](plan.md) is the record of v1, [plan-structure.md](plan-structure.md) that of the Structure module; both are complete. This plan does not touch the modules of [vision.md](vision.md) after Structure.
+[plan.md](plan.md) is the record of v1, [plan-structure.md](plan-structure.md) that of the Structure module; both are complete. This plan comes before Conformance, the next module in [vision.md](vision.md): the author asked for the roadmap to be finished first, and the vision's order says so now. It builds no module of the vision; the export of part 10 covers ADRs only, and the Documentation module builds on it later.
 
 ## Decided by the author
 
@@ -11,6 +11,7 @@ On 2026-11-02, before this plan was written:
 - **Licence:** MIT ([ADR-0010](adr/0010-the-suite-is-open-source-under-the-mit-licence.md)).
 - **Name:** Softarch Suite, the working title until now ([ADR-0011](adr/0011-the-product-is-called-softarch-suite.md)). The Decisions module is what was called ADR Tool; the repository and the package names keep `adr-tool`.
 - **Distribution is deferred:** installers, code signing, auto-update and Windows and macOS in CI stay where the roadmap has them, and are not part of this plan.
+- **Left to the author**, because they need what this plan cannot provide: the check of the name for clashes in trademark registers, domains, npm and GitHub ([ADR-0011](adr/0011-the-product-is-called-softarch-suite.md)), and running a quit with unsaved text once on a Mac (roadmap, "Known gaps of v1"). Both stay on the roadmap's list before the first public release.
 - **Working mode:** one branch and one pull request per part, as before. The author does not review them: each pull request is reviewed independently of the one who wrote it, its findings are fixed, and it is merged once CI is green.
 
 ## Working mode
@@ -19,7 +20,7 @@ As in [plan.md](plan.md#working-mode): `main` stays green, cores are built test-
 
 ## Parts
 
-The order follows the roadmap: what a first-time user meets at once comes first, then what carries the tool into teams, then the items under Later, cheapest and most independent first. Translations come late on purpose — every part before them adds texts.
+The order follows the roadmap: what a first-time user meets at once comes first, then what carries the tool into teams, then the items under Later, cheapest and most independent first. Translations come late on purpose — every part before them adds texts; the two parts after them bring their German texts with them.
 
 ### Part 1 — Licence and name
 

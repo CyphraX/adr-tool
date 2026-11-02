@@ -3,7 +3,7 @@
 Records what was deliberately left out of v1, so that it does not drop out of focus.
 Agreed in the design session of 2026-09-19. Vocabulary follows [CONTEXT.md](../CONTEXT.md).
 
-This is the plan of the ADR tool, which becomes the Decisions module of a larger suite; where the project as a whole is heading is in [vision.md](vision.md). How what is left of it gets built is in [plan-roadmap.md](plan-roadmap.md).
+This is the plan of the Decisions module of Softarch Suite — the ADR tool of v1; where the project as a whole is heading is in [vision.md](vision.md). How what is left of it gets built is in [plan-roadmap.md](plan-roadmap.md).
 
 ## v1
 
