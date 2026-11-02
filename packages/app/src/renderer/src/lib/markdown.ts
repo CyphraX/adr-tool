@@ -20,11 +20,15 @@ export function baseOf(repositoryId: string, path: string): DocumentBase {
 /**
  * The URL under which the main process serves an image of the repository (main/assets.ts), for
  * a source as the ADR writes it: relative to the ADR's directory, or to the root with a leading
- * slash. A source with a scheme stays as it is — the page's policy decides about it — and one
- * that leads out of the repository has none.
+ * slash. Any other source has none, and the image is shown without one: a source with a
+ * scheme or a host (`//host/x.png`, which a page loaded from a file reads as a network share),
+ * one with a backslash, one that leads out of the repository. So an ADR makes no request but
+ * for the files of its own repository.
  */
 export function assetSource(base: DocumentBase, source: string): string | undefined {
-  if (/^[a-z][a-z0-9+.-]*:/i.test(source) || source.startsWith('//')) return source
+  if (/^[a-z][a-z0-9+.-]*:/i.test(source) || source.startsWith('//') || source.includes('\\')) {
+    return undefined
+  }
   const path = source.split(/[?#]/)[0]!
   if (path === '') return undefined
   const segments = path.startsWith('/') ? [] : base.directory.split('/').filter(Boolean)
@@ -58,7 +62,6 @@ interface HtmlNode {
 function rehypeImages() {
   return (tree: HtmlNode, file: { data: object }): void => {
     const base = (file.data as { base?: DocumentBase }).base
-    if (!base) return
     const visit = (node: HtmlNode): void => {
       if (node.type === 'element' && node.tagName === 'img' && node.properties) {
         rewrite(node.properties, base)
@@ -69,10 +72,11 @@ function rehypeImages() {
   }
 }
 
-function rewrite(properties: Record<string, unknown>, base: DocumentBase): void {
+/** Without a base nothing can be found, and no source is kept. */
+function rewrite(properties: Record<string, unknown>, base: DocumentBase | undefined): void {
   const source = properties['src']
   if (typeof source !== 'string') return
-  const rewritten = assetSource(base, source)
+  const rewritten = base && assetSource(base, source)
   if (rewritten === undefined) delete properties['src']
   else properties['src'] = rewritten
 }
@@ -91,7 +95,7 @@ const pipeline = unified()
 
 /**
  * Render the body of an ADR to HTML that is safe to put into the page. With a base, the images
- * it names in its repository are shown.
+ * it names in its repository are shown; without one, no image has a source.
  */
 export function renderMarkdown(markdown: string, base?: DocumentBase): string {
   return String(pipeline.processSync({ value: markdown, data: base ? { base } : {} }))

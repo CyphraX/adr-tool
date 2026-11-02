@@ -1,4 +1,5 @@
-import { readFile, realpath, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { open, realpath, type FileHandle } from 'node:fs/promises'
 import { extname, isAbsolute, resolve, sep } from 'node:path'
 
 /**
@@ -28,10 +29,17 @@ export const ASSET_LIMIT = 20 * 1024 * 1024
 
 export interface Asset {
   readonly type: string
-  readonly bytes: Buffer
+  readonly size: number
+  /**
+   * The bytes, read as they are asked for: a large image is never held in memory whole. The
+   * file is closed when the stream ends or is cancelled, so it has to be read or cancelled.
+   */
+  readonly body: ReadableStream<Uint8Array>
 }
 
 const within = (base: string, full: string): boolean => full.startsWith(base + sep)
+
+const typeOf = (path: string): string | undefined => IMAGE_TYPES[extname(path).toLowerCase()]
 
 /**
  * The image at `path` below `root`, or `undefined` for anything that is not one: another kind
@@ -39,22 +47,60 @@ const within = (base: string, full: string): boolean => full.startsWith(base + s
  */
 export async function readAsset(root: string, path: string): Promise<Asset | undefined> {
   if (path === '' || path.includes('\0') || isAbsolute(path)) return undefined
-  const type = IMAGE_TYPES[extname(path).toLowerCase()]
-  if (type === undefined) return undefined
+  if (typeOf(path) === undefined) return undefined
   const base = resolve(root)
   const full = resolve(base, path)
   if (!within(base, full)) return undefined
+  let handle: FileHandle | undefined
   try {
     // The same question once more with the links resolved: a link inside the root may point
-    // anywhere on the disk.
+    // anywhere on the disk — and what it points to has to be an image by its own name too.
     const [realBase, realFull] = await Promise.all([realpath(base), realpath(full)])
-    if (!within(realBase, realFull)) return undefined
-    const info = await stat(realFull)
-    if (!info.isFile() || info.size > ASSET_LIMIT) return undefined
-    return { type, bytes: await readFile(realFull) }
+    const type = typeOf(realFull)
+    if (!within(realBase, realFull) || type === undefined) return undefined
+    // What is checked from here on is the file that is open, not a name that could be swapped
+    // in the meantime: a link put in place of the file itself is not followed.
+    handle = await open(realFull, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+    const info = await handle.stat()
+    if (!info.isFile() || info.size > ASSET_LIMIT) {
+      await handle.close()
+      return undefined
+    }
+    return { type, size: info.size, body: streamOf(handle, info.size) }
   } catch {
+    await handle?.close().catch(() => undefined)
     return undefined
   }
+}
+
+const CHUNK = 64 * 1024
+
+/** The first `size` bytes of an open file — what it had when it was checked, never more. */
+function streamOf(handle: FileHandle, size: number): ReadableStream<Uint8Array> {
+  let position = 0
+  const finish = async (controller: ReadableStreamDefaultController<Uint8Array>): Promise<void> => {
+    await handle.close().catch(() => undefined)
+    controller.close()
+  }
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const wanted = Math.min(CHUNK, size - position)
+        if (wanted <= 0) return await finish(controller)
+        const chunk = new Uint8Array(wanted)
+        const { bytesRead } = await handle.read(chunk, 0, wanted, position)
+        if (bytesRead === 0) return await finish(controller)
+        position += bytesRead
+        controller.enqueue(chunk.subarray(0, bytesRead))
+      } catch (error) {
+        await handle.close().catch(() => undefined)
+        controller.error(error)
+      }
+    },
+    async cancel() {
+      await handle.close().catch(() => undefined)
+    }
+  })
 }
 
 /**
@@ -72,7 +118,8 @@ export function parseAssetUrl(url: string): { repositoryId: string; path: string
   try {
     const segments = parsed.pathname.split('/').filter((segment) => segment !== '')
     const path = segments.map((segment) => decodeURIComponent(segment)).join('/')
-    // A decoded segment that holds a slash or is a step up says something other than its URL.
+    // A decoded segment that holds a slash says something other than its URL. Steps up are
+    // taken by the URL parser already, and readAsset refuses whatever leads out of the root.
     if (segments.some((segment) => /%2f|%5c/i.test(segment))) return undefined
     return { repositoryId: parsed.hostname, path }
   } catch {
@@ -92,9 +139,10 @@ export function assetHandler(
     const root = target && rootOf(target.repositoryId)
     const asset = target && root !== undefined ? await readAsset(root, target.path) : undefined
     if (!asset) return new Response(null, { status: 404 })
-    return new Response(new Uint8Array(asset.bytes), {
+    return new Response(asset.body, {
       headers: {
         'content-type': asset.type,
+        'content-length': String(asset.size),
         'x-content-type-options': 'nosniff',
         // An SVG opened on its own runs nothing and loads nothing.
         'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'"

@@ -44,30 +44,55 @@
 
   // The matches stand over everything around the field, also over the edge of a dialog whose
   // lists scroll: they are placed in the window, below the field, or above it where the space
-  // below is short, and follow it while anything scrolls.
+  // below is short. While they are open they follow the field, whatever moves it — a scroll, the
+  // window, a pick that makes the list above the field longer — and they are hidden while the
+  // field is scrolled out of sight.
   let field = $state<HTMLInputElement | undefined>(undefined)
-  let place = $state<{ left: number; width: number; top?: number; bottom?: number }>()
+  type Place = { left: number; width: number; top?: number; bottom?: number }
+  let place = $state<Place>()
   const ROOM = 200
 
-  function measure(): void {
-    if (!field) return
-    const box = field.getBoundingClientRect()
-    const below = window.innerHeight - box.bottom
-    place =
-      below >= ROOM || below >= box.top
-        ? { left: box.left, width: box.width, top: box.bottom + 2 }
-        : { left: box.left, width: box.width, bottom: window.innerHeight - box.top + 2 }
+  /** The nearest ancestor that scrolls, whose edges the field can be scrolled past. */
+  function scrollArea(from: HTMLElement): HTMLElement | undefined {
+    for (let node = from.parentElement; node; node = node.parentElement) {
+      if (/auto|scroll/.test(getComputedStyle(node).overflowY)) return node
+    }
+    return undefined
   }
 
+  function measure(area: HTMLElement | undefined): Place | undefined {
+    if (!field) return undefined
+    const box = field.getBoundingClientRect()
+    const edges = area?.getBoundingClientRect()
+    if (edges && (box.bottom <= edges.top || box.top >= edges.bottom)) return undefined
+    const below = window.innerHeight - box.bottom
+    return below >= ROOM || below >= box.top
+      ? { left: box.left, width: box.width, top: box.bottom + 2 }
+      : { left: box.left, width: box.width, bottom: window.innerHeight - box.top + 2 }
+  }
+
+  const same = (a: Place | undefined, b: Place | undefined): boolean =>
+    a === b ||
+    (a !== undefined &&
+      b !== undefined &&
+      a.left === b.left &&
+      a.width === b.width &&
+      a.top === b.top &&
+      a.bottom === b.bottom)
+
   $effect(() => {
-    if (!open) return
-    measure()
-    window.addEventListener('scroll', measure, true)
-    window.addEventListener('resize', measure)
-    return () => {
-      window.removeEventListener('scroll', measure, true)
-      window.removeEventListener('resize', measure)
+    if (!open || !field) return
+    const area = scrollArea(field)
+    // Compared with what was set last, not read from `place`: this effect does not depend on it.
+    let last: Place | undefined
+    let frame = 0
+    const follow = (): void => {
+      const next = measure(area)
+      if (!same(next, last)) place = last = next
+      frame = requestAnimationFrame(follow)
     }
+    follow()
+    return () => cancelAnimationFrame(frame)
   })
 
   function pick(candidate: T | undefined): void {
@@ -100,7 +125,7 @@
     type="text"
     role="combobox"
     aria-label={label}
-    aria-expanded={open}
+    aria-expanded={open && place !== undefined}
     aria-controls={`${uid}-matches`}
     aria-autocomplete="list"
     placeholder={candidates.length === 0 ? noneLeft : placeholder}
@@ -110,14 +135,14 @@
     onblur={() => (focused = false)}
     {onkeydown}
   />
-  {#if open}
+  {#if open && place}
     <ul
       id={`${uid}-matches`}
       role="listbox"
-      style:left="{place?.left ?? 0}px"
-      style:width="{place?.width ?? 0}px"
-      style:top={place?.top === undefined ? undefined : `${place.top}px`}
-      style:bottom={place?.bottom === undefined ? undefined : `${place.bottom}px`}
+      style:left="{place.left}px"
+      style:width="{place.width}px"
+      style:top={place.top === undefined ? undefined : `${place.top}px`}
+      style:bottom={place.bottom === undefined ? undefined : `${place.bottom}px`}
     >
       {#each matches as candidate, position (candidate.id)}
         <!-- mousedown, not click: the input must not lose the focus before the pick. -->

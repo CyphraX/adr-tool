@@ -48,19 +48,33 @@ describe('the images of an ADR', () => {
     expect(html).toContain('src="adr-asset://repo-1/assets/d.png"')
   })
 
-  it('lose a source that leads out of the repository, and keep one with a scheme', () => {
-    const html = renderMarkdown(
-      '![X](../../../etc/passwd.png) ![Y](https://example.com/y.png)',
-      base
-    )
+  it('lose a source that leads out of the repository', () => {
+    const html = renderMarkdown('![X](../../../etc/passwd.png)', base)
     expect(html).not.toContain('passwd')
-    expect(html).toContain('src="https://example.com/y.png"')
     expect(renderMarkdown('![Z](z.png)', { repositoryId: 'repo-1', directory: '' })).toContain(
       'src="adr-asset://repo-1/z.png"'
     )
   })
 
-  it('are left as written where there is no repository to read them from', () => {
-    expect(renderMarkdown('![A](img/diagram.png)')).toContain('src="img/diagram.png"')
+  // A page loaded from a file reads `//host/x.png` as a network share: on Windows, merely
+  // viewing such an ADR would hand the user's login to that host.
+  it('lose a source with a scheme, a host or a backslash: nothing is requested from elsewhere', () => {
+    const html = renderMarkdown(
+      [
+        '![A](https://example.com/a.png)',
+        '![B](//evil.example/share/b.png)',
+        '![C](\\\\evil.example\\share\\c.png)',
+        '![D](img\\..\\..\\d.png)',
+        '![E](img/%5c..%5cE.png)',
+        '![F](file:///etc/f.png)'
+      ].join(' '),
+      base
+    )
+    expect(html.match(/<img[^>]*>/g)).toHaveLength(6)
+    expect(html).not.toContain('src=')
+  })
+
+  it('have no source where there is no repository to read them from', () => {
+    expect(renderMarkdown('![A](img/diagram.png) ![B](//evil.example/b.png)')).not.toContain('src=')
   })
 })
