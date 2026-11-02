@@ -147,22 +147,27 @@ A use of something outside the repository is not a Dependency. Where it names a 
 
 ### TypeScript and JavaScript (part 3)
 
-Files are parsed one by one; no program is built and no type checker runs. This keeps the analysis fast, incremental per file, and independent of type errors in the repository.
+Files are parsed one by one with TypeScript's parser; no program is built and no type checker runs ([ADR-0008](adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)). This keeps the analysis fast, incremental per file, and independent of type errors in the repository.
 
-- What counts as a use: `import` and `export … from` declarations, `import x = require('…')`, `require('…')` and dynamic `import('…')` — the last two only with a string literal as argument. Computed specifiers are not followed.
-- `import type`, `export type … from`, and an import whose every named binding is marked `type`, are type-only.
+- What counts as a use: `import` and `export … from` declarations, `import x = require('…')`, `require('…')` and dynamic `import('…')` — the last two only with a string literal as argument — and `import('…')` in the position of a type (`import('./x').T`, `typeof import('./x')`). Computed specifiers are not followed, nor are triple-slash directives or types written in JSDoc comments.
+- `import type`, `export type … from`, `import('…')` in the position of a type, and an import whose every named binding is marked `type`, are type-only. So is every use in a declaration file and inside a module declared with `declare`: neither exists at run time.
+- A file **cannot be parsed** when TypeScript's parser reports a syntax error. Types written into a `.js` file, as Flow does, are not one; its imports are read. `.svelte`, `.mjs` and `.mts` files are read as ES modules, in which the top level may `await`, whatever they contain.
 - A specifier is resolved with TypeScript's own module resolution, under the compiler options that apply to the importing file:
   - They come from the nearest `tsconfig.json` or `jsconfig.json` above the file. Where that file has `references` (a solution-style configuration), the options of the first referenced project whose `files` and `include` cover the importing file apply instead; where none covers it, the file's own.
-  - `baseUrl`, `paths`, `moduleResolution` and `extends` are honoured. `extends` is followed wherever it points, also into `node_modules`, when the file is there; when it is not, the settings it would have brought are missing. `plugins` are never loaded.
+  - `baseUrl`, `paths`, `moduleResolution` and `extends` are honoured. `extends` is followed wherever it points inside the repository, also into `node_modules` or into a generated file git ignores (`.svelte-kit/tsconfig.json`), when the file is there; when it is not, the settings it would have brought are missing. Configuration is read as JSON and nothing outside of the repository is read. `plugins` are never loaded.
   - Where `moduleResolution` is not set, and where there is no configuration file at all, TypeScript's `bundler` resolution applies.
+- Resolution lands only on the files the repository consists of (section 2). Build output git ignores is not there for it, even where it lies on the disk.
 - A relative specifier that ends in the extension of a Source File TypeScript does not know (`./App.svelte`) is resolved as a path.
-- An import of a workspace package resolves through that package's `exports`, `main` or `types`. When the result is a Source File, it is a Dependency. When it is not — the package points at build output that is not there or not a Source File — the use is not resolved. It is never a Library use: the package is part of the repository.
+- A **workspace package** is a package the workspace declares — the globs of `pnpm-workspace.yaml` or of `workspaces` in the root `package.json` — or the repository's root package itself. A `package.json` elsewhere, a fixture for instance, names no workspace package. An import of a workspace package resolves through that package's `exports`, `main` or `types`. When the result is a Source File, it is a Dependency. When it is not — the package points at build output that is not there or not a Source File — the use is not resolved. It is never a Library use: the package is part of the repository.
 - **Dependencies are counted as written.** An import of a barrel file (`./index`) is a Dependency on the barrel, not on the file that defines the imported name. A barrel at the edge of a Component is that Component's interface. Looking through re-exports is a later option, not the default.
 - Imports of files that are not Source Files (`.css`, `.json`, images) are ignored.
+- A specifier that is no package name — a path (`/abs`), a subpath import of `package.json` (`#internal`), a URL or a scheme only a bundler or another runtime understands (`virtual:pwa`, `npm:x`) — is not resolved when TypeScript does not resolve it. It is never a Library.
 
 ### Svelte (part 3)
 
-A `.svelte` file is a Source File whose content is the concatenation of its `<script>` blocks (instance and `module`), read as TypeScript. The Svelte compiler is not used; markup and styles are not looked at. Svelte components used in markup are imported in the script, so nothing is lost. Line numbers refer to the `.svelte` file.
+A `.svelte` file is a Source File whose content is the concatenation of its `<script>` blocks (instance and `module`), read as TypeScript. The Svelte compiler is not used; markup and styles are not looked at. Svelte components used in markup are imported in the script, so nothing is lost. Line numbers refer to the `.svelte` file. A `<script>` inside an HTML comment or inside `<svelte:head>` belongs to the page and not to the component, and is not read.
+
+A component named through an alias or a package (`$lib/Row.svelte`) resolves as TypeScript would resolve it were it a file `Row.svelte.ts`, unless a file of that name exists, which is then the one meant.
 
 ### Java (part 4)
 

@@ -1,8 +1,7 @@
-import { parse as parseYaml } from 'yaml'
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import type { DeclaredComponent } from './declaration'
-import { matcherOf } from './patterns'
 import { isNeverLookedAt, type SourceFile } from './source-files'
+import { workspacePackages } from './workspace'
 
 /**
  * The Draft (docs/structure-format.md, "The Draft"): the Components the suite derives as long
@@ -146,44 +145,6 @@ export function segmentOf(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   return segment === '' ? 'unit' : segment
-}
-
-async function workspacePackages(fs: FileSystem, files: readonly string[]): Promise<string[]> {
-  const globs: string[] = []
-  const strings = (value: unknown): string[] =>
-    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
-
-  if (files.includes('pnpm-workspace.yaml')) {
-    try {
-      const workspace: unknown = parseYaml((await fs.readText('pnpm-workspace.yaml')) ?? '')
-      globs.push(...strings((workspace as { packages?: unknown } | null)?.packages))
-    } catch {
-      // A workspace file that cannot be read names no packages.
-    }
-  }
-  if (files.includes('package.json')) {
-    try {
-      const manifest = JSON.parse((await fs.readText('package.json')) ?? '{}') as {
-        workspaces?: unknown
-      }
-      const workspaces = manifest.workspaces
-      globs.push(
-        ...strings(
-          Array.isArray(workspaces)
-            ? workspaces
-            : (workspaces as { packages?: unknown } | undefined)?.packages
-        )
-      )
-    } catch {
-      // As above.
-    }
-  }
-  if (globs.length === 0) return []
-  const isPackage = matcherOf(globs, true)
-  return files
-    .filter((path) => path.endsWith('/package.json'))
-    .map((path) => path.slice(0, -'/package.json'.length))
-    .filter(isPackage)
 }
 
 async function mavenModules(fs: FileSystem, files: readonly string[]): Promise<string[]> {

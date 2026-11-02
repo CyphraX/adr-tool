@@ -2,7 +2,7 @@
   "name": "@adr-tool/spikes",
   "version": "0.0.0",
   "private": true,
-  "description": "Temporary: the two spikes of part 1 of docs/plan-structure.md. Their halves move into the structure package with parts 3 and 4, and this package goes",
+  "description": "Temporary: what is left of the two spikes of part 1 of docs/plan-structure.md, the Java half. It moves into the structure package with part 4, and this package goes",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -11,7 +11,6 @@
   "dependencies": {
     "@adr-tool/kernel": "workspace:*",
     "tree-sitter-java": "^0.23.5",
-    "typescript": "^5.9.3",
     "web-tree-sitter": "^0.27.0"
   },
   "devDependencies": {

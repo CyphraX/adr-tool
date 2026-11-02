@@ -1,7 +1,14 @@
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { applyChangeSet, memoryFileSystem } from '@adr-tool/kernel'
-import { DECLARATION_PATH, openStructure, planAdopt, type DeclaredComponent } from '../src'
+import {
+  analyseDependencies,
+  DECLARATION_PATH,
+  levelOf,
+  openStructure,
+  planAdopt,
+  type DeclaredComponent
+} from '../src'
 import { nodeFileSystem, repositoryFiles } from './repository-files'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url))
@@ -42,8 +49,10 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
       'kernel/text'
     ])
   )
-  // `structure` has its files directly under src: there is nothing to tell apart yet.
-  expect(ids(structure.components).filter((id) => id.startsWith('structure/'))).toEqual([])
+  // `structure` keeps most of its files directly under src, beside the adapter of a language.
+  expect(ids(structure.components).filter((id) => id.startsWith('structure/'))).toEqual([
+    'structure/typescript'
+  ])
 
   const owner = (path: string): string | undefined =>
     structure.sourceFiles.find((file) => file.path === path)?.component
@@ -79,4 +88,45 @@ it('adopts that Draft into a declaration that reads back as the same Components'
   expect(adopted.problems).toEqual([])
   expect(adopted.components).toEqual(structure.components)
   expect(adopted.sourceFiles).toEqual(structure.sourceFiles)
+})
+
+// The done-when of part 3, as far as `structure` goes; the app shows the same in the second
+// half of the part.
+it('finds the Dependency from app to core, and the Source File Dependencies behind it', async () => {
+  const fs = nodeFileSystem(root)
+  const files = repositoryFiles(root)
+  const structure = await openStructure(fs, files)
+  const analysis = await analyseDependencies(fs, files, structure.sourceFiles)
+
+  expect(analysis.notAnalysed).toEqual([])
+  expect(analysis.notResolved).toEqual([])
+
+  const top = levelOf(structure, analysis.dependencies)!
+  const edges = top.edges.map((edge) => `${edge.from} > ${edge.to}`)
+  expect(edges).toEqual(
+    expect.arrayContaining(['app > core', 'core > kernel', 'structure > kernel'])
+  )
+  // One core package per module on a shared kernel (ADR-0006): the cores do not meet, and
+  // the kernel depends on nothing.
+  expect(
+    edges.filter((edge) => /^(?:core > structure|structure > core|kernel > )/.test(edge))
+  ).toEqual([])
+  expect(top.cycles).toEqual([])
+
+  const behind = top.edges.find((edge) => edge.from === 'app' && edge.to === 'core')!
+  expect(behind.weight).toBe(behind.dependencies.length)
+  const users = behind.dependencies.map((dependency) => dependency.from)
+  expect(users).toEqual(
+    expect.arrayContaining([
+      // The main process, under tsconfig.node.json of app's solution-style tsconfig.json …
+      'packages/app/src/main/repositories.ts',
+      // … the renderer, under tsconfig.web.json …
+      'packages/app/src/renderer/src/lib/graph-layout.ts',
+      // … and its Svelte components, read from their script blocks.
+      'packages/app/src/renderer/src/components/RelationsGraph.svelte'
+    ])
+  )
+  expect(
+    behind.dependencies.every((dependency) => dependency.to === 'packages/core/src/index.ts')
+  ).toBe(true)
 })

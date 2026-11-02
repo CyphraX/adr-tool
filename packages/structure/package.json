@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@adr-tool/kernel": "workspace:*",
+    "typescript": "^5.9.3",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.5",
-    "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   }
 }
