@@ -27,6 +27,15 @@
   --unknown: #6b7385;
   --problem: #b0382f;
 
+  /* Code in the viewer: a few quiet hues, and the lines a Dependency points at. */
+  --code-keyword: #7a3e9d;
+  --code-string: #25764a;
+  --code-comment: #8891a3;
+  --code-type: #2f5f8a;
+  --code-literal: #a2650f;
+  --code-marked: #fbf0d2;
+  --code-marked-edge: #e2aa4f;
+
   --ui: 'IBM Plex Sans', system-ui, sans-serif;
   --document: 'IBM Plex Serif', Georgia, serif;
   --code: 'IBM Plex Mono', ui-monospace, monospace;
@@ -61,6 +70,14 @@
     --superseded: #96a7cb;
     --unknown: #98a1b3;
     --problem: #f08378;
+
+    --code-keyword: #c39be0;
+    --code-string: #62c088;
+    --code-comment: #737d91;
+    --code-type: #8fb0e0;
+    --code-literal: #e2aa4f;
+    --code-marked: #3a3322;
+    --code-marked-edge: #a2650f;
   }
 }
 

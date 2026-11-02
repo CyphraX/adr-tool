@@ -10,6 +10,7 @@ import type {
 import type {
   Cycle,
   Dependency,
+  Language,
   MatrixCycle,
   Metrics,
   NotAnalysed,
@@ -20,8 +21,10 @@ import type {
 /**
  * The contract between the main process and the sandboxed renderer.
  *
- * The renderer never names a file or a directory. A repository the user opened gets an
- * `id` from the main process, and everything after that refers to the id.
+ * The renderer never names a file or a directory it was not given. A repository the user
+ * opened gets an `id` from the main process, and everything after that refers to the id; a
+ * Source File is named by the path the analysis gave it, which the main process looks up
+ * among the Source Files of its analysis before it reads anything.
  */
 export interface OpenRepository {
   readonly id: string
@@ -206,6 +209,11 @@ export interface StructureComponent {
   readonly tests: readonly string[]
   /** The Component whose children it is one of; `undefined` at the top. */
   readonly level: string | undefined
+  /**
+   * The Source Files it contains that are counted, in the order of their paths: the first
+   * few hundred. How many there are is in its metrics.
+   */
+  readonly files: readonly string[]
   /** The test files it contains, counted or not. */
   readonly testFiles: number
   /** It contains Java that is counted: its metrics are a lower bound. */
@@ -263,6 +271,18 @@ export interface StructureView {
 
 export type StructureResult =
   | { readonly ok: true; readonly view: StructureView }
+  | { readonly ok: false; readonly reason: string }
+
+/** The text of one Source File, as the code viewer shows it. */
+export interface SourceFileText {
+  /** As the analysis names it: relative to the repository root. */
+  readonly path: string
+  readonly language: Language
+  readonly text: string
+}
+
+export type SourceFileResult =
+  | { readonly ok: true; readonly file: SourceFileText }
   | { readonly ok: false; readonly reason: string }
 
 export type PlanResult =
@@ -328,6 +348,11 @@ export interface Api {
     /** The Components whose rows the matrix shows expanded. */
     expanded: readonly string[]
   ): Promise<StructureResult>
+  /**
+   * The text of a Source File, by the path the analysis gave it. Nothing else is read: the
+   * main process looks the path up among the Source Files of its analysis first.
+   */
+  readSourceFile(repositoryId: string, path: string): Promise<SourceFileResult>
   /** Called when the analysis of a repository changed: files changed, or a change was applied. */
   onStructureChanged(listener: (repositoryId: string) => void): () => void
   /** Plan writing the Draft into `.arch/components.yml`. Nothing is written until the change is applied. */
@@ -357,6 +382,7 @@ export const CHANNEL = {
   planAdopt: 'change:plan-adopt',
   planStructureRepair: 'change:plan-structure-repair',
   structureView: 'structure:view',
+  readSourceFile: 'structure:read-source-file',
   structureChanged: 'structure:changed',
   listTemplates: 'templates:list',
   history: 'git:history',

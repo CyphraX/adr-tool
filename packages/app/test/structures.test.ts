@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { metricsOf } from '@adr-tool/structure/model'
 import { analyse, readCache, writeCache, type Analysis } from '../src/main/analysis'
-import { Structures, viewOf } from '../src/main/structures'
+import { readSourceFile, Structures, viewOf } from '../src/main/structures'
 
 /** A small repository without git: a Cycle between two Components, one of which has children. */
 let root: string
@@ -198,6 +198,7 @@ describe('a level as the window gets it', () => {
       paths: ['src/shop/**'],
       tests: [],
       level: undefined,
+      files: ['src/shop/cart/cart.ts', 'src/shop/index.ts'],
       testFiles: 0,
       java: false,
       dependsOn: [
@@ -215,7 +216,16 @@ describe('a level as the window gets it', () => {
       ]
     })
     expect(shop.metrics).toEqual(view.nodes[0]!.metrics)
-    expect(view.components[1]).toMatchObject({ id: 'billing', testFiles: 1 })
+    // Its test file is counted among its test files, and listed only when tests are included.
+    expect(view.components[1]).toMatchObject({
+      id: 'billing',
+      files: ['src/billing/invoice.ts'],
+      testFiles: 1
+    })
+    expect(
+      viewOf('repo', analysis, undefined, true).components.find((page) => page.id === 'billing')!
+        .files
+    ).toEqual(['src/billing/invoice.test.ts', 'src/billing/invoice.ts'])
     // Below shop, cart is used by the files shop owns itself.
     expect(view.components[2]).toMatchObject({
       level: 'shop',
@@ -251,6 +261,62 @@ describe('this repository, as the window gets it', () => {
     expect(
       view.matrix.cells.filter((cell) => rows.indexOf(cell.from) < rows.indexOf(cell.to))
     ).toEqual([])
+  })
+})
+
+describe('a Source File for the code viewer', () => {
+  let analysis: Analysis
+  beforeAll(async () => {
+    analysis = (await analyse(root, undefined)).analysis
+  })
+
+  it('is read as the disk has it, with its language', async () => {
+    expect(await readSourceFile(root, 'src/billing/invoice.ts', analysis)).toEqual({
+      ok: true,
+      file: {
+        path: 'src/billing/invoice.ts',
+        language: 'typescript',
+        text: "import type { Cart } from '../shop/cart/cart'\nimport x from './gone'\n"
+      }
+    })
+  })
+
+  it('is read only when the analysis lists it as a Source File', async () => {
+    // The renderer names a file by the path the analysis gave it, and nothing else is read.
+    for (const path of [
+      '.arch/components.yml',
+      '../outside.ts',
+      `${root}/src/billing/invoice.ts`,
+      'src/billing/gone.ts',
+      'src/billing/../billing/invoice.ts'
+    ]) {
+      expect(await readSourceFile(root, path, analysis)).toMatchObject({ ok: false })
+    }
+  })
+
+  it('is refused when it is too large to show, or gone since the analysis', async () => {
+    expect(await readSourceFile(root, 'src/billing/invoice.ts', analysis, 20)).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('too large')
+    })
+    write('src/billing/brief.ts', 'export {}\n')
+    const withBrief = (await analyse(root, undefined)).analysis
+    rmSync(join(root, 'src/billing/brief.ts'))
+    expect(await readSourceFile(root, 'src/billing/brief.ts', withBrief)).toMatchObject({
+      ok: false
+    })
+  })
+
+  it('is asked for through the Structures, which analyse first if need be', async () => {
+    const structures = new Structures(
+      async () => analysis,
+      () => undefined,
+      false
+    )
+    expect(await structures.sourceFile('repo', root, 'src/shop/index.ts')).toMatchObject({
+      ok: true,
+      file: { path: 'src/shop/index.ts' }
+    })
   })
 })
 

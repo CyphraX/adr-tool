@@ -379,6 +379,22 @@ export const t = {
       cycle: 'the rows of a Cycle'
     },
 
+    viewer: {
+      label: 'Source File',
+      back: (show: 'graph' | 'matrix' | 'metrics'): string =>
+        ({
+          graph: 'Back to the graph',
+          matrix: 'Back to the matrix',
+          metrics: 'Back to the metrics'
+        })[show],
+      marked: (lines: readonly number[]): string =>
+        `${many(lines.length, 'Line', 'Lines')} ${lines.join(', ')} marked`,
+      reading: 'Reading the file …',
+      readOnly: 'Read-only',
+      open: (path: string): string => `Open ${path}`,
+      openAt: (path: string, line: number): string => `Open ${path} at line ${line}`
+    },
+
     page: {
       component: 'Component',
       id: 'ID',
@@ -393,6 +409,8 @@ export const t = {
           ? many(tests, 'One of them a test', `${count(tests)} of them tests`)
           : many(tests, 'One test file, left out', `${count(tests)} test files, left out`),
       empty: 'It contains no Source File, and so has no metrics.',
+      files: 'Source Files',
+      filesIn: (directory: string): string => `In \`${directory}\`:`,
       metrics: 'Metrics',
       cycles: 'Cycles it is part of',
       noCycle: 'None at its level.',
@@ -415,6 +433,7 @@ export const t = {
       sourceFile: 'Source File',
       lines: (lines: readonly number[]): string =>
         `${many(lines.length, 'line', 'lines')} ${lines.join(', ')}`,
+      lineWord: (count: number): string => many(count, 'line', 'lines'),
       typeOnly: 'type-only',
       notResolved: 'Uses that are not resolved',
       notResolvedHint:

@@ -15,6 +15,7 @@ import type {
   HistoryEntry,
   OpenRepository,
   PlannedChange,
+  SourceFileText,
   StructureView
 } from '../../../shared/ipc'
 import { recordedIn } from './history'
@@ -41,6 +42,17 @@ export type StructureSelection =
   | { kind: 'not-resolved' }
   | { kind: 'not-analysed' }
 
+/** A Source File open in the code viewer, with the lines to mark and the one to bring into view. */
+export interface CodeView {
+  path: string
+  marks: number[]
+  line: number | undefined
+  /** Its text, once it is read. */
+  file: SourceFileText | undefined
+  /** Why it cannot be shown. */
+  error: string | undefined
+}
+
 /** The Structure view of one repository: which level, with or without tests, and what is selected. */
 interface StructureTab {
   parent: string | undefined
@@ -54,6 +66,8 @@ interface StructureTab {
   /** Why the level could not be shown. */
   error: string | undefined
   selection: StructureSelection | undefined
+  /** The Source File the middle shows instead of the level, if one is open. */
+  code: CodeView | undefined
 }
 
 interface Tab {
@@ -240,6 +254,8 @@ class AppState {
     window.api.onStructureChanged((repositoryId) => {
       const tab = this.tabs.find((candidate) => candidate.repository.id === repositoryId)
       if (tab?.structure.view) void this.loadStructure(tab)
+      // The file in the viewer may be one that changed.
+      if (tab?.structure.code) void this.readSourceFile(tab)
     })
     window.api.onCloseRequested(() => this.requestClose())
     const session = await window.api.restoreSession()
@@ -336,12 +352,47 @@ class AppState {
     tab.structure.parent = id
     tab.structure.expanded = []
     tab.structure.selection = undefined
+    tab.structure.code = undefined
     void this.loadStructure(tab)
   }
 
   /** Show the level as a drawing, as a matrix, or as a table of its metrics. */
   showInStructure(show: StructureShow): void {
-    if (this.active) this.active.structure.show = show
+    if (!this.active) return
+    this.active.structure.show = show
+    this.active.structure.code = undefined
+  }
+
+  /**
+   * Open a Source File in the code viewer, with `marks` marked — the lines of a Dependency —
+   * and `line` brought into view, or else the first of them.
+   */
+  openSourceFile(path: string, marks: readonly number[] = [], line?: number): void {
+    const tab = this.active
+    if (!tab) return
+    const open = tab.structure.code?.path === path ? tab.structure.code.file : undefined
+    tab.structure.code = { path, marks: [...marks], line, file: open, error: undefined }
+    if (!open) void this.readSourceFile(tab)
+  }
+
+  /** Back from the code viewer to the level. */
+  closeSourceFile(): void {
+    if (this.active) this.active.structure.code = undefined
+  }
+
+  private async readSourceFile(tab: Tab): Promise<void> {
+    const path = tab.structure.code?.path
+    if (path === undefined) return
+    const result = await window.api.readSourceFile(tab.repository.id, path)
+    const code = tab.structure.code
+    // Another file was opened in the meantime, or none.
+    if (code?.path !== path) return
+    if (result.ok) {
+      code.file = result.file
+      code.error = undefined
+    } else {
+      code.error = result.reason
+    }
   }
 
   /** Expand the row of a Component in the matrix into the rows of the level below it, or fold it back. */
@@ -875,6 +926,7 @@ function newTab(repository: OpenRepository): Tab {
       tests: false,
       show: 'graph',
       expanded: [],
+      code: undefined,
       view: undefined,
       loading: false,
       error: undefined,

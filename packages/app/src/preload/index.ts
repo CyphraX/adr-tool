@@ -31,6 +31,8 @@ const api: Api = {
   },
   structureView: (repositoryId, parent, tests, expanded) =>
     ipcRenderer.invoke(CHANNEL.structureView, repositoryId, parent, tests, expanded),
+  readSourceFile: (repositoryId, path) =>
+    ipcRenderer.invoke(CHANNEL.readSourceFile, repositoryId, path),
   onStructureChanged: (listener) => {
     const handler = (_: unknown, repositoryId: string): void => listener(repositoryId)
     ipcRenderer.on(CHANNEL.structureChanged, handler)
