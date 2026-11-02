@@ -1,9 +1,13 @@
 import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { win32 } from 'node:path'
 import { createTwoFilesPatch } from 'diff'
 import {
   DEFAULT_LOG_PATHS,
   RELATION_TYPES,
+  firstLog,
+  normalizePath,
   STATUSES,
   applyChangeSet,
   describeConsequences,
@@ -36,16 +40,6 @@ import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/str
 import { repositoryFiles } from './files'
 import { Refusal, type Tool } from './protocol'
 import type { Schema } from './schema'
-
-/** Where the first ADR of a repository goes, as in the app: a well-known directory. */
-const FIRST_LOG: DecisionLog = {
-  path: DEFAULT_LOG_PATHS[0]!,
-  naming: 'sequential',
-  adrs: [],
-  relations: [],
-  guests: [],
-  problems: []
-}
 
 /** How many planned changes wait at most; the oldest is forgotten first. */
 const MAX_PLANNED = 50
@@ -81,8 +75,15 @@ const object = (properties: Record<string, Schema>, needed: string[] = []): Sche
 })
 
 const LOG = text(
-  'The directory of the Decision Log, e.g. "docs/adr". Can be left out when the repository has one log, or when the ID is found in one log only.'
+  'The directory of the Decision Log, e.g. "docs/adr"; "." for a log at the top of the repository. Can be left out when the repository has one log, or when the ID is found in one log only.'
 )
+
+/** How a log is named to the agent: its directory, `.` for the top of the repository. */
+const shown = (path: string): string => (path === '' ? '.' : path)
+
+/** What identifies the body of an ADR as it was read: an edit of it starts from that. */
+const revisionOf = (body: string): string =>
+  createHash('sha256').update(body, 'utf8').digest('hex').slice(0, 16)
 const ID = required(
   'The ADR\'s ID: its file name without ".md", e.g. "0007-use-kafka". "<log>/<ID>" names an ADR of another log.'
 )
@@ -121,41 +122,54 @@ export function toolsFor(options: ToolOptions): Tool[] {
     return { repository, components }
   }
 
+  /** Where the first ADR goes, in a repository without a Decision Log. */
+  const first = async (): Promise<DecisionLog> => {
+    const found = await firstLog(fs)
+    if ('reason' in found) throw new Refusal(found.reason)
+    return found.log
+  }
+
   /** The log a call means: named, implied by a qualified ID, the only one, or the one with the ID. */
-  const logFor = (
+  const logFor = async (
     repository: Repository,
     input: Record<string, unknown>,
     purpose: 'adr' | 'log' | 'create'
-  ): { log: DecisionLog; id: string | undefined } => {
+  ): Promise<{ log: DecisionLog; id: string | undefined }> => {
     const logs = repository.logs
-    const named = typeof input.log === 'string' && input.log !== '' ? input.log : undefined
+    let path: string | undefined
+    if (typeof input.log === 'string') {
+      path = normalizePath(input.log)
+      if (path === undefined) throw new Refusal(`${input.log} is no directory of the repository.`)
+    }
     let id = typeof input.id === 'string' ? input.id : undefined
-    let path = named
     if (id !== undefined && id.includes('/')) {
       const reference = parseReference(id)
       if (path !== undefined && path !== reference.log) {
-        throw new Refusal(`${id} names an ADR of ${reference.log}, not of ${path}.`)
+        throw new Refusal(
+          `${id} names an ADR of ${shown(reference.log ?? '')}, not of ${shown(path)}.`
+        )
       }
       path = reference.log
       id = reference.id
     }
-    const paths = logs.map((log) => log.path).join(', ')
+    const paths = logs.map((log) => shown(log.path)).join(', ')
     if (path !== undefined) {
       const log = logs.find((candidate) => candidate.path === path)
       if (log) return { log, id }
-      if (purpose === 'create' && logs.length === 0 && path === FIRST_LOG.path) {
-        return { log: FIRST_LOG, id }
+      if (purpose === 'create' && logs.length === 0) {
+        const log = await first()
+        if (log.path === path) return { log, id }
       }
       throw new Refusal(
         logs.length === 0
-          ? `There is no Decision Log at ${path}: the repository has none yet.`
-          : `There is no Decision Log at ${path}. The repository has: ${paths}.`
+          ? `There is no Decision Log at ${shown(path)}: the repository has none yet.`
+          : `There is no Decision Log at ${shown(path)}. The repository has: ${paths}.`
       )
     }
     if (logs.length === 0) {
-      if (purpose === 'create') return { log: FIRST_LOG, id }
+      if (purpose === 'create') return { log: await first(), id }
       throw new Refusal(
-        `The repository has no Decision Log yet: none is configured in .adr/config.yml or .adr-dir, and none of ${DEFAULT_LOG_PATHS.join(', ')} exists. plan_create_adr starts one in ${FIRST_LOG.path}.`
+        `The repository has no Decision Log yet: none is configured in .adr/config.yml or .adr-dir, and none of ${DEFAULT_LOG_PATHS.join(', ')} exists. plan_create_adr starts the first one.`
       )
     }
     if (logs.length === 1) return { log: logs[0]!, id }
@@ -169,7 +183,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
 
   const adrIn = (log: DecisionLog, id: string | undefined): Adr => {
     const adr = log.adrs.find((candidate) => candidate.id === id)
-    if (!adr) throw new Refusal(`There is no ADR ${id ?? ''} in ${log.path}.`)
+    if (!adr) throw new Refusal(`There is no ADR ${id ?? ''} in ${shown(log.path)}.`)
     return adr
   }
 
@@ -188,7 +202,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       changeId,
       files: plan.changeSet.files.map(fileOf),
       warnings: plan.warnings ?? [],
-      ...(plan.created && { created: { log: log.path, ...plan.created } }),
+      ...(plan.created && { created: { log: shown(log.path), ...plan.created } }),
       ...(plan.renamed && { renamed: plan.renamed }),
       next: 'Nothing is written yet. Show the person the files and the warnings; apply_change with this changeId writes them, discard_change drops them.'
     }
@@ -208,7 +222,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
           root: options.root,
           discoveredBy: repository.discoveredBy,
           logs: repository.logs.map((log) => ({
-            path: log.path,
+            path: shown(log.path),
             naming: log.naming,
             adrs: log.adrs.length,
             problems: groupProblems(log).length
@@ -238,7 +252,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       run: async (input) => {
         const { repository } = await open()
         const logs =
-          input.log === undefined ? repository.logs : [logFor(repository, input, 'log').log]
+          input.log === undefined ? repository.logs : [(await logFor(repository, input, 'log')).log]
         const adrs = logs.flatMap((log) =>
           log.adrs
             .filter(
@@ -254,12 +268,12 @@ export function toolsFor(options: ToolOptions): Tool[] {
       name: 'read_adr',
       title: 'Read an ADR',
       description:
-        'One ADR: its Metadata, its Relations with their state, its Problems, and its body as Markdown.',
+        'One ADR: its Metadata, its Relations with their state, its Problems, and its body as Markdown with its revision, which plan_edit_body takes.',
       inputSchema: object({ id: ID, log: LOG }, ['id']),
       annotations: { title: 'Read an ADR', ...READ },
       run: async (input) => {
         const { repository } = await open()
-        const { log, id } = logFor(repository, input, 'adr')
+        const { log, id } = await logFor(repository, input, 'adr')
         const adr = adrIn(log, id)
         const { metadata } = adr
         return {
@@ -277,7 +291,8 @@ export function toolsFor(options: ToolOptions): Tool[] {
           problems: problemsOf(log).filter(
             (group) => group.adr === adr.id || group.consequences.some((one) => one.adr === adr.id)
           ),
-          body: adr.body
+          body: adr.body,
+          revision: revisionOf(adr.body)
         }
       }
     },
@@ -303,10 +318,10 @@ export function toolsFor(options: ToolOptions): Tool[] {
       run: async (input) => {
         const { repository } = await open()
         const logs =
-          input.log === undefined ? repository.logs : [logFor(repository, input, 'log').log]
+          input.log === undefined ? repository.logs : [(await logFor(repository, input, 'log')).log]
         return {
           problems: logs.flatMap((log) =>
-            problemsOf(log).map((group) => ({ log: log.path, ...group }))
+            problemsOf(log).map((group) => ({ log: shown(log.path), ...group }))
           ),
           repository: repository.problems.map((problem) => ({
             code: problem.kind,
@@ -377,7 +392,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
           throw new Refusal('A new ADR either supersedes or amends another one, not both.')
         }
         const { repository } = await open()
-        const { log } = logFor(repository, input, 'create')
+        const { log } = await logFor(repository, input, 'create')
         const template =
           typeof input.template === 'string' && input.template !== ''
             ? input.template
@@ -422,7 +437,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       annotations: { title: 'Plan a decision', ...PLAN },
       run: async (input) => {
         const { repository } = await open()
-        const { log, id } = logFor(repository, input, 'adr')
+        const { log, id } = await logFor(repository, input, 'adr')
         const adr = adrIn(log, id)
         const when = { today: today() }
         const plan =
@@ -446,17 +461,26 @@ export function toolsFor(options: ToolOptions): Tool[] {
             type: 'string',
             description: 'The whole new body, as read_adr returns it, changed.'
           },
+          revision: required(
+            'The revision read_adr returned with the body the edit starts from. When the body changed since, the edit is refused: read it again.'
+          ),
           log: LOG,
           note: text('What was corrected, for an ADR that is no longer proposed.'),
           author: text("Who corrects; git's user.name when left out.")
         },
-        ['id', 'body']
+        ['id', 'body', 'revision']
       ),
       annotations: { title: 'Plan an edit of the text', ...PLAN },
       run: async (input) => {
         const { repository } = await open()
-        const { log, id } = logFor(repository, input, 'adr')
+        const { log, id } = await logFor(repository, input, 'adr')
         const adr = adrIn(log, id)
+        // What a person changed since the agent read it is not to be written over.
+        if (revisionOf(adr.body) !== input.revision) {
+          throw new Refusal(
+            `The body of ${adr.id} changed since it was read, or the revision is not one read_adr returned. Read it again and edit what it says now.`
+          )
+        }
         const who =
           typeof input.author === 'string' && input.author.trim() !== ''
             ? input.author.trim()
@@ -499,7 +523,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       annotations: { title: 'Plan an edit of the Metadata', ...PLAN },
       run: async (input) => {
         const { repository, components } = await open()
-        const { log, id } = logFor(repository, input, 'adr')
+        const { log, id } = await logFor(repository, input, 'adr')
         const adr = adrIn(log, id)
         const relations = input.relations as Partial<Record<RelationType, string[]>> | undefined
         return preview(
@@ -558,7 +582,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       run: async (input) => {
         const { repository } = await open()
         const repair = input.repair as Repair
-        const { log } = logFor(repository, { ...input, id: repair.adr }, 'adr')
+        const { log } = await logFor(repository, { ...input, id: repair.adr }, 'adr')
         return preview(log, await planRepair(fs, log, repair))
       }
     },
@@ -574,7 +598,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       annotations: { title: 'Plan a Migration', ...PLAN },
       run: async (input) => {
         const { repository } = await open()
-        const { log, id } = logFor(repository, input, input.id === undefined ? 'log' : 'adr')
+        const { log, id } = await logFor(repository, input, input.id === undefined ? 'log' : 'adr')
         return preview(log, await planMigration(fs, log, id))
       }
     },
@@ -589,20 +613,22 @@ export function toolsFor(options: ToolOptions): Tool[] {
       annotations: {
         title: 'Apply a planned change',
         readOnlyHint: false,
-        destructiveHint: false,
+        // It overwrites and renames files: what a client asks a person about.
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: false
       },
       run: async (input) => {
         const changeId = String(input.changeId)
         const held = planned.get(changeId)
-        planned.delete(changeId)
         if (!held) {
           throw new Refusal(
             'There is no planned change with this changeId: it was applied or discarded already, or the server was restarted. Plan it again.'
           )
         }
+        // Held until it is written or refused: a write that fails half-way can be asked about.
         const result = await applyChangeSet(fs, held.changeSet)
+        planned.delete(changeId)
         if (!result.applied) {
           throw new Refusal(
             `Nothing was written: ${result.conflicts.join(', ')} changed on disk after the change was planned. Plan it again to see the change against the current files.`
@@ -611,7 +637,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return {
           applied: true,
           files: held.changeSet.files.map((file) => file.renameTo ?? file.path),
-          ...(held.created && { created: { log: held.log, ...held.created } }),
+          ...(held.created && { created: { log: shown(held.log), ...held.created } }),
           ...(held.renamed && { renamed: held.renamed })
         }
       }
@@ -633,7 +659,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
 function summaryOf(log: DecisionLog, adr: Adr): Record<string, unknown> {
   const { metadata } = adr
   return {
-    log: log.path,
+    log: shown(log.path),
     id: adr.id,
     path: adr.path,
     ...(adr.number !== undefined && { number: adr.number }),
@@ -708,19 +734,24 @@ function search(repository: Repository, query: string): Record<string, unknown>[
 /** A file of a planned change: where it is, where it goes, and the change as a unified diff. */
 function fileOf(file: FileChange): Record<string, unknown> {
   const to = file.renameTo ?? file.path
+  // A rename says so, as git does: without it, a rename that changes no line shows nothing.
+  const rename =
+    file.renameTo === undefined ? '' : `rename from ${file.path}\nrename to ${file.renameTo}\n`
   return {
     path: file.path,
     ...(file.renameTo !== undefined && { renameTo: file.renameTo }),
     ...(file.creates && { creates: true }),
-    diff: createTwoFilesPatch(
-      file.creates ? '/dev/null' : `a/${file.path}`,
-      `b/${to}`,
-      file.before,
-      file.after,
-      undefined,
-      undefined,
-      { context: 3 }
-    ).replace(/^=+\n/, '')
+    diff:
+      rename +
+      createTwoFilesPatch(
+        file.creates ? '/dev/null' : `a/${file.path}`,
+        `b/${to}`,
+        file.before,
+        file.after,
+        undefined,
+        undefined,
+        { context: 3 }
+      ).replace(/^=+\n/, '')
   }
 }
 
@@ -730,11 +761,31 @@ function localDate(now = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
+/**
+ * The git to run. On Windows a bare `git` is looked for in the directory it runs in before
+ * the PATH — a `git.exe` a repository brings along would run — so git is found on the PATH
+ * there, by its full path. As the app finds it (packages/app/src/main/git.ts).
+ */
+export function gitExecutable(
+  platform: NodeJS.Platform = process.platform,
+  path: string | undefined = process.env.PATH,
+  exists: (path: string) => boolean = existsSync
+): string {
+  if (platform !== 'win32') return 'git'
+  for (const entry of (path ?? '').split(';')) {
+    const directory = entry.replace(/^"(.*)"$/, '$1')
+    if (!win32.isAbsolute(directory)) continue
+    const candidate = win32.join(directory, 'git.exe')
+    if (exists(candidate)) return candidate
+  }
+  return 'git'
+}
+
 /** git's `user.name` for the repository, if git knows one; reading it runs nothing of the repository. */
 function gitUserName(root: string): Promise<string | undefined> {
   return new Promise((resolve) => {
     execFile(
-      'git',
+      gitExecutable(),
       ['config', 'user.name'],
       { cwd: root, timeout: 5000, windowsHide: true },
       (error, stdout) => {

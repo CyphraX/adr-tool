@@ -1,7 +1,27 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
+import { isAbsolute, join, relative, resolve as resolvePath, win32 } from 'node:path'
 import { t } from './strings'
+
+/**
+ * The git to run. On Windows a bare `git` is looked for in the directory it runs in before
+ * the PATH — a `git.exe` a repository brings along would run — so git is found on the PATH
+ * there, by its full path.
+ */
+export function gitExecutable(
+  platform: NodeJS.Platform = process.platform,
+  path: string | undefined = process.env.PATH,
+  exists: (path: string) => boolean = existsSync
+): string {
+  if (platform !== 'win32') return 'git'
+  for (const entry of (path ?? '').split(';')) {
+    const directory = entry.replace(/^"(.*)"$/, '$1')
+    if (!win32.isAbsolute(directory)) continue
+    const candidate = win32.join(directory, 'git.exe')
+    if (exists(candidate)) return candidate
+  }
+  return 'git'
+}
 
 /** Whether `path` is `root` or lies below it. Both are absolute. */
 const within = (root: string, path: string): boolean => {
@@ -70,7 +90,7 @@ const OBJECT_NAME = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
  * pages, or runs a program the repository names: no fsmonitor, no signature check, no
  * textconv or filter (`cat-file blob` prints the blob as it is).
  */
-export function gitIn(root: string, executable = 'git'): Git {
+export function gitIn(root: string, executable = gitExecutable()): Git {
   /** The output of a git command, read as UTF-8, or `undefined` when it fails. */
   const run = (args: string[]): Promise<string | undefined> =>
     new Promise((resolve) => {
@@ -239,7 +259,7 @@ export async function commitFiles(
   root: string,
   paths: readonly string[],
   message: string,
-  executable = 'git'
+  executable = gitExecutable()
 ): Promise<CommitOutcome> {
   const git = (
     args: string[],

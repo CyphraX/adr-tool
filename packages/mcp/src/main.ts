@@ -1,3 +1,4 @@
+import { Console } from 'node:console'
 import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { serve } from './protocol'
@@ -23,6 +24,11 @@ async function main(args: readonly string[]): Promise<number> {
     process.stderr.write(`adr-mcp: ${root} is not a directory.\n`)
     return 2
   }
+  // Standard output is the protocol's alone: what a library prints goes to standard error.
+  const aside = new Console(process.stderr)
+  for (const method of ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'trace'] as const) {
+    console[method] = aside[method].bind(aside)
+  }
   await serve(
     process.stdin,
     process.stdout,
@@ -44,6 +50,7 @@ export function instructionsFor(root: string): string {
     `The Architecture Decision Records of the repository at ${root}, as Softarch Suite reads and writes them.`,
     'Read with list_decision_logs, list_adrs, read_adr, search_adrs and list_problems.',
     'Every write takes two steps. A plan_* tool returns the change — each file as a diff, and warnings — and writes nothing. Show it to the person; apply_change writes it, discard_change drops it.',
+    'To edit the text of an ADR, read it with read_adr first and pass the revision it returns to plan_edit_body: an edit of a body that changed since is refused.',
     'The tool decides IDs, numbers and Metadata, and keeps Relations and Back-references consistent. Do not write ADR files directly.'
   ].join('\n')
 }

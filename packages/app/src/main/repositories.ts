@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { basename, join } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
 import {
-  DEFAULT_LOG_PATHS,
   applyChangeSet,
+  firstLog,
   listTemplates,
   openRepository,
   planAccept,
@@ -44,16 +44,6 @@ import { openWithTraces, planComponentRename } from './traces'
 import { watchPaths } from './watch-paths'
 
 const RELOAD_DELAY_MS = 150
-
-/** Where the first ADR of a repository goes: a well-known directory, found again without configuration. */
-const FIRST_LOG: DecisionLog = {
-  path: DEFAULT_LOG_PATHS[0]!,
-  naming: 'sequential',
-  adrs: [],
-  relations: [],
-  guests: [],
-  problems: []
-}
 
 interface Entry {
   readonly id: string
@@ -223,10 +213,13 @@ export class Repositories {
     const fs = nodeFileSystem(entry.root)
     const { repository, components } = await openWithTraces(fs)
     const logs = repository.logs
-    const log =
-      logPath === undefined && logs.length === 0
-        ? FIRST_LOG
-        : logs.find((candidate) => candidate.path === (logPath ?? logs[0]?.path))
+    let log: DecisionLog | undefined
+    if (logPath === undefined && logs.length === 0) {
+      // The first ADR goes where the configuration says, or to a well-known directory.
+      const first = await firstLog(fs)
+      if ('reason' in first) return { ok: false, reason: first.reason }
+      log = first.log
+    } else log = logs.find((candidate) => candidate.path === (logPath ?? logs[0]?.path))
     if (!log) return { ok: false, reason: t.noLogAt(logPath) }
 
     const ids = components?.map((component) => component.id)
