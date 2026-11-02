@@ -88,7 +88,7 @@ const de: typeof en = {
   sourceFileUnreadable: (path: string): string =>
     `${path} lässt sich nicht lesen. Vielleicht wurde die Datei verschoben oder gelöscht, seit der Code analysiert wurde.`,
   changedSincePreview: (files: string): string =>
-    `Nichts wurde geschrieben: ${files} hat sich auf der Festplatte geändert, nachdem die Vorschau erstellt wurde. Versuchen Sie es noch einmal, um die Änderung gegen die aktuellen Dateien zu sehen.`,
+    `Nichts wurde geschrieben, denn seit der Vorschau hat sich auf der Festplatte etwas geändert: ${files}. Versuchen Sie es noch einmal, um die Änderung gegen die aktuellen Dateien zu sehen.`,
   commit: {
     noGit:
       'Dieser Ordner liegt in keinem git-Repository, es gibt also nichts, wohin committet werden könnte.',
@@ -99,7 +99,7 @@ const de: typeof en = {
     failed: 'git hat nicht committet und nicht gesagt, warum.',
     gone: 'Dieser Commit ist nicht mehr verfügbar. Versuchen Sie es noch einmal.',
     changedSincePreview: (files: string): string =>
-      `Nichts wurde committet: ${files} hat sich auf der Festplatte geändert, nachdem die Vorschau erstellt wurde. Versuchen Sie es noch einmal, um zu sehen, was jetzt committet würde.`,
+      `Nichts wurde committet, denn seit der Vorschau hat sich auf der Festplatte etwas geändert: ${files}. Versuchen Sie es noch einmal, um zu sehen, was jetzt committet würde.`,
     stillAnnounced: (files: string): string =>
       `git konnte ${files} nicht wieder aus dem Index nehmen, wo die App sie für den Commit angemeldet hatte. \`git rm --cached\` mit ihren Pfaden tut das; die Dateien auf der Festplatte bleiben, wie sie sind.`
   },

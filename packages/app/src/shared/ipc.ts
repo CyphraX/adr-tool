@@ -500,6 +500,11 @@ export interface Api {
   setUnsaved(unsaved: boolean): Promise<void>
   /** Say the language of the window, so that what the main process says is said in it too. */
   setLanguage(language: WindowLanguage): Promise<void>
+  /**
+   * Load the window again, as after a change of its language. The window cannot do that itself:
+   * the main process lets nothing navigate inside it.
+   */
+  reloadWindow(): Promise<void>
   /** Called when the window is to close while it holds unsaved text. Nothing closes until it was answered. */
   onCloseRequested(listener: () => void): () => void
   /** What the person said: close the window, whatever it holds — or keep it, and forget that anything was to quit. */
@@ -540,6 +545,7 @@ export const CHANNEL = {
   openExternal: 'shell:open-external',
   setUnsaved: 'window:set-unsaved',
   setLanguage: 'window:set-language',
+  reloadWindow: 'window:reload',
   closeRequested: 'window:close-requested',
   answerCloseRequest: 'window:answer-close-request'
 } as const

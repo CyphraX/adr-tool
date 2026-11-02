@@ -378,7 +378,7 @@ class AppState {
       () =>
         this.leaveEditor(() => {
           chooseLanguage(language)
-          location.reload()
+          void window.api.reloadWindow()
         }, declined),
       declined
     )
