@@ -21,6 +21,10 @@ export const RELATION_TYPE_LABEL = Object.fromEntries(
   Object.entries(said.relation).map(([type, sides]) => [type, sides.from])
 ) as Record<RelationType, string>
 
+/** How a Relation of `type` reads from the ADR that carries it, or from the ADR it names. */
+export const relationWord = (type: RelationType, side: 'from' | 'to'): string =>
+  said.relation[type][side]
+
 export function relationLabel(relation: Relation, side: 'from' | 'to'): string {
   const pending = relation.state === 'pending' ? said.pending[relation.type] : undefined
   return (pending ?? said.relation[relation.type])[side]

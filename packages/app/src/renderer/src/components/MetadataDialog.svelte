@@ -1,9 +1,10 @@
 <script lang="ts">
-  import type { Adr, RelationType } from '@adr-tool/core'
+  import { outsideReference, type Adr, type GuestAdr, type RelationType } from '@adr-tool/core'
   import type { ComponentName } from '../../../shared/ipc'
-  import { everyNamed, namedIn, type Named } from '../lib/references'
+  import { everyNamed, namedIn } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
+  import { outsideCandidates, outsideTarget } from '../lib/together'
   import { logName, RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import ChipInput from './ChipInput.svelte'
   import Picker from './Picker.svelte'
@@ -39,15 +40,26 @@
   /** How deep a Component lies, for the indentation of the picker. */
   const depthOf = (component: ComponentName): number => component.id.split('/').length - 1
 
+  /** An ADR to pick: of a log of this repository, or of another open repository. */
+  type Candidate = { id: string; adr: Adr | GuestAdr; log?: string; repository?: string }
+
+  // The other repositories open in the window, whose ADRs `depends-on` and `relates-to` may
+  // name (docs/file-format.md, section 3).
+  const repositories = $derived(app.tabs.map((tab) => tab.repository))
+  const outside = $derived(
+    app.activeId === undefined ? [] : outsideCandidates(repositories, app.activeId)
+  )
+
   /**
-   * The ADRs a Relation of this type can still be added to: of this Decision Log, and of the
-   * other logs of the repository (docs/file-format.md, section 3).
+   * The ADRs a Relation of this type can still be added to: of this Decision Log, of the other
+   * logs of the repository, and — for `depends-on` and `relates-to` — of the other repositories
+   * that are open.
    */
-  function candidates(type: RelationType, chosen: string[]): Named[] {
+  function candidates(type: RelationType, chosen: string[]): Candidate[] {
     const log = app.log
     if (!log) return []
     const taken = new Set(chosen.map((id) => namedIn(log, id)?.id ?? id))
-    return everyNamed(log).filter(({ id, adr: candidate }) => {
+    const inside = everyNamed(log).filter(({ id, adr: candidate }) => {
       if (id === editing?.adrId || taken.has(id)) return false
       const status = statusKey(candidate)
       // Accepting such a Relation writes to its target, and a foreign file is never written.
@@ -56,6 +68,17 @@
       if (type === 'amends') return status === 'accepted'
       return true
     })
+    if (type !== 'depends-on' && type !== 'relates-to') return inside
+    // The other repositories first: the picker shows the last candidates first.
+    return [...outside.filter(({ id }) => !taken.has(id)), ...inside]
+  }
+
+  /** What an item of a list names: an ADR of this repository, or of another open one. */
+  function chosenOf(id: string): Candidate | undefined {
+    const inside = app.log && namedIn(app.log, id)
+    if (inside) return inside
+    const there = outsideTarget(repositories, id, app.activeId)
+    return there && { id, adr: there.adr, log: there.log, repository: there.repository }
   }
 
   // The dialog steps aside while the change is reviewed, and is back, as it was, when the
@@ -112,14 +135,29 @@
           {#if chosen.length > 0}
             <ul aria-label={RELATION_TYPE_LABEL[type]}>
               {#each chosen as id (id)}
-                {@const named = app.log && namedIn(app.log, id)}
-                <li class:missing={!named}>
+                {@const named = chosenOf(id)}
+                {@const elsewhere = outsideReference(id)?.repository}
+                {@const open =
+                  elsewhere !== undefined && repositories.some((one) => one.name === elsewhere)}
+                <li class:missing={!named && (elsewhere === undefined || open)}>
                   {#if named}
                     {@const other = named.adr}
                     <StatusMark status={statusKey(other)} />
-                    {#if named.log !== undefined}<span class="log">{logName(named.log)}</span>{/if}
+                    {#if named.repository !== undefined}
+                      <span class="log">{named.repository}</span>
+                    {:else if named.log !== undefined}
+                      <span class="log">{logName(named.log)}</span>
+                    {/if}
                     <span class="prefix">{prefixOf(other)}</span>
                     <span class="title">{other.title ?? other.id}</span>
+                  {:else if elsewhere !== undefined}
+                    <!-- Taken as written: only where its repository is open is it known. -->
+                    <span class="title">{id}</span>
+                    <span class="log">
+                      {open
+                        ? t.detail.notInRepository(elsewhere)
+                        : t.detail.repositoryNotOpen(elsewhere)}
+                    </span>
                   {:else}
                     <span class="title">{t.metadata.notInLog(id)}</span>
                   {/if}
@@ -140,9 +178,13 @@
             newestFirst
             onpick={(id) => chosen.push(id)}
           >
-            {#snippet option({ adr: other, log })}
+            {#snippet option({ adr: other, log, repository })}
               <StatusMark status={statusKey(other)} />
-              {#if log !== undefined}<span class="log">{logName(log)}</span>{/if}
+              {#if repository !== undefined}
+                <span class="log">{repository}</span>
+              {:else if log !== undefined}
+                <span class="log">{logName(log)}</span>
+              {/if}
               <span class="prefix">{prefixOf(other)}</span>
               <span class="title">{other.title ?? other.id}</span>
             {/snippet}

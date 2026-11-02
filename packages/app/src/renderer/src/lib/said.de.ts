@@ -213,6 +213,8 @@ export const DE: Wording<Codes> = {
   'decided-while-proposed': () => 'Ein ADR mit dem Status proposed ist noch nicht entschieden',
   'adr-dir-outside': () => 'Das Verzeichnis muss ein relativer Pfad innerhalb des Repositorys sein',
   'expected-mapping': () => 'Erwartet wird ein Mapping',
+  'repository-name': () =>
+    '„name“ darf nur aus Buchstaben, Ziffern, „.“, „_“ und „-“ bestehen und muss mit einem Buchstaben oder einer Ziffer beginnen',
   'logs-not-a-list': () => '„logs“ muss eine Liste sein',
   'log-needs-path': () =>
     'Jedes Log braucht einen „path“, der relativ ist und innerhalb des Repositorys liegt',

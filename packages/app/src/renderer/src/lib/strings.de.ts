@@ -102,7 +102,23 @@ export const de: typeof en = {
     branches: 'Branches',
     otherBranches: 'Andere Branches',
     otherBranchesHint:
-      'ADRs, die nicht ausgecheckte Branches hinzufügen oder entscheiden, aus git gelesen, ohne etwas auszuchecken'
+      'ADRs, die nicht ausgecheckte Branches hinzufügen oder entscheiden, aus git gelesen, ohne etwas auszuchecken',
+    together: 'Geöffnete Repositorys',
+    allAdrs: 'Alle ADRs',
+    allAdrsHint: 'Die ADRs aller geöffneten Repositorys in einer Liste',
+    allProblems: 'Alle Probleme',
+    allProblemsHint: 'Die Probleme aller geöffneten Repositorys in einer Liste'
+  },
+
+  together: {
+    adrs: 'Alle ADRs der geöffneten Repositorys',
+    problems: 'Alle Probleme der geöffneten Repositorys',
+    count: (adrs: number, repositories: number): string =>
+      `${many(adrs, 'Ein ADR', `${adrs} ADRs`)} in ${repositories} Repositorys`,
+    noProblems: 'Keine Probleme in einem der geöffneten Repositorys.',
+    noneHere: 'Keine Probleme.',
+    repository: 'Das Repository selbst',
+    hint: 'Wählen Sie ein ADR, um es zu lesen: Das Repository, zu dem es gehört, kommt nach vorn.'
   },
 
   export: {
@@ -250,7 +266,11 @@ export const de: typeof en = {
     corrections: 'Korrekturen',
     corrected: 'Korrigiert',
     showChange: 'Änderung zeigen',
-    problems: 'Probleme'
+    problems: 'Probleme',
+    otherRepositories: 'Relationen zu anderen Repositorys',
+    repositoryNotOpen: (repository: string): string => `${repository} ist nicht geöffnet`,
+    notInRepository: (repository: string): string => `nicht in ${repository}`,
+    showIn: (repository: string): string => `In ${repository} zeigen`
   },
 
   editor: {

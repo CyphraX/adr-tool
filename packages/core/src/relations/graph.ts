@@ -2,7 +2,7 @@ import type { Adr, GuestAdr } from '../adr/adr'
 import type { Problem } from '../problems/problem'
 import { RELATION_TYPES, type RelationType } from '../relation'
 import type { Status } from '../status'
-import { normalReference, parseReference } from './reference'
+import { normalReference, outsideReference, parseReference } from './reference'
 
 /**
  * Whether a Relation counts, judged by the Status of the ADR that carries it
@@ -34,11 +34,14 @@ export interface LogContext {
 
 const ALONE: LogContext = { path: '', guests: [] }
 
+/** The Relations that may name an ADR of another repository (docs/file-format.md, section 3). */
+const OUTSIDE: ReadonlySet<RelationType> = new Set(['depends-on', 'relates-to'])
+
 export function hasBeenAccepted(status: Status | undefined): boolean {
   return status === 'accepted' || status === 'deprecated' || status === 'superseded'
 }
 
-function stateOf(status: Status | undefined): RelationState {
+export function stateOf(status: Status | undefined): RelationState {
   if (hasBeenAccepted(status)) return 'in-effect'
   return status === 'proposed' ? 'pending' : 'void'
 }
@@ -72,6 +75,14 @@ export function relationsOf(
       // What another file says this ADR supersedes counts like what its own file says.
       const implied = type === 'supersedes' ? (adr.impliedSupersedes ?? []) : []
       for (const written of [...adr.metadata.relations[type], ...implied]) {
+        // An ADR of another repository is that repository's: only where both are open is it
+        // known, and only `depends-on` and `relates-to` may lead there.
+        if (outsideReference(written)) {
+          if (!OUTSIDE.has(type)) {
+            problems.push({ kind: 'other-repository', adr: adr.id, key: type, target: written })
+          }
+          continue
+        }
         const target = normalReference(log.path, written)
         if (target === adr.id) problems.push({ kind: 'self-reference', adr: adr.id, key: type })
         else if (!ids.has(target) && !guests.has(target)) {
@@ -85,6 +96,7 @@ export function relationsOf(
     const state = stateOf(guest.metadata.status)
     for (const type of RELATION_TYPES) {
       for (const written of guest.metadata.relations[type]) {
+        if (outsideReference(written)) continue
         const { log: to, id } = parseReference(written)
         if (to === log.path && ids.has(id)) add({ type, from: guest.reference, to: id, state })
       }

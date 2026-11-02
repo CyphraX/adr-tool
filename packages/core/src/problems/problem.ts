@@ -72,3 +72,13 @@ export type Problem =
     }
   /** A configured Decision Log directory does not exist. */
   | { readonly kind: 'missing-log-directory'; readonly path: string }
+  /**
+   * `supersedes`, `amends` or a Back-reference names an ADR of another repository: only
+   * `depends-on` and `relates-to` may (docs/file-format.md, section 3).
+   */
+  | {
+      readonly kind: 'other-repository'
+      readonly adr: string
+      readonly key: MetadataKey
+      readonly target: string
+    }

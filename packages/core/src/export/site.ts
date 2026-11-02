@@ -1,7 +1,7 @@
 import type { Adr, GuestAdr } from '../adr/adr'
 import type { DecisionLog, Repository } from '../log/load'
-import type { Relation } from '../relations/graph'
-import { isQualified } from '../relations/reference'
+import { stateOf, type Relation } from '../relations/graph'
+import { isQualified, outsideReference } from '../relations/reference'
 import type { RelationType } from '../relation'
 import type { Status } from '../status'
 import { isImage, renderBody, type Links } from './markdown'
@@ -299,10 +299,24 @@ function relationsOf(
         : ''
     return `<div><dt>${wording[side]}</dt><dd>${href ? `<a href="${escapeHtml(href)}">${name}</a>` : name}${where}</dd></div>`
   }
+  // An ADR of another repository is not in the export: the Relation is shown as written.
+  const state = stateOf(adr.metadata.status)
+  const elsewhere = (['depends-on', 'relates-to'] as const).flatMap((type) =>
+    state === 'void'
+      ? []
+      : adr.metadata.relations[type]
+          .filter((written) => outsideReference(written) !== undefined)
+          .map((written) => {
+            const wording =
+              (state === 'pending' ? PENDING_WORDING[type] : undefined) ?? RELATION_WORDING[type]
+            return `<div><dt>${wording.from}</dt><dd class="elsewhere">${escapeHtml(written)}</dd></div>`
+          })
+  )
   return [
     ...log.relations
       .filter((relation) => relation.from === adr.id)
       .map((relation) => lines(relation, 'from')),
+    ...elsewhere,
     ...log.relations
       .filter((relation) => relation.to === adr.id)
       .map((relation) => lines(relation, 'to'))

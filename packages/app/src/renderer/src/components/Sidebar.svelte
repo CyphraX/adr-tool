@@ -3,6 +3,7 @@
   import { app, statusKey, type StatusFilter } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import { MIGRATE_LOG_HINT, STATUS_LABEL, logName } from '../lib/wording'
+  import { problemsAcross } from '../lib/together'
   import StatusMark from './StatusMark.svelte'
 
   // The views of a log beside its list and graph (docs/plan-roadmap.md, part 11).
@@ -33,6 +34,21 @@
   // The ADRs of the log in view that are read and never written, until they are migrated.
   const foreign = $derived(
     (app.log?.adrs ?? []).filter((adr) => adr.foreign && adr.noMigration === undefined).length
+  )
+
+  // With more than one repository open, they can be seen together (docs/plan-roadmap.md, part 13).
+  const across = $derived(view === 'all-adrs' || view === 'all-problems')
+  const together = $derived(app.tabs.length > 1 || across)
+  const repositories = $derived(app.tabs.map((tab) => tab.repository))
+  const everyCount = $derived(
+    repositories.reduce(
+      (sum, repository) =>
+        sum + repository.repository.logs.reduce((inLog, log) => inLog + log.adrs.length, 0),
+      0
+    )
+  )
+  const everyProblem = $derived(
+    problemsAcross(repositories).reduce((sum, repository) => sum + repository.count, 0)
   )
 
   // An ADR whose Status cannot be read is rare; its filter only appears when there is one.
@@ -149,6 +165,32 @@
       <span class="label all">{t.sidebar.exportPdf}</span>
     </button>
   </section>
+
+  {#if together}
+    <section>
+      <h2>{t.sidebar.together}</h2>
+      <button
+        class="row"
+        class:current={view === 'all-adrs'}
+        aria-pressed={view === 'all-adrs'}
+        title={t.sidebar.allAdrsHint}
+        onclick={() => app.show('all-adrs')}
+      >
+        <span class="label all">{t.sidebar.allAdrs}</span>
+        <span class="count">{everyCount}</span>
+      </button>
+      <button
+        class="row"
+        class:current={view === 'all-problems'}
+        aria-pressed={view === 'all-problems'}
+        title={t.sidebar.allProblemsHint}
+        onclick={() => app.show('all-problems')}
+      >
+        <span class="label all">{t.sidebar.allProblems}</span>
+        <span class="count" class:some={everyProblem > 0}>{everyProblem}</span>
+      </button>
+    </section>
+  {/if}
 
   {#if git}
     <section>

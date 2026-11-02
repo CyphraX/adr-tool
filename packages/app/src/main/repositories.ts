@@ -466,7 +466,8 @@ export class Repositories {
     return {
       id: entry.id,
       root: entry.root,
-      name: basename(entry.root),
+      // How other repositories name it: as it names itself, or by its directory.
+      name: repository.name ?? basename(entry.root),
       repository,
       ...(components && { components }),
       ...(tree && {
