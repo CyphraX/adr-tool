@@ -27,6 +27,10 @@ import { gitExecutable, toolsFor } from '../src/tools'
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
 const TODAY = '2026-11-02'
 
+/** The number Create gives the next ADR: one above the highest, numbers left free or not. */
+const nextNumber = (adrs: readonly { number?: number }[]): string =>
+  String(Math.max(0, ...adrs.map((adr) => adr.number ?? 0)) + 1).padStart(4, '0')
+
 /**
  * The server on a pair of streams, and the reference client of the Model Context Protocol
  * talking to it over them, a JSON-RPC message per line, as over a process's stdin and stdout.
@@ -157,7 +161,7 @@ describe('the MCP server (docs/mcp.md)', () => {
     const planned = await call(client, 'plan_create_adr', {
       title: 'Agents reach the Decision Logs over MCP'
     })
-    const id = `${String(adrs.length + 1).padStart(4, '0')}-agents-reach-the-decision-logs-over-mcp`
+    const id = `${nextNumber(adrs)}-agents-reach-the-decision-logs-over-mcp`
     expect(planned.created).toEqual({ log: 'docs/adr', id, path: `docs/adr/${id}.md` })
     expect(planned.files).toHaveLength(1)
     expect(planned.files[0]).toMatchObject({ path: `docs/adr/${id}.md`, creates: true })
@@ -435,8 +439,9 @@ describe('what the review found (PR #41)', () => {
   it('writes nothing through a symbolic link that leads nowhere, and says so', async () => {
     const outside = mkdtempSync(join(tmpdir(), 'adr-tool-mcp-outside-'))
     try {
-      const numbers = (await openRepository(repositoryFiles(root))).logs[0]!.adrs.length
-      const next = String(numbers + 1).padStart(4, '0')
+      const listed = (await openRepository(repositoryFiles(root))).logs[0]!.adrs
+      const numbers = listed.length
+      const next = nextNumber(listed)
       symlinkSync(join(outside, 'pwned.md'), join(root, `docs/adr/${next}-use-kafka.md`))
       // A link to itself: a loop that is nothing to read.
       symlinkSync('loop.md', join(root, 'docs/adr/loop.md'))
@@ -505,8 +510,7 @@ describe('what the review found (PR #41)', () => {
 
   it('says that a rename is one, even when no line changes', async () => {
     const { client, close } = await connect(root)
-    const numbers = (await call(client, 'list_adrs')).adrs.length as number
-    const next = String(numbers + 1).padStart(4, '0')
+    const next = nextNumber((await call(client, 'list_adrs')).adrs)
     // Two ADRs with one number: the Repair renumbers the newer one.
     for (const slug of ['first', 'second']) {
       writeFileSync(
