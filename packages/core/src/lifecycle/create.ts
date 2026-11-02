@@ -3,6 +3,7 @@ import type { Plan } from '../plan'
 import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { nextPrefix, slugify } from '../log/new-id'
+import { formatScalar } from '../metadata/write'
 import { fillTemplate, loadTemplate } from '../templates/templates'
 import type { Eol } from '../text/source'
 import type { Today } from './decide'
@@ -61,7 +62,7 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
       '---',
       'status: proposed',
       `created: ${adr.today}`,
-      ...(relation ? [`${relation.type}: [${relation.target}]`] : []),
+      ...(relation ? [`${relation.type}: [${formatScalar(relation.target)}]`] : []),
       '---',
       ''
     ]

@@ -15,46 +15,50 @@ export function analysisHost(cacheFileOf: (root: string) => string): {
   analyse: (root: string) => Promise<Analysis>
   stop: () => Promise<void>
 } {
-  let worker: Worker | undefined
-  let next = 0
-  const waiting = new Map<
-    number,
-    { resolve: (analysis: Analysis) => void; reject: (error: Error) => void }
-  >()
-
-  const failAll = (reason: string): void => {
-    for (const { reject } of waiting.values()) reject(new Error(reason))
-    waiting.clear()
-    worker = undefined
+  interface Running {
+    readonly worker: Worker
+    /** What was asked of this worker, and waits for its answer. */
+    readonly waiting: Map<
+      number,
+      { resolve: (analysis: Analysis) => void; reject: (error: Error) => void }
+    >
   }
+  let current: Running | undefined
+  let next = 0
 
-  const start = (): Worker => {
-    const started = createAnalysisWorker({})
-    started.on('message', (answer: Answer) => {
-      const asked = waiting.get(answer.id)
-      waiting.delete(answer.id)
+  const start = (): Running => {
+    const running: Running = { worker: createAnalysisWorker({}), waiting: new Map() }
+    // A worker that stops fails what it was asked; its successor's requests are its own.
+    const failAll = (reason: string): void => {
+      for (const { reject } of running.waiting.values()) reject(new Error(reason))
+      running.waiting.clear()
+      if (current === running) current = undefined
+    }
+    running.worker.on('message', (answer: Answer) => {
+      const asked = running.waiting.get(answer.id)
+      running.waiting.delete(answer.id)
       if (answer.ok) asked?.resolve(answer.analysis)
       else asked?.reject(new Error(answer.reason))
     })
-    started.on('error', (error) => failAll(String(error)))
-    started.on('exit', (code) => failAll(`The analysis stopped (${code}).`))
-    return started
+    running.worker.on('error', (error) => failAll(String(error)))
+    running.worker.on('exit', (code) => failAll(`The analysis stopped (${code}).`))
+    return running
   }
 
   return {
     analyse(root) {
-      worker ??= start()
+      const running = (current ??= start())
       const id = next++
       const request: AnalysisRequest = { id, root, cacheFile: cacheFileOf(root) }
       return new Promise((resolve, reject) => {
-        waiting.set(id, { resolve, reject })
-        worker!.postMessage(request)
+        running.waiting.set(id, { resolve, reject })
+        running.worker.postMessage(request)
       })
     },
     async stop() {
-      const stopping = worker
-      worker = undefined
-      await stopping?.terminate()
+      const stopping = current
+      current = undefined
+      await stopping?.worker.terminate()
     }
   }
 }

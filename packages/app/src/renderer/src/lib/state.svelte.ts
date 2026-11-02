@@ -889,7 +889,10 @@ class AppState {
    * looked at is not applied; the question takes its place.
    */
   private requestClose(): void {
-    this.dismissReview()
+    // A question that is open already gives way without an answer: if it was this same
+    // question, asked before, a "no" to it would tell the main process that no quit waits.
+    if (this.review?.kind === 'confirm') this.review = undefined
+    else this.dismissReview()
     this.leaveEditor(
       () => void window.api.answerCloseRequest(true),
       () => void window.api.answerCloseRequest(false)

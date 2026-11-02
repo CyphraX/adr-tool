@@ -71,11 +71,11 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
           )
         }
       }
-      const mentions = namingKeys(other, id).length > 0
-      if (other.foreign && (mentions || (await fs.readText(other.path))?.includes(id))) {
+      const keys = namingKeys(other, id)
+      if (other.foreign && (keys.length > 0 || (await fs.readText(other.path))?.includes(id))) {
         requireOwnFormat(other, ` It mentions ${id}: migrate it first, or renumber the other ADR.`)
       }
-      for (const key of namingKeys(other, id)) {
+      for (const key of keys) {
         await pending.write(other.path, (view) => replaceInList(view, key, id, to))
       }
     }

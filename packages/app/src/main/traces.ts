@@ -4,6 +4,7 @@
  * and puts the halves of a Rename together into one change set.
  */
 import {
+  joinChangeSets,
   openRepository,
   planRenameTraces,
   type FileSystem,
@@ -53,8 +54,5 @@ export async function planComponentRename(
   const { logs } = await openRepository(fs)
   const traces = await planRenameTraces(fs, logs, declared.renamed.from, declared.renamed.to)
   if (!traces.ok) return traces
-  return {
-    ok: true,
-    changeSet: { files: [...declared.changeSet.files, ...traces.changeSet.files] }
-  }
+  return { ok: true, changeSet: joinChangeSets(declared.changeSet, traces.changeSet) }
 }

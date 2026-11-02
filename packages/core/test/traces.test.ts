@@ -279,6 +279,16 @@ describe('renaming a Component in the Traces', () => {
         'The frontmatter of 0002-b cannot be read, and it has a list "affects". Fix it before core is renamed.'
     })
 
+    // What the body says is no Trace, however it begins its lines.
+    const body = await repository({
+      '0001-a': adr('affects: [core]'),
+      '0002-b': '---\nstatus: [\n---\n# T\n\naffects: the payment flow\n'
+    })
+    const planned = await planRenameTraces(body.fs, body.repository.logs, 'core', 'x')
+    expect(planned.ok && planned.changeSet.files.map((file) => file.path)).toEqual([
+      'docs/adr/0001-a.md'
+    ])
+
     // MADR 3 keeps its Metadata in a frontmatter of its own; the tool reads it and never writes it.
     const foreign = await repository({
       '0001-use-x': [

@@ -45,7 +45,12 @@ export async function loadTemplate(
   fs: FileSystem,
   name: string
 ): Promise<{ text: string } | { problem: string }> {
-  const text = (await fs.readText(`${TEMPLATES_PATH}/${name}.md`)) ?? BUILT_IN_TEMPLATES[name]
+  // A name is a file name in the directory of Templates, or a built-in one: never a path.
+  const named = name !== '' && name !== '.' && name !== '..' && !/[/\\\0]/.test(name)
+  const text = named
+    ? ((await fs.readText(`${TEMPLATES_PATH}/${name}.md`)) ??
+      (Object.hasOwn(BUILT_IN_TEMPLATES, name) ? BUILT_IN_TEMPLATES[name] : undefined))
+    : undefined
   if (text === undefined) return { problem: `There is no Template called "${name}".` }
 
   const view = viewSource(text)

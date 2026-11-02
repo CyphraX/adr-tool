@@ -42,6 +42,19 @@ describe('a repository on disk', () => {
     expect(await fs.list('docs/adr/0001-modular-monolith.md')).toBeUndefined()
   })
 
+  it('stays inside its root, whatever path it is handed', async () => {
+    const fs = nodeFileSystem(join(showcase, 'docs'))
+    for (const path of ['../../own/0001-crlf-and-foreign-keys.md', '/etc/hostname']) {
+      expect(await fs.readText(path)).toBeUndefined()
+    }
+    expect(await fs.list('..')).toBeUndefined()
+    await expect(fs.writeText('../escaped.md', 'x')).rejects.toThrow('../escaped.md')
+    await expect(fs.rename('adr/0001-modular-monolith.md', '../moved.md')).rejects.toThrow(
+      '../moved.md'
+    )
+    expect(await fs.readText('adr/0001-modular-monolith.md')).toContain('# ')
+  })
+
   it('is watched at its Decision Logs and where new ones can appear, never as a whole tree', async () => {
     const repository = await openRepository(nodeFileSystem(showcase))
     expect(watchPaths(showcase, repository)).toEqual(

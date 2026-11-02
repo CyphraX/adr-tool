@@ -72,7 +72,11 @@ export function addToList(
     // A single value where a list is expected reads as a list of one; appending makes it a real list.
     requireInline(key, node)
     const [start, end] = [fm.abs(node.range![0]), fm.abs(node.range![1])]
-    const existing = view.text.slice(start, end)
+    // The value keeps how it is written, unless a list would read it as something else:
+    // `tags: foo, bar` is one tag, and `[foo, bar]` would be two.
+    const written = view.text.slice(start, end)
+    const value = scalarText(node)!
+    const existing = readsInFlowAs(written, value) ? written : formatScalar(value)
     return [{ start, end, insert: `[${existing}, ${formatted.join(', ')}]` }]
   }
 
@@ -358,7 +362,7 @@ function lineStart(text: string, offset: number): number {
  * Render a string as a YAML scalar: plain when that reads back as the same string,
  * double-quoted otherwise. `like` carries over the quoting of the value being replaced.
  */
-function formatScalar(value: string, like?: Scalar['type']): string {
+export function formatScalar(value: string, like?: Scalar['type']): string {
   if (like === 'QUOTE_SINGLE') return `'${value.replaceAll("'", "''")}'`
   if (like === 'QUOTE_DOUBLE') return JSON.stringify(value)
   const plain = parseDocument(`[${value}]`)
@@ -368,6 +372,13 @@ function formatScalar(value: string, like?: Scalar['type']): string {
   return safe && value === value.trim() && !YAML_1_1_BOOLEAN.test(value)
     ? value
     : JSON.stringify(value)
+}
+
+/** Whether `text`, standing alone in a flow list, is read as the one value `value`. */
+function readsInFlowAs(text: string, value: string): boolean {
+  const doc = parseDocument(`[${text}]`)
+  const items = doc.errors.length === 0 && isSeq(doc.contents) ? doc.contents.items : []
+  return items.length === 1 && scalarText(items[0]) === value
 }
 
 /** Other tools that read the frontmatter, Jekyll for one, still take these words for booleans. */

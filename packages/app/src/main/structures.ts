@@ -121,6 +121,10 @@ export class Structures {
   private entryOf(repositoryId: string, root: string): Entry {
     let entry = this.entries.get(repositoryId)
     if (!entry || entry.root !== root) {
+      if (entry) {
+        clearTimeout(entry.timer)
+        void entry.watcher?.close()
+      }
       entry = { root, again: false }
       this.entries.set(repositoryId, entry)
       if (this.watchFiles) {

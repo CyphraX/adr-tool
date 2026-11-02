@@ -96,6 +96,19 @@ describe('Templates', () => {
     })
   })
 
+  it('are named by a file name: nothing outside .adr/templates, and nothing an object has', async () => {
+    const { fs, log } = await repository({
+      'docs/adr/0001-first.md': adr('status: accepted'),
+      'notes/secret.md': 'Not a Template.\n'
+    })
+    for (const template of ['../../notes/secret', '../templates/x', 'a/b', 'constructor', '']) {
+      expect(await planCreate(fs, log, { title: 'New', template, today })).toEqual({
+        ok: false,
+        reason: `There is no Template called "${template}".`
+      })
+    }
+  })
+
   it('fall back to minimal when the configured default does not exist', async () => {
     const fs = memoryFileSystem({ '.adr/config.yml': 'templates:\n  default: gone\n' })
     expect((await listTemplates(fs)).defaultName).toBe('minimal')
@@ -250,6 +263,26 @@ describe('creating an ADR that supersedes or amends another', () => {
       status: 'superseded',
       backReferences: { 'superseded-by': ['0003-postgres'] }
     })
+  })
+
+  it('names a target whose ID YAML would read as something else, quoted', async () => {
+    const { fs, log } = await repository({
+      'docs/adr/0001-a, b #1.md': adr('status: accepted')
+    })
+    const plan = await planCreate(fs, log, {
+      title: 'Next',
+      template: 'minimal',
+      today,
+      relation: { type: 'supersedes', target: '0001-a, b #1' }
+    })
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.changeSet.files[0]!.after).toContain('\nsupersedes: ["0001-a, b #1"]\n')
+    await applyChangeSet(fs, plan.changeSet)
+    const created = (await openRepository(fs)).logs[0]!
+    expect(created.problems).toEqual([])
+    expect(created.relations).toEqual([
+      { type: 'supersedes', from: '0002-next', to: '0001-a, b #1', state: 'pending' }
+    ])
   })
 
   it('is refused when the target cannot be superseded or amended', async () => {

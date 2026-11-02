@@ -4,6 +4,7 @@ export { RELATION_TYPES, BACK_REFERENCE_KEYS, isRelationType, type RelationType 
 // What core's callers use of the kernel is handed on, so that they have one place to import from.
 export {
   applyChangeSet,
+  joinChangeSets,
   joinPath,
   memoryFileSystem,
   type Applied,

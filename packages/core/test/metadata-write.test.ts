@@ -102,6 +102,17 @@ describe('setScalar', () => {
 })
 
 describe('addToList', () => {
+  it('turns a single value into a list without taking it apart', () => {
+    const text = ['---', 'tags: foo, bar   # one tag', '---', ''].join('\n')
+    const result = write(text, (view) => addToList(view, 'tags', 'baz'))
+    expect(result.added).toEqual(['tags: ["foo, bar", baz]   # one tag\n'])
+    expect(result.metadata['tags']).toEqual(['foo, bar', 'baz'])
+    const quoted = ['---', "tags: 'foo, bar'", '---', ''].join('\n')
+    expect(write(quoted, (view) => addToList(view, 'tags', 'baz')).added).toEqual([
+      "tags: ['foo, bar', baz]\n"
+    ])
+  })
+
   it('appends to a flow list in place, keeping its inner spacing', () => {
     const text = fixture('own/0002-hostile-formatting.md')
     const result = write(text, (view) => addToList(view, 'supersedes', '0003-no-frontmatter'))

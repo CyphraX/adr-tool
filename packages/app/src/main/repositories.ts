@@ -5,6 +5,7 @@ import {
   DEFAULT_LOG_PATHS,
   applyChangeSet,
   listTemplates,
+  openRepository,
   planAccept,
   planCreate,
   planDeprecate,
@@ -268,7 +269,7 @@ export class Repositories {
     const entry = this.entries.get(repositoryId)
     if (!entry) return undefined
     const fs = nodeFileSystem(entry.root)
-    const adr = (await openWithTraces(fs)).repository.logs
+    const adr = (await openRepository(fs)).logs
       .find((log) => log.path === logPath)
       ?.adrs.find((candidate) => candidate.id === adrId)
     return adr && { root: entry.root, path: adr.path, text: await fs.readText(adr.path) }

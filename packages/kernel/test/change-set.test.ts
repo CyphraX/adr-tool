@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyChangeSet, memoryFileSystem, type WritableFileSystem } from '../src'
+import { applyChangeSet, joinChangeSets, memoryFileSystem, type WritableFileSystem } from '../src'
 
 describe('applyChangeSet', () => {
   it('writes every file of the change set', async () => {
@@ -81,5 +81,20 @@ describe('applyChangeSet', () => {
       ]
     })
     expect(calls).toEqual(['rename old.md', 'write a.md'])
+  })
+})
+
+describe('joinChangeSets', () => {
+  it('puts the files of several change sets into one, in their order', () => {
+    const a = { path: 'a.md', before: 'a', after: 'A' }
+    const b = { path: 'b.md', before: '', after: 'b', creates: true as const }
+    expect(joinChangeSets({ files: [a] }, { files: [b] })).toEqual({ files: [a, b] })
+  })
+
+  it('refuses change sets that both touch a file, or a place a file moves to', () => {
+    const a = { path: 'a.md', before: 'a', after: 'A' }
+    expect(() => joinChangeSets({ files: [a] }, { files: [{ ...a, after: 'AA' }] })).toThrow('a.md')
+    const moved = { path: 'old.md', before: 'x', after: 'x', renameTo: 'a.md' }
+    expect(() => joinChangeSets({ files: [a] }, { files: [moved] })).toThrow('a.md')
   })
 })
