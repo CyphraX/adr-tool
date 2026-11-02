@@ -93,6 +93,8 @@ export type Review =
       saves?: boolean
       /** How the warnings of the change are introduced, and what to do about them. */
       caution?: Caution
+      /** The change renames a Component: the Structure view follows it. */
+      renames?: { from: string; to: string }
     }
   /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
@@ -163,6 +165,8 @@ export interface MetadataLists {
   decisionMakers: string[]
   tags: string[]
   relations: Record<RelationType, string[]>
+  /** The Components the ADR affects, by their IDs. */
+  affects: string[]
 }
 
 /**
@@ -182,7 +186,8 @@ function listsOf(adr: Adr): MetadataLists {
     tags: [...adr.metadata.tags],
     relations: Object.fromEntries(
       RELATION_TYPES.map((type) => [type, [...adr.metadata.relations[type]]])
-    ) as Record<RelationType, string[]>
+    ) as Record<RelationType, string[]>,
+    affects: [...adr.metadata.affects]
   }
 }
 
@@ -191,7 +196,8 @@ function pairs(a: MetadataLists, b: MetadataLists): [string[], string[]][] {
   return [
     [a.decisionMakers, b.decisionMakers],
     [a.tags, b.tags],
-    ...RELATION_TYPES.map((type): [string[], string[]] => [a.relations[type], b.relations[type]])
+    ...RELATION_TYPES.map((type): [string[], string[]] => [a.relations[type], b.relations[type]]),
+    [a.affects, b.affects]
   ]
 }
 
@@ -354,6 +360,59 @@ class AppState {
     tab.structure.selection = undefined
     tab.structure.code = undefined
     void this.loadStructure(tab)
+  }
+
+  /**
+   * Show a Component's page in the Structure view, at the level it is part of: where an ADR
+   * names it, say.
+   */
+  showComponent(id: string): void {
+    const tab = this.active
+    if (!tab) return
+    this.leaveEditor(() => {
+      tab.module = 'structure'
+      tab.structure.parent = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : undefined
+      tab.structure.expanded = []
+      tab.structure.selection = { kind: 'node', id }
+      tab.structure.code = undefined
+      void this.loadStructure(tab)
+    })
+  }
+
+  /** Plan giving a declared Component a new segment, with every Trace that names it. Nothing is written yet. */
+  async renameComponent(id: string, segment: string): Promise<void> {
+    const tab = this.active
+    if (!tab) return
+    const texts = t.review.rename
+    const to = (id.includes('/') ? id.slice(0, id.lastIndexOf('/') + 1) : '') + segment
+    const plan = await window.api.planRename(tab.repository.id, id, segment)
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: texts.title(id, to),
+          action: texts.action,
+          change: plan.change,
+          applying: false,
+          renames: { from: id, to }
+        }
+      : { kind: 'refused', title: texts.refused(id), reason: plan.reason }
+  }
+
+  /** A Component was renamed: what the Structure view shows of it, and below it, goes with it. */
+  private followRename(from: string, to: string): void {
+    const tab = this.active
+    if (!tab) return
+    const moved = (id: string): string =>
+      id === from || id.startsWith(`${from}/`) ? to + id.slice(from.length) : id
+    const { structure } = tab
+    if (structure.parent !== undefined) structure.parent = moved(structure.parent)
+    structure.expanded = structure.expanded.map(moved)
+    if (structure.selection?.kind === 'node') {
+      structure.selection = { kind: 'node', id: moved(structure.selection.id) }
+    } else if (structure.selection?.kind === 'edge') {
+      const { from: source, to: target } = structure.selection
+      structure.selection = { kind: 'edge', from: moved(source), to: moved(target) }
+    }
   }
 
   /** Show the level as a drawing, as a matrix, or as a table of its metrics. */
@@ -693,7 +752,7 @@ class AppState {
     const adr = this.selected
     if (!editing || !adr || !this.metadataDirty) return
     // A reactive proxy cannot cross the process boundary; send a plain copy.
-    const { repositoryId, logPath, adrId, decisionMakers, tags, relations } =
+    const { repositoryId, logPath, adrId, decisionMakers, tags, relations, affects } =
       $state.snapshot(editing)
     const plan = await window.api.planMetadataEdit({
       repositoryId,
@@ -701,7 +760,8 @@ class AppState {
       adrId,
       decisionMakers,
       tags,
-      relations
+      relations,
+      affects
     })
     this.review = plan.ok
       ? {
@@ -793,6 +853,8 @@ class AppState {
       }
       this.replace(result.repository)
       this.review = undefined
+      // A renamed Component has a new ID: the Structure view stays with it.
+      if (review.renames) this.followRename(review.renames.from, review.renames.to)
       // A renumbered ADR has a new ID: stay with it.
       const renamedId = review.change.renamedId
       if (renamedId !== undefined && this.active) this.active.selectedId = renamedId
@@ -880,6 +942,7 @@ class AppState {
         onDisk.relations[type]
       )
     }
+    editing.affects = rebase(editing.affects, editing.base.affects, onDisk.affects)
     editing.base = onDisk
   }
 

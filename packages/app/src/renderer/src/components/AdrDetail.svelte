@@ -37,6 +37,9 @@
   const editing = $derived(app.editing?.adrId === adr.id)
   const problems = $derived(problemsOf(app.problemGroups, adr.id))
 
+  // The Components the repository declares: what `affects` names is shown by its name.
+  const declared = $derived(app.active?.repository.components)
+
   // What git says: absent without git, and then there is no history to offer either.
   const git = $derived(app.active?.repository.git)
   const uncommitted = $derived(git?.changed.includes(adr.path) ?? false)
@@ -162,6 +165,29 @@
             {#if relation.implied}<span class="note">{IMPLIED_NOTE}</span>{/if}
           </li>
         {/each}
+      </ul>
+    {/if}
+
+    {#if adr.metadata.affects.length > 0}
+      <ul class="affects" aria-label={t.detail.components}>
+        <li>
+          <span class="kind">{t.detail.affects}</span>
+          <span class="components">
+            {#each adr.metadata.affects as id (id)}
+              {@const component = declared?.find((candidate) => candidate.id === id)}
+              {#if component}
+                <button
+                  title={t.detail.showComponent(component.name)}
+                  onclick={() => app.showComponent(id)}>{component.name}</button
+                >
+              {:else if declared}
+                <span class="missing" title={t.detail.notDeclared}>{id}</span>
+              {:else}
+                <code>{id}</code>
+              {/if}
+            {/each}
+          </span>
+        </li>
       </ul>
     {/if}
 
@@ -390,6 +416,33 @@
 
   .void button {
     color: var(--ink-faint);
+  }
+
+  .components {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 14px;
+    min-width: 0;
+  }
+
+  .components button {
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+  }
+
+  .components button:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .components code {
+    font-family: var(--code);
+    font-size: 12px;
+  }
+
+  .components .missing {
+    color: var(--problem);
+    text-decoration: line-through;
   }
 
   .note {

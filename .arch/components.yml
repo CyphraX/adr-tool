@@ -1,0 +1,49 @@
+components:
+  app:
+    paths: [packages/app/**]
+    components:
+      main:
+        paths: [packages/app/src/main/**]
+      preload:
+        paths: [packages/app/src/preload/**]
+      renderer:
+        paths: [packages/app/src/renderer/**]
+      shared:
+        paths: [packages/app/src/shared/**]
+  core:
+    paths: [packages/core/**]
+    components:
+      adr:
+        paths: [packages/core/src/adr/**]
+      foreign:
+        paths: [packages/core/src/foreign/**]
+      lifecycle:
+        paths: [packages/core/src/lifecycle/**]
+      log:
+        paths: [packages/core/src/log/**]
+      metadata:
+        paths: [packages/core/src/metadata/**]
+      problems:
+        paths: [packages/core/src/problems/**]
+      relations:
+        paths: [packages/core/src/relations/**]
+      templates:
+        paths: [packages/core/src/templates/**]
+      text:
+        paths: [packages/core/src/text/**]
+  kernel:
+    paths: [packages/kernel/**]
+    components:
+      change:
+        paths: [packages/kernel/src/change/**]
+      fs:
+        paths: [packages/kernel/src/fs/**]
+      text:
+        paths: [packages/kernel/src/text/**]
+  structure:
+    paths: [packages/structure/**]
+    components:
+      java:
+        paths: [packages/structure/src/java/**]
+      typescript:
+        paths: [packages/structure/src/typescript/**]

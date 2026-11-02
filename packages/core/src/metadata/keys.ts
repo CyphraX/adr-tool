@@ -12,6 +12,7 @@ export const METADATA_KEYS = [
   'amends',
   'depends-on',
   'relates-to',
+  'affects',
   'superseded-by',
   'amended-by',
   'corrections'

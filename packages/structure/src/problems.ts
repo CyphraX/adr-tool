@@ -37,13 +37,17 @@ export type PatternKey = 'paths' | 'tests'
 
 export const DECLARATION_PATH = '.arch/components.yml'
 
+/** What makes a segment of a Component ID, in a sentence. */
+export const SEGMENT_RULE =
+  'A segment consists of lowercase letters, digits and dashes, and starts and ends with a letter or a digit.'
+
 /** What a Problem says to a person. The app and the later CLI say the same thing. */
 export function wordingOf(problem: StructureProblem): string {
   switch (problem.kind) {
     case 'unreadable-declaration':
       return `${DECLARATION_PATH} cannot be read: ${problem.detail}`
     case 'invalid-segment':
-      return `"${problem.segment}" in ${problem.component} is not a valid segment of a Component ID. A segment consists of lowercase letters, digits and dashes, and starts and ends with a letter or a digit.`
+      return `"${problem.segment}" in ${problem.component} is not a valid segment of a Component ID. ${SEGMENT_RULE}`
     case 'duplicate-component':
       return `${problem.component} is declared twice. The first declaration is read.`
     case 'dead-pattern':

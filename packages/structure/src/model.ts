@@ -6,11 +6,17 @@
  * code runs elsewhere and hands its Dependencies in (ADR-0008).
  */
 export { openStructure, type RepositoryFiles, type Structure } from './structure'
-export type { DeclaredComponent } from './declaration'
+export {
+  everyComponent,
+  isSegment,
+  readDeclaration,
+  type Declaration,
+  type DeclaredComponent
+} from './declaration'
 export type { OwnedSourceFile } from './ownership'
 export type { Language, SourceFile } from './source-files'
 export { DECLARATION_PATH, wordingOf, type PatternKey, type StructureProblem } from './problems'
-export { hasRepair, planAdopt, planRepair } from './operations'
+export { hasRepair, planAdopt, planRename, planRepair, type RenamePlan } from './operations'
 export type { Dependencies, Dependency, LibraryUse, NotAnalysed, NotResolved } from './dependencies'
 export {
   levelOf,

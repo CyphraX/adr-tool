@@ -16,21 +16,25 @@ export interface MetadataEdit {
   readonly decisionMakers?: readonly string[]
   readonly tags?: readonly string[]
   readonly relations?: Partial<Readonly<Record<RelationType, readonly string[]>>>
+  /** The Components the ADR affects, by their Component IDs. */
+  readonly affects?: readonly string[]
 }
 
 /**
  * Edit the lists of an ADR's Metadata that a person maintains (docs/file-format.md,
- * section 5). `decision-makers`, `tags`, `depends-on` and `relates-to` can change at any
- * Status; `supersedes` and `amends` only while the ADR is `proposed`.
+ * section 5). `decision-makers`, `tags`, `depends-on`, `relates-to` and `affects` can change
+ * at any Status; `supersedes` and `amends` only while the ADR is `proposed`.
  *
- * What is added must be valid. What is already there can always be removed, valid or not:
- * that is how a Relation to an ADR that does not exist is repaired.
+ * What is added must be valid: a Component in `affects` must be one of `components`, the IDs
+ * the repository declares. What is already there can always be removed, valid or not: that is
+ * how a Relation to an ADR that does not exist is repaired.
  */
 export function planEditMetadata(
   fs: FileSystem,
   log: DecisionLog,
   id: string,
-  edit: MetadataEdit
+  edit: MetadataEdit,
+  components?: readonly string[]
 ): Promise<Plan> {
   return plan(fs, async (pending) => {
     const adr = writable(log, id)
@@ -52,6 +56,7 @@ export function planEditMetadata(
       const wanted = edit.relations?.[type]
       if (wanted) change(type, adr.metadata.relations[type], [...new Set(wanted)])
     }
+    if (edit.affects) change('affects', adr.metadata.affects, [...new Set(edit.affects)])
 
     for (const { key, added } of changes) {
       if (key !== 'supersedes' && key !== 'amends') continue
@@ -67,6 +72,7 @@ export function planEditMetadata(
       if (key === 'depends-on' || key === 'relates-to') {
         for (const target of added) other(log, id, target)
       }
+      if (key === 'affects') for (const component of added) declared(components, component)
     }
 
     for (const { key, removed, added } of changes) {
@@ -86,6 +92,16 @@ function other(log: DecisionLog, id: string, target: string): DecisionLog['adrs'
   const adr = log.adrs.find((candidate) => candidate.id === target)
   if (!adr) throw new Refusal(`There is no ADR ${target} in this Decision Log.`)
   return adr
+}
+
+/** A Component a Trace can be added to: one the repository declares. */
+function declared(components: readonly string[] | undefined, component: string): void {
+  if (!components || components.length === 0) {
+    throw new Refusal('No Component is declared in this repository, so none can be named.')
+  }
+  if (!components.includes(component)) {
+    throw new Refusal(`There is no declared Component ${component}.`)
+  }
 }
 
 /** Free text as it goes into a list: one line, not empty, once. What is already in the file stays as it is. */

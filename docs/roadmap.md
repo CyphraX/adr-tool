@@ -42,7 +42,7 @@ This is the plan of the ADR tool, which becomes the Decisions module of a larger
 - Live editor: table rendering
 - UI translations. The app's own texts are in two modules of the renderer and one of the main process, ready to be replaced. `core` still answers in English sentences — why it refuses an operation, what a change warns about, what is wrong with a piece of Metadata, why a foreign file has no Migration — and so does the wording of Problems once it has moved to `core` for `adr lint`; both need codes before the window can be translated whole
 - Read-only export for non-technical readers (static site or PDF)
-- ADR → code links ("which ADRs affect this file?")
+- ADR → code links ("which ADRs affect this file?"): closed by the first Trace of Structure, part 7 — an ADR names the Components it affects in `affects`, and a Component lists its ADRs ([plan-structure.md](plan-structure.md)). From a file it is one step: its Component.
 - Aggregation across repositories, including Relations that cross repository boundaries
 - Timeline, Kanban by Status, dashboards
 

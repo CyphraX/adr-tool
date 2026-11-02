@@ -77,6 +77,16 @@ export function checkConsistency(
   return problems
 }
 
+/** The Traces of the ADRs that name a Component the repository does not declare. */
+export function checkTraces(adrs: readonly Adr[], components: readonly string[]): Problem[] {
+  const declared = new Set(components)
+  return adrs.flatMap((adr) =>
+    adr.metadata.affects
+      .filter((component) => !declared.has(component))
+      .map((component): Problem => ({ kind: 'unknown-component', adr: adr.id, component }))
+  )
+}
+
 /**
  * Groups of ADRs that supersede each other in a circle, whatever the state of the Relations:
  * the strongly connected components of the `supersedes` graph with more than one member.

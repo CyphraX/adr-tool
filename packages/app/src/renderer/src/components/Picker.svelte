@@ -1,16 +1,30 @@
-<script lang="ts">
-  import type { Adr } from '@adr-tool/core'
-  import { statusKey } from '../lib/state.svelte'
-  import { t } from '../lib/strings'
-  import { prefixOf } from '../lib/wording'
-  import StatusMark from './StatusMark.svelte'
+<script lang="ts" generics="T extends { id: string }">
+  import type { Snippet } from 'svelte'
 
-  // Find an ADR by its number or by words of its title, and pick it.
+  // Find one of the candidates by words of its text, and pick it.
   let {
     candidates,
     label,
+    placeholder,
+    noneLeft,
+    textOf,
+    option,
+    newestFirst = false,
     onpick
-  }: { candidates: Adr[]; label: string; onpick: (id: string) => void } = $props()
+  }: {
+    candidates: readonly T[]
+    label: string
+    placeholder: string
+    /** What the field says when there is nothing left to pick. */
+    noneLeft: string
+    /** What a search is matched against. */
+    textOf: (candidate: T) => string
+    /** How a match is shown. */
+    option: Snippet<[T]>
+    /** The last candidates first, as the list of ADRs shows them. */
+    newestFirst?: boolean
+    onpick: (id: string) => void
+  } = $props()
 
   const LIMIT = 6
   const uid = $props.id()
@@ -18,20 +32,19 @@
   let focused = $state(false)
   let cursor = $state(0)
 
-  const matches = $derived.by((): Adr[] => {
+  const matches = $derived.by((): T[] => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-    const found = candidates.filter((adr) => {
-      const text = `${adr.id} ${prefixOf(adr)} ${adr.title ?? ''}`.toLowerCase()
+    const found = candidates.filter((candidate) => {
+      const text = textOf(candidate).toLowerCase()
       return words.every((word) => text.includes(word))
     })
-    // Newest first, like the list.
-    return found.toReversed().slice(0, LIMIT)
+    return (newestFirst ? found.toReversed() : found).slice(0, LIMIT)
   })
   const open = $derived(focused && matches.length > 0)
 
-  function pick(adr: Adr | undefined): void {
-    if (!adr) return
-    onpick(adr.id)
+  function pick(candidate: T | undefined): void {
+    if (!candidate) return
+    onpick(candidate.id)
     query = ''
     cursor = 0
   }
@@ -61,7 +74,7 @@
     aria-expanded={open}
     aria-controls={`${uid}-matches`}
     aria-autocomplete="list"
-    placeholder={candidates.length === 0 ? t.metadata.noneLeft : t.metadata.pickerPlaceholder}
+    placeholder={candidates.length === 0 ? noneLeft : placeholder}
     disabled={candidates.length === 0}
     oninput={() => (cursor = 0)}
     onfocus={() => (focused = true)}
@@ -70,7 +83,7 @@
   />
   {#if open}
     <ul id={`${uid}-matches`} role="listbox">
-      {#each matches as adr, position (adr.id)}
+      {#each matches as candidate, position (candidate.id)}
         <!-- mousedown, not click: the input must not lose the focus before the pick. -->
         <li
           role="option"
@@ -78,13 +91,11 @@
           class:cursor={position === cursor}
           onmousedown={(event) => {
             event.preventDefault()
-            pick(adr)
+            pick(candidate)
           }}
           onmousemove={() => (cursor = position)}
         >
-          <StatusMark status={statusKey(adr)} />
-          <span class="prefix">{prefixOf(adr)}</span>
-          <span class="title">{adr.title ?? adr.id}</span>
+          {@render option(candidate)}
         </li>
       {/each}
     </ul>
@@ -140,16 +151,5 @@
 
   .cursor {
     background: var(--selected);
-  }
-
-  .prefix {
-    flex: none;
-    color: var(--ink-soft);
-  }
-
-  .title {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 </style>

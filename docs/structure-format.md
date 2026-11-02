@@ -48,8 +48,16 @@ Keys the suite does not know are preserved and ignored, at the top level and ins
 
 - The **Component ID** is the path of map keys from the top-level `components` down to the Component, joined with `/`: `core`, `core/metadata`.
 - A segment consists of lowercase ASCII letters, digits and dashes, and starts and ends with a letter or a digit. IDs are compared exactly, and a segment is read as it is written: `007` is a segment of its own, not the number 7.
-- The ID is what every Trace, Rule and Diagram names. Changing a segment, or moving a Component to another parent, changes the ID of that Component and of everything below it. Both are one operation of the suite, **Rename** (part 7), which rewrites the declaration and everything that names the ID through one previewed change set, as Renumber does for ADRs. Before part 7 nothing outside the declaration names a Component, and a segment is changed by editing the file.
+- The ID is what every Trace, Rule and Diagram names. Changing a segment, or moving a Component to another parent, changes the ID of that Component and of everything below it. Changing the segment is **Rename** (below), an operation of the suite that rewrites the declaration and everything that names the ID through one previewed change set, as Renumber does for ADRs. Moving a Component to another parent is done in an editor: what then names the old ID shows up as a Problem (section 6).
 - Splitting and merging Components is done by hand. What then names an ID that no longer exists shows up as a Problem (section 6).
+
+### Rename (part 7)
+
+- Rename gives a declared Component a new segment. The Draft has no Rename: its IDs follow directories, and are adopted first.
+- The new segment follows the rules above, differs from the old one, and is not taken by a sibling. The `name` stays: a Component without one is shown under its new segment afterwards.
+- In the declaration, the key is rewritten where it stands, its quoting kept; nothing else in the file changes. The Components below it follow by themselves, since their IDs are made from it.
+- In the same change set, every Trace that names the old ID or an ID below it is rewritten: `affects` in every ADR of the repository ([file-format.md](file-format.md), section 5). Rules and Diagrams join when they exist.
+- Rename is refused while the file cannot be read, and where the key is written in a way a splice cannot serve — an alias, say: what the suite hands out has been checked to read back as the same declaration under the new IDs.
 
 ### Patterns
 
@@ -253,7 +261,7 @@ A Repair is offered only where exactly one change is right. Problems of Structur
 
 The Repair takes the pattern out where it stands: from a flow list with one comma, from a block list with its line, and with its key when it was the last one — a Component left with neither `paths` nor `components` is then a Problem of its own, for a person to decide. YAML can be written in more ways than a splice can serve: a Component in braces, a comment between two items, a tag or an anchor on an item. There the Repair is refused with the advice to use an editor. Whatever the suite hands out has been checked to read back as a declaration.
 
-With the first Trace (part 7) one more arrives, reported on the ADR: **`affects` names a Component ID that does not exist.** Its Repair takes the item out of the list, where it stands, as the Repair for a Relation to a missing ADR does.
+A Trace adds one more, reported on the ADR among the Problems of its Decision Log: **`affects` names a Component ID that is not declared.** Its Repair takes the item out of the list, where it stands, as the Repair for a Relation to a missing ADR does. Traces are checked only against a declaration that can be read: on the Draft, whose IDs follow directories, nothing is reported, and while the file cannot be read, that is the Problem to solve first ([file-format.md](file-format.md), section 5).
 
 ## 7. What is not in the repository (part 3)
 

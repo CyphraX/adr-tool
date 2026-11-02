@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { metadataEditRequest, migrationRequest, repairRequest } from '../src/main/requests'
+import {
+  metadataEditRequest,
+  migrationRequest,
+  renameRequest,
+  repairRequest
+} from '../src/main/requests'
 
 const valid = {
   repositoryId: 'r1',
@@ -7,7 +12,8 @@ const valid = {
   adrId: '0001-a',
   decisionMakers: ['Kim Becker'],
   tags: [],
-  relations: { supersedes: [], amends: [], 'depends-on': ['0002-b'], 'relates-to': [] }
+  relations: { supersedes: [], amends: [], 'depends-on': ['0002-b'], 'relates-to': [] },
+  affects: ['core/metadata']
 }
 
 describe('a Metadata edit as the renderer sends it', () => {
@@ -40,7 +46,9 @@ describe('a Metadata edit as the renderer sends it', () => {
       { ...valid, decisionMakers: ['Kim Becker', 7] },
       { ...valid, relations: undefined },
       { ...valid, relations: threeTypes },
-      { ...valid, relations: { ...valid.relations, amends: [{ id: '0002-b' }] } }
+      { ...valid, relations: { ...valid.relations, amends: [{ id: '0002-b' }] } },
+      without(valid, 'affects'),
+      { ...valid, affects: 'core' }
     ]) {
       expect(metadataEditRequest(request)).toBeUndefined()
     }
@@ -58,6 +66,7 @@ describe('a repair as the renderer sends it', () => {
     const repairs = [
       { kind: 'lowercase-status', adr: '0001-a' },
       { kind: 'remove-item', adr: '0001-a', key: 'depends-on', item: '0009-gone' },
+      { kind: 'remove-item', adr: '0001-a', key: 'affects', item: 'core/storage' },
       { kind: 'add-back-reference', adr: '0001-a', key: 'amended-by', item: '0002-b' },
       { kind: 'set-status', adr: '0001-a', status: 'superseded' },
       { kind: 'renumber', adr: '0001-a' }
@@ -106,6 +115,24 @@ describe('a request for a Migration from the renderer', () => {
       { repositoryId: 'r1', logPath: 'doc/adr', adrId: null }
     ]) {
       expect(migrationRequest(request)).toBeUndefined()
+    }
+  })
+})
+
+describe('a Rename as the renderer sends it', () => {
+  it('names a Component and a segment, and nothing else', () => {
+    expect(renameRequest('r1', 'core/metadata', 'meta')).toEqual({
+      repositoryId: 'r1',
+      component: 'core/metadata',
+      segment: 'meta'
+    })
+    for (const args of [
+      [undefined, 'core', 'x'],
+      ['r1', 7, 'x'],
+      ['r1', 'core', ['x']],
+      ['r1', 'core']
+    ]) {
+      expect(renameRequest(...(args as [unknown, unknown, unknown]))).toBeUndefined()
     }
   })
 })

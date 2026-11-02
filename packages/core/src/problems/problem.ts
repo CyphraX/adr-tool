@@ -27,6 +27,8 @@ export type Problem =
       readonly key: MetadataKey
       readonly target: string
     }
+  /** `affects` names a Component ID that the repository does not declare. */
+  | { readonly kind: 'unknown-component'; readonly adr: string; readonly component: string }
   /** A Relation or Back-reference names the ADR's own ID. */
   | { readonly kind: 'self-reference'; readonly adr: string; readonly key: MetadataKey }
   /** `source` has been accepted and supersedes or amends `adr`, which lacks the Back-reference. */

@@ -176,6 +176,8 @@ export function describeProblem(problem: Problem): string {
       return `${problem.key} names ${problem.target}, which is not in this Decision Log.`
     case 'self-reference':
       return `${problem.key} names this ADR itself.`
+    case 'unknown-component':
+      return `affects names ${problem.component}, which is not a declared Component.`
     case 'missing-back-reference':
       return `${problem.source} has been accepted and points here, but ${problem.key} does not list it.`
     case 'unfounded-back-reference':

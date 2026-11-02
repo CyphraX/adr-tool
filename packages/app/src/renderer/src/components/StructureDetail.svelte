@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { Adr, DecisionLog } from '@adr-tool/core'
+  import { isSegment } from '@adr-tool/structure/model'
   import type {
     StructureComponent,
     StructureEdge,
@@ -6,16 +8,53 @@
     StructureNode,
     StructureView
   } from '../../../shared/ipc'
-  import { app } from '../lib/state.svelte'
+  import { app, statusKey } from '../lib/state.svelte'
   import { METRICS, t } from '../lib/strings'
   import { commonDirectory, nodeLabel } from '../lib/structure'
-  import { codeSpans } from '../lib/wording'
+  import { codeSpans, prefixOf } from '../lib/wording'
+  import StatusMark from './StatusMark.svelte'
 
   // What the selection in the Structure view stands for: a Component with its page — the
-  // declaration, the metrics, the Dependencies at its level, its Cycles — another node with
-  // its Dependencies, a line or a cell with the Source File Dependencies behind it, a Cycle
-  // with its example round trip, or one of the lists of what the analysis could not do.
+  // declaration, the ADRs that affect it, the metrics, the Dependencies at its level, its
+  // Cycles — another node with its Dependencies, a line or a cell with the Source File
+  // Dependencies behind it, a Cycle with its example round trip, or one of the lists of what
+  // the analysis could not do.
   let { view }: { view: StructureView } = $props()
+
+  /** The new segment being typed for a Component, while its Rename is open. */
+  let renaming = $state<{ id: string; segment: string } | undefined>(undefined)
+  const segmentOf = (id: string): string => id.slice(id.lastIndexOf('/') + 1)
+  const parentPrefix = (id: string): string => id.slice(0, id.lastIndexOf('/') + 1)
+
+  interface Affecting {
+    log: DecisionLog
+    adr: Adr
+    /** The Component inside this one that the ADR names, when it does not name this one. */
+    inside: string | undefined
+  }
+
+  /**
+   * The ADRs that affect a Component — the opposite direction of their Traces, which only the
+   * ADRs record — and then those that affect a Component inside it. Every Decision Log counts.
+   */
+  function affecting(id: string): Affecting[] {
+    const direct: Affecting[] = []
+    const below: Affecting[] = []
+    for (const log of app.active?.repository.repository.logs ?? []) {
+      for (const adr of log.adrs) {
+        const { affects } = adr.metadata
+        if (affects.includes(id)) direct.push({ log, adr, inside: undefined })
+        else {
+          const inside = affects.find((item) => item.startsWith(`${id}/`))
+          if (inside !== undefined) below.push({ log, adr, inside })
+        }
+      }
+    }
+    return [...direct, ...below]
+  }
+
+  const nameOfComponent = (id: string): string =>
+    app.active?.repository.components?.find((component) => component.id === id)?.name ?? id
 
   const selection = $derived(app.active?.structure.selection)
   // What the code viewer shows, so that its link reads as the one that is open.
@@ -158,6 +197,73 @@
     </button>
   {:else}
     <p class="faint">{t.structure.page.empty}</p>
+  {/if}
+  {#if view.origin === 'declared' && renaming?.id !== page.id}
+    <button class="action" onclick={() => (renaming = { id: page.id, segment: segmentOf(page.id) })}
+      >{t.structure.page.rename}</button
+    >
+  {/if}
+  {#if view.origin === 'declared' && renaming?.id === page.id}
+    {@const form = renaming}
+    {@const valid = isSegment(form.segment)}
+    <form
+      class="rename"
+      onsubmit={(event) => {
+        event.preventDefault()
+        if (valid && form.segment !== segmentOf(page.id)) {
+          void app.renameComponent(page.id, form.segment)
+        }
+      }}
+    >
+      <label>
+        <span class="faint">{t.structure.page.renameLabel(page.name)}</span>
+        <span class="segment">
+          {#if parentPrefix(page.id)}<code>{parentPrefix(page.id)}</code>{/if}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            bind:value={form.segment}
+            aria-invalid={!valid}
+            spellcheck="false"
+            autocomplete="off"
+            autofocus
+          />
+        </span>
+      </label>
+      {#if !valid}<p class="problem">{t.structure.page.notASegment}</p>{/if}
+      <p class="faint note">{t.structure.page.renameHint(page.id)}</p>
+      <div class="buttons">
+        <button type="button" class="action" onclick={() => (renaming = undefined)}
+          >{t.cancel}</button
+        >
+        <button
+          type="submit"
+          class="action primary"
+          disabled={!valid || form.segment === segmentOf(page.id)}
+          >{t.structure.page.preview}</button
+        >
+      </div>
+    </form>
+  {/if}
+
+  <h3>{t.structure.page.decisions}</h3>
+  {@const decisions = affecting(page.id)}
+  {#if decisions.length === 0}
+    <p class="faint">{t.structure.page.noDecision}</p>
+  {:else}
+    <ul class="decisions">
+      {#each decisions as { log, adr, inside } (`${log.path}\n${adr.id}`)}
+        <li>
+          <button class="link" onclick={() => app.jumpTo(log.path, adr.id)}>
+            <StatusMark status={statusKey(adr)} />
+            <span class="prefix">{prefixOf(adr)}</span>
+            {adr.title ?? adr.id}
+          </button>
+          {#if inside !== undefined}
+            <span class="tag">{t.structure.page.inside(nameOfComponent(inside))}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
   {/if}
 
   <h3>{t.structure.page.patterns}</h3>
@@ -424,6 +530,93 @@
 
   .action:hover {
     background: var(--hover);
+  }
+
+  .action + .action {
+    margin-left: 6px;
+  }
+
+  .action.primary {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .action.primary:hover:not(:disabled) {
+    border-color: var(--focus);
+    background: var(--focus);
+  }
+
+  .action:disabled {
+    opacity: 0.5;
+  }
+
+  .rename {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--panel-raised);
+  }
+
+  .rename label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .segment {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .segment input {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--code);
+    font-size: 12px;
+  }
+
+  .segment input[aria-invalid='true'] {
+    border-color: var(--problem);
+  }
+
+  .problem {
+    margin-top: 4px;
+    color: var(--problem);
+    font-size: 12px;
+  }
+
+  .rename .buttons {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .decisions li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+  }
+
+  .decisions .link {
+    color: var(--ink);
+  }
+
+  .decisions .link :global(svg) {
+    display: inline-block;
+    margin-right: 4px;
+    vertical-align: -1px;
+  }
+
+  .decisions .prefix {
+    color: var(--ink-soft);
   }
 
   .edges li,

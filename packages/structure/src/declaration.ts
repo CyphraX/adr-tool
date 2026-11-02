@@ -27,6 +27,14 @@ export type Declaration =
 
 const SEGMENT = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 
+/** Whether a text is a valid segment of a Component ID (docs/structure-format.md, section 1). */
+export const isSegment = (text: string): boolean => SEGMENT.test(text)
+
+/** Every Component of a declaration, each parent before its children, in the order of the file. */
+export function everyComponent(components: readonly DeclaredComponent[]): DeclaredComponent[] {
+  return components.flatMap((component) => [component, ...everyComponent(component.children)])
+}
+
 /** The value of a key the suite owns is not of the form the specification gives it. */
 class WrongForm extends Error {}
 

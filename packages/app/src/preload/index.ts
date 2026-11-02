@@ -41,6 +41,8 @@ const api: Api = {
   planAdopt: (repositoryId) => ipcRenderer.invoke(CHANNEL.planAdopt, repositoryId),
   planStructureRepair: (repositoryId, problem) =>
     ipcRenderer.invoke(CHANNEL.planStructureRepair, repositoryId, problem),
+  planRename: (repositoryId, component, segment) =>
+    ipcRenderer.invoke(CHANNEL.planRename, repositoryId, component, segment),
   setUnsaved: (unsaved) => ipcRenderer.invoke(CHANNEL.setUnsaved, unsaved),
   onCloseRequested: (listener) => {
     const handler = (): void => listener()

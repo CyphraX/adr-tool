@@ -48,6 +48,7 @@ describe('a repository on disk', () => {
       [
         showcase,
         join(showcase, '.adr'),
+        join(showcase, '.arch'),
         join(showcase, 'doc'),
         join(showcase, 'docs'),
         join(showcase, 'docs/adr')
