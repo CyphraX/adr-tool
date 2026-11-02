@@ -2,7 +2,8 @@ import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 import type { YAMLMap } from 'yaml'
 import type { BackReferenceKey, Problem } from '../problems/problem'
 import { RELATION_TYPES, type RelationType } from '../relation'
-import { STATUSES, isStatus, type Status } from '../status'
+import { detailed, type CoreSaid } from '../sentences'
+import { isStatus, type Status } from '../status'
 import { viewSource, type SourceView } from '../text/source'
 import { METADATA_KEYS, type MetadataKey } from './keys'
 import { scalarText } from './scalar'
@@ -50,18 +51,22 @@ export function readMetadata(view: SourceView, adr: string): MetadataReading {
     // The first line of the message ends in a colon: the library quotes the source after it.
     // It counts lines from the start of the frontmatter; the file's lines are counted here.
     const before = view.text.slice(0, view.frontmatter.start).split('\n').length - 1
-    const detail = doc.errors[0]!.message.split('\n')[0]!
+    const message = doc.errors[0]!.message.split('\n')[0]!
       .replace(/:$/, '')
       .replace(/ at line (\d+), column (\d+)$/, (_, line: string, column: string) => {
         return ` at line ${Number(line) + before}, column ${column}`
       })
-    return unreadable({ kind: 'invalid-frontmatter', adr, detail })
+    return unreadable({
+      kind: 'invalid-frontmatter',
+      adr,
+      ...detailed({ code: 'yaml-error', values: { message } })
+    })
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
     return unreadable({
       kind: 'invalid-frontmatter',
       adr,
-      detail: 'The frontmatter is not a mapping'
+      ...detailed({ code: 'frontmatter-not-mapping', values: {} })
     })
   }
   const problems: Problem[] = []
@@ -82,20 +87,22 @@ function metadataFrom(map: YAMLMap | undefined, adr: string, problems: Problem[]
     present.add(key)
     if (pair.value !== null) nodes.set(key, pair.value)
   }
-  const invalid = (key: MetadataKey, detail: string): void => {
-    problems.push({ kind: 'invalid-metadata', adr, key, detail })
+  const invalid = (key: MetadataKey, said: CoreSaid): void => {
+    problems.push({ kind: 'invalid-metadata', adr, key, ...detailed(said) })
   }
 
   const text = (key: MetadataKey): string | undefined => {
     const node = nodes.get(key)
-    if (node !== undefined && !isScalar(node)) invalid(key, 'Expected a single value')
+    if (node !== undefined && !isScalar(node)) {
+      invalid(key, { code: 'expected-single-value', values: {} })
+    }
     return scalarText(node)
   }
 
   const date = (key: MetadataKey): string | undefined => {
     const value = text(key)
     if (value === undefined || isCalendarDate(value)) return value
-    invalid(key, `"${value}" is not a date of the form YYYY-MM-DD`)
+    invalid(key, { code: 'not-a-date', values: { value } })
     return undefined
   }
 
@@ -108,13 +115,13 @@ function metadataFrom(map: YAMLMap | undefined, adr: string, problems: Problem[]
       return only === undefined ? [] : [only]
     }
     if (!isSeq(node)) {
-      invalid(key, 'Expected a list')
+      invalid(key, { code: 'expected-list', values: {} })
       return []
     }
     const items: string[] = []
     for (const item of node.items) {
       const value = scalarText(item)
-      if (value === undefined) invalid(key, 'Expected a list of single values')
+      if (value === undefined) invalid(key, { code: 'expected-single-values', values: {} })
       else if (!items.includes(value)) items.push(value)
     }
     return items
@@ -124,14 +131,14 @@ function metadataFrom(map: YAMLMap | undefined, adr: string, problems: Problem[]
     const node = nodes.get('corrections')
     if (node === undefined) return []
     if (!isSeq(node)) {
-      invalid('corrections', 'Expected a list of corrections')
+      invalid('corrections', { code: 'expected-corrections', values: {} })
       return []
     }
     const entries: Correction[] = []
     for (const item of node.items) {
       const when = isMap(item) ? scalarText(item.get('date', true)) : undefined
       if (!isMap(item) || when === undefined || !isCalendarDate(when)) {
-        invalid('corrections', 'Every correction needs a date of the form YYYY-MM-DD')
+        invalid('corrections', { code: 'correction-needs-date', values: {} })
         continue
       }
       const author = scalarText(item.get('author', true))
@@ -154,14 +161,14 @@ function metadataFrom(map: YAMLMap | undefined, adr: string, problems: Problem[]
     } else {
       status = undefined
       rawStatus = written
-      invalid('status', `"${written}" is not one of ${STATUSES.join(', ')}`)
+      invalid('status', { code: 'unknown-status', values: { status: written } })
     }
   }
 
   const created = date('created')
   const decided = date('decided')
   if (decided !== undefined && status === 'proposed') {
-    invalid('decided', 'A proposed ADR has not been decided yet')
+    invalid('decided', { code: 'decided-while-proposed', values: {} })
   }
 
   return {

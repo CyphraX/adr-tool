@@ -16,7 +16,18 @@ export {
 export type { OwnedSourceFile } from './ownership'
 export { isDirectoryNode, withDirectories, type DirectoryNode } from './directories'
 export type { Language, SourceFile } from './source-files'
-export { DECLARATION_PATH, wordingOf, type PatternKey, type StructureProblem } from './problems'
+export {
+  DECLARATION_PATH,
+  saidOf,
+  wordingOf,
+  type PatternKey,
+  type StructureProblem
+} from './problems'
+export {
+  SENTENCES as STRUCTURE_SENTENCES,
+  englishOf as structureEnglishOf,
+  type StructureSaid
+} from './sentences'
 export { hasRepair, planAdopt, planRename, planRepair, type RenamePlan } from './operations'
 export type { Dependencies, Dependency, LibraryUse, NotAnalysed, NotResolved } from './dependencies'
 export {

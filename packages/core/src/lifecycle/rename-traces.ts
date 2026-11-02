@@ -3,7 +3,8 @@ import type { DecisionLog } from '../log/load'
 import { replaceInList } from '../metadata/write'
 import type { Plan } from '../plan'
 import { viewSource } from '../text/source'
-import { Refusal, plan } from './pending'
+import { plan } from './pending'
+import { refuse } from '../sentences'
 import { requireOwnFormat } from './rules'
 
 /** A line of a frontmatter that holds `affects`, as far as text that cannot be parsed tells. */
@@ -26,7 +27,7 @@ export function planRenameTraces(
 
   return plan(fs, async (pending) => {
     if (from === '' || to === '' || from === to) {
-      throw new Refusal('A Rename needs an old and a new Component ID that differ.')
+      refuse({ code: 'rename-needs-two-ids', values: {} })
     }
     for (const log of logs) {
       for (const adr of log.adrs) {
@@ -38,15 +39,16 @@ export function planRenameTraces(
             ? view.text.slice(view.frontmatter.start, view.frontmatter.end)
             : view.text
           if (AFFECTS_LINE.test(frontmatter)) {
-            throw new Refusal(
-              `The frontmatter of ${adr.id} cannot be read, and it has a list "affects". Fix it before ${from} is renamed.`
-            )
+            refuse({ code: 'unreadable-has-affects', values: { adr: adr.id, component: from } })
           }
           continue
         }
         const items = adr.metadata.affects.filter((item) => renamed(item) !== undefined)
         if (items.length === 0) continue
-        requireOwnFormat(adr, ` It names ${from} in affects: migrate it first.`)
+        requireOwnFormat(adr, (foreign) => ({
+          code: 'foreign-format-names-component',
+          values: { ...foreign, component: from }
+        }))
         for (const item of items) {
           await pending.write(adr.path, (view) =>
             replaceInList(view, 'affects', item, renamed(item)!)

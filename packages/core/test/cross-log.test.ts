@@ -164,7 +164,7 @@ describe('operations across Decision Logs', () => {
     })
     expect(
       await planAccept(fs, log('docs/decisions'), '0001-new', { today: '2026-11-02' })
-    ).toEqual({
+    ).toMatchObject({
       ok: false,
       reason: 'Only an accepted ADR can be amended. docs/adr/0002-old is proposed.'
     })
@@ -185,12 +185,12 @@ describe('operations across Decision Logs', () => {
       await planEditMetadata(fs, log('docs/decisions'), '0001-b', {
         relations: { 'depends-on': ['docs/adr/0009-gone'] }
       })
-    ).toEqual({ ok: false, reason: 'There is no ADR docs/adr/0009-gone in this repository.' })
+    ).toMatchObject({ ok: false, reason: 'There is no ADR docs/adr/0009-gone in this repository.' })
     expect(
       await planEditMetadata(fs, log('docs/decisions'), '0001-b', {
         relations: { 'depends-on': ['docs/decisions/0001-b'] }
       })
-    ).toEqual({ ok: false, reason: '0001-b cannot have a Relation to itself.' })
+    ).toMatchObject({ ok: false, reason: '0001-b cannot have a Relation to itself.' })
   })
 
   it('creates an ADR that supersedes one of another log', async () => {
@@ -284,7 +284,7 @@ describe('what the review of part 6 found', () => {
       'docs/adr/0002-a.md': adr('status: accepted'),
       'docs/adr/0002-b.md': adr('status: accepted', 'relates-to: [docs/adr/0002-b]')
     })
-    expect(await planRenumber(itself.fs, itself.log('docs/adr'), '0002-b')).toEqual({
+    expect(await planRenumber(itself.fs, itself.log('docs/adr'), '0002-b')).toMatchObject({
       ok: false,
       reason: '0002-b names itself in relates-to. Remove that before it is renumbered.'
     })

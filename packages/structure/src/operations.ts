@@ -1,6 +1,7 @@
-import { plan, Refusal, type FileSystem, type Plan } from '@adr-tool/kernel'
+import { plan, type FileSystem, type Plan } from '@adr-tool/kernel'
 import { everyComponent, isSegment, readDeclaration } from './declaration'
-import { DECLARATION_PATH, SEGMENT_RULE, type StructureProblem } from './problems'
+import { DECLARATION_PATH, type StructureProblem } from './problems'
+import { refuse } from './sentences'
 import type { Structure } from './structure'
 import { insertComponents, removePattern, renameSegment, renderComponents } from './write'
 
@@ -14,13 +15,13 @@ const asText = (text: string): string => text
 export function planAdopt(fs: FileSystem, structure: Structure): Promise<Plan> {
   return plan(fs, asText, async (pending) => {
     if (structure.origin !== 'draft') {
-      throw new Refusal('The Components of this repository are declared already.')
+      refuse({ code: 'declared-already', values: {} })
     }
     if (!structure.canAdopt) {
-      throw new Refusal(
+      refuse(
         structure.components.length === 0
-          ? 'There is nothing to adopt: the Draft has no Components.'
-          : `${DECLARATION_PATH} is there and cannot be read. Adopting would overwrite what a person wrote; fix the file first.`
+          ? { code: 'nothing-to-adopt', values: {} }
+          : { code: 'adopt-over-unreadable', values: { path: DECLARATION_PATH } }
       )
     }
     if ((await fs.readText(DECLARATION_PATH)) === undefined) {
@@ -38,7 +39,7 @@ export const hasRepair = (problem: StructureProblem): boolean => problem.kind ==
 export function planRepair(fs: FileSystem, problem: StructureProblem): Promise<Plan> {
   return plan(fs, asText, async (pending) => {
     if (problem.kind !== 'dead-pattern') {
-      throw new Refusal('This Problem has no Repair: the suite cannot know what was meant.')
+      refuse({ code: 'no-repair', values: {} })
     }
     await pending.write(DECLARATION_PATH, (text) =>
       removePattern(text, problem.component, problem.key, problem.pattern)
@@ -59,21 +60,24 @@ export async function planRename(fs: FileSystem, id: string, segment: string): P
   const to = parent + segment
   const planned = await plan(fs, asText, async (pending) => {
     if (!isSegment(segment)) {
-      throw new Refusal(`"${segment}" is not a valid segment of a Component ID. ${SEGMENT_RULE}`)
+      refuse({ code: 'not-a-segment', values: { segment } })
     }
     const declaration = readDeclaration(await fs.readText(DECLARATION_PATH))
     if (declaration.kind === 'absent') {
-      throw new Refusal('Only a declared Component can be renamed. Adopt the Draft first.')
+      refuse({ code: 'rename-needs-declaration', values: {} })
     }
     if (declaration.kind === 'unreadable') {
-      throw new Refusal(`${DECLARATION_PATH} cannot be read: ${declaration.detail}`)
+      refuse({
+        code: 'unreadable-declaration',
+        values: { path: DECLARATION_PATH, detail: declaration.said }
+      })
     }
     const declared = new Set(everyComponent(declaration.components).map((one) => one.id))
     if (!declared.has(id)) {
-      throw new Refusal(`${DECLARATION_PATH} declares no Component ${id}. Look at the file again.`)
+      refuse({ code: 'not-declared', values: { path: DECLARATION_PATH, id } })
     }
-    if (to === id) throw new Refusal(`${id} has that segment already.`)
-    if (declared.has(to)) throw new Refusal(`There is a Component ${to} already.`)
+    if (to === id) refuse({ code: 'segment-unchanged', values: { id } })
+    if (declared.has(to)) refuse({ code: 'component-exists', values: { id: to } })
     await pending.write(DECLARATION_PATH, (text) => renameSegment(text, id, segment))
   })
   return planned.ok ? { ...planned, renamed: { from: id, to } } : planned

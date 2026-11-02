@@ -16,6 +16,14 @@ export {
   type Plan
 } from './change/change-set'
 export { PendingFiles, Refusal, plan } from './change/pending'
-export { sentenceOf, type Said, type SaidBy, type Sentences } from './change/said'
+export {
+  KERNEL_SENTENCES,
+  sentenceOf,
+  type KernelSaid,
+  type Said,
+  type SaidBy,
+  type SaidValue,
+  type Sentences
+} from './change/said'
 
 export { applyEdits, type TextEdit } from './text/edit'

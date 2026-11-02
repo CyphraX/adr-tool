@@ -102,7 +102,7 @@ describe('Templates', () => {
       'notes/secret.md': 'Not a Template.\n'
     })
     for (const template of ['../../notes/secret', '../templates/x', 'a/b', 'constructor', '']) {
-      expect(await planCreate(fs, log, { title: 'New', template, today })).toEqual({
+      expect(await planCreate(fs, log, { title: 'New', template, today })).toMatchObject({
         ok: false,
         reason: `There is no Template called "${template}".`
       })
@@ -173,7 +173,9 @@ describe('creating an ADR', () => {
     const { fs, log } = await repository({ 'docs/adr/20260919-caching.md': adr() })
     const other = await planCreate(fs, log, { title: 'Logging', template: 'minimal', today })
     expect(other.ok && other.created?.id).toBe('20260919-logging')
-    expect(await planCreate(fs, log, { title: 'Caching', template: 'minimal', today })).toEqual({
+    expect(
+      await planCreate(fs, log, { title: 'Caching', template: 'minimal', today })
+    ).toMatchObject({
       ok: false,
       reason: '20260919-caching already exists in this Decision Log.'
     })

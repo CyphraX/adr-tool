@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { PROBLEM_CODES, type FileChange, type Problem } from '@adr-tool/core'
+import {
+  PROBLEM_CODES,
+  memoryFileSystem,
+  openRepository,
+  type FileChange,
+  type Problem
+} from '@adr-tool/core'
 import { languageOf } from '../src/shared/language'
 import { setLanguage, t } from '../src/main/strings'
 import { de } from '../src/renderer/src/lib/strings.de'
@@ -97,6 +103,23 @@ describe('the language of the window (part 12)', () => {
     expect(deWording.describeCause(problems[0]!)).toBe(
       'Nur gemeldet, weil sich das Frontmatter von 0001-a nicht lesen lässt.'
     )
+  })
+
+  it('words the detail of a Problem and why a file has no Migration by their codes', async () => {
+    const repository = await openRepository(
+      memoryFileSystem({
+        'docs/adr/0001-a.md': '---\nstatus: approved\n---\n\n# A\n',
+        'docs/adr/0002-b.md': '# 2. B\n\nDate: 2026-01-01\n\n## Status\n\nSuperseded by 3\n'
+      })
+    )
+    const [log] = repository.logs
+    const problem = log!.problems.find((one) => one.kind === 'invalid-metadata')!
+    expect(enWording.describeProblem(problem)).toContain('approved')
+    expect(deWording.describeProblem(problem)).not.toBe(enWording.describeProblem(problem))
+    expect(deWording.describeProblem(problem)).toMatch(/^status: /)
+    const foreign = log!.adrs.find((adr) => adr.id === '0002-b')!
+    expect(foreign.noMigrationSaid).toBeDefined()
+    expect(deWording.describeForeign(foreign)).toContain('Dieses ADR nennt seinen Nachfolger')
   })
 
   it('has the main process speak the language the window says', () => {

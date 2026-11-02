@@ -4,9 +4,10 @@ import type { DecisionLog } from '../log/load'
 import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList } from '../metadata/write'
 import { RELATION_TYPES, type RelationType } from '../relation'
-import { Refusal, plan } from './pending'
+import { plan } from './pending'
+import { refuse } from '../sentences'
 import { isQualified, normalReference } from '../relations/reference'
-import { named, requireTarget, writable, type AnyAdr } from './rules'
+import { named, requireTarget, statusAsWritten, writable, type AnyAdr } from './rules'
 
 /**
  * The lists of an ADR's Metadata as they should be afterwards. A list that is left out is
@@ -48,10 +49,14 @@ export function planEditMetadata(
 
     if (edit.decisionMakers) {
       const current = adr.metadata.decisionMakers
-      change('decision-makers', current, freeText(edit.decisionMakers, current, 'decision-maker'))
+      change(
+        'decision-makers',
+        current,
+        freeText(edit.decisionMakers, current, 'decision-maker-one-line')
+      )
     }
     if (edit.tags) {
-      change('tags', adr.metadata.tags, freeText(edit.tags, adr.metadata.tags, 'tag'))
+      change('tags', adr.metadata.tags, freeText(edit.tags, adr.metadata.tags, 'tag-one-line'))
     }
     for (const type of RELATION_TYPES) {
       const wanted = edit.relations?.[type]
@@ -75,10 +80,7 @@ export function planEditMetadata(
     for (const { key, added } of changes) {
       if (key !== 'supersedes' && key !== 'amends') continue
       if (adr.metadata.status !== 'proposed') {
-        const is = adr.metadata.rawStatus ? `"${adr.metadata.rawStatus}"` : adr.metadata.status
-        throw new Refusal(
-          `What an ADR supersedes or amends is fixed once it is no longer proposed. ${id} is ${is}.`
-        )
+        refuse({ code: 'relations-fixed', values: { adr: id, is: statusAsWritten(adr) } })
       }
       for (const target of added) requireTarget(key, other(log, id, target))
     }
@@ -103,15 +105,14 @@ export function planEditMetadata(
 /** The target of a new Relation: another ADR of the Decision Log, or of another log. */
 function other(log: DecisionLog, id: string, target: string): AnyAdr {
   if (normalReference(log.path, target) === id) {
-    throw new Refusal(`${id} cannot have a Relation to itself.`)
+    refuse({ code: 'relation-to-itself', values: { adr: id } })
   }
   const adr = named(log, target)
   if (!adr) {
-    throw new Refusal(
-      isQualified(target)
-        ? `There is no ADR ${target} in this repository.`
-        : `There is no ADR ${target} in this Decision Log.`
-    )
+    refuse({
+      code: isQualified(target) ? 'no-adr-in-repository' : 'no-adr',
+      values: { id: target }
+    })
   }
   return adr
 }
@@ -119,19 +120,23 @@ function other(log: DecisionLog, id: string, target: string): AnyAdr {
 /** A Component a Trace can be added to: one the repository declares. */
 function declared(components: readonly string[] | undefined, component: string): void {
   if (!components || components.length === 0) {
-    throw new Refusal('No Component is declared in this repository, so none can be named.')
+    refuse({ code: 'no-components-declared', values: {} })
   }
   if (!components.includes(component)) {
-    throw new Refusal(`There is no declared Component ${component}.`)
+    refuse({ code: 'component-not-declared', values: { component } })
   }
 }
 
 /** Free text as it goes into a list: one line, not empty, once. What is already in the file stays as it is. */
-function freeText(wanted: readonly string[], current: readonly string[], what: string): string[] {
+function freeText(
+  wanted: readonly string[],
+  current: readonly string[],
+  rule: 'decision-maker-one-line' | 'tag-one-line'
+): string[] {
   const items = wanted.map((item) => (current.includes(item) ? item : item.trim()))
   for (const item of items) {
     if (item === '' || /[\r\n]/.test(item)) {
-      throw new Refusal(`A ${what} is one line of text and cannot be empty.`)
+      refuse({ code: rule, values: {} })
     }
   }
   return [...new Set(items)]

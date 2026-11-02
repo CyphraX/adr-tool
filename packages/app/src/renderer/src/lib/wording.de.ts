@@ -7,8 +7,10 @@ import {
   type ForeignFormat,
   type ForeignSign,
   type Problem,
-  type Repair
+  type Repair,
+  type Said
 } from '@adr-tool/core'
+import { wordIn } from './said'
 import type { Wording } from './wording.en'
 
 /**
@@ -51,11 +53,13 @@ const NO_REPAIR =
 const unreadable = (problem: Problem): boolean =>
   problem.kind === 'invalid-frontmatter' || problem.kind === 'unterminated-frontmatter'
 
-/** What a Problem says in detail — the reason a file cannot be read — in German. */
-const detailOf = (problem: { readonly detail: string }): string => problem.detail
+/** What a Problem says in detail — the reason a file cannot be read — in German, by its code. */
+const detailOf = (problem: { readonly detail: string; readonly said?: Said }): string =>
+  wordIn('de', problem.said, problem.detail)
 
 /** Why an ADR of a foreign format cannot be migrated, as the rest of a sentence about it. */
-const noMigrationOf = (adr: Pick<Adr, 'noMigration'>): string => adr.noMigration ?? ''
+const noMigrationOf = (adr: Pick<Adr, 'noMigration' | 'noMigrationSaid'>): string =>
+  wordIn('de', adr.noMigrationSaid, adr.noMigration ?? '')
 
 export const de: Wording = {
   status: {
@@ -129,7 +133,7 @@ export const de: Wording = {
       : `${read} Dieses ADR ${noMigrationOf(adr)}`
   },
 
-  noRepairIn(adr: Pick<Adr, 'foreign' | 'noMigration'>): string {
+  noRepairIn(adr: Pick<Adr, 'foreign' | 'noMigration' | 'noMigrationSaid'>): string {
     if (!adr.foreign) return NO_REPAIR
     const never = `Das Werkzeug liest das Format von ${FORMAT_NAMES[adr.foreign]} und schreibt es nie.`
     return adr.noMigration === undefined
