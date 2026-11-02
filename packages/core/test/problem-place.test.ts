@@ -169,6 +169,25 @@ describe('where a Problem is', () => {
     ).toEqual([expect.stringMatching(/^docs\/decisions\/0001-a\.md:8 /)])
   })
 
+  it('is the link in the Links section of MADR 2 that names it', async () => {
+    expect(
+      await places({
+        'docs/adr/0001-a.md': [
+          '# A',
+          '',
+          '* Status: accepted',
+          '',
+          '## Links',
+          '',
+          '* Refined by [ADR-0002](0002-b.md)',
+          '* Amends [ADR-0009](0009-gone.md)',
+          ''
+        ].join('\n'),
+        'docs/adr/0002-b.md': '# B\n\n* Status: accepted\n'
+      })
+    ).toEqual(['docs/adr/0001-a.md:8 unknown-target'])
+  })
+
   it('is the first of several ADRs, without a line for a number they share', async () => {
     expect(
       await places({

@@ -59,7 +59,7 @@ describe('a MADR repository', () => {
       ],
       ['0007', 'madr', 'superseded', []],
       ['0008', undefined, 'proposed', ['Alex Roth']],
-      ['0009', 'madr', 'rejected', []]
+      ['0009', 'madr-2', 'rejected', ['Kim Becker']]
     ])
     // The template, the README: no ADRs.
     expect(log!.adrs).toHaveLength(10)
@@ -205,16 +205,17 @@ describe('recognizing a file of MADR', () => {
     expect(
       log.adrs.map((adr) => [adr.foreign, adr.metadata.status ?? adr.metadata.rawStatus])
     ).toEqual([
-      ['madr', 'rejected'],
-      ['madr', 'superseded'],
+      ['madr-2', 'rejected'],
+      ['madr-2', 'superseded'],
       [undefined, 'accepted'],
-      ['madr', 'draft'],
+      // log4brains' draft is what the tool calls proposed.
+      ['madr-2', 'proposed'],
       [undefined, 'proposed'],
-      ['madr', 'rejected'],
+      ['madr-2', 'rejected'],
       // The first list of the body, not the first thing in it.
-      ['madr', 'rejected']
+      ['madr-2', 'rejected']
     ])
-    expect(log.adrs[0]!.metadata.decisionMakers).toEqual([])
+    expect(log.adrs[0]!.metadata.decisionMakers).toEqual(['A'])
     expect(log.relations).toMatchObject([{ from: '0003-c', to: '0002-b' }])
   })
 
@@ -232,7 +233,7 @@ describe('recognizing a file of MADR', () => {
       '0002-b': madr(['status: superseded by [__proto__](constructor.md)']),
       '0003-c': `# C\n\n* Status:${spaces}x${spaces}\n*${spaces}Status: y\n`
     })
-    expect(log.adrs.map((adr) => adr.foreign)).toEqual(['madr', 'madr', 'madr'])
+    expect(log.adrs.map((adr) => adr.foreign)).toEqual(['madr', 'madr', 'madr-2'])
   })
 })
 
@@ -416,7 +417,7 @@ describe('values of MADR in shapes nobody expects', () => {
       [undefined, 'accepted', []],
       ['madr', 'superseded', []],
       // A thematic break is no list, and the template's comments are no Status.
-      ['madr', 'rejected', []],
+      ['madr-2', 'rejected', []],
       [undefined, 'accepted', []],
       // MADR 3's placeholder without quotes is not YAML: a Problem of its own kind.
       [undefined, 'accepted', []]

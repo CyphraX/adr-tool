@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { FileChange } from '@adr-tool/core'
+import { memoryFileSystem, openRepository, type FileChange } from '@adr-tool/core'
 import {
   codeSpans,
   describeCorrection,
+  describeForeign,
   logName,
   summarizeChange
 } from '../src/renderer/src/lib/wording'
@@ -76,5 +77,22 @@ describe('what a Decision Log is called', () => {
   it('is its path, and the one at the top of the repository has a name of its own', () => {
     expect(logName('docs/adr')).toBe('docs/adr')
     expect(logName('')).toBe('(repository root)')
+  })
+})
+
+describe('the header of an ADR in a foreign format', () => {
+  it('names what made the tool read it so', async () => {
+    const { logs } = await openRepository(
+      memoryFileSystem({
+        'docs/adr/0001-a.md': '---\nstatus: superseded by ADR-0002\ndeciders: [A]\n---\n\n# A\n',
+        'docs/adr/0002-b.md': '# B\n\n- Status: draft\n- Tags: api\n',
+        'docs/adr/0003-c.md': '# 3. C\n\n## Status\n\nAccepted\n'
+      })
+    )
+    expect(logs[0]!.adrs.map(describeForeign)).toEqual([
+      'Read as a file of MADR: a Status that names a successor and "deciders" for the decision-makers. That is read as MADR means it. The tool never writes this format. Migration rewrites the file into the tool\'s own, and shows the change first.',
+      "Read as a file of MADR 2 or log4brains: its Status or its Deciders in the list under the title. Its Status, its Deciders and log4brains' Tags are taken from that list, and its Relations from the links of its Links section. The tool never writes this format. Migration rewrites the file into the tool's own, and shows the change first.",
+      "Read as a file of adr-tools: no frontmatter, and a Status section in its text. Its Status, its Relations and Back-references and the day it was created are taken from there. The tool never writes this format. Migration rewrites the file into the tool's own, and shows the change first."
+    ])
   })
 })

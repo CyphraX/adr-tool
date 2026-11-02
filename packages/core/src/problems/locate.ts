@@ -2,6 +2,7 @@ import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import { isMap, isSeq, parseDocument, type Node, type YAMLMap } from 'yaml'
 import type { Adr } from '../adr/adr'
 import { parseAdrTools } from '../foreign/adr-tools'
+import { parseMadrList } from '../foreign/madr-list'
 import type { DecisionLog } from '../log/load'
 import { scalarText } from '../metadata/scalar'
 import { viewSource } from '../text/source'
@@ -100,24 +101,25 @@ function fileLines(text: string, adr: Adr | undefined): FileLines {
 
   // Where the Status is written, and the links of a foreign format with it: the `status` key,
   // the `* Status:` item of the list under the title (MADR 2), or the Status section (adr-tools).
+  /** The lines of a section that are not blank, from the line after its heading. */
+  const sectionLines = (section: { start: number; end: number }): number[] => {
+    const lines: number[] = []
+    const last = lineAt(Math.max(section.end - 1, 0))
+    for (let line = lineAt(section.start) + 1; line <= last; line++) {
+      if (lineText(line).trim() !== '') lines.push(line)
+    }
+    return lines
+  }
   const statusLines = ((): number[] => {
     const own = key('status')
     if (own !== undefined) return [own]
     const listed = listedStatus(text, front ? lineAt(front.end) : 0)
-    if (listed !== undefined) return [listed]
+    // MADR 2 and log4brains keep their other links in a Links section.
+    const links = adr?.foreign === 'madr-2' ? parseMadrList(view)?.links?.section : undefined
+    if (listed !== undefined) return [listed, ...(links ? sectionLines(links) : [])]
     if (front) return []
     const section = parseAdrTools(view)?.section
-    if (!section) return []
-    const lines: number[] = []
-    // From the line after the heading to the last line of the section.
-    for (
-      let line = lineAt(section.start) + 1;
-      line <= lineAt(Math.max(section.end - 1, 0));
-      line++
-    ) {
-      if (lineText(line).trim() !== '') lines.push(line)
-    }
-    return lines
+    return section ? sectionLines(section) : []
   })()
   const status = statusLines[0]
   /** In a foreign format: the line of the Status that links to `id`, or the Status itself. */

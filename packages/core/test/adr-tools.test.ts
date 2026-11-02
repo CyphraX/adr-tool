@@ -78,10 +78,23 @@ describe('a repository written with adr-tools', () => {
         to: '0002-deploy-to-one-region',
         state: 'in-effect'
       },
+      // "Clarified by" and "Clarifies": other words relate the two ADRs.
+      {
+        type: 'relates-to',
+        from: '0003-deploy-to-two-regions',
+        to: '0005-review-decisions-every-quarter',
+        state: 'in-effect'
+      },
       {
         type: 'amends',
         from: '0005-review-decisions-every-quarter',
         to: '0001-record-architecture-decisions',
+        state: 'in-effect'
+      },
+      {
+        type: 'relates-to',
+        from: '0005-review-decisions-every-quarter',
+        to: '0003-deploy-to-two-regions',
         state: 'in-effect'
       },
       {
@@ -402,7 +415,11 @@ describe('a hostile file', () => {
       '0002-b': adrTools('2. B', ['toString [x](0001-a.md)', 'hasOwnProperty [y](0001-a.md)'])
     })
     expect(log.adrs.map((adr) => adr.metadata.status)).toEqual(['accepted', 'accepted'])
-    expect(log.relations).toEqual([])
+    // Words the tool does not know relate the two ADRs, whatever the words are.
+    expect(log.relations.map(({ type, from, to }) => `${from} ${type} ${to}`)).toEqual([
+      '0001-a relates-to 0002-b',
+      '0002-b relates-to 0001-a'
+    ])
   })
 
   it('costs no more than its length', async () => {

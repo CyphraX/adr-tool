@@ -64,7 +64,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 - **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body.
 - **git, read-only.** The app shows the branch that is checked out and the ADRs with uncommitted changes. For each ADR it shows its history, commit by commit, with the diff.
-- **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 3 and 4 and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
+- **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 2, 3 and 4, for [log4brains](https://github.com/thomvaill/log4brains) and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
 
 <details>
@@ -176,7 +176,7 @@ The test fixtures are useful for exploring the app. They are test data, so copy 
 | --- | --- |
 | `packages/core/test/fixtures/showcase` | Every Status, supersedes, amends and depends-on, and one Problem |
 | `packages/core/test/fixtures/broken` | Ten Problems, each with its Repair |
-| `packages/core/test/fixtures/madr`, `…/adr-tools` | Foreign formats, offered for Migration |
+| `packages/core/test/fixtures/madr`, `…/madr-2`, `…/log4brains`, `…/adr-tools` | Foreign formats, offered for Migration |
 | `packages/structure/test/fixtures/shop` | A Cycle between two Components with its weakest Dependency, and one between two files |
 | `packages/structure/test/fixtures/maven-shop` | Java: a Maven project of three modules, with one package spread over two of them |
 | this repository | Its own ADRs, and its packages as declared Components |
@@ -282,7 +282,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 - **The rest of the roadmap** is being built part by part ([plan-roadmap.md](docs/plan-roadmap.md)):
   - the known gaps before the first release and the live editor (built);
   - an `adr lint` CLI for CI (built);
-  - MADR 2.x and log4brains;
+  - MADR 2.x and log4brains (built);
   - Relations across Decision Logs, committing an ADR, a branch overview;
   - an MCP server for agents;
   - export, timeline, board and dashboard;

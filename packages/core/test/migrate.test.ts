@@ -53,12 +53,25 @@ describe.each([
   },
   {
     name: 'madr',
-    changed: ['0002', '0003', '0005', '0007'],
-    stillForeign: ['0009-csv-export-for-finance'],
+    changed: ['0002', '0003', '0005', '0007', '0009'],
+    stillForeign: [] as string[],
+    warnings: [['0007-xml-for-the-bank', 'ADR-0042']]
+  },
+  {
+    name: 'madr-2',
+    changed: ['0000', '0001', '0002', '0003', '0004', '0005'],
+    stillForeign: [] as string[],
     warnings: [
-      ['0009-csv-export-for-finance', 'MADR 2'],
-      ['0007-xml-for-the-bank', 'ADR-0042']
+      ['0002-rest-for-the-api', 'Refined by'],
+      ['0004-pagination-by-cursor', 'Refines'],
+      ['0005-graphql-for-partners', '"on hold"']
     ]
+  },
+  {
+    name: 'log4brains',
+    changed: ['20200925', '20200926', '20210110', '20210301', '20210415'],
+    stillForeign: [] as string[],
+    warnings: [] as string[][]
   }
 ])(
   'Migration of the Decision Log of the fixture $name',
@@ -69,10 +82,10 @@ describe.each([
       const plan = await planMigration(fs, log)
       if (!plan.ok) throw new Error(plan.reason)
 
-      expect(plan.changeSet.files.map((file) => /\/(\d{4})-/.exec(file.path)![1]).sort()).toEqual(
+      expect(plan.changeSet.files.map((file) => /\/(\d+)-/.exec(file.path)![1]).sort()).toEqual(
         changed
       )
-      expect(plan.warnings).toHaveLength(warnings.length)
+      expect(plan.warnings ?? []).toHaveLength(warnings.length)
       warnings.forEach(([adr, what], position) => {
         expect(plan.warnings![position]).toContain(adr)
         expect(plan.warnings![position]).toContain(what)
@@ -254,7 +267,8 @@ describe('Migration of a file of MADR', () => {
     const [fs, log] = await open(
       inLog({
         '0001-oldest': madr('status: superseded by ADR-0002'),
-        '0002-old': '# Old\n\n* Status: superseded by [ADR-0003](0003-new.md)\n',
+        // adr-tools, naming its successor in its Status text: there is no Migration for that.
+        '0002-old': '# 2. Old\n\n## Status\n\nSuperseded by ADR 3\n',
         '0003-new': madr('status: accepted'),
         '0004-other': madr('status: accepted', 'deciders: A')
       })
@@ -263,12 +277,12 @@ describe('Migration of a file of MADR', () => {
     if (!plan.ok) throw new Error(plan.reason)
     expect(plan.changeSet.files.map((file) => file.path)).toEqual(['docs/adr/0004-other.md'])
     expect(plan.warnings).toEqual([
-      expect.stringContaining('0002-old keeps its Status in the list under its title'),
+      expect.stringContaining('0002-old names its successor in its Status text'),
       expect.stringContaining('0001-oldest waits for its successor 0002-old')
     ])
     expect(await planMigration(fs, log, '0002-old')).toMatchObject({
       ok: false,
-      reason: expect.stringContaining('MADR 2')
+      reason: expect.stringContaining('Make it a link line by hand')
     })
   })
 })
@@ -411,7 +425,7 @@ describe('what Migration does not do', () => {
       inLog({
         '0001-a': ['# 1. A', '', '## Status', '', 'Accepted', '', ...links, ''].join('\n'),
         ...chain,
-        '4000-m': '# End\n\n* Status: accepted\n'
+        '4000-m': '# 4000. End\n\n## Status\n\nSuperseded by ADR 1\n'
       })
     )
     const started = performance.now()

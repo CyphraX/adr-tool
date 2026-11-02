@@ -2,6 +2,7 @@
 status: accepted
 created: 2017-06-20
 supersedes: [0002-deploy-to-one-region]
+relates-to: [0005-review-decisions-every-quarter]
 ---
 
 # 3. Deploy to two regions

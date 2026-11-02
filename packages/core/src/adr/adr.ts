@@ -1,5 +1,6 @@
 import { readAdrTools } from '../foreign/adr-tools'
-import { namesSuccessor, readMadr, type ByNumber } from '../foreign/madr'
+import { namesSuccessor, readMadr, type ByNumber, type ForeignSign } from '../foreign/madr'
+import { readMadrList } from '../foreign/madr-list'
 import { numberOf, type AdrFileName, type NamingScheme } from '../log/naming'
 import { readMetadata, type Metadata } from '../metadata/read'
 import type { Problem } from '../problems/problem'
@@ -7,12 +8,15 @@ import { viewSource, type Eol } from '../text/source'
 import { titleOf } from '../text/title'
 
 /** A format the tool reads and never writes (docs/file-format.md, section 8). */
-export type ForeignFormat = 'adr-tools' | 'madr'
+export type ForeignFormat = 'adr-tools' | 'madr' | 'madr-2'
+
+export type { ForeignSign }
 
 /** What each foreign format is called, in a sentence. */
 export const FOREIGN_FORMAT_NAMES: Record<ForeignFormat, string> = {
   'adr-tools': 'adr-tools',
-  madr: 'MADR'
+  madr: 'MADR',
+  'madr-2': 'MADR 2 or log4brains'
 }
 
 /** An ADR as read from its file. */
@@ -34,6 +38,8 @@ export interface Adr {
    * what Migration would write, and no operation but Migration writes to the file.
    */
   readonly foreign?: ForeignFormat
+  /** What made the tool read the file in its foreign format; only with `foreign`. */
+  readonly foreignSigns?: readonly ForeignSign[]
   /**
    * Why this foreign ADR has no Migration, as the rest of a sentence that begins with its ID.
    * It stays read-only until a person has changed the file by hand.
@@ -51,8 +57,6 @@ export interface Adr {
 }
 
 const NO_MIGRATION = {
-  listed:
-    "keeps its Status in the list under its title, as MADR 2 does, and there is no Migration for that yet. Give it a `status` key in a frontmatter by hand, and it is one of the tool's own.",
   successorInText:
     'names its successor in its Status text, where adr-tools writes a link. As a `status` that would be read the way MADR means it, and say something else than it says now. Make it a link line by hand — Superseded by [2. Title](0002-title.md) — and it can be migrated.'
 }
@@ -68,12 +72,23 @@ export function readAdr(
   const own = readMetadata(view, name.id)
   const adrTools = readAdrTools(view, name.id, own.metadata)
   // A file whose frontmatter cannot be read is nobody's format yet.
-  const madr = adrTools || !own.writable ? undefined : readMadr(view, name.id, own, byNumber)
-  const foreign: ForeignFormat | undefined = adrTools ? 'adr-tools' : madr ? 'madr' : undefined
-  const { metadata, problems } = adrTools ?? madr?.reading ?? own
-  const noMigration = madr?.listed
-    ? NO_MIGRATION.listed
-    : adrTools && metadata.rawStatus !== undefined && namesSuccessor(metadata.rawStatus)
+  const listed = adrTools || !own.writable ? undefined : readMadrList(view, name.id, own, byNumber)
+  const madr =
+    adrTools || listed || !own.writable ? undefined : readMadr(view, name.id, own, byNumber)
+  const foreign: ForeignFormat | undefined = adrTools
+    ? 'adr-tools'
+    : listed
+      ? 'madr-2'
+      : madr
+        ? 'madr'
+        : undefined
+  const signs: readonly ForeignSign[] | undefined = adrTools
+    ? ['status-section']
+    : (listed ?? madr)?.signs
+  const { metadata, problems } = adrTools ?? listed?.reading ?? madr?.reading ?? own
+  const successor = (listed ?? madr)?.successor
+  const noMigration =
+    adrTools && metadata.rawStatus !== undefined && namesSuccessor(metadata.rawStatus)
       ? NO_MIGRATION.successorInText
       : undefined
   const number = numberOf(name, scheme)
@@ -86,10 +101,10 @@ export function readAdr(
     ...(title !== undefined && { title }),
     body,
     eol: view.eol,
-    ...(foreign && { foreign }),
+    ...(foreign && { foreign, foreignSigns: signs ?? [] }),
     ...(noMigration !== undefined && { noMigration }),
     metadata,
     metadataWritable: own.writable
   }
-  return { adr, problems, ...(madr?.successor !== undefined && { successor: madr.successor }) }
+  return { adr, problems, ...(successor !== undefined && { successor }) }
 }

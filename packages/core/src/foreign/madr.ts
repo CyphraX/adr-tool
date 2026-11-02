@@ -4,7 +4,6 @@ import type { Metadata, MetadataReading } from '../metadata/read'
 import { scalarText } from '../metadata/scalar'
 import type { Problem } from '../problems/problem'
 import { STATUSES, isStatus, type Status } from '../status'
-import { headingOf, proseLines } from '../text/prose'
 import type { SourceView } from '../text/source'
 import { linkLine, targetOf } from './links'
 
@@ -14,9 +13,17 @@ type Reading = Pick<MetadataReading, 'metadata' | 'problems'>
 export type ByNumber = (number: number) => string | undefined
 
 const SUPERSEDED_BY = /^super[sc]eded[ \t]+by(?![^\s:])/i
-const STATUS_ITEM = /^ {0,3}[*+-][ \t]+status[ \t]*:/i
-const LIST_ITEM = /^ {0,3}[*+-](?:[ \t]|$)/
-const THEMATIC_BREAK = /^(?:\*{3,}|-{3,}|_{3,})$/
+
+/** What made the tool read a file as foreign (docs/file-format.md, section 8). */
+export type ForeignSign =
+  /** adr-tools: no frontmatter, and a `## Status` section. */
+  | 'status-section'
+  /** MADR 3 and 4: a `status` that names a successor. */
+  | 'successor-in-status'
+  /** MADR 3: `deciders` for the decision-makers. */
+  | 'deciders'
+  /** MADR 2 and log4brains: the Metadata in the list under the title. */
+  | 'listed'
 
 /**
  * Read a file the way MADR wrote it (docs/file-format.md, section 8), laid over what the
@@ -28,9 +35,9 @@ export function readMadr(
   adr: string,
   own: Reading,
   byNumber: ByNumber
-): { reading: Reading; successor?: string; listed: boolean } | undefined {
-  const { written, inFrontmatter, listed, deciders } = signsOf(view)
-  if (!inFrontmatter && listed === undefined && !deciders) return undefined
+): { reading: Reading; successor?: string; signs: ForeignSign[] } | undefined {
+  const { written, inFrontmatter, deciders } = signsOf(view)
+  if (!inFrontmatter && !deciders) return undefined
 
   let { metadata } = own
   let problems = own.problems
@@ -38,7 +45,7 @@ export function readMadr(
 
   let successor: string | undefined
 
-  const text = inFrontmatter ? written?.text : listed
+  const text = inFrontmatter ? written?.text : undefined
   if (text !== undefined) {
     const status = readStatus(text, byNumber)
     successor = status.supersededBy[0]
@@ -68,7 +75,10 @@ export function readMadr(
   return {
     reading: { metadata, problems },
     ...(successor !== undefined && { successor }),
-    listed: listed !== undefined
+    signs: [
+      ...(inFrontmatter ? (['successor-in-status'] as const) : []),
+      ...(deciders ? (['deciders'] as const) : [])
+    ]
   }
 }
 
@@ -77,28 +87,25 @@ function signsOf(view: SourceView): {
   written: Key | undefined
   /** `status: superseded by …` in the frontmatter. */
   inFrontmatter: boolean
-  /** The Status in the list under the title, where MADR 2 keeps it. */
-  listed: string | undefined
   /** `deciders` that names somebody, and no `decision-makers`. */
   deciders: readonly string[] | undefined
 } {
   const keys = frontmatterOf(view)
   const written = keys.get('status')
   const inFrontmatter = written !== undefined && SUPERSEDED_BY.test(written.text)
-  const listed = keys.has('status') ? undefined : listedStatus(view)
+  return { written, inFrontmatter, deciders: decidersOf(keys) }
+}
+
+/** MADR 3's `deciders`, when it names somebody and there is no `decision-makers`. */
+export function decidersOf(keys: ReadonlyMap<string, Key>): readonly string[] | undefined {
   const named = keys.has('decision-makers') ? [] : (keys.get('deciders')?.items ?? [])
-  return { written, inFrontmatter, listed, deciders: named.length > 0 ? named : undefined }
+  return named.length > 0 ? named : undefined
 }
 
 /** What Migration has to do to a file of MADR (docs/file-format.md, section 8, "Migration"). */
-export function migrationOfMadr(view: SourceView): {
-  status: boolean
-  deciders: boolean
-  /** There is no Migration for the Status in the list under the title yet. */
-  listed: boolean
-} {
-  const { inFrontmatter, listed, deciders } = signsOf(view)
-  return { status: inFrontmatter, deciders: deciders !== undefined, listed: listed !== undefined }
+export function migrationOfMadr(view: SourceView): { status: boolean; deciders: boolean } {
+  const { inFrontmatter, deciders } = signsOf(view)
+  return { status: inFrontmatter, deciders: deciders !== undefined }
 }
 
 function withoutRawStatus(metadata: Metadata): Omit<Metadata, 'rawStatus'> {
@@ -118,7 +125,8 @@ export function numberNamedBy(identifier: string): number | undefined {
   return match ? Number(match[1]) : undefined
 }
 
-function readStatus(
+/** A Status as MADR writes it: one of the five in any case, or "superseded by" a successor. */
+export function readStatus(
   text: string,
   byNumber: ByNumber
 ): { status: Status | undefined; rawStatus?: string; supersededBy: string[] } {
@@ -138,22 +146,24 @@ function readStatus(
   return { status: 'superseded', supersededBy: [linked ?? named ?? target] }
 }
 
-interface Key {
+export interface Key {
   /** The value as a single text; empty for a list. */
   readonly text: string
   /** The value as a list: a single value is a list of one. */
   readonly items: readonly string[]
 }
 
-/** The keys of the frontmatter this reader looks at. Nothing when the frontmatter cannot be read. */
-function frontmatterOf(view: SourceView): Map<string, Key> {
+/** The keys of the frontmatter the readers of MADR look at. Nothing when it cannot be read. */
+export function frontmatterOf(view: SourceView): Map<string, Key> {
   const keys = new Map<string, Key>()
   if (!view.frontmatter) return keys
   const doc = parseDocument(view.text.slice(view.frontmatter.start, view.frontmatter.end))
   if (doc.errors.length > 0 || !isMap(doc.contents)) return keys
   for (const pair of doc.contents.items) {
     const key = scalarText(pair.key)
-    if (key !== 'status' && key !== 'deciders' && key !== 'decision-makers') continue
+    if (key !== 'status' && key !== 'deciders' && key !== 'decision-makers' && key !== 'tags') {
+      continue
+    }
     const value = pair.value
     const items = isSeq(value) ? value.items.map((item) => scalarText(item)) : [scalarText(value)]
     const plain = isSeq(value) ? items.every((item) => item !== undefined) : isScalar(value)
@@ -166,27 +176,8 @@ function frontmatterOf(view: SourceView): Map<string, Key> {
   return keys
 }
 
-/**
- * MADR 2 and log4brains: `* Status: …` in the first list of the body, before the first
- * level-two heading. A comment behind the value is the template's, not the author's.
- */
-function listedStatus(view: SourceView): string | undefined {
-  let inList = false
-  for (const line of proseLines(view.text, view.bodyStart)) {
-    if (headingOf(line)?.level === 2) return undefined
-    if (LIST_ITEM.test(line) && !THEMATIC_BREAK.test(line.replace(/[ \t]/g, ''))) {
-      inList = true
-      if (!STATUS_ITEM.test(line)) continue
-      return withoutComments(line.slice(line.indexOf(':') + 1)).trim() || undefined
-    }
-    // A list ends with the first line that is neither an item, nor blank, nor indented under one.
-    if (inList && line.trim() !== '' && !/^[ \t]/.test(line)) return undefined
-  }
-  return undefined
-}
-
 /** `<!-- optional -->`: what the template says about a value is not the value. */
-function withoutComments(value: string): string {
+export function withoutComments(value: string): string {
   let rest = value
   for (let open = rest.indexOf('<!--'); open !== -1; open = rest.indexOf('<!--')) {
     const close = rest.indexOf('-->', open + 4)
@@ -197,7 +188,7 @@ function withoutComments(value: string): string {
 
 /** Whether a file of MADR names this number as its successor without naming an ADR by it (yet). */
 export function namesNumber(adr: Adr, number: number | undefined): boolean {
-  if (adr.foreign !== 'madr' || number === undefined) return false
+  if ((adr.foreign !== 'madr' && adr.foreign !== 'madr-2') || number === undefined) return false
   return adr.metadata.backReferences['superseded-by'].some(
     (written) => numberNamedBy(written) === number
   )
