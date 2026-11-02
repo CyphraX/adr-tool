@@ -1,6 +1,7 @@
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
 import type {
+  CreateRequest,
   MetadataEditRequest,
   MigrationRequest,
   RenameRequest,
@@ -31,6 +32,22 @@ export function metadataEditRequest(request: unknown): MetadataEditRequest | und
     relations: Object.fromEntries(RELATION_TYPES.map((type) => [type, relations[type]])),
     affects: given['affects']
   } as MetadataEditRequest
+}
+
+/**
+ * A new ADR: which log, its title and Template, and the ADR it supersedes or amends, if any.
+ * Whether the Template exists and the target can be superseded is `core`'s question.
+ */
+export function createRequest(request: unknown): CreateRequest | undefined {
+  const { repositoryId, logPath, title, template, relation } = record(request)
+  if (typeof repositoryId !== 'string' || typeof title !== 'string') return undefined
+  if (typeof template !== 'string') return undefined
+  if (logPath !== undefined && typeof logPath !== 'string') return undefined
+  const asked = { repositoryId, logPath, title, template }
+  if (relation === undefined) return asked
+  const { type, target } = record(relation)
+  const valid = (type === 'supersedes' || type === 'amends') && typeof target === 'string'
+  return valid ? { ...asked, relation: { type, target } } : undefined
 }
 
 /** Which Component, and its new segment. Whether either is valid is `structure`'s question. */

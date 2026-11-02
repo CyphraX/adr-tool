@@ -2,6 +2,7 @@ import type { FileSystem } from '@adr-tool/kernel'
 import type { DecisionLog } from '../log/load'
 import { replaceInList } from '../metadata/write'
 import type { Plan } from '../plan'
+import { viewSource } from '../text/source'
 import { Refusal, plan } from './pending'
 import { requireOwnFormat } from './rules'
 
@@ -30,8 +31,13 @@ export function planRenameTraces(
     for (const log of logs) {
       for (const adr of log.adrs) {
         if (!adr.metadataWritable) {
-          // Nobody can tell what this file names, so nothing may be left behind in it.
-          if (AFFECTS_LINE.test((await fs.readText(adr.path)) ?? '')) {
+          // Nobody can tell what this file names, so nothing may be left behind in it. What
+          // its body says is no Trace; a frontmatter that never closes runs to the end.
+          const view = viewSource((await fs.readText(adr.path)) ?? '')
+          const frontmatter = view.frontmatter
+            ? view.text.slice(view.frontmatter.start, view.frontmatter.end)
+            : view.text
+          if (AFFECTS_LINE.test(frontmatter)) {
             throw new Refusal(
               `The frontmatter of ${adr.id} cannot be read, and it has a list "affects". Fix it before ${from} is renamed.`
             )

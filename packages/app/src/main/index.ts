@@ -6,7 +6,6 @@ import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
   CHANNEL,
   type BodyEditRequest,
-  type CreateRequest,
   type Decision,
   type OpenRepository,
   type Session
@@ -15,6 +14,7 @@ import { analysisHost } from './analysis-host'
 import { nodeFileSystem } from './node-file-system'
 import { Repositories } from './repositories'
 import {
+  createRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
@@ -130,21 +130,9 @@ function registerIpc(): void {
   )
 
   ipcMain.handle(CHANNEL.planCreate, (_, request: unknown) => {
-    const given = (typeof request === 'object' && request !== null ? request : {}) as Record<
-      string,
-      unknown
-    >
-    const relation = given['relation'] as Record<string, unknown> | undefined
-    const valid =
-      typeof given['repositoryId'] === 'string' &&
-      (given['logPath'] === undefined || typeof given['logPath'] === 'string') &&
-      typeof given['title'] === 'string' &&
-      typeof given['template'] === 'string' &&
-      (relation === undefined ||
-        ((relation['type'] === 'supersedes' || relation['type'] === 'amends') &&
-          typeof relation['target'] === 'string'))
-    if (!valid) return { ok: false, reason: t.notUnderstood }
-    return repositories.planCreate(given as unknown as CreateRequest)
+    const create = createRequest(request)
+    if (!create) return { ok: false, reason: t.notUnderstood }
+    return repositories.planCreate(create)
   })
 
   ipcMain.handle(CHANNEL.planBodyEdit, (_, request: unknown) => {

@@ -9,6 +9,7 @@ export { memoryFileSystem } from './fs/memory'
 
 export {
   applyChangeSet,
+  joinChangeSets,
   type Applied,
   type ChangeSet,
   type FileChange,

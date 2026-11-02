@@ -35,6 +35,24 @@ export type Plan<Outcome extends object = object> =
     } & Outcome)
   | { readonly ok: false; readonly reason: string }
 
+/**
+ * One change set out of several, as one operation: the halves of an operation that more than
+ * one module plans — a Rename of a Component, with the declaration and the ADRs that name it.
+ * The halves must not touch the same file, nor a file one of them moves to: each was planned
+ * against the disk as it is, not against the other.
+ */
+export function joinChangeSets(...changeSets: readonly ChangeSet[]): ChangeSet {
+  const files = changeSets.flatMap((changeSet) => changeSet.files)
+  const seen = new Set<string>()
+  for (const file of files) {
+    for (const path of file.renameTo === undefined ? [file.path] : [file.path, file.renameTo]) {
+      if (seen.has(path)) throw new Error(`Two change sets that are joined both change ${path}.`)
+      seen.add(path)
+    }
+  }
+  return { files }
+}
+
 export type Applied =
   | { readonly applied: true }
   /** These files are no longer what the change set was planned against. Nothing was written. */

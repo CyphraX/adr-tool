@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
@@ -133,6 +134,36 @@ describe('a Rename as the renderer sends it', () => {
       ['r1', 'core']
     ]) {
       expect(renameRequest(...(args as [unknown, unknown, unknown]))).toBeUndefined()
+    }
+  })
+})
+
+describe('a new ADR as the renderer asks for it', () => {
+  const asked = { repositoryId: 'r1', logPath: 'docs/adr', title: 'Use X', template: 'minimal' }
+
+  it('names the log, the title and the Template, a Relation if it has one, and nothing else', () => {
+    expect(createRequest({ ...asked, extra: true })).toEqual(asked)
+    const first = { repositoryId: 'r1', title: 'Use X', template: 'minimal' }
+    expect(createRequest(first)).toEqual({ ...first, logPath: undefined })
+    const relation = { type: 'supersedes', target: '0001-a' }
+    expect(createRequest({ ...asked, relation: { ...relation, more: 1 } })).toEqual({
+      ...asked,
+      relation
+    })
+  })
+
+  it('is turned down when it is not what it should be', () => {
+    for (const request of [
+      undefined,
+      { ...asked, title: 7 },
+      { ...asked, logPath: null },
+      { ...asked, template: undefined },
+      { ...asked, relation: null },
+      { ...asked, relation: 'supersedes' },
+      { ...asked, relation: { type: 'depends-on', target: '0001-a' } },
+      { ...asked, relation: { type: 'amends' } }
+    ]) {
+      expect(createRequest(request)).toBeUndefined()
     }
   })
 })

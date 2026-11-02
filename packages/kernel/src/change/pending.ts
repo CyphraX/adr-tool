@@ -30,7 +30,8 @@ export class PendingFiles<View = string> {
 
   /** A file that does not exist yet. Refused when it does. */
   async create(path: string, text: string): Promise<void> {
-    if (this.texts.has(path) || (await this.fs.readText(path)) !== undefined) {
+    const taken = [...this.texts.values()].some((file) => file.renameTo === path)
+    if (taken || this.texts.has(path) || (await this.fs.readText(path)) !== undefined) {
       throw new Refusal(`${path} already exists.`)
     }
     this.texts.set(path, { before: '', after: text, creates: true })
@@ -69,7 +70,9 @@ export class PendingFiles<View = string> {
 
   changeSet(): ChangeSet {
     const files = [...this.texts]
-      .filter(([, file]) => file.after !== file.before || file.renameTo !== undefined)
+      .filter(
+        ([, file]) => file.creates || file.after !== file.before || file.renameTo !== undefined
+      )
       .map(([path, file]) => ({ path, ...file }))
     return { files }
   }

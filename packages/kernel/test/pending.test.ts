@@ -99,4 +99,21 @@ describe('plan', () => {
     })
     expect(twice).toEqual({ ok: false, reason: 'd.txt already exists.' })
   })
+
+  it('refuses to create a file where another one is moved to', async () => {
+    const fs = memoryFileSystem({ 'a.txt': 'a' })
+    const result = await plan(fs, text, async (pending) => {
+      await pending.rename('a.txt', 'b.txt')
+      await pending.create('b.txt', 'new')
+    })
+    expect(result).toEqual({ ok: false, reason: 'b.txt already exists.' })
+  })
+
+  it('keeps a file it creates in the change set, an empty one too', async () => {
+    const result = await plan(memoryFileSystem({}), text, (pending) => pending.create('e.txt', ''))
+    expect(result).toEqual({
+      ok: true,
+      changeSet: { files: [{ path: 'e.txt', before: '', after: '', creates: true }] }
+    })
+  })
 })

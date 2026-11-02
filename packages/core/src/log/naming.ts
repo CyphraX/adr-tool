@@ -1,3 +1,5 @@
+import { isCalendarDate } from '../metadata/read'
+
 /** How the ADR files of a Decision Log are named (docs/file-format.md, section 1). */
 export type NamingScheme = 'sequential' | 'date'
 
@@ -20,7 +22,7 @@ export function parseAdrFileName(name: string): AdrFileName | undefined {
 
 /** A log is `date` when every prefix is a valid eight-digit date; an empty log is `sequential`. */
 export function detectNamingScheme(names: readonly AdrFileName[]): NamingScheme {
-  return names.length > 0 && names.every((name) => isCalendarDate(name.prefix))
+  return names.length > 0 && names.every((name) => isDatePrefix(name.prefix))
     ? 'date'
     : 'sequential'
 }
@@ -30,11 +32,10 @@ export function numberOf(name: AdrFileName, scheme: NamingScheme): number | unde
   return scheme === 'sequential' ? Number(name.prefix) : undefined
 }
 
-function isCalendarDate(digits: string): boolean {
-  if (digits.length !== 8) return false
-  const [year, month, day] = [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6)].map(Number)
-  const date = new Date(Date.UTC(year!, month! - 1, day!))
+/** `YYYYMMDD`, a day the calendar has. */
+function isDatePrefix(digits: string): boolean {
   return (
-    date.getUTCFullYear() === year && date.getUTCMonth() === month! - 1 && date.getUTCDate() === day
+    digits.length === 8 &&
+    isCalendarDate(`${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`)
   )
 }
