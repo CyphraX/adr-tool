@@ -13,6 +13,7 @@ export {
   type DirectoryEntry,
   type FileChange,
   type FileSystem,
+  type Stranded,
   type WritableFileSystem
 } from '@adr-tool/kernel'
 

@@ -13,7 +13,8 @@ export {
   type Applied,
   type ChangeSet,
   type FileChange,
-  type Plan
+  type Plan,
+  type Stranded
 } from './change/change-set'
 export { PendingFiles, Refusal, plan } from './change/pending'
 export { sentenceOf, type Said, type SaidBy, type Sentences } from './change/said'

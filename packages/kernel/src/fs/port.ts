@@ -14,12 +14,25 @@ export interface FileSystem {
 
 /**
  * A file system that can be written to. Reading a repository only ever takes a
- * `FileSystem`, so that it cannot write; applying a change set takes this.
+ * `FileSystem`, so that it cannot write; applying a change set takes this, and builds
+ * an all-or-nothing write out of these steps (`applyChangeSet`).
  */
 export interface WritableFileSystem extends FileSystem {
-  /** Write a file, creating it and its directories when they do not exist. */
-  writeText(path: string, text: string): Promise<void>
+  /**
+   * Write a file, creating it and its directories when they do not exist. When the promise
+   * resolves, the text is on the disk and not only in a cache. With `like`, the file takes
+   * the permissions of that existing one: a new text that is to replace it keeps them.
+   */
+  writeText(path: string, text: string, options?: { readonly like?: string }): Promise<void>
+  /** Move a file in one step, replacing what is at `to`. */
   rename(from: string, to: string): Promise<void>
+  /**
+   * Give a file a second name, the same bytes under both: a hard link, or a copy where the
+   * file system has none. Refused when something is at `to`.
+   */
+  link(from: string, to: string): Promise<void>
+  /** Remove a file. Nothing happens when there is none. */
+  remove(path: string): Promise<void>
 }
 
 export interface DirectoryEntry {

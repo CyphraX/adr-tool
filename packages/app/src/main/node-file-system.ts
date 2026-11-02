@@ -1,12 +1,16 @@
+import { constants } from 'node:fs'
 import {
+  copyFile,
+  link,
   lstat,
   mkdir,
+  open,
   readFile,
   readdir,
   realpath,
   rename,
   stat,
-  writeFile
+  unlink
 } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { WritableFileSystem } from '@adr-tool/core'
@@ -92,11 +96,55 @@ export function nodeFileSystem(root: string): WritableFileSystem {
       )
       return listed.filter((entry) => entry !== undefined)
     },
-    writeText: async (path, text) => {
+    writeText: async (path, text, options) => {
       const full = await writable(path)
+      const like = options?.like === undefined ? undefined : await real(options.like)
+      const mode = like === undefined ? undefined : (await stat(like).catch(missing))?.mode
       await mkdir(dirname(full), { recursive: true })
-      await writeFile(full, text, 'utf8')
+      const file = await open(full, 'w')
+      try {
+        await file.writeFile(text, 'utf8')
+        if (mode !== undefined) await file.chmod(mode & 0o7777)
+        // On the disk, not in a cache: a rename that puts it in place must not outlive its text.
+        await file.sync()
+      } finally {
+        await file.close()
+      }
     },
-    rename: async (from, to) => rename(await writable(from), await writable(to))
+    // A file that stands where a symbolic link inside the repository leads is replaced
+    // there, as a write through the link would; the link stays.
+    rename: async (from, to) => {
+      const source = await writable(from)
+      const target = (await real(to)) ?? (await writable(to))
+      await rename(source, target)
+      await syncDirectory(dirname(target))
+    },
+    link: async (from, to) => {
+      const source = await real(from)
+      if (source === undefined) throw new Error(`${from} is not a file of the repository.`)
+      const target = await writable(to)
+      await link(source, target).catch(async (error: unknown) => {
+        if (!LINKLESS.has((error as NodeJS.ErrnoException).code ?? '')) throw error
+        await copyFile(source, target, constants.COPYFILE_EXCL)
+      })
+    },
+    remove: async (path) => {
+      await unlink(await writable(path)).catch(missing)
+    }
   }
+}
+
+/** What a file system says when it has no hard links, or none across what is asked. */
+const LINKLESS = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EXDEV', 'EMLINK', 'EINVAL'])
+
+/**
+ * Make a rename in `directory` durable. Windows cannot open a directory for this and needs
+ * it less; where it fails, the rename is still done.
+ */
+async function syncDirectory(directory: string): Promise<void> {
+  if (process.platform === 'win32') return
+  const handle = await open(directory, 'r').catch(() => undefined)
+  if (!handle) return
+  await handle.sync().catch(() => undefined)
+  await handle.close()
 }

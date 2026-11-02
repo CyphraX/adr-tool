@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync
@@ -444,9 +445,11 @@ describe('what the review found (PR #41)', () => {
       const planned = await call(client, 'plan_create_adr', { title: 'Use Kafka' })
       expect(planned.created.id).toBe(`${next}-use-kafka`)
       expect(await refusal(client, 'apply_change', { changeId: planned.changeId })).toBe(
-        `The tool failed: docs/adr/${next}-use-kafka.md is a symbolic link that leads nowhere: it is not written.`
+        `Nothing was written. docs/adr/${next}-use-kafka.md is a symbolic link that leads nowhere: it is not written. Every file is as it was before; apply_change with this changeId tries again.`
       )
       expect(existsSync(join(outside, 'pwned.md'))).toBe(false)
+      // Nothing was left beside the link either.
+      expect(readdirSync(join(root, 'docs/adr')).filter((name) => name.startsWith('.'))).toEqual([])
       await close()
     } finally {
       rmSync(outside, { recursive: true, force: true })

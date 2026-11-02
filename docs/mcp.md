@@ -100,7 +100,7 @@ A plan the operation does not allow — accepting an ADR that is not `proposed`,
 
 | Tool | Takes | Does |
 | --- | --- | --- |
-| `apply_change` | `changeId` | Writes the planned change: `applied`, the `files` written, and `created` or `renamed` as planned. Nothing is written — and the tool says which file — when a file it touches changed on disk since it was planned: plan it again then. A write that fails on the way says why, and the change stays held. |
+| `apply_change` | `changeId` | Writes the planned change: `applied`, the `files` written, and `created` or `renamed` as planned. Nothing is written — and the tool says which file — when a file it touches changed on disk since it was planned: plan it again then. The change is written all of it or nothing ([ADR-0015](adr/0015-a-change-set-is-written-beside-its-files-and-renamed-into.md)): when the disk refuses a step, the tool says why, every file is as it was, and the change stays held, so that `apply_change` can try again. |
 | `discard_change` | `changeId` | Drops a planned change: `discarded`, `false` when there was none. |
 
 A planned change is applied once. The server holds the 50 most recent ones while it runs; a change that was applied, discarded or forgotten — or planned before the server was restarted — is answered with a tool error that says to plan it again.

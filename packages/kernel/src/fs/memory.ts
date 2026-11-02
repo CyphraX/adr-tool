@@ -25,6 +25,15 @@ export function memoryFileSystem(initial: Readonly<Record<string, string>>): Wri
       if (text === undefined) throw new Error(`No such file: ${from}`)
       files.delete(from)
       files.set(to, text)
+    },
+    async link(from, to) {
+      const text = files.get(from)
+      if (text === undefined) throw new Error(`No such file: ${from}`)
+      if (files.has(to)) throw new Error(`${to} already exists.`)
+      files.set(to, text)
+    },
+    async remove(path) {
+      files.delete(path)
     }
   }
 }

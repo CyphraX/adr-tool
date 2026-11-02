@@ -1,17 +1,27 @@
 import {
+  chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
+  readlinkSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { openRepository } from '@adr-tool/core'
+import {
+  applyChangeSet,
+  openRepository,
+  type ChangeSet,
+  type WritableFileSystem
+} from '@adr-tool/core'
 import { nodeFileSystem } from '../src/main/node-file-system'
 import { Repositories } from '../src/main/repositories'
 import { watchPaths } from '../src/main/watch-paths'
@@ -157,4 +167,175 @@ describe('a repository on disk', () => {
       ].sort()
     )
   })
+})
+
+/** Every file below `root` with its bytes; a symbolic link as what it points to. */
+function everything(root: string, directory = ''): Record<string, string> {
+  const files: Record<string, string> = {}
+  for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+    const path = directory === '' ? entry.name : `${directory}/${entry.name}`
+    if (entry.isDirectory()) Object.assign(files, everything(root, path))
+    else if (entry.isSymbolicLink()) files[path] = `-> ${readlinkSync(join(root, path))}`
+    else files[path] = readFileSync(join(root, path)).toString('base64')
+  }
+  return files
+}
+
+/** The file system of the main process, refusing the `failing`-th step that writes. */
+function failingAt(root: string, failing: number): WritableFileSystem & { steps: () => number } {
+  const fs = nodeFileSystem(root)
+  let steps = 0
+  const step = (): void => {
+    if (++steps === failing) throw new Error('ENOSPC: no space left on device')
+  }
+  return {
+    ...fs,
+    steps: () => steps,
+    writeText: async (path, text, options) => {
+      step()
+      await fs.writeText(path, text, options)
+    },
+    link: async (from, to) => {
+      step()
+      await fs.link(from, to)
+    },
+    rename: async (from, to) => {
+      step()
+      await fs.rename(from, to)
+    }
+  }
+}
+
+describe('a change set applied on disk', () => {
+  const files = {
+    'docs/adr/0001-a.md': '---\nstatus: proposed\n---\n\n# A\n',
+    'docs/adr/0002-b.md': '# B — ä\r\n',
+    'docs/adr/0003-c.md': '# C\n'
+  }
+  // Each kind of file a change set has: one that changes, one that is created in a directory
+  // that is not there yet, one that moves and changes — a Renumber —, and one that only moves.
+  const change: ChangeSet = {
+    files: [
+      {
+        path: 'docs/adr/0001-a.md',
+        before: files['docs/adr/0001-a.md'],
+        after: '---\nstatus: accepted\n---\n\n# A\n'
+      },
+      { path: 'docs/new/0001-x.md', before: '', after: '# X\n', creates: true },
+      {
+        path: 'docs/adr/0002-b.md',
+        before: files['docs/adr/0002-b.md'],
+        after: '# B — ä, 12\r\n',
+        renameTo: 'docs/adr/0012-b.md'
+      },
+      {
+        path: 'docs/adr/0003-c.md',
+        before: '# C\n',
+        after: '# C\n',
+        renameTo: 'docs/adr/0013-c.md'
+      }
+    ]
+  }
+
+  function scratch(): string {
+    const root = mkdtempSync(join(tmpdir(), 'adr-apply-'))
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true })
+      writeFileSync(join(root, path), text)
+    }
+    return root
+  }
+
+  it('writes every file, keeps their permissions, and leaves nothing beside them', async () => {
+    const root = scratch()
+    try {
+      chmodSync(join(root, 'docs/adr/0001-a.md'), 0o640)
+      expect(await applyChangeSet(nodeFileSystem(root), change)).toEqual({ applied: true })
+      expect(Object.keys(everything(root)).sort()).toEqual([
+        'docs/adr/0001-a.md',
+        'docs/adr/0012-b.md',
+        'docs/adr/0013-c.md',
+        'docs/new/0001-x.md'
+      ])
+      expect(readFileSync(join(root, 'docs/adr/0012-b.md'), 'utf8')).toBe('# B — ä, 12\r\n')
+      expect(readFileSync(join(root, 'docs/adr/0001-a.md'), 'utf8')).toContain('accepted')
+      if (process.platform !== 'win32') {
+        expect(statSync(join(root, 'docs/adr/0001-a.md')).mode & 0o777).toBe(0o640)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves every byte as it was, and nothing beside the files, whichever step fails', async () => {
+    const counted = scratch()
+    let steps = 0
+    try {
+      const counting = failingAt(counted, 0)
+      await applyChangeSet(counting, change)
+      steps = counting.steps()
+    } finally {
+      rmSync(counted, { recursive: true, force: true })
+    }
+    // Three new texts, one second name, five renames.
+    expect(steps).toBe(9)
+    for (let failing = 1; failing <= steps; failing++) {
+      const root = scratch()
+      try {
+        const before = everything(root)
+        const applied = await applyChangeSet(failingAt(root, failing), change)
+        expect(applied, `step ${failing}`).toEqual({
+          applied: false,
+          failed: 'ENOSPC: no space left on device',
+          stranded: []
+        })
+        expect(everything(root), `step ${failing}`).toEqual(before)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    }
+  })
+
+  it('writes nothing when the disk itself refuses a step', async () => {
+    const root = scratch()
+    try {
+      const before = everything(root)
+      // A file stands where the new ADR's directory would have to be.
+      const blocked: ChangeSet = {
+        files: [
+          change.files[0]!,
+          { path: 'docs/adr/0003-c.md/0009-y.md', before: '', after: '# Y\n', creates: true }
+        ]
+      }
+      const applied = await applyChangeSet(nodeFileSystem(root), blocked)
+      expect(applied).toMatchObject({ applied: false, stranded: [] })
+      expect(everything(root)).toEqual(before)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'replaces the file a symbolic link inside the repository leads to, and keeps the link',
+    async () => {
+      const root = scratch()
+      try {
+        symlinkSync('0003-c.md', join(root, 'docs/adr/0004-same.md'))
+        const applied = await applyChangeSet(nodeFileSystem(root), {
+          files: [{ path: 'docs/adr/0004-same.md', before: '# C\n', after: '# C, linked\n' }]
+        })
+        expect(applied).toEqual({ applied: true })
+        expect(lstatSync(join(root, 'docs/adr/0004-same.md')).isSymbolicLink()).toBe(true)
+        expect(readFileSync(join(root, 'docs/adr/0003-c.md'), 'utf8')).toBe('# C, linked\n')
+        expect(Object.keys(everything(root)).sort()).toEqual([
+          'docs/adr/0001-a.md',
+          'docs/adr/0002-b.md',
+          'docs/adr/0003-c.md',
+          'docs/adr/0004-same.md'
+        ])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    }
+  )
 })
