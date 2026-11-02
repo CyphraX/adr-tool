@@ -3,6 +3,7 @@
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
   import ChangeDialog from './components/ChangeDialog.svelte'
+  import CommitDialog from './components/CommitDialog.svelte'
   import HistoryDialog from './components/HistoryDialog.svelte'
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
@@ -204,6 +205,7 @@
   <NewAdrDialog />
   <MetadataDialog />
   <HistoryDialog />
+  <CommitDialog />
   <SearchPalette />
   <ChangeDialog />
 {/if}

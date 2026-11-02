@@ -1,4 +1,13 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
+import { t } from './strings'
+
+/** Whether `path` is `root` or lies below it. Both are absolute. */
+const within = (root: string, path: string): boolean => {
+  const rest = relative(root, path)
+  return rest === '' || (!rest.startsWith('..') && !isAbsolute(rest))
+}
 
 /** What git says about the working tree below the directory that was opened. */
 export interface WorkingTree {
@@ -205,4 +214,76 @@ export function gitIn(root: string, executable = 'git'): Git {
         .sort()
     }
   }
+}
+
+/** What became of a commit: its hash, or what git said instead. */
+export type CommitOutcome =
+  | { readonly committed: true; readonly sha: string }
+  | { readonly committed: false; readonly reason: string }
+
+/**
+ * Commit these files as they are in the working tree, and nothing else that is changed or
+ * staged (docs/adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md): the one
+ * place where the app writes to git. It is `git commit --only`, so git runs the hooks and the
+ * signing that are configured, as it does on the command line. A file git does not know yet
+ * is announced to it first, and taken out of the index again when the commit fails.
+ * The paths are relative to the opened directory; nothing is pushed.
+ */
+export async function commitFiles(
+  root: string,
+  paths: readonly string[],
+  message: string,
+  executable = 'git'
+): Promise<CommitOutcome> {
+  const git = (
+    args: string[],
+    timeout = 15_000
+  ): Promise<{ ok: boolean; stdout: string; stderr: string }> =>
+    new Promise((resolve) => {
+      execFile(
+        executable,
+        [
+          '--no-pager',
+          '--literal-pathspecs',
+          '-c',
+          'core.quotepath=off',
+          '-c',
+          'core.fsmonitor=false',
+          ...args
+        ],
+        { cwd: root, timeout, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+        (error, stdout, stderr) => resolve({ ok: !error, stdout, stderr })
+      )
+    })
+  /** The last lines git wrote, which say why. */
+  const said = (output: { stdout: string; stderr: string }): string =>
+    (output.stderr.trim() || output.stdout.trim()).split(/\r?\n/).slice(-6).join('\n') ||
+    t.commit.failed
+
+  const text = message.trim()
+  if (text === '') return { committed: false, reason: t.commit.noMessage }
+  const base = resolvePath(root)
+  const outside = paths.find((path) => {
+    const full = resolvePath(base, path)
+    return isAbsolute(path) || !within(base, full) || full === base
+  })
+  if (outside !== undefined) return { committed: false, reason: t.commit.notInRepository(outside) }
+  if (paths.length === 0) return { committed: false, reason: t.commit.failed }
+
+  const tracked = await git(['ls-files', '-z', '--', ...paths])
+  if (!tracked.ok) return { committed: false, reason: said(tracked) }
+  const known = new Set(tracked.stdout.split('\0').filter(Boolean))
+  const announced = paths.filter((path) => !known.has(path) && existsSync(join(base, path)))
+  if (announced.length > 0) {
+    const added = await git(['add', '--intent-to-add', '--', ...announced])
+    if (!added.ok) return { committed: false, reason: said(added) }
+  }
+  // A hook may take its time; a signing may wait for a passphrase.
+  const done = await git(['commit', '--only', '--quiet', '-m', text, '--', ...paths], 120_000)
+  if (!done.ok) {
+    if (announced.length > 0) await git(['rm', '--cached', '--quiet', '--', ...announced])
+    return { committed: false, reason: said(done) }
+  }
+  const sha = (await git(['rev-parse', 'HEAD'])).stdout.trim()
+  return { committed: true, sha }
 }

@@ -11,6 +11,7 @@ import {
 } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
 import type {
+  CommitPlan,
   Decision,
   HistoryEntry,
   OpenRepository,
@@ -150,6 +151,20 @@ interface History {
   notFound: boolean
 }
 
+/** A commit of one ADR's files, as the dialog shows it (docs/adr/0012-…). */
+interface Committing {
+  adrId: string
+  title: string
+  /** `undefined` while git is being asked, or after the plan was used up. */
+  plan: CommitPlan | undefined
+  /** The paths of the offered files the person keeps chosen. */
+  include: string[]
+  message: string
+  busy: boolean
+  /** Why it cannot be planned, or why git did not commit. */
+  refused: string | undefined
+}
+
 /** A new ADR being described in the dialog. */
 interface Creating {
   repositoryId: string
@@ -217,6 +232,7 @@ class AppState {
   creating = $state<Creating | undefined>(undefined)
   editingMetadata = $state<EditingMetadata | undefined>(undefined)
   history = $state<History | undefined>(undefined)
+  committing = $state<Committing | undefined>(undefined)
   /** The search palette, while it is open. */
   searching = $state<{ query: string } | undefined>(undefined)
 
@@ -639,6 +655,75 @@ class AppState {
 
   closeHistory(): void {
     this.history = undefined
+  }
+
+  /**
+   * Plan a commit of the selected ADR. The main process says which files it takes and which
+   * it offers; nothing is committed until the person confirms. Asked again, the message the
+   * person wrote stays.
+   */
+  async startCommit(): Promise<void> {
+    const [tab, log, adr] = [this.active, this.log, this.selected]
+    if (!tab || !log || !adr) return
+    const message = this.committing?.adrId === adr.id ? this.committing.message : undefined
+    this.committing = {
+      adrId: adr.id,
+      title: t.commit.title(prefixOf(adr)),
+      plan: undefined,
+      include: [],
+      message: message ?? '',
+      busy: false,
+      refused: undefined
+    }
+    const result = await window.api.planCommit(tab.repository.id, log.path, adr.id)
+    const committing = this.committing
+    if (committing?.adrId !== adr.id || committing.plan !== undefined) {
+      if (result.ok) void window.api.discardCommit(result.plan.planId)
+      return
+    }
+    if (!result.ok) {
+      committing.refused = result.reason
+      return
+    }
+    committing.plan = result.plan
+    committing.include = result.plan.related.map((one) => one.file.path)
+    if (message === undefined || message.trim() === '') committing.message = result.plan.message
+  }
+
+  toggleCommitted(path: string): void {
+    const committing = this.committing
+    if (!committing) return
+    committing.include = committing.include.includes(path)
+      ? committing.include.filter((one) => one !== path)
+      : [...committing.include, path]
+  }
+
+  async confirmCommit(): Promise<void> {
+    const committing = this.committing
+    const plan = committing?.plan
+    if (!committing || !plan || committing.busy) return
+    committing.busy = true
+    committing.refused = undefined
+    // A plain array: what crosses to the main process is copied, and a proxy cannot be.
+    const result = await window.api
+      .commit(plan.planId, [...committing.include], committing.message)
+      .catch((error: unknown) => ({ committed: false as const, reason: String(error) }))
+    if (this.committing !== committing) return
+    if (result.committed) {
+      this.replace(result.repository)
+      this.committing = undefined
+      return
+    }
+    // The plan is used up: the main process forgets it either way.
+    committing.plan = undefined
+    committing.busy = false
+    committing.refused = result.reason
+  }
+
+  cancelCommit(): void {
+    const plan = this.committing?.plan
+    if (plan) void window.api.discardCommit(plan.planId)
+    this.committing = undefined
   }
 
   /** Ask for one of the repairs of a Problem. The main process plans it; nothing is written yet. */

@@ -319,6 +319,36 @@ export type SourceFileResult =
   | { readonly ok: true; readonly file: SourceFileText }
   | { readonly ok: false; readonly reason: string }
 
+/** The file of another ADR that a commit of one ADR offers to take along. */
+export interface RelatedChange {
+  readonly file: FileChange
+  readonly logPath: string
+  readonly adrId: string
+  readonly title?: string
+  readonly number?: number
+}
+
+/**
+ * A commit of one ADR, planned by the main process and held there
+ * (docs/adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md): the files it takes,
+ * as the last commit has them and as they are now, the files of related ADRs it offers, the
+ * message it proposes, and how many other changed files stay out of it.
+ */
+export interface CommitPlan {
+  readonly planId: string
+  readonly files: readonly FileChange[]
+  readonly related: readonly RelatedChange[]
+  readonly message: string
+  readonly others: number
+}
+
+export type CommitPlanResult =
+  { readonly ok: true; readonly plan: CommitPlan } | { readonly ok: false; readonly reason: string }
+
+export type CommitResult =
+  | { readonly committed: true; readonly sha: string; readonly repository: OpenRepository }
+  | { readonly committed: false; readonly reason: string }
+
 export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
   | { readonly ok: false; readonly reason: string }
@@ -364,6 +394,14 @@ export interface Api {
     adrId: string,
     entryId: string
   ): Promise<FileChange | undefined>
+  /** Plan a commit of an ADR's files. Nothing is committed until the commit is confirmed. */
+  planCommit(repositoryId: string, logPath: string, adrId: string): Promise<CommitPlanResult>
+  /**
+   * Commit a planned commit with the related files chosen out of those it offered, by their
+   * paths, and the message as the person left it.
+   */
+  commit(planId: string, include: readonly string[], message: string): Promise<CommitResult>
+  discardCommit(planId: string): Promise<void>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
   applyChange(changeId: string): Promise<ApplyResult>
   discardChange(changeId: string): Promise<void>
@@ -427,6 +465,9 @@ export const CHANNEL = {
   listTemplates: 'templates:list',
   history: 'git:history',
   historyChange: 'git:history-change',
+  planCommit: 'git:plan-commit',
+  commit: 'git:commit',
+  discardCommit: 'git:discard-commit',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
   openExternal: 'shell:open-external',

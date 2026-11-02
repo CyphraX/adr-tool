@@ -23,6 +23,8 @@ import {
 import type {
   ApplyResult,
   BodyEditRequest,
+  CommitPlanResult,
+  CommitResult,
   CreateRequest,
   Decision,
   HistoryEntry,
@@ -33,7 +35,8 @@ import type {
   RenameRequest,
   RepairRequest
 } from '../shared/ipc'
-import { gitIn } from './git'
+import { planCommitOf } from './commit'
+import { commitFiles, gitIn } from './git'
 import { historyChangeOf, historyOf } from './history'
 import { nodeFileSystem } from './node-file-system'
 import { t } from './strings'
@@ -70,6 +73,11 @@ export class Repositories {
   private readonly entries = new Map<string, Entry>()
   /** Changes that were planned and shown, and wait to be applied or discarded. */
   private readonly planned = new Map<string, { repositoryId: string; changeSet: ChangeSet }>()
+  /** Commits that were planned and shown: the files they take, and those they offer. */
+  private readonly commits = new Map<
+    string,
+    { repositoryId: string; files: readonly FileChange[]; related: readonly FileChange[] }
+  >()
 
   constructor(private readonly onChanged: (repository: OpenRepository) => void) {}
 
@@ -95,6 +103,9 @@ export class Repositories {
     this.entries.delete(id)
     for (const [changeId, planned] of this.planned) {
       if (planned.repositoryId === id) this.planned.delete(changeId)
+    }
+    for (const [planId, planned] of this.commits) {
+      if (planned.repositoryId === id) this.commits.delete(planId)
     }
     clearTimeout(entry.reload)
     await entry.watcher?.close()
@@ -274,6 +285,71 @@ export class Repositories {
       .find((log) => log.path === logPath)
       ?.adrs.find((candidate) => candidate.id === adrId)
     return adr && { root: entry.root, path: adr.path, text: await fs.readText(adr.path) }
+  }
+
+  /** Plan a commit of an ADR's files against what git and the disk say right now. */
+  async planCommit(
+    repositoryId: string,
+    logPath: string,
+    adrId: string
+  ): Promise<CommitPlanResult> {
+    const entry = this.entries.get(repositoryId)
+    if (!entry) return { ok: false, reason: t.repositoryClosed }
+    const fs = nodeFileSystem(entry.root)
+    const git = gitIn(entry.root)
+    const tree = await git.workingTree()
+    if (!tree) return { ok: false, reason: t.commit.noGit }
+    const planned = await planCommitOf({
+      repository: await openRepository(fs),
+      logPath,
+      adrId,
+      tree,
+      head: (path) => git.head(path),
+      read: (path) => fs.readText(path)
+    })
+    if (!planned.ok) return planned
+    const planId = randomUUID()
+    const { files, related, message, others } = planned
+    this.commits.set(planId, {
+      repositoryId,
+      files,
+      related: related.map((one) => one.file)
+    })
+    return { ok: true, plan: { planId, files, related, message, others } }
+  }
+
+  /**
+   * Commit what was planned and shown, with the offered files the person chose — never a path
+   * that was not offered —, unless one of them changed on disk since the preview.
+   */
+  async commit(planId: string, include: readonly string[], message: string): Promise<CommitResult> {
+    const planned = this.commits.get(planId)
+    const entry = planned && this.entries.get(planned.repositoryId)
+    this.commits.delete(planId)
+    if (!planned || !entry) return { committed: false, reason: t.commit.gone }
+
+    const files = [
+      ...planned.files,
+      ...planned.related.filter((file) => include.includes(file.path))
+    ]
+    const fs = nodeFileSystem(entry.root)
+    const changed: string[] = []
+    for (const file of files) {
+      const where = file.renameTo ?? file.path
+      if ((await fs.readText(where)) !== file.after) changed.push(where)
+    }
+    if (changed.length > 0) {
+      return { committed: false, reason: t.commit.changedSincePreview(changed.join(', ')) }
+    }
+    const paths = files.flatMap((file) =>
+      file.renameTo === undefined ? [file.path] : [file.path, file.renameTo]
+    )
+    const outcome = await commitFiles(entry.root, paths, message)
+    return outcome.committed ? { ...outcome, repository: await this.load(entry) } : outcome
+  }
+
+  discardCommit(planId: string): void {
+    this.commits.delete(planId)
   }
 
   async applyChange(changeId: string): Promise<ApplyResult> {

@@ -24,5 +24,16 @@ export const t = {
   sourceFileUnreadable: (path: string): string =>
     `${path} cannot be read. It may have been moved or deleted since the code was analysed.`,
   changedSincePreview: (files: string): string =>
-    `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`
+    `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`,
+  commit: {
+    noGit: 'This folder is not in a git repository, so there is nothing to commit to.',
+    noAdr: (id: string): string => `There is no ADR ${id} in this Decision Log any more.`,
+    nothing: (id: string): string => `${id} has no uncommitted changes.`,
+    noMessage: 'A commit needs a message.',
+    notInRepository: (path: string): string => `${path} is not a file of this repository.`,
+    failed: 'git did not commit, and did not say why.',
+    gone: 'This commit is no longer available. Try again.',
+    changedSincePreview: (files: string): string =>
+      `Nothing was committed: ${files} changed on disk after the preview was made. Try again to see what would be committed now.`
+  }
 }
