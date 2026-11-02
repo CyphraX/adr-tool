@@ -1,5 +1,5 @@
 import { prepareJava, type JavaReader } from '@adr-tool/structure'
-import { grammar, runtime } from 'virtual:tree-sitter-wasm'
+import { grammar, runtime } from './tree-sitter-wasm'
 
 let java: Promise<JavaReader> | undefined
 
@@ -9,9 +9,6 @@ let java: Promise<JavaReader> | undefined
  * nothing beside it, wherever it is copied to.
  */
 export function javaReader(): Promise<JavaReader> {
-  java ??= prepareJava({
-    runtime: Buffer.from(runtime, 'base64'),
-    grammar: Buffer.from(grammar, 'base64')
-  })
+  java ??= prepareJava({ runtime: runtime(), grammar: grammar() })
   return java
 }

@@ -1,24 +1,29 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { normalize } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 
 const require = createRequire(import.meta.url)
 
 /**
  * The WebAssembly of tree-sitter goes into the command as base64 text (ADR-0017), so that the
- * one file reads Java wherever it is copied to. The tests read the same module.
+ * one file reads Java wherever it is copied to: `src/tree-sitter-wasm.ts`, which reads both
+ * files from the installed packages, is replaced by them. The tests read the same module.
  */
 function treeSitterWasm(): Plugin {
-  const id = 'virtual:tree-sitter-wasm'
+  const file = fileURLToPath(new URL('src/tree-sitter-wasm.ts', import.meta.url))
   const base64 = (path: string): string => readFileSync(require.resolve(path)).toString('base64')
+  const constant = (name: string, path: string): string =>
+    `export const ${name} = () => Buffer.from(${JSON.stringify(base64(path))}, 'base64')`
   return {
     name: 'tree-sitter-wasm',
-    resolveId: (source) => (source === id ? `\0${id}` : undefined),
-    load: (loaded) =>
-      loaded === `\0${id}`
+    enforce: 'pre',
+    load: (id) =>
+      normalize(id.split('?')[0]!) === file
         ? [
-            `export const runtime = ${JSON.stringify(base64('web-tree-sitter/web-tree-sitter.wasm'))}`,
-            `export const grammar = ${JSON.stringify(base64('tree-sitter-java/tree-sitter-java.wasm'))}`
+            constant('runtime', 'web-tree-sitter/web-tree-sitter.wasm'),
+            constant('grammar', 'tree-sitter-java/tree-sitter-java.wasm')
           ].join('\n')
         : undefined
   }
