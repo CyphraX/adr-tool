@@ -153,6 +153,9 @@ importers:
       '@adr-tool/core':
         specifier: workspace:*
         version: link:../core
+      '@adr-tool/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@adr-tool/structure':
         specifier: workspace:*
         version: link:../structure

@@ -41,7 +41,11 @@ export interface LogOptions {
    * `changes` then holds that file alone, under the name it had in that commit.
    */
   readonly path?: string
-  /** Only commits made on or after this day, `YYYY-MM-DD`: when they were committed, rebases included. */
+  /**
+   * Only commits made on or after this day, `YYYY-MM-DD`, from its start in UTC: when they were
+   * committed, so that a rebased commit counts as new. git stops at the first commits older
+   * than that, as `git log --since` does.
+   */
   readonly since?: string
   /** At most this many commits, the newest. */
   readonly limit?: number
