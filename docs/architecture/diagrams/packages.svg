@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="988" height="612" viewBox="16 -40 988 612" role="img">
+  <title>The packages of Softarch Suite</title>
+  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. diagrams uses kernel. diagrams uses structure: Components, Dependencies. mcp uses core: serves ADRs. mcp uses structure. cli uses core: lints and exports. cli uses structure. app uses core: Decisions. app uses structure: Structure. app uses cli: the export. app uses diagrams: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
+  <style>
+    svg { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .background, .ground { fill: #eef1f5; }
+    .box { fill: #fcfcfd; stroke: #8891a3; stroke-width: 1.2; }
+    .external .box { stroke-dasharray: 6 4; }
+    .repository .box { stroke-width: 2; }
+    .name { fill: #1c2230; font-size: 14px; font-weight: 600; }
+    .title { fill: #1c2230; font-size: 16px; font-weight: 600; }
+    .description, .label, .legend { fill: #566075; font-size: 12px; }
+    .line { fill: none; stroke: #566075; stroke-width: 1.4; }
+    .arrowhead { fill: #566075; }
+    @media (prefers-color-scheme: dark) {
+      .background, .ground { fill: #1f222a; }
+      .box { fill: #181a20; stroke: #737d91; }
+      .name, .title { fill: #e4e7ee; }
+      .description, .label, .legend { fill: #a5aec0; }
+      .line { stroke: #a5aec0; }
+      .arrowhead { fill: #a5aec0; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="3.5" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+      <path class="arrowhead" d="M0 0.5L7.5 4L0 7.5z"/>
+    </marker>
+  </defs>
+  <rect class="background" x="16" y="-40" width="988" height="612"/>
+  <text class="title" x="40" y="-1.2">The packages of Softarch Suite</text>
+  <text class="description" x="40" y="19.6">Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages.</text>
+  <g class="connections">
+    <path class="line" d="M298 128L124.7 317.05" marker-end="url(#arrow)"/>
+    <path class="line" d="M260 344L164 344" marker-end="url(#arrow)"/>
+    <path class="line" d="M480 464.91L163.81 364.3" marker-end="url(#arrow)"/>
+    <path class="line" d="M502.29 460L361.09 370.15" marker-end="url(#arrow)"/>
+    <path class="line" d="M480 104L384 104" marker-end="url(#arrow)"/>
+    <path class="line" d="M518 128L344.7 317.05" marker-end="url(#arrow)"/>
+    <path class="line" d="M496 200L367.51 129.92" marker-end="url(#arrow)"/>
+    <path class="line" d="M496 248L367.51 318.08" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 207.64L383.86 121.42" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 240.36L383.86 326.58" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 224L604 224" marker-end="url(#arrow)"/>
+    <path class="line" d="M739.69 248L562.89 456.95" marker-end="url(#arrow)"/>
+    <path class="line" d="M766.61 248L807.44 396.14" marker-end="url(#arrow)"/>
+    <path class="line" d="M740 87.13L603.99 98.6" marker-end="url(#arrow)"/>
+  </g>
+  <g class="elements">
+    <g class="element component">
+      <rect class="box" x="40" y="320" width="120" height="48" rx="5"/>
+      <text class="name" x="100" y="348.2" text-anchor="middle">kernel</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="260" y="80" width="120" height="48" rx="5"/>
+      <text class="name" x="320" y="108.2" text-anchor="middle">core</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="260" y="320" width="120" height="48" rx="5"/>
+      <text class="name" x="320" y="348.2" text-anchor="middle">structure</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="480" y="80" width="120" height="48" rx="5"/>
+      <text class="name" x="540" y="108.2" text-anchor="middle">mcp</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="480" y="200" width="120" height="48" rx="5"/>
+      <text class="name" x="540" y="228.2" text-anchor="middle">cli</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="480" y="460" width="120" height="48" rx="5"/>
+      <text class="name" x="540" y="488.2" text-anchor="middle">diagrams</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="700" y="200" width="120" height="48" rx="5"/>
+      <text class="name" x="760" y="228.2" text-anchor="middle">app</text>
+    </g>
+    <g class="element external">
+      <rect class="box" x="740" y="40" width="240" height="74" rx="5"/>
+      <text class="name" x="860" y="63.2" text-anchor="middle">A coding agent</text>
+      <text class="description" x="860" y="83.6" text-anchor="middle">Brought by the person, connected</text>
+      <text class="description" x="860" y="99.6" text-anchor="middle">over MCP.</text>
+    </g>
+    <g class="element external">
+      <rect class="box" x="700" y="400" width="233" height="58" rx="5"/>
+      <text class="name" x="816.5" y="423.2" text-anchor="middle">git</text>
+      <text class="description" x="816.5" y="443.6" text-anchor="middle">Holds the history of the repository.</text>
+    </g>
+  </g>
+  <g class="labels">
+    <rect class="ground" x="343" y="406" width="174" height="16"/>
+    <text class="label" x="430" y="417.6" text-anchor="middle">Components, Dependencies</text>
+    <rect class="ground" x="387.5" y="96" width="85" height="16"/>
+    <text class="label" x="430" y="107.6" text-anchor="middle">serves ADRs</text>
+    <rect class="ground" x="375.5" y="156" width="109" height="16"/>
+    <text class="label" x="430" y="167.6" text-anchor="middle">lints and exports</text>
+    <rect class="ground" x="506.5" y="156" width="67" height="16"/>
+    <text class="label" x="540" y="167.6" text-anchor="middle">Decisions</text>
+    <rect class="ground" x="507.5" y="276" width="65" height="16"/>
+    <text class="label" x="540" y="287.6" text-anchor="middle">Structure</text>
+    <rect class="ground" x="615" y="216" width="70" height="16"/>
+    <text class="label" x="650" y="227.6" text-anchor="middle">the export</text>
+    <rect class="ground" x="590" y="346" width="120" height="16"/>
+    <text class="label" x="650" y="357.6" text-anchor="middle">German sentences</text>
+    <rect class="ground" x="722.06" y="316" width="131" height="16"/>
+    <text class="label" x="787.56" y="327.6" text-anchor="middle">history and commits</text>
+    <rect class="ground" x="622.5" y="85.03" width="95" height="16"/>
+    <text class="label" x="670" y="96.63" text-anchor="middle">plans changes</text>
+  </g>
+  <g class="legend">
+    <g class="component"><rect class="box" x="40" y="533" width="24" height="14" rx="3"/></g>
+    <text x="70" y="543.6">Component</text>
+    <g class="external"><rect class="box" x="155.2" y="533" width="24" height="14" rx="3"/></g>
+    <text x="185.2" y="543.6">External System</text>
+    <path class="line" d="M302.8 540H326.8" marker-end="url(#arrow)"/>
+    <text x="336.8" y="543.6">uses; the arrow points at what is used</text>
+  </g>
+</svg>

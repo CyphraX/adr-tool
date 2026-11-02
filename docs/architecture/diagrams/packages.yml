@@ -1,0 +1,67 @@
+# The packages of this repository, drawn by hand in the format of docs/diagrams-format.md.
+# Its picture beside it, packages.svg, is drawn by the core: `pnpm --filter @adr-tool/diagrams
+# export-own` writes it again after a change.
+title: The packages of Softarch Suite
+description: Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages.
+level: container
+elements:
+  - component: kernel
+    at: [40, 320]
+  - component: core
+    at: [260, 80]
+  - component: structure
+    at: [260, 320]
+  - component: mcp
+    at: [480, 80]
+  - component: cli
+    at: [480, 200]
+  - component: diagrams
+    at: [480, 460]
+  - component: app
+    at: [700, 200]
+  - external: agent
+    name: A coding agent
+    description: Brought by the person, connected over MCP.
+    at: [740, 40]
+  - external: git
+    name: git
+    description: Holds the history of the repository.
+    at: [700, 400]
+connections:
+  - from: core
+    to: kernel
+  - from: structure
+    to: kernel
+  - from: diagrams
+    to: kernel
+  - from: diagrams
+    to: structure
+    label: Components, Dependencies
+  - from: mcp
+    to: core
+    label: serves ADRs
+  - from: mcp
+    to: structure
+  - from: cli
+    to: core
+    label: lints and exports
+  - from: cli
+    to: structure
+  - from: app
+    to: core
+    label: Decisions
+  - from: app
+    to: structure
+    label: Structure
+  - from: app
+    to: cli
+    label: the export
+  - from: app
+    to: diagrams
+    label: German sentences
+  - from: app
+    to: git
+    label: history and commits
+  - from: agent
+    to: mcp
+    label: plans changes
