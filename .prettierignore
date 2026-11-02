@@ -7,3 +7,4 @@ pnpm-lock.yaml
 # normalization ADR-0002 forbids, and this repository's ADRs are test data too.
 *.md
 packages/core/test/fixtures/
+packages/conformance/test/fixtures/
