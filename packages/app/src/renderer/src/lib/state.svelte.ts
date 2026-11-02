@@ -114,7 +114,7 @@ export interface Caution {
   advice: string
 }
 
-export type EditorMode = 'source' | 'split'
+export type EditorMode = 'source' | 'split' | 'live'
 
 /**
  * The body of one ADR being edited. The editor has its own text; what is on disk reaches

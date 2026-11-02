@@ -51,9 +51,11 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![A new ADR that supersedes another, previewed before it is written](docs/screenshots/readme/new-adr-preview.png)
 
-- **Edit.** The editor shows the Markdown source on its own, or the source with a live preview. Once an ADR is decided, saving records a **Correction**. A Correction never changes what was decided.
+- **Edit.** The editor has three modes: the Markdown source on its own, the source with a live preview, and **Live**, which renders headings, emphasis, links, lists and code in place and shows the source of the line the cursor is in. Every mode saves the same text. Once an ADR is decided, saving records a **Correction**. A Correction never changes what was decided.
 
   ![The editor: Markdown source with a live preview](docs/screenshots/readme/editor.png)
+
+  ![The live mode: the text reads as rendered, the line with the cursor shows its source](docs/screenshots/readme/live.png)
 
 - **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Each Problem comes with a Repair, which is previewed like any other change.
 
@@ -258,7 +260,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 - **Decisions:** v1 is built and accepted ([plan.md](docs/plan.md)).
 - **Structure:** parts 1 to 8 are built ([plan-structure.md](docs/plan-structure.md)).
 - **The rest of the roadmap** is being built part by part ([plan-roadmap.md](docs/plan-roadmap.md)):
-  - the known gaps before the first release and the live editor;
+  - the known gaps before the first release and the live editor (built);
   - an `adr lint` CLI for CI;
   - MADR 2.x and log4brains;
   - Relations across Decision Logs, committing an ADR, a branch overview;
