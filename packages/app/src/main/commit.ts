@@ -19,8 +19,9 @@ function prefixOf(adr: Pick<Adr, 'id' | 'number'>): string {
 
 /** The Status a file's frontmatter writes, as it is written; nothing for a file without one. */
 function statusIn(text: string | undefined): string | undefined {
+  // Frontmatter opens the file; a `---` block further down is part of the body.
   const front =
-    text === undefined ? undefined : /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?$/m.exec(text)
+    text === undefined ? undefined : /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)
   return front ? /^status:[ \t]*["']?([A-Za-z]+)/m.exec(front[1]!)?.[1]?.toLowerCase() : undefined
 }
 
@@ -58,6 +59,37 @@ export function commitMessage(
 /** The slug of an ID: what follows the number or the day. */
 const slugOf = (path: string): string => posix.basename(path).replace(/^\d+-/, '')
 
+/**
+ * Whether two texts are the same file, one renamed into the other: at least half their lines
+ * that say something are the same, much as git judges a rename. A Renumber changes a line or
+ * two, if any.
+ */
+function similar(a: string, b: string): boolean {
+  const lines = (text: string): string[] => text.split(/\r?\n/).filter((line) => line.trim() !== '')
+  const left = lines(a)
+  const right = lines(b)
+  const count = new Map<string, number>()
+  for (const line of left) count.set(line, (count.get(line) ?? 0) + 1)
+  let shared = 0
+  for (const line of right) {
+    const left = count.get(line) ?? 0
+    if (left > 0) {
+      shared++
+      count.set(line, left - 1)
+    }
+  }
+  return shared * 2 >= Math.max(left.length, right.length)
+}
+
+/**
+ * A file as the last commit has it, with the line breaks it has on disk: where git stores LF
+ * and checks out CRLF (`core.autocrlf`), every line would seem changed.
+ */
+function asOnDisk(stored: string | undefined, onDisk: string): string | undefined {
+  if (stored === undefined || stored.includes('\r') || !onDisk.includes('\r\n')) return stored
+  return stored.replaceAll('\n', '\r\n')
+}
+
 /** Every ADR an ADR names in its Relations and Back-references, as `<log>\0<ID>`. */
 function named(adr: Adr, log: string): Set<string> {
   const lists = { ...adr.metadata.relations, ...adr.metadata.backReferences }
@@ -77,9 +109,9 @@ export type CommitPlanOf =
 
 /**
  * What a commit of one ADR takes (docs/adr/0012-…): its file — with the file it had before a
- * Renumber that git has not seen as a rename yet —, and, offered, the files of other ADRs with
- * uncommitted changes that it names or that name it. `head` reads a file as the last commit
- * has it, `read` as it is now.
+ * Renumber —, and, offered, the files of other ADRs with uncommitted changes that it names or
+ * that name it, each with the file it had before a Renumber too. `head` reads a file as the
+ * last commit has it, `read` as it is now.
  */
 export async function planCommitOf(input: {
   repository: Repository
@@ -95,25 +127,39 @@ export async function planCommitOf(input: {
   if (!log || !adr) return { ok: false, reason: t.commit.noAdr(adrId) }
   if (!tree.changed.includes(adr.path)) return { ok: false, reason: t.commit.nothing(adrId) }
 
-  const before = await head(adr.path)
-  const after = (await read(adr.path)) ?? ''
-  const previous =
-    tree.renamedFrom[adr.path] ??
-    (before === undefined
-      ? tree.deleted.find(
-          (path) =>
-            path !== adr.path &&
-            posix.dirname(path) === posix.dirname(adr.path) &&
-            slugOf(path) === slugOf(adr.path)
-        )
-      : undefined)
-  const earlier = previous === undefined ? undefined : await head(previous)
-  const file: FileChange =
-    previous !== undefined
-      ? { path: previous, renameTo: adr.path, before: earlier ?? '', after }
-      : before === undefined
-        ? { path: adr.path, before: '', after, creates: true }
-        : { path: adr.path, before, after }
+  /**
+   * A file as a commit of it takes it: with the file it had before a Renumber — one git
+   * already sees as a rename, or a deleted file of the same slug and much the same text that
+   * is gone from the disk —, as a new file, or as a changed one.
+   */
+  const changeOf = async (path: string): Promise<FileChange> => {
+    const after = (await read(path)) ?? ''
+    const before = asOnDisk(await head(path), after)
+    if (before !== undefined) return { path, before, after }
+    const staged = tree.renamedFrom[path]
+    const candidates =
+      staged !== undefined
+        ? [staged]
+        : tree.deleted.filter(
+            (one) =>
+              one !== path &&
+              posix.dirname(one) === posix.dirname(path) &&
+              slugOf(one) === slugOf(path)
+          )
+    for (const candidate of candidates) {
+      // Still on disk, it was not moved.
+      if ((await read(candidate)) !== undefined) continue
+      const earlier = asOnDisk(await head(candidate), after)
+      if (earlier === undefined) continue
+      if (staged !== undefined || similar(earlier, after)) {
+        return { path: candidate, renameTo: path, before: earlier, after }
+      }
+    }
+    return { path, before: '', after, creates: true }
+  }
+
+  const file = await changeOf(adr.path)
+  const previous = file.renameTo === undefined ? undefined : file.path
 
   // What it names, and what names it: Accept wrote a Back-reference into the other file.
   const self = `${log.path}\0${adr.id}`
@@ -127,14 +173,8 @@ export async function planCommitOf(input: {
       const linked =
         names.has(`${other.path}\0${candidate.id}`) || named(candidate, other.path).has(self)
       if (!linked) continue
-      const was = await head(candidate.path)
       related.push({
-        file: {
-          path: candidate.path,
-          before: was ?? '',
-          after: (await read(candidate.path)) ?? '',
-          ...(was === undefined && { creates: true as const })
-        },
+        file: await changeOf(candidate.path),
         logPath: other.path,
         adrId: candidate.id,
         ...(candidate.title !== undefined && { title: candidate.title }),
@@ -143,18 +183,23 @@ export async function planCommitOf(input: {
     }
   }
 
-  const taken = new Set([adr.path, ...(previous === undefined ? [] : [previous])])
-  for (const one of related) taken.add(one.file.path)
+  // Every file a commit can take, so that what is left is the rest of the working tree.
+  const taken = new Set<string>()
+  for (const one of [file, ...related.map((one) => one.file)]) {
+    taken.add(one.path)
+    if (one.renameTo !== undefined) taken.add(one.renameTo)
+  }
   return {
     ok: true,
     files: [file],
     related,
     message: commitMessage(
       adr,
-      previous === undefined ? before : earlier,
-      after,
+      file.creates ? undefined : file.before,
+      file.after,
       previous === undefined ? undefined : posix.basename(previous).replace(/\.md$/i, '')
     ),
-    others: tree.changed.filter((path) => !taken.has(path)).length
+    others: tree.changed.filter((path) => !taken.has(path)).length,
+    branch: tree.branch
   }
 }

@@ -160,9 +160,13 @@ interface Committing {
   /** The paths of the offered files the person keeps chosen. */
   include: string[]
   message: string
+  /** The message the plan proposed: what the person did not change is proposed afresh. */
+  proposed: string
   busy: boolean
   /** Why it cannot be planned, or why git did not commit. */
   refused: string | undefined
+  /** The commit is made, and git said something after it: a hook failed. */
+  made: { sha: string; said: string } | undefined
 }
 
 /** A new ADR being described in the dialog. */
@@ -659,21 +663,25 @@ class AppState {
 
   /**
    * Plan a commit of the selected ADR. The main process says which files it takes and which
-   * it offers; nothing is committed until the person confirms. Asked again, the message the
-   * person wrote stays.
+   * it offers; nothing is committed until the person confirms. Asked again, a message the
+   * person wrote stays; one they left as it was proposed is proposed afresh.
    */
   async startCommit(): Promise<void> {
     const [tab, log, adr] = [this.active, this.log, this.selected]
     if (!tab || !log || !adr) return
-    const message = this.committing?.adrId === adr.id ? this.committing.message : undefined
+    const previous = this.committing?.adrId === adr.id ? this.committing : undefined
+    const message =
+      previous && previous.message !== previous.proposed ? previous.message : undefined
     this.committing = {
       adrId: adr.id,
       title: t.commit.title(prefixOf(adr)),
       plan: undefined,
       include: [],
       message: message ?? '',
+      proposed: '',
       busy: false,
-      refused: undefined
+      refused: undefined,
+      made: undefined
     }
     const result = await window.api.planCommit(tab.repository.id, log.path, adr.id)
     const committing = this.committing
@@ -687,6 +695,7 @@ class AppState {
     }
     committing.plan = result.plan
     committing.include = result.plan.related.map((one) => one.file.path)
+    committing.proposed = result.plan.message
     if (message === undefined || message.trim() === '') committing.message = result.plan.message
   }
 
@@ -711,7 +720,13 @@ class AppState {
     if (this.committing !== committing) return
     if (result.committed) {
       this.replace(result.repository)
-      this.committing = undefined
+      // A hook that failed after the commit has its say; the commit stands.
+      if (result.said === undefined) this.committing = undefined
+      else {
+        committing.plan = undefined
+        committing.busy = false
+        committing.made = { sha: result.sha, said: result.said }
+      }
       return
     }
     // The plan is used up: the main process forgets it either way.
@@ -721,6 +736,8 @@ class AppState {
   }
 
   cancelCommit(): void {
+    // While git commits, the dialog waits for what it says: closed, that would go unheard.
+    if (this.committing?.busy) return
     const plan = this.committing?.plan
     if (plan) void window.api.discardCommit(plan.planId)
     this.committing = undefined

@@ -309,13 +309,13 @@ export class Repositories {
     })
     if (!planned.ok) return planned
     const planId = randomUUID()
-    const { files, related, message, others } = planned
+    const { files, related, message, others, branch } = planned
     this.commits.set(planId, {
       repositoryId,
       files,
       related: related.map((one) => one.file)
     })
-    return { ok: true, plan: { planId, files, related, message, others } }
+    return { ok: true, plan: { planId, files, related, message, others, branch } }
   }
 
   /**
@@ -337,6 +337,10 @@ export class Repositories {
     for (const file of files) {
       const where = file.renameTo ?? file.path
       if ((await fs.readText(where)) !== file.after) changed.push(where)
+      // A Renumber is a rename only while the file it came from stays gone.
+      if (file.renameTo !== undefined && (await fs.readText(file.path)) !== undefined) {
+        changed.push(file.path)
+      }
     }
     if (changed.length > 0) {
       return { committed: false, reason: t.commit.changedSincePreview(changed.join(', ')) }

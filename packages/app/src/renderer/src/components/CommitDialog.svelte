@@ -20,18 +20,32 @@
       : []
   )
 
+  // Every changed file it does not take stays as it is: the offered ones left out among them.
+  const left = $derived(
+    plan ? plan.others + plan.related.length + plan.files.length - files.length : 0
+  )
+
   $effect(() => {
     if (committing && !dialog?.open) dialog?.showModal()
     if (!committing && dialog?.open) dialog.close()
   })
+
+  function oncancel(event: Event): void {
+    // Escape while git commits would leave what git says unheard.
+    if (committing?.busy) event.preventDefault()
+    app.cancelCommit()
+  }
 </script>
 
-<dialog bind:this={dialog} oncancel={() => app.cancelCommit()} aria-labelledby="commit-title">
+<dialog bind:this={dialog} {oncancel} aria-labelledby="commit-title">
   {#if committing}
     <h1 id="commit-title">{committing.title}</h1>
 
     {#if plan}
-      <p class="summary">{t.commit.summary(files.length, plan.others)}</p>
+      <p class="summary">{t.commit.summary(files.length, left)}</p>
+      {#if plan.branch === undefined}
+        <p class="detached">{t.commit.detached}</p>
+      {/if}
 
       {#if plan.related.length > 0}
         <fieldset class="related">
@@ -74,6 +88,11 @@
         >
           {committing.busy ? t.commit.committing : t.commit.action}
         </button>
+      </footer>
+    {:else if committing.made}
+      <p class="reason">{t.commit.madeButSaid(committing.made.sha, committing.made.said)}</p>
+      <footer>
+        <button class="primary" onclick={() => app.cancelCommit()}>{t.close}</button>
       </footer>
     {:else if committing.refused !== undefined}
       <p class="reason">{committing.refused}</p>
@@ -127,6 +146,12 @@
   .reason {
     color: var(--ink);
     white-space: pre-wrap;
+  }
+
+  .detached {
+    margin-top: 6px;
+    color: var(--proposed);
+    line-height: 1.55;
   }
 
   .hooks,

@@ -340,13 +340,21 @@ export interface CommitPlan {
   readonly related: readonly RelatedChange[]
   readonly message: string
   readonly others: number
+  /** The branch the commit goes on; `undefined` on a detached HEAD, where it goes on none. */
+  readonly branch: string | undefined
 }
 
 export type CommitPlanResult =
   { readonly ok: true; readonly plan: CommitPlan } | { readonly ok: false; readonly reason: string }
 
 export type CommitResult =
-  | { readonly committed: true; readonly sha: string; readonly repository: OpenRepository }
+  | {
+      readonly committed: true
+      readonly sha: string
+      readonly repository: OpenRepository
+      /** What git said although it made the commit: a hook after it failed. */
+      readonly said?: string
+    }
   | { readonly committed: false; readonly reason: string }
 
 export type PlanResult =

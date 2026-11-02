@@ -125,7 +125,9 @@ export function gitIn(root: string, executable = 'git'): Git {
         if (entry.length < 4) continue
         const codes = entry.slice(0, 2)
         const path = below(top, entry.slice(3))
-        const origin = /[RC]/.test(codes) ? below(top, entries[++position]) : undefined
+        // A rename and a copy are both followed by where they came from; only a rename moved it.
+        const source = /[RC]/.test(codes) ? entries[++position] : undefined
+        const origin = codes.includes('R') ? below(top, source) : undefined
         if (path === undefined) continue
         changed.push(path)
         if (codes.includes('D')) deleted.push(path)
@@ -216,9 +218,13 @@ export function gitIn(root: string, executable = 'git'): Git {
   }
 }
 
-/** What became of a commit: its hash, or what git said instead. */
+/**
+ * What became of a commit: its hash, or what git said instead. A commit that git made and
+ * then reported a failure for — a hook after the commit failed or took too long — is made;
+ * what git said comes with it.
+ */
 export type CommitOutcome =
-  | { readonly committed: true; readonly sha: string }
+  | { readonly committed: true; readonly sha: string; readonly said?: string }
   | { readonly committed: false; readonly reason: string }
 
 /**
@@ -278,12 +284,21 @@ export async function commitFiles(
     const added = await git(['add', '--intent-to-add', '--', ...announced])
     if (!added.ok) return { committed: false, reason: said(added) }
   }
+  const head = async (): Promise<string> =>
+    (await git(['rev-parse', '--verify', '--quiet', 'HEAD'])).stdout.trim()
+  const parent = await head()
   // A hook may take its time; a signing may wait for a passphrase.
   const done = await git(['commit', '--only', '--quiet', '-m', text, '--', ...paths], 120_000)
-  if (!done.ok) {
-    if (announced.length > 0) await git(['rm', '--cached', '--quiet', '--', ...announced])
-    return { committed: false, reason: said(done) }
+  const sha = await head()
+  if (done.ok) return { committed: true, sha }
+  // HEAD moved: the commit is made, whatever failed after it. Its files are in it to stay.
+  if (sha !== '' && sha !== parent) return { committed: true, sha, said: said(done) }
+
+  const reason = said(done)
+  if (announced.length === 0) return { committed: false, reason }
+  const undone = await git(['rm', '--cached', '--quiet', '--', ...announced])
+  return {
+    committed: false,
+    reason: undone.ok ? reason : `${reason}\n\n${t.commit.stillAnnounced(announced.join(', '))}`
   }
-  const sha = (await git(['rev-parse', 'HEAD'])).stdout.trim()
-  return { committed: true, sha }
 }

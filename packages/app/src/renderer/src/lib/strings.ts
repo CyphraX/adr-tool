@@ -202,7 +202,11 @@ export const t = {
     action: 'Commit',
     committing: 'Committing …',
     again: 'Try again',
-    committed: (sha: string): string => `Committed as ${sha.slice(0, 7)}.`
+    committed: (sha: string): string => `Committed as ${sha.slice(0, 7)}.`,
+    detached:
+      'HEAD is detached: the commit goes on no branch. Create a branch at it afterwards to keep it.',
+    madeButSaid: (sha: string, said: string): string =>
+      `Committed as ${sha.slice(0, 7)}. After the commit, git said:\n\n${said}`
   },
 
   history: {

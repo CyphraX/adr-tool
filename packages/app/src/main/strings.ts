@@ -34,6 +34,8 @@ export const t = {
     failed: 'git did not commit, and did not say why.',
     gone: 'This commit is no longer available. Try again.',
     changedSincePreview: (files: string): string =>
-      `Nothing was committed: ${files} changed on disk after the preview was made. Try again to see what would be committed now.`
+      `Nothing was committed: ${files} changed on disk after the preview was made. Try again to see what would be committed now.`,
+    stillAnnounced: (files: string): string =>
+      `git could not take ${files} out of the index again, where the app had announced them for the commit. \`git rm --cached\` with their paths does that; the files on disk stay as they are.`
   }
 }
