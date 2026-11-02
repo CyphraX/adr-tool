@@ -6,8 +6,12 @@ import type { EditorState } from '@codemirror/state'
  * of the Markdown it hides, where a bullet stands for a list mark, and how lines and spans look.
  * It decorates and never writes: the text in the editor is the text that is saved.
  *
- * The line the cursor is in — every line a selection touches, and all of a fenced code block
- * when one of its lines is — shows its source. Tables stay source.
+ * The line the cursor is in shows its source — every line a selection touches, and all of a
+ * construct that one of its lines belongs to: a fenced code block, a quote, emphasis or a link
+ * over several lines. Tables, images and task markers stay source.
+ *
+ * Every hidden range and every bullet lies within one line, and every styled span has text:
+ * the editor cannot hide a line break from a plugin, and does not draw an empty mark.
  */
 export type LiveMark =
   | { readonly kind: 'hide'; readonly from: number; readonly to: number }
@@ -21,6 +25,10 @@ export type SpanStyle = 'code' | 'link'
 type SyntaxNode = ReturnType<typeof syntaxTree>['topNode']
 
 const HEADING = /^ATXHeading([1-6])$/
+const SETEXT = /^SetextHeading([12])$/
+
+/** A link label as Markdown compares them: case folded, runs of white space as one space. */
+const labelOf = (text: string): string => text.trim().replace(/\s+/g, ' ').toLowerCase()
 
 export function liveMarks(state: EditorState): LiveMark[] {
   const marks: LiveMark[] = []
@@ -48,8 +56,20 @@ export function liveMarks(state: EditorState): LiveMark[] {
     hide(node.from, next === ' ' ? node.to + 1 : node.to)
   }
   const children = (node: SyntaxNode, name: string): SyntaxNode[] => node.getChildren(name)
+  const tree = syntaxTree(state)
 
-  syntaxTree(state).iterate({
+  // `[x]` is a link only where a definition `[x]: …` says so; otherwise it is text in brackets.
+  const defined = new Set<string>()
+  tree.iterate({
+    enter: (ref) => {
+      if (ref.name !== 'LinkReference') return
+      const label = ref.node.getChild('LinkLabel')
+      if (label) defined.add(labelOf(doc.sliceString(label.from + 1, label.to - 1)))
+      return false
+    }
+  })
+
+  tree.iterate({
     enter: (ref) => {
       const node = ref.node
       const heading = HEADING.exec(node.name)
@@ -57,13 +77,28 @@ export function liveMarks(state: EditorState): LiveMark[] {
         const line = doc.lineAt(node.from)
         marks.push({ kind: 'line', from: line.from, style: `h${Number(heading[1])}` as LineStyle })
         if (!shown(node.from, node.to)) {
-          for (const mark of children(node, 'HeaderMark')) {
-            // A closing sequence takes the space before it along.
-            if (mark.from > line.from && doc.sliceString(mark.from - 1, mark.from) === ' ') {
-              hide(mark.from - 1, mark.to)
-            } else hideWithSpace(mark)
-          }
+          children(node, 'HeaderMark').forEach((mark, position) => {
+            // The opening sequence takes the space after it along, a closing one the space before.
+            if (position === 0) hideWithSpace(mark)
+            else
+              hide(
+                doc.sliceString(mark.from - 1, mark.from) === ' ' ? mark.from - 1 : mark.from,
+                mark.to
+              )
+          })
         }
+        return
+      }
+      const setext = SETEXT.exec(node.name)
+      if (setext) {
+        const underline = node.getChild('HeaderMark')
+        const style = `h${Number(setext[1])}` as LineStyle
+        for (let at = node.from; at <= (underline?.from ?? node.to) - 1;) {
+          const line = doc.lineAt(at)
+          marks.push({ kind: 'line', from: line.from, style })
+          at = line.to + 1
+        }
+        if (underline && !shown(node.from, node.to)) hide(underline.from, underline.to)
         return
       }
       switch (node.name) {
@@ -90,7 +125,8 @@ export function liveMarks(state: EditorState): LiveMark[] {
         }
         case 'Link':
           link(node)
-          return false
+          // Emphasis and code in the text of a link are rendered as anywhere else.
+          return
         case 'Autolink': {
           const linkMarks = children(node, 'LinkMark')
           if (!shown(node.from, node.to)) for (const mark of linkMarks) hide(mark.from, mark.to)
@@ -117,6 +153,16 @@ export function liveMarks(state: EditorState): LiveMark[] {
             for (const mark of quoteMarks(node)) hideWithSpace(mark)
           }
           return
+        case 'CodeBlock':
+          for (let at = node.from; at <= node.to;) {
+            const line = doc.lineAt(at)
+            marks.push({ kind: 'line', from: line.from, style: 'code-block' })
+            at = line.to + 1
+          }
+          return false
+        case 'Escape':
+          if (!shown(node.from, node.to)) hide(node.from, node.from + 1)
+          return
         case 'FencedCode': {
           for (let at = node.from; at <= node.to;) {
             const line = doc.lineAt(at)
@@ -142,12 +188,26 @@ export function liveMarks(state: EditorState): LiveMark[] {
     }
   })
 
-  /** `[text](url "title")`, `[text][label]`, `[text]`: the text stays, styled as a link. */
+  /**
+   * `[text](url "title")`, and `[text][label]`, `[text][]`, `[text]` where the label is
+   * defined: the text stays, styled as a link. Brackets that are no link stay as they are.
+   */
   function link(node: SyntaxNode): void {
     const linkMarks = children(node, 'LinkMark')
     const open = linkMarks[0]
     const close = linkMarks[1]
     if (!open || !close || doc.sliceString(open.from, open.to) !== '[') return
+    const inline = linkMarks.some((mark) => doc.sliceString(mark.from, mark.to) === '(')
+    if (!inline) {
+      const label = node.getChild('LinkLabel')
+      const name = label
+        ? doc.sliceString(label.from + 1, label.to - 1)
+        : doc.sliceString(open.to, close.from)
+      // `[text][]` names itself.
+      const named =
+        labelOf(name) === '' ? labelOf(doc.sliceString(open.to, close.from)) : labelOf(name)
+      if (!defined.has(named)) return
+    }
     marks.push({ kind: 'span', from: open.to, to: close.from, style: 'link' })
     if (shown(node.from, node.to)) return
     hide(open.from, open.to)
@@ -163,5 +223,33 @@ export function liveMarks(state: EditorState): LiveMark[] {
     return found
   }
 
-  return marks
+  return onLines(marks, state)
+}
+
+/**
+ * What the editor can draw: a hidden range is cut where a line ends — the line break itself
+ * stays —, a bullet that is not on one line and a span without text are left out.
+ */
+function onLines(marks: readonly LiveMark[], state: EditorState): LiveMark[] {
+  const doc = state.doc
+  return marks.flatMap((mark): LiveMark[] => {
+    switch (mark.kind) {
+      case 'hide': {
+        const pieces: LiveMark[] = []
+        for (let from = mark.from; from < mark.to;) {
+          const line = doc.lineAt(from)
+          const to = Math.min(mark.to, line.to)
+          if (to > from) pieces.push({ kind: 'hide', from, to })
+          from = line.to + 1
+        }
+        return pieces
+      }
+      case 'bullet':
+        return mark.to > mark.from && doc.lineAt(mark.from).to >= mark.to ? [mark] : []
+      case 'span':
+        return mark.to > mark.from ? [mark] : []
+      case 'line':
+        return [mark]
+    }
+  })
 }

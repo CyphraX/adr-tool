@@ -20,12 +20,17 @@ function marksOf(text: string): { doc: string; marks: LiveMark[] } {
 /** What a reader sees of each line: the hidden marks taken out, bullets as `•`. */
 function rendered(text: string): string {
   const { doc, marks } = marksOf(text)
-  const cuts = marks
-    .filter((mark) => mark.kind === 'hide' || mark.kind === 'bullet')
-    .sort((a, b) => b.from - a.from)
-  let out = doc
-  for (const cut of cuts) {
-    out = out.slice(0, cut.from) + (cut.kind === 'bullet' ? '•' : '') + out.slice(cut.to)
+  const gone = new Set<number>()
+  const bullets = new Set<number>()
+  for (const mark of marks) {
+    if (mark.kind !== 'hide' && mark.kind !== 'bullet') continue
+    if (mark.kind === 'bullet') bullets.add(mark.from)
+    for (let at = mark.from; at < mark.to; at++) gone.add(at)
+  }
+  let out = ''
+  for (let at = 0; at < doc.length; at++) {
+    if (bullets.has(at)) out += '•'
+    if (!gone.has(at)) out += doc[at]
   }
   return out
 }
@@ -95,5 +100,92 @@ describe('the live mode of the editor (docs/plan-roadmap.md, part 3)', () => {
 
   it('hides a closing sequence of a heading with the space before it', () => {
     expect(rendered('## Context ##\n\n‸')).toBe('Context\n\n')
+  })
+
+  it('renders ATX and setext headings, also in a quote', () => {
+    expect(rendered('> # Heard\n\n‸')).toBe('Heard\n\n')
+    expect(rendered('Title\n=====\n\nPart\n----\n\n‸')).toBe('Title\n\n\nPart\n\n\n')
+    expect(styles('Title\n=====\n\n‸')).toEqual(['h1'])
+    expect(rendered('Ti‸tle\n=====')).toBe('Title\n=====')
+  })
+
+  it('renders the text of a link, emphasis in it included', () => {
+    expect(rendered('See [**the** other](0002.md).\n\n‸')).toBe('See the other.\n\n')
+  })
+
+  it('takes brackets for a link only where the label is defined', () => {
+    expect(rendered('Pick [x] or [y][].\n\n‸')).toBe('Pick [x] or [y][].\n\n')
+    const defined = 'Pick [x] or [y][].\n\n[x]: a.md\n[Y]: b.md\n\n‸'
+    expect(rendered(defined)).toBe('Pick x or y.\n\n[x]: a.md\n[Y]: b.md\n\n')
+  })
+
+  it('hides a link over two lines on each of them, and never the line break', () => {
+    const text = 'See [the\nother](0002.md "a\nb").\n\n‸'
+    expect(rendered(text)).toBe('See the\nother\n.\n\n')
+    const { doc, marks } = marksOf(text)
+    for (const mark of marks) {
+      if (mark.kind === 'hide') expect(doc.slice(mark.from, mark.to)).not.toContain('\n')
+    }
+  })
+
+  it('draws no span for a link without text', () => {
+    const { marks } = marksOf('An empty [](0002.md) link.\n\n‸')
+    expect(marks.filter((mark) => mark.kind === 'span')).toEqual([])
+  })
+
+  it('hides the backslash of an escape, and leaves indented code as it is', () => {
+    expect(rendered('Not \\*emphasis\\*.\n\n‸')).toBe('Not *emphasis*.\n\n')
+    expect(rendered('Not \\*emph‸asis\\*.')).toBe('Not \\*emphasis\\*.')
+    expect(rendered('    **code**\n\n‸')).toBe('    **code**\n\n')
+    expect(styles('    code\n\n‸')).toEqual(['code-block'])
+  })
+
+  it('only ever hides within a line and draws spans with text, wherever the cursor is', () => {
+    const corpus = [
+      '# A decision #',
+      '',
+      'Title',
+      '=====',
+      '',
+      '> # Heard',
+      '> over **two',
+      '> lines**',
+      '',
+      'See [the',
+      'other](0002.md "a',
+      'b") and [](x.md), [x], [y][] and <https://example.org>.',
+      '',
+      '[y]: y.md',
+      '',
+      '- one',
+      '-',
+      '  * nested',
+      '',
+      '```',
+      'code',
+      '```',
+      '',
+      '    indented',
+      '',
+      '***',
+      '',
+      '| a | b |',
+      '| - | - |',
+      '',
+      'Escaped \\# and `` ` `` and ~~gone~~.'
+    ].join('\n')
+    const lines = corpus.split('\n')
+    let start = 0
+    for (const line of lines) {
+      const { doc, marks } = marksOf(corpus.slice(0, start) + '‸' + corpus.slice(start))
+      for (const mark of marks) {
+        if (mark.kind === 'line') continue
+        expect(mark.to, `${mark.kind} at ${mark.from}`).toBeGreaterThan(mark.from)
+        if (mark.kind !== 'span') {
+          expect(doc.slice(mark.from, mark.to), `${mark.kind} at ${mark.from}`).not.toContain('\n')
+        }
+      }
+      start += line.length + 1
+    }
   })
 })

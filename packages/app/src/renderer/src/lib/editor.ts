@@ -50,6 +50,11 @@ class Bullet extends WidgetType {
     return true
   }
 
+  // A click on the bullet puts the cursor there, as on any other text.
+  override ignoreEvent(): boolean {
+    return false
+  }
+
   toDOM(): HTMLElement {
     const bullet = document.createElement('span')
     bullet.className = 'cm-live-bullet'
@@ -77,21 +82,35 @@ function decorationsOf(state: EditorState): DecorationSet {
   return Decoration.set(ranges, true)
 }
 
-/** Decorations of the live mode, recomputed as the text, the cursor or the parse moves. */
+/** The lines a selection touches, the ones that show their source, as one key. */
+function activeLines(state: EditorState): string {
+  return state.selection.ranges
+    .map((range) => `${state.doc.lineAt(range.from).number}-${state.doc.lineAt(range.to).number}`)
+    .join(' ')
+}
+
+/**
+ * Decorations of the live mode, recomputed as the text or the parse changes, or the cursor
+ * moves to another line; moving within a line changes nothing.
+ */
 const livePlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
+    lines: string
     constructor(view: EditorView) {
       this.decorations = decorationsOf(view.state)
+      this.lines = activeLines(view.state)
     }
     update(update: ViewUpdate): void {
+      const lines = activeLines(update.state)
       if (
         update.docChanged ||
-        update.selectionSet ||
+        lines !== this.lines ||
         syntaxTree(update.startState) !== syntaxTree(update.state)
       ) {
         this.decorations = decorationsOf(update.state)
       }
+      this.lines = lines
     }
   },
   { decorations: (plugin) => plugin.decorations }

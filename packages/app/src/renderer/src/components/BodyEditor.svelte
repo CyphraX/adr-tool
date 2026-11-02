@@ -145,8 +145,11 @@
     border-radius: 4px 0 0 4px;
   }
 
-  .modes button:last-child {
+  .modes button + button {
     border-left: 0;
+  }
+
+  .modes button:last-child {
     border-radius: 0 4px 4px 0;
   }
 
