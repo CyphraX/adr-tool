@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "What every module of the suite needs and none of them owns: the file-system port, splice edits and change sets",
+  "description": "What every module of the suite needs and none of them owns: the file-system port, the git port, splice edits and change sets",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

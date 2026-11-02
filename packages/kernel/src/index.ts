@@ -8,6 +8,16 @@ export {
 export { memoryFileSystem } from './fs/memory'
 
 export {
+  isDay,
+  isObjectName,
+  type ChangedFile,
+  type Git,
+  type LogEntry,
+  type LogOptions
+} from './git/port'
+export { memoryGit, type ScriptedCommit, type ScriptedHistory } from './git/memory'
+
+export {
   applyChangeSet,
   joinChangeSets,
   type Applied,
