@@ -113,6 +113,8 @@ export const SENTENCES = {
   'top-not-map': (): string => 'its top level must be a map',
   'key-not-list': (v: { key: string }): string => `"${v.key}" must be a list`,
   'key-twice': (v: { key: string }): string => `"${v.key}" is written twice`,
+  'key-not-of-kind': (v: { key: string; kind: string }): string =>
+    `"${v.key}" is no key of a Rule of the kind ${v.kind}`,
   'item-not-map': (): string => 'it must be a map of its keys',
   'missing-key': (v: { key: string }): string => `it has no "${v.key}"`,
   'not-text': (v: { key: string }): string => `"${v.key}" must be a text`,

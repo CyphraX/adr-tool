@@ -62,7 +62,7 @@ A file without any of them, or an empty file, has no Rules. A repository without
 | `why`  | one sentence, required         | Why the Rule holds, in the architect's words. Every message about a Violation of the Rule carries it. |
 | `kind` | one of the kinds of section 2, required | What the Rule says. |
 | `tests` | `excluded` (default) or `included` | Whether test files count (structure-format.md, section 2, "Tests"). As in Structure's views, Cycles and metrics, they are left out unless the Rule takes them in. |
-| `type-only` | `counted` (default) or `ignored` | Whether type-only Dependencies count (structure-format.md, section 3). They count, as in Structure's metrics: a type couples code at compile time too. A Rule that is only about run time ignores them: then a Dependency that is type-only as a whole is not counted, and of one that is not, the lines whose every use is type-only are not pointed at. Not for `threshold`, whose metric says what it counts. |
+| `type-only` | `counted` (default) or `ignored` | Whether type-only Dependencies count (structure-format.md, section 3). They count, as in Structure's metrics: a type couples code at compile time too. A Rule that is only about run time ignores them: then a Dependency that is type-only as a whole is not counted, and of one that is not, the lines whose every use is type-only are not pointed at. Not for `threshold`, whose metric says what it counts: there it is a Problem of the Rule. |
 
 `tests` and `type-only` are read for every kind that counts Dependencies: `must-not-depend`, `may-only-depend`, `layers` and `no-cycles`. `tests` is read for `threshold` too.
 
@@ -72,7 +72,7 @@ Rules name Components by their Component ID ([structure-format.md](structure-for
 
 - A pattern is matched against the IDs of the declared Components, segment by segment, separated by `/`. A pattern without a wildcard is a Component ID, and names that Component.
 - `*` matches any run of characters within one segment: `*` alone matches every top-level Component, `features/*` every child of `features`, `api-*` every top-level Component whose ID begins with `api-`.
-- `**` as a whole segment matches any number of segments, none included: `ui/**` matches `ui` and every Component below it, `**` every Component, `**/api` every Component whose last segment is `api`.
+- `**` as a whole segment matches any number of segments, none included: `ui/**` matches `ui` and every Component below it, `**` every Component, `**/api` every Component whose last segment is `api`. `**/**` says no more than `**`, and is read as it.
 - Directory nodes (structure-format.md, section 4) are no Components: nothing declares them, and no pattern matches them. Who wants a directory named by a Rule declares it as a Component.
 - **Rules are evaluated on the declaration.** While `.arch/components.yml` declares no Components, or cannot be read, the suite works on the Draft, whose IDs follow directories and are no names to write down, as for Traces ([ADR-0009](adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)). Then no Rule is evaluated, and that is a Problem (section 5).
 

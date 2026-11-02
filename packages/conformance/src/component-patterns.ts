@@ -10,7 +10,10 @@ export const hasWildcard = (pattern: string): boolean => pattern.includes('*')
 const escape = (text: string): string => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
 
 function expressionOf(pattern: string): RegExp {
-  const parts = pattern.split('/')
+  // `**/**` says no more than `**`.
+  const parts = pattern
+    .split('/')
+    .filter((part, index, all) => !(part === '**' && all[index - 1] === '**'))
   let expression = ''
   parts.forEach((part, index) => {
     if (part === '**') {

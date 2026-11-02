@@ -37,6 +37,13 @@ describe('Component patterns (docs/conformance-format.md, section 1)', () => {
     expect(hasWildcard('ui/**')).toBe(true)
   })
 
+  it('read ** written twice in a row as one', () => {
+    expect(matched('**/**')).toEqual(matched('**'))
+    expect(matched('ui/**/**')).toEqual(matched('ui/**'))
+    expect(matched('**/**/api')).toEqual(matched('**/api'))
+    expect(matched('features/**/**/api')).toEqual(matched('features/**/api'))
+  })
+
   it('follow a Rename where their leading segments name the Component', () => {
     expect(renamedPattern('core', 'core', 'domain')).toBe('domain')
     expect(renamedPattern('core/**', 'core', 'domain')).toBe('domain/**')

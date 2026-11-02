@@ -281,7 +281,8 @@ function readRule(
   const patternsAt = (key: string, required: boolean): string[] | undefined => {
     const node = valueOf(map, key)
     if (node === undefined || node === null) {
-      if (required) throw new Wrong({ code: 'missing-key', values: { key } }, line)
+      // `to:` without a value is reported where it stands.
+      if (required) throw new Wrong({ code: 'missing-key', values: { key } }, at(key))
       return undefined
     }
     return componentPatterns(node, key, names, lineOf)
@@ -293,6 +294,13 @@ function readRule(
       throw new Wrong({ code: 'not-one-of', values: { key, value, allowed } }, at(key))
     }
     return value as T
+  }
+  // A threshold's metric says what it counts; `type-only` there would be read past.
+  if (kind === 'threshold' && keyNodeOf(map, 'type-only') !== undefined) {
+    throw new Wrong(
+      { code: 'key-not-of-kind', values: { key: 'type-only', kind } },
+      at('type-only')
+    )
   }
   const common = {
     id,

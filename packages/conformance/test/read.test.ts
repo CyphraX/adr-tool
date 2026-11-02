@@ -283,6 +283,23 @@ describe('the Problems of the file (docs/conformance-format.md, section 5)', () 
     expect(rule('id: a', 'why: W.', 'kind: must-not-depend', 'from: x')).toEqual([
       '2: invalid-rule: The Rule a cannot be checked: it has no "to".'
     ])
+    // An empty "to:" is reported where it stands.
+    expect(rule('id: a', 'why: W.', 'kind: must-not-depend', 'from: x', 'to:')).toEqual([
+      '6: invalid-rule: The Rule a cannot be checked: it has no "to".'
+    ])
+    expect(
+      rule(
+        'id: a',
+        'why: W.',
+        'kind: threshold',
+        'metric: files',
+        'max: 3',
+        'of: x',
+        'type-only: ignored'
+      )
+    ).toEqual([
+      '8: invalid-rule: The Rule a cannot be checked: "type-only" is no key of a Rule of the kind threshold.'
+    ])
     expect(rule('id: a', 'why: W.', 'kind: must-not-depend', 'from: {x: y}', 'to: z')).toEqual([
       '5: invalid-rule: The Rule a cannot be checked: "from" must be a Component ID or pattern, or a list of them.'
     ])
