@@ -122,9 +122,9 @@ describe('applyChangeSet', () => {
 
 /** What `applyChangeSet` asks of the file system, step by step. */
 interface Call {
-  readonly step: 'writeText' | 'link' | 'rename' | 'remove'
+  readonly step: 'writeText' | 'link' | 'rename' | 'remove' | 'removeDirectory'
   readonly paths: readonly string[]
-  /** How many steps that write — every one but `remove` — were asked for so far, this one included. */
+  /** How many steps that write — every one but the removals — were asked for so far, this one included. */
   readonly writes: number
 }
 
@@ -132,7 +132,7 @@ interface Call {
 function watched(memory: WritableFileSystem, watch: (call: Call) => void): WritableFileSystem {
   let writes = 0
   const ask = (step: Call['step'], ...paths: string[]): void =>
-    watch({ step, paths, writes: step === 'remove' ? writes : ++writes })
+    watch({ step, paths, writes: step.startsWith('remove') ? writes : ++writes })
   return {
     readText: (path) => memory.readText(path),
     list: (path) => memory.list(path),
@@ -151,6 +151,10 @@ function watched(memory: WritableFileSystem, watch: (call: Call) => void): Writa
     remove: async (path) => {
       ask('remove', path)
       await memory.remove(path)
+    },
+    removeDirectory: async (path) => {
+      ask('removeDirectory', path)
+      await memory.removeDirectory(path)
     }
   }
 }
@@ -212,12 +216,12 @@ describe('applyChangeSet on a disk that fails', () => {
       watched(memoryFileSystem(before), (call) => void (steps = call.writes)),
       change
     )
-    // Three new texts, one second name, five renames.
-    expect(steps).toBe(9)
+    // Three new texts, two second names, five renames.
+    expect(steps).toBe(10)
     for (let failing = 1; failing <= steps; failing++) {
       const memory = memoryFileSystem(before)
       const fs = watched(memory, (call) => {
-        if (call.step !== 'remove' && call.writes === failing) throw full()
+        if (!call.step.startsWith('remove') && call.writes === failing) throw full()
       })
       const applied = await applyChangeSet(fs, change)
       expect(applied, `step ${failing}`).toEqual({
@@ -231,28 +235,67 @@ describe('applyChangeSet on a disk that fails', () => {
 
   it('names what it could not put back, and keeps the text each file had', async () => {
     const memory = memoryFileSystem(before)
-    // The third rename fails, and so does every rename after it: the two that undo.
+    // The third rename fails — the new text of 0001, after the two moves —, and so does every
+    // rename after it: the ones that undo. The two moves stay.
     let renames = 0
     const fs = watched(memory, (call) => {
       if (call.step === 'rename' && ++renames >= 3) throw new Error('EIO: i/o error')
     })
     const applied = await applyChangeSet(fs, change)
-    const token = /\.0003-c\.md\.(\w+)\.old/.exec(JSON.stringify(applied))?.[1]
     expect(applied).toEqual({
       applied: false,
       failed: 'EIO: i/o error',
       stranded: [
         { path: 'docs/adr/0002-b.md', textAt: 'docs/adr/0012-b.md' },
-        { path: 'docs/adr/0003-c.md', textAt: `docs/adr/.0003-c.md.${token ?? '?'}.old` }
+        { path: 'docs/adr/0003-c.md', textAt: 'docs/adr/0013-c.md' }
       ]
     })
     const files = await everything(memory)
-    expect(files[`docs/adr/.0003-c.md.${token}.old`]).toBe('C\n')
     expect(files['docs/adr/0012-b.md']).toBe('B\n')
+    expect(files['docs/adr/0013-c.md']).toBe('C\n')
     // What no file needs to be put back from is removed.
-    expect(Object.keys(files).filter((path) => /\.(new|old)$/.test(path))).toEqual([
-      `docs/adr/.0003-c.md.${token}.old`
-    ])
+    expect(Object.keys(files).filter((path) => /\.(new|old)$/.test(path))).toEqual([])
+  })
+
+  it('keeps the text a moved file had when its new text cannot be taken back', async () => {
+    // 0003 moves to 0013 and gets its new text there; then the new text of 0001 fails.
+    const renumbered = { files: [change.files[3]!, change.files[0]!] }
+    const stranded = async (failing: (rename: number) => boolean) => {
+      const memory = memoryFileSystem(before)
+      let renames = 0
+      const fs = watched(memory, (call) => {
+        if (call.step === 'rename' && failing(++renames)) throw new Error('EIO')
+      })
+      const applied = await applyChangeSet(fs, renumbered)
+      return { applied, files: await everything(memory) }
+    }
+    const old = (applied: object): string =>
+      `docs/adr/.0003-c.md.${/\.0003-c\.md\.(\w+)\.old/.exec(JSON.stringify(applied))?.[1]}.old`
+
+    // Taking back the new text fails, moving the file back does not: it has the new text at
+    // its old name, and the old one beside it.
+    const back = await stranded((rename) => rename === 3 || rename === 4)
+    expect(back.applied).toEqual({
+      applied: false,
+      failed: 'EIO',
+      stranded: [{ path: 'docs/adr/0003-c.md', textAt: old(back.applied) }]
+    })
+    expect(back.files['docs/adr/0003-c.md']).toBe('C, 13\n')
+    expect(back.files[old(back.applied)]).toBe('C\n')
+    expect(back.files['docs/adr/0013-c.md']).toBeUndefined()
+
+    // Both fail: the new text stays at the new name, which was not there before.
+    const both = await stranded((rename) => rename >= 3)
+    expect(both.applied).toEqual({
+      applied: false,
+      failed: 'EIO',
+      stranded: [
+        { path: 'docs/adr/0003-c.md', textAt: old(both.applied) },
+        { path: 'docs/adr/0013-c.md' }
+      ]
+    })
+    expect(both.files['docs/adr/0013-c.md']).toBe('C, 13\n')
+    expect(both.files[old(both.applied)]).toBe('C\n')
   })
 
   it('still counts as written when what it wrote beside the files cannot be removed', async () => {

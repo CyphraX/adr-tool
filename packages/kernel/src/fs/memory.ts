@@ -34,6 +34,12 @@ export function memoryFileSystem(initial: Readonly<Record<string, string>>): Wri
     },
     async remove(path) {
       files.delete(path)
+    },
+    async removeDirectory(path) {
+      // A directory is there while files are in it, and gone with the last of them.
+      if ([...files.keys()].some((file) => file.startsWith(`${path}/`))) {
+        throw new Error(`${path} is not empty.`)
+      }
     }
   }
 }

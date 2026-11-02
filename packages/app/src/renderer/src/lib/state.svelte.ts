@@ -192,6 +192,8 @@ interface History {
   notFound: boolean
   /** How often git was asked for the entries: only the answer to the latest question counts. */
   asked: number
+  /** How often git was asked what an entry did: only the answer to the latest question counts. */
+  changeAsked: number
 }
 
 /** A commit of one ADR's files, as the dialog shows it (docs/adr/0012-…). */
@@ -838,7 +840,8 @@ class AppState {
       selectedId: undefined,
       change: undefined,
       notFound: false,
-      asked: 0
+      asked: 0,
+      changeAsked: 0
     }
     await this.readHistory()
   }
@@ -854,9 +857,9 @@ class AppState {
     const asked = ++history.asked
     const { repositoryId, logPath, adrId } = history
     const entries = await window.api.history(repositoryId, logPath, adrId).catch(() => undefined)
-    // The dialog may have been closed, opened for another ADR, or asked again in the meantime.
+    // The dialog may have been closed, opened again, or asked again in the meantime.
     const now = this.history
-    if (now?.repositoryId !== repositoryId || now.adrId !== adrId || now.asked !== asked) return
+    if (now !== history || now.asked !== asked) return
 
     if (now.entries !== undefined) {
       if (!entries) return
@@ -892,11 +895,14 @@ class AppState {
   private async readHistoryChange(id: string | undefined): Promise<void> {
     const history = this.history
     if (!history || id === undefined) return
+    const asked = ++history.changeAsked
     const change = await window.api
       .historyChange(history.repositoryId, history.logPath, history.adrId, id)
       .catch(() => undefined)
-    if (this.history?.adrId === history.adrId && this.history.selectedId === id) {
-      this.history.change = change ?? null
+    // The dialog may have been closed, opened again — for an ADR of the same ID in another
+    // repository, say —, or asked again since: an older answer is no answer.
+    if (this.history === history && history.changeAsked === asked && history.selectedId === id) {
+      history.change = change ?? null
     }
   }
 
@@ -1254,7 +1260,8 @@ class AppState {
         this.edit()
       }
     } else {
-      this.review = { kind: 'refused', title: t.review.notWritten, reason: result.reason }
+      const title = result.inPart ? t.review.writtenInPart : t.review.notWritten
+      this.review = { kind: 'refused', title, reason: result.reason }
     }
   }
 

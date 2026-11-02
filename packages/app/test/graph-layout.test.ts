@@ -221,6 +221,14 @@ describe('the zoom of a drawing', () => {
     expect(scale).toBe(1)
     expect(stepScale(ZOOM.max, 1)).toBe(ZOOM.max)
     expect(stepScale(ZOOM.min, -1)).toBe(ZOOM.min)
+    // Down to the smallest and up again, or on from where the wheel left it: 100 % on the way.
+    scale = ZOOM.min
+    const up: number[] = []
+    while (scale < 1) up.push((scale = stepScale(scale, 1)))
+    expect(up.at(-1)).toBe(1)
+    expect(stepScale(0.97, 1)).toBe(1)
+    expect(stepScale(1.03, -1)).toBe(1)
+    expect(stepScale(0.97, -1)).toBe(0.8)
   })
 
   it('follows the wheel smoothly: down is smaller, up is larger, within the limits', () => {

@@ -139,6 +139,10 @@ describe('full-text search', () => {
     expect(foldWithPlaces('für')).toEqual({ text: 'fur', from: [0, 1, 3], to: [1, 3, 4] })
     // A letter outside the first plane is one character, two code units long.
     expect(foldWithPlaces('𝐀b')).toEqual({ text: '𝐀b', from: [0, 0, 2], to: [2, 2, 3] })
+    // A Hangul syllable stays one letter: "가" is not the start of "강".
+    expect(foldWithPlaces('강남')).toEqual({ text: '강남', from: [0, 1], to: [1, 2] })
+    expect(fold('가')).not.toBe(fold('강').slice(0, 1))
+    expect(fold('Éé')).toBe('ee')
   })
 
   it('marks the match where it is, whatever stands before it', async () => {

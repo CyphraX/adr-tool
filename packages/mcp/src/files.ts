@@ -9,6 +9,7 @@ import {
   readdir,
   realpath,
   rename,
+  rmdir,
   stat,
   unlink
 } from 'node:fs/promises'
@@ -116,26 +117,51 @@ export function repositoryFiles(root: string): WritableFileSystem {
     rename: async (from, to) => {
       const source = await writable(from)
       const target = (await real(to)) ?? (await writable(to))
-      await rename(source, target)
+      await renameWaiting(source, target)
       await syncDirectory(dirname(target))
     },
     link: async (from, to) => {
       const source = await real(from)
       if (source === undefined) throw new Error(`${from} is not a file of the repository.`)
       const target = await writable(to)
+      // Where there is no hard link, a copy: file systems without them say so in many ways —
+      // EPERM, ENOTSUP, EXDEV, and EISDIR from FAT and exFAT on Windows. Only a name that is
+      // taken is no reason to copy.
       await link(source, target).catch(async (error: unknown) => {
-        if (!LINKLESS.has((error as NodeJS.ErrnoException).code ?? '')) throw error
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw error
         await copyFile(source, target, constants.COPYFILE_EXCL)
       })
     },
     remove: async (path) => {
       await unlink(await writable(path)).catch(missing)
+    },
+    removeDirectory: async (path) => {
+      await rmdir(await writable(path))
     }
   }
 }
 
-/** What a file system says when it has no hard links, or none across what is asked. */
-const LINKLESS = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EXDEV', 'EMLINK', 'EINVAL'])
+/** What Windows says while another program — a virus scanner, the search indexer — holds a file a moment. */
+const BUSY = new Set(['EPERM', 'EACCES', 'EBUSY'])
+
+/**
+ * A rename. On Windows, a file that was just written is often held open for a moment by a
+ * virus scanner or the search indexer, and a rename of it refused; it is tried again for up
+ * to two seconds, as graceful-fs does. A read-only file stays refused, and nothing is written.
+ */
+async function renameWaiting(from: string, to: string): Promise<void> {
+  const start = Date.now()
+  for (let wait = 10; ; wait = Math.min(wait + 10, 100)) {
+    try {
+      await rename(from, to)
+      return
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? ''
+      if (process.platform !== 'win32' || !BUSY.has(code) || Date.now() - start > 2000) throw error
+      await new Promise((resolve) => setTimeout(resolve, wait))
+    }
+  }
+}
 
 /**
  * Make a rename in `directory` durable. Windows cannot open a directory for this and needs

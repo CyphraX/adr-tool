@@ -92,12 +92,20 @@ function besideName(path: string, token: string, kind: 'new' | 'old'): string {
   return `${path.slice(0, slash + 1)}.${short}.${token}.${kind}`
 }
 
-/** One step of the commit: a rename, and the rename that takes it back. */
+/** One rename of the commit, and the rename that takes it back. */
 interface Step {
   readonly run: () => Promise<void>
   readonly undo: () => Promise<void>
-  /** What stays other than it was when the step was done and cannot be taken back. */
-  readonly stranded: Stranded
+}
+
+/** One file of a change set as the commit handles it. */
+interface Planned {
+  /** The file moves to its new name; every move comes before any new text is put in place. */
+  readonly move?: Step
+  /** Its new text goes in place. */
+  readonly place?: Step
+  /** What is not as it was when the move, or the placement, could not be taken back. */
+  readonly stranded: (moveStays: boolean, placeStays: boolean) => readonly Stranded[]
 }
 
 const messageOf = (error: unknown): string =>
@@ -108,6 +116,17 @@ async function removeAll(fs: WritableFileSystem, paths: readonly string[]): Prom
   for (const path of paths) await fs.remove(path).catch(() => undefined)
 }
 
+/** The directories above `path` that are not there yet, the deepest first. */
+async function missingDirectories(fs: WritableFileSystem, path: string): Promise<string[]> {
+  const missing: string[] = []
+  for (let slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
+    const directory = path.slice(0, slash)
+    if ((await fs.list(directory)) !== undefined) break
+    missing.push(directory)
+  }
+  return missing
+}
+
 /**
  * Write a change set, all of it or nothing (ADR-0015). Every file is compared with what the
  * change set was planned against first; if git, an editor or an agent changed one in the
@@ -116,11 +135,12 @@ async function removeAll(fs: WritableFileSystem, paths: readonly string[]): Prom
  * Then every new text is written beside the file it is for, under a name of its own, and
  * made durable, and each file that a new text replaces gets a second name — a hard link,
  * which needs no room on a full disk. Nothing a reader sees has changed so far; when one of
- * these writes fails, they are removed again. Only then are the new texts renamed into
- * place, one rename per file, each of which replaces a file in one step. Files that move go
- * first: a rename is what another program is most likely to stand in the way of, an editor
- * holding the file open on Windows, say. When a rename fails, the ones before it are
- * renamed back, from the second names, and every file is as it was.
+ * these writes fails, they are removed again, and so are the directories they needed. Only
+ * then are the files that move renamed, and then the new texts into place, one rename per
+ * file, each of which replaces a file in one step. Files that move go first: a rename is
+ * what another program is most likely to stand in the way of, an editor holding the file
+ * open on Windows, say. When a rename fails, the ones before it are renamed back, from the
+ * second names, and every file is as it was.
  *
  * What remains: each rename is one step, but all of them together are not. A crash or a
  * power cut between the first and the last leaves some files new and some old, with the
@@ -145,13 +165,13 @@ export async function applyChangeSet(
   const token = Math.random().toString(36).slice(2, 8).padEnd(6, '0')
   /** The names the preparation writes beside the files: removed at the end, whatever happens. */
   const made: string[] = []
+  /** The directories a new file needs that are not there yet: removed again when nothing is written. */
+  const directories = new Set<string>()
   const prepare: (() => Promise<void>)[] = []
-  const moves: Step[] = []
-  const placements: Step[] = []
-  const step = (from: string, to: string, stranded: Stranded): Step => ({
+  const planned: Planned[] = []
+  const rename = (from: string, to: string): Step => ({
     run: () => fs.rename(from, to),
-    undo: () => fs.rename(to, from),
-    stranded
+    undo: () => fs.rename(to, from)
   })
 
   for (const [index, file] of changeSet.files.entries()) {
@@ -160,53 +180,92 @@ export async function applyChangeSet(
     // Numbered, so that two names that are cut alike stay apart.
     const fresh = besideName(target, `${token}${index}`, 'new')
     const old = besideName(file.path, `${token}${index}`, 'old')
+    if (file.creates || file.renameTo !== undefined) {
+      for (const directory of await missingDirectories(fs, target)) directories.add(directory)
+    }
     if (writes) {
       made.push(fresh)
       const options = file.creates ? undefined : { like: file.path }
       prepare.push(() => fs.writeText(fresh, file.after, options))
     }
-    if (file.renameTo !== undefined) {
-      // A file that moves with a new text moves out of the way, and the new text takes its new place.
-      const away = writes ? old : file.renameTo
-      if (writes) made.push(old)
-      moves.push(step(file.path, away, { path: file.path, textAt: away }))
-      if (writes) placements.push(step(fresh, target, { path: target }))
-    } else if (file.creates) {
-      placements.push(step(fresh, file.path, { path: file.path }))
-    } else if (writes) {
+    if (file.creates) {
+      planned.push({
+        place: rename(fresh, file.path),
+        stranded: (_, placeStays) => (placeStays ? [{ path: file.path }] : [])
+      })
+      continue
+    }
+    if (writes) {
+      // A second name for what the new text replaces, made before anything moves; the new
+      // text replaces it where it ends up. A file that a symbolic link leads to is replaced
+      // where it is, whether the link moves or not.
       made.push(old)
       prepare.push(() => fs.link(file.path, old))
-      placements.push({
-        run: () => fs.rename(fresh, file.path),
-        undo: () => fs.rename(old, file.path),
-        stranded: { path: file.path, textAt: old }
-      })
+    }
+    const renameTo = file.renameTo
+    const move = renameTo === undefined ? undefined : rename(file.path, renameTo)
+    const place = writes
+      ? { run: () => fs.rename(fresh, target), undo: () => fs.rename(old, target) }
+      : undefined
+    if (move === undefined && place === undefined) continue
+    planned.push({
+      move,
+      place,
+      stranded: (moveStays, placeStays) =>
+        renameTo === undefined
+          ? placeStays
+            ? [{ path: file.path, textAt: old }]
+            : []
+          : placeStays
+            ? // The new text stayed; it was moved back, or it still stands at the new name.
+              [{ path: file.path, textAt: old }, ...(moveStays ? [{ path: renameTo }] : [])]
+            : moveStays
+              ? [{ path: file.path, textAt: renameTo }]
+              : []
+    })
+  }
+
+  /** What an apply that writes nothing takes away: what it made, and the directories for it. */
+  const removeMade = async (kept: ReadonlySet<string>): Promise<void> => {
+    await removeAll(
+      fs,
+      made.filter((path) => !kept.has(path))
+    )
+    const deepestFirst = [...directories].sort((a, b) => b.split('/').length - a.split('/').length)
+    for (const directory of deepestFirst) {
+      await fs.removeDirectory(directory).catch(() => undefined)
     }
   }
 
   try {
     for (const write of prepare) await write()
   } catch (error) {
-    await removeAll(fs, made)
+    await removeMade(new Set())
     return { applied: false, failed: messageOf(error), stranded: [] }
   }
 
+  const steps = [
+    ...planned.flatMap((one) => (one.move ? [one.move] : [])),
+    ...planned.flatMap((one) => (one.place ? [one.place] : []))
+  ]
   const done: Step[] = []
   try {
-    for (const next of [...moves, ...placements]) {
+    for (const next of steps) {
       await next.run()
       done.push(next)
     }
   } catch (error) {
-    const stranded: Stranded[] = []
+    const stays = new Set<Step>()
     for (const undone of done.toReversed()) {
-      await undone.undo().catch(() => stranded.unshift(undone.stranded))
+      await undone.undo().catch(() => stays.add(undone))
     }
-    const kept = new Set(stranded.flatMap((file) => file.textAt ?? []))
-    await removeAll(
-      fs,
-      made.filter((path) => !kept.has(path))
+    const stranded = planned.flatMap((one) =>
+      one.stranded(
+        one.move !== undefined && stays.has(one.move),
+        one.place !== undefined && stays.has(one.place)
+      )
     )
+    await removeMade(new Set(stranded.flatMap((file) => file.textAt ?? [])))
     return { applied: false, failed: messageOf(error), stranded }
   }
   await removeAll(fs, made)

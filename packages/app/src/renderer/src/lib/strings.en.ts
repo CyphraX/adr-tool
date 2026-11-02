@@ -804,6 +804,7 @@ export const en = {
       }
     },
     notWritten: 'The change was not written',
+    writtenInPart: 'Some files are not as they were',
     discard: {
       title: 'Discard your changes?',
       reason: 'The text in the editor has not been saved. Leaving the editor now loses it.',

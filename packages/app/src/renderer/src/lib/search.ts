@@ -43,10 +43,14 @@ export interface FoldedText {
   readonly to: readonly number[]
 }
 
-/** One character as it is compared: lowercase, without accents, "ß" and "ẞ" as "ss". */
+/**
+ * One character as it is compared: lowercase, without accents, "ß" and "ẞ" as "ss". What
+ * is left is composed again: a Hangul syllable comes apart into letters that are no marks,
+ * and "가" is to find "가", not the first letters of "강".
+ */
 function foldCharacter(character: string): string {
   const lower = character.toLowerCase()
-  return lower === 'ß' ? 'ss' : lower.normalize('NFD').replace(/\p{M}/gu, '')
+  return lower === 'ß' ? 'ss' : lower.normalize('NFD').replace(/\p{M}/gu, '').normalize('NFC')
 }
 
 /**

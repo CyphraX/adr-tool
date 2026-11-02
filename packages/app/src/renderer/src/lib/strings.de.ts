@@ -763,6 +763,7 @@ export const de: typeof en = {
       }
     },
     notWritten: 'Die Änderung wurde nicht geschrieben',
+    writtenInPart: 'Einige Dateien sind nicht, wie sie waren',
     discard: {
       title: 'Ihre Änderungen verwerfen?',
       reason:

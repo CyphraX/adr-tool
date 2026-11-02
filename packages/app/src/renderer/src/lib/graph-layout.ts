@@ -333,12 +333,27 @@ export function clampScale(scale: number): number {
   return Math.min(ZOOM.max, Math.max(ZOOM.min, scale))
 }
 
+/** The scales a step stops at: the powers of the step about 100 %, to whole percents, and the limits. */
+const STOPS = [
+  ...new Set([
+    ZOOM.min,
+    ...Array.from({ length: 30 }, (_, power) => Math.round(ZOOM.step ** (power - 15) * 100) / 100),
+    ZOOM.max
+  ])
+]
+  .filter((scale) => scale >= ZOOM.min && scale <= ZOOM.max)
+  .sort((a, b) => a - b)
+
 /**
- * One step larger (1) or smaller (-1), to a whole percent: steps back and forth meet again,
- * and 100 % is on the way.
+ * One step larger (1) or smaller (-1): to the next of the same scales, from wherever the
+ * wheel or Fit left it, so that steps back and forth meet again, and 100 % is on the way.
  */
 export function stepScale(scale: number, direction: 1 | -1): number {
-  return clampScale(Math.round(scale * ZOOM.step ** direction * 100) / 100)
+  const next =
+    direction === 1
+      ? STOPS.find((stop) => stop > scale + 0.005)
+      : STOPS.findLast((stop) => stop < scale - 0.005)
+  return next ?? (direction === 1 ? ZOOM.max : ZOOM.min)
 }
 
 /** The scale after a turn of the wheel, as smooth as the wheel or the trackpad turns. */

@@ -430,13 +430,9 @@ export class Repositories {
       if ('conflicts' in result) {
         return { applied: false, reason: t.changedSincePreview(result.conflicts.join(', ')) }
       }
-      return {
-        applied: false,
-        reason:
-          result.stranded.length === 0
-            ? t.writeFailed(result.failed)
-            : t.writtenInPart(result.failed, result.stranded)
-      }
+      return result.stranded.length === 0
+        ? { applied: false, reason: t.writeFailed(result.failed) }
+        : { applied: false, reason: t.writtenInPart(result.failed, result.stranded), inPart: true }
     }
     return { applied: true, repository: await this.load(entry) }
   }

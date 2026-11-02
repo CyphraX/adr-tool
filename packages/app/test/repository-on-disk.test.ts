@@ -169,12 +169,12 @@ describe('a repository on disk', () => {
   })
 })
 
-/** Every file below `root` with its bytes; a symbolic link as what it points to. */
+/** Every file below `root` with its bytes, a symbolic link as what it points to, and every directory. */
 function everything(root: string, directory = ''): Record<string, string> {
   const files: Record<string, string> = {}
   for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
     const path = directory === '' ? entry.name : `${directory}/${entry.name}`
-    if (entry.isDirectory()) Object.assign(files, everything(root, path))
+    if (entry.isDirectory()) Object.assign(files, { [`${path}/`]: '' }, everything(root, path))
     else if (entry.isSymbolicLink()) files[path] = `-> ${readlinkSync(join(root, path))}`
     else files[path] = readFileSync(join(root, path)).toString('base64')
   }
@@ -252,9 +252,12 @@ describe('a change set applied on disk', () => {
       chmodSync(join(root, 'docs/adr/0001-a.md'), 0o640)
       expect(await applyChangeSet(nodeFileSystem(root), change)).toEqual({ applied: true })
       expect(Object.keys(everything(root)).sort()).toEqual([
+        'docs/',
+        'docs/adr/',
         'docs/adr/0001-a.md',
         'docs/adr/0012-b.md',
         'docs/adr/0013-c.md',
+        'docs/new/',
         'docs/new/0001-x.md'
       ])
       expect(readFileSync(join(root, 'docs/adr/0012-b.md'), 'utf8')).toBe('# B — ä, 12\r\n')
@@ -277,8 +280,8 @@ describe('a change set applied on disk', () => {
     } finally {
       rmSync(counted, { recursive: true, force: true })
     }
-    // Three new texts, one second name, five renames.
-    expect(steps).toBe(9)
+    // Three new texts, two second names, five renames.
+    expect(steps).toBe(10)
     for (let failing = 1; failing <= steps; failing++) {
       const root = scratch()
       try {
@@ -328,11 +331,56 @@ describe('a change set applied on disk', () => {
         expect(lstatSync(join(root, 'docs/adr/0004-same.md')).isSymbolicLink()).toBe(true)
         expect(readFileSync(join(root, 'docs/adr/0003-c.md'), 'utf8')).toBe('# C, linked\n')
         expect(Object.keys(everything(root)).sort()).toEqual([
+          'docs/',
+          'docs/adr/',
           'docs/adr/0001-a.md',
           'docs/adr/0002-b.md',
           'docs/adr/0003-c.md',
           'docs/adr/0004-same.md'
         ])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'moves the link of a Renumber, and gives the file it leads to the new text',
+    async () => {
+      const root = scratch()
+      try {
+        mkdirSync(join(root, 'shared'))
+        writeFileSync(join(root, 'shared/d.md'), '# D\n')
+        symlinkSync('../../shared/d.md', join(root, 'docs/adr/0004-d.md'))
+        const renumber: ChangeSet = {
+          files: [
+            {
+              path: 'docs/adr/0004-d.md',
+              before: '# D\n',
+              after: '# D, 14\n',
+              renameTo: 'docs/adr/0014-d.md'
+            }
+          ]
+        }
+        expect(await applyChangeSet(nodeFileSystem(root), renumber)).toEqual({ applied: true })
+        expect(readlinkSync(join(root, 'docs/adr/0014-d.md'))).toBe('../../shared/d.md')
+        expect(readFileSync(join(root, 'shared/d.md'), 'utf8')).toBe('# D, 14\n')
+        expect(existsSync(join(root, 'docs/adr/0004-d.md'))).toBe(false)
+        expect(Object.keys(everything(root)).filter((path) => /\.(new|old)$/.test(path))).toEqual(
+          []
+        )
+
+        // And when the disk refuses the new text, the link is back where it was, and the file
+        // it leads to as it was.
+        writeFileSync(join(root, 'shared/d.md'), '# D\n')
+        rmSync(join(root, 'docs/adr/0014-d.md'))
+        symlinkSync('../../shared/d.md', join(root, 'docs/adr/0004-d.md'))
+        const before = everything(root)
+        expect(await applyChangeSet(failingAt(root, 4), renumber)).toMatchObject({
+          applied: false,
+          stranded: []
+        })
+        expect(everything(root)).toEqual(before)
       } finally {
         rmSync(root, { recursive: true, force: true })
       }

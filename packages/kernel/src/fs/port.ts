@@ -33,6 +33,8 @@ export interface WritableFileSystem extends FileSystem {
   link(from: string, to: string): Promise<void>
   /** Remove a file. Nothing happens when there is none. */
   remove(path: string): Promise<void>
+  /** Remove a directory that is empty. Refused when it is not empty, or not a directory. */
+  removeDirectory(path: string): Promise<void>
 }
 
 export interface DirectoryEntry {
