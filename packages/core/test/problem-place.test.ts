@@ -188,6 +188,37 @@ describe('where a Problem is', () => {
     ).toEqual(['docs/adr/0001-a.md:8 unknown-target'])
   })
 
+  it('is the line in MADR 2 also without a Status item, and with `+` for a marker', async () => {
+    expect(
+      await places({
+        'docs/adr/0001-a.md': [
+          '# A',
+          '',
+          '* Deciders: Kim',
+          '',
+          '## Links',
+          '',
+          '* Supersedes [X](0042-x.md)',
+          ''
+        ].join('\n'),
+        'docs/adr/0002-b.md': [
+          '# B',
+          '',
+          '+ Status: on hold',
+          '',
+          '## Links',
+          '',
+          '+ Amends [Y](0043-y.md)',
+          ''
+        ].join('\n')
+      })
+    ).toEqual([
+      'docs/adr/0002-b.md:3 invalid-metadata',
+      'docs/adr/0001-a.md:7 unknown-target',
+      'docs/adr/0002-b.md:7 unknown-target'
+    ])
+  })
+
   it('is the first of several ADRs, without a line for a number they share', async () => {
     expect(
       await places({

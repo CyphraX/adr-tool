@@ -20,6 +20,14 @@ export function linkLine(content: string): { words: string; target: string } | u
   return { words, target }
 }
 
+/**
+ * Whether an ID can be one of an ADR: its file name begins with a number (section 1). A link
+ * to any other file — `guide.md` — is no Relation unless its words say it is one.
+ */
+export function namesAdr(id: string): boolean {
+  return /^\d{4,}-./.test(id)
+}
+
 /** The ID a link target names: the file name without `.md`. */
 export function targetOf(target: string): string | undefined {
   return ADR_FILE.exec(target)?.[1]

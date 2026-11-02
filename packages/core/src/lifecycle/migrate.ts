@@ -197,18 +197,28 @@ async function migrateListed(pending: PendingFiles, adr: Adr, warnings: string[]
         `The Status of ${adr.id} stays in the list under its title: the tool does not know "${read.rawStatus}".`
       )
     }
-    const going = read.read.filter((item) => !item.continued)
-    const edits: TextEdit[] =
-      going.length === file.list.items
-        ? [{ ...file.list.whole, insert: '' }]
-        : going.map((item) => ({ ...item.line, insert: '' }))
+    for (const [name, item] of [
+      ['Status', file.status],
+      ['Deciders', file.deciders],
+      ['Tags', file.tags]
+    ] as const) {
+      if (item?.repeated) {
+        warnings.push(
+          `The list under the title of ${adr.id} says ${name} twice: both items stay in its text.`
+        )
+      }
+    }
+    const going = read.read.filter((item) => !item.continued && !item.repeated)
+    const spans: Span[] =
+      going.length === file.list.items ? [file.list.whole] : going.map((item) => item.line)
     if (file.links && file.links.keeps.length === 0) {
-      edits.push(withoutSection(view, file.links.section))
+      spans.push(file.links.section)
     } else if (file.links) {
       warnings.push(
         `The Links section of ${adr.id} stays in its text: the Metadata does not hold ${quoted(file.links.keeps)}.`
       )
     }
+    const edits = deletions(view, spans)
     if (!view.frontmatter) {
       const first = edits.find((edit) => edit.start === view.bodyStart)
       edits.push(emptyFrontmatter(view, first ? first.end : view.bodyStart))
@@ -245,6 +255,26 @@ function emptyFrontmatter(view: SourceView, textAt: number): TextEdit {
   const from = Math.max(textAt, at)
   const blank = from >= text.length || text.startsWith('\n', from) || text.startsWith('\r\n', from)
   return { start: at, end: at, insert: `---${eol}---${eol}${blank ? '' : eol}` }
+}
+
+/**
+ * What `spans` take out of the text, joined where they meet: the list under the title and
+ * the Links section after it may — and at the end of the file, the blank lines in front of
+ * what goes go with it.
+ */
+function deletions(view: SourceView, spans: readonly Span[]): TextEdit[] {
+  const joined: Span[] = []
+  const join = (span: Span): void => {
+    const last = joined.at(-1)
+    if (last && span.start <= last.end)
+      joined[joined.length - 1] = { ...last, end: Math.max(last.end, span.end) }
+    else joined.push(span)
+  }
+  for (const span of [...spans].sort((one, other) => one.start - other.start)) join(span)
+  const atEnd = joined.map((span) => withoutSection(view, span))
+  joined.length = 0
+  for (const edit of atEnd) join(edit)
+  return joined.map((span) => ({ start: span.start, end: span.end, insert: '' }))
 }
 
 /**

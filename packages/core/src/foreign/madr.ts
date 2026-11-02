@@ -22,8 +22,10 @@ export type ForeignSign =
   | 'successor-in-status'
   /** MADR 3: `deciders` for the decision-makers. */
   | 'deciders'
-  /** MADR 2 and log4brains: the Metadata in the list under the title. */
-  | 'listed'
+  /** MADR 2 and log4brains: an item `Status` in the list under the title. */
+  | 'listed-status'
+  /** MADR 2 and log4brains: an item `Deciders` in the list under the title. */
+  | 'listed-deciders'
 
 /**
  * Read a file the way MADR wrote it (docs/file-format.md, section 8), laid over what the
@@ -178,12 +180,16 @@ export function frontmatterOf(view: SourceView): Map<string, Key> {
 
 /** `<!-- optional -->`: what the template says about a value is not the value. */
 export function withoutComments(value: string): string {
-  let rest = value
-  for (let open = rest.indexOf('<!--'); open !== -1; open = rest.indexOf('<!--')) {
-    const close = rest.indexOf('-->', open + 4)
-    rest = rest.slice(0, open) + (close === -1 ? '' : rest.slice(close + 3))
+  // One pass from left to right: a long value costs its length, however many comments it has.
+  const pieces: string[] = []
+  let from = 0
+  for (let open = value.indexOf('<!--'); open !== -1; open = value.indexOf('<!--', from)) {
+    pieces.push(value.slice(from, open))
+    const close = value.indexOf('-->', open + 4)
+    from = close === -1 ? value.length : close + 3
   }
-  return rest
+  pieces.push(value.slice(from))
+  return pieces.join('')
 }
 
 /** Whether a file of MADR names this number as its successor without naming an ADR by it (yet). */

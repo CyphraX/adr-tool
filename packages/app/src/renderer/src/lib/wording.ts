@@ -122,7 +122,8 @@ const FOREIGN_SIGN: Record<ForeignSign, string> = {
   'status-section': 'no frontmatter, and a Status section in its text',
   'successor-in-status': 'a Status that names a successor',
   deciders: '"deciders" for the decision-makers',
-  listed: 'its Status or its Deciders in the list under the title'
+  'listed-status': 'its Status in the list under the title',
+  'listed-deciders': 'its Deciders in the list under the title'
 }
 
 /** What the tool takes from a file of a foreign format. */
@@ -131,7 +132,7 @@ const FOREIGN_READING: Record<ForeignFormat, string> = {
     'Its Status, its Relations and Back-references and the day it was created are taken from there.',
   madr: 'That is read as MADR means it.',
   'madr-2':
-    "Its Status, its Deciders and log4brains' Tags are taken from that list, and its Relations from the links of its Links section."
+    "What its list under the title says — Status, Deciders, log4brains' Tags — is taken from there, unless the frontmatter says it already, and its Relations from the links of its Links section."
 }
 
 /** `a`, `a and b`, `a, b and c`. */
