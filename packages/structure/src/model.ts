@@ -1,0 +1,22 @@
+/**
+ * Everything of `structure` but the parsers: Components and who owns which Source File, the
+ * Draft, Adopt and the Repair, the levels of the hierarchy and their Cycles. It does not load
+ * TypeScript, so the app's main process and its renderer can use it; the analysis that reads
+ * code runs elsewhere and hands its Dependencies in (ADR-0008).
+ */
+export { openStructure, type RepositoryFiles, type Structure } from './structure'
+export type { DeclaredComponent } from './declaration'
+export type { OwnedSourceFile } from './ownership'
+export type { Language, SourceFile } from './source-files'
+export { DECLARATION_PATH, wordingOf, type PatternKey, type StructureProblem } from './problems'
+export { hasRepair, planAdopt, planRepair } from './operations'
+export type { Dependencies, Dependency, LibraryUse, NotAnalysed, NotResolved } from './dependencies'
+export {
+  levelOf,
+  UNASSIGNED,
+  type Level,
+  type LevelEdge,
+  type LevelNode,
+  type LevelOptions
+} from './levels'
+export type { Cycle } from './cycles'

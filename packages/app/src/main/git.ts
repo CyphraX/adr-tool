@@ -36,6 +36,12 @@ export interface Git {
   userName(): Promise<string | undefined>
   /** Where git keeps HEAD and the index: what changes when somebody commits or switches branches. */
   directory(): Promise<string | undefined>
+  /**
+   * The files the directory consists of: what git tracks and is still there, plus what it
+   * neither tracks nor ignores (docs/structure-format.md, section 2). Sorted. `undefined`
+   * without git.
+   */
+  files(): Promise<string[] | undefined>
 }
 
 const FIELD = '\x1f'
@@ -184,6 +190,19 @@ export function gitIn(root: string, executable = 'git'): Git {
 
     async directory(): Promise<string | undefined> {
       return (await run(['rev-parse', '--absolute-git-dir']))?.trim()
+    },
+
+    async files(): Promise<string[] | undefined> {
+      // Run in the directory, ls-files names what lies below it, relative to it.
+      const [listed, deleted] = await Promise.all([
+        run(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.']),
+        run(['ls-files', '-z', '--deleted', '--', '.'])
+      ])
+      if (listed === undefined || deleted === undefined) return undefined
+      const gone = new Set(deleted.split('\0'))
+      return [...new Set(listed.split('\0'))]
+        .filter((path) => path !== '' && !gone.has(path))
+        .sort()
     }
   }
 }

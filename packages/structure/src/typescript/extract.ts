@@ -10,6 +10,12 @@
 import ts from 'typescript'
 import { scriptOfSvelte } from './svelte'
 
+/**
+ * Changes whenever the same text would be extracted differently. What was cached under
+ * another version is extracted again (docs/structure-format.md, section 7).
+ */
+export const EXTRACTION_VERSION = 1
+
 export interface Use {
   /** The module specifier as written: `./cart`, `@acme/shared`, `node:fs`. */
   readonly specifier: string

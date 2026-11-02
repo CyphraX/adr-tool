@@ -1,6 +1,9 @@
 <script lang="ts">
-  import { app } from '../lib/state.svelte'
+  import { app, type Module } from '../lib/state.svelte'
   import { t } from '../lib/strings'
+
+  // The modules of the suite, for the repository in front. More of them follow.
+  const MODULES: readonly Module[] = ['decisions', 'structure']
 </script>
 
 <header>
@@ -29,6 +32,19 @@
       </div>
     {/each}
   </div>
+  {#if app.active}
+    <div class="modules" role="group" aria-label={t.modules.label}>
+      {#each MODULES as module (module)}
+        <button
+          class:current={app.active.module === module}
+          aria-pressed={app.active.module === module}
+          onclick={() => app.showModule(module)}
+        >
+          {t.modules[module]}
+        </button>
+      {/each}
+    </div>
+  {/if}
   <button class="open" onclick={() => app.open()}>{t.tabs.open}</button>
 </header>
 
@@ -84,6 +100,33 @@
   .close:hover {
     background: var(--hover);
     color: var(--ink);
+  }
+
+  .modules {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    padding: 0 10px;
+  }
+
+  .modules button {
+    padding: 3px 12px;
+    border-radius: 4px;
+    color: var(--ink-soft);
+  }
+
+  .modules button:hover {
+    background: var(--hover);
+    color: var(--ink);
+  }
+
+  .modules button.current {
+    background: var(--paper);
+    color: var(--ink);
+    font-weight: 500;
+    box-shadow: inset 0 0 0 1px var(--line-strong);
   }
 
   .open {

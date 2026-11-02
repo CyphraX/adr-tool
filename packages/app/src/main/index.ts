@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
   CHANNEL,
   type BodyEditRequest,
@@ -10,16 +11,32 @@ import {
   type OpenRepository,
   type Session
 } from '../shared/ipc'
+import { analysisHost } from './analysis-host'
+import { nodeFileSystem } from './node-file-system'
 import { Repositories } from './repositories'
-import { metadataEditRequest, migrationRequest, repairRequest } from './requests'
+import {
+  metadataEditRequest,
+  migrationRequest,
+  repairRequest,
+  structureRepairRequest
+} from './requests'
 import { readSession, writeSession } from './session-store'
 import { t } from './strings'
+import { Structures, cacheName } from './structures'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
 
 const repositories = new Repositories((repository) => {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(CHANNEL.repositoryChanged, repository)
+  }
+})
+const analysis = analysisHost((root) =>
+  join(app.getPath('userData'), 'structure-cache', cacheName(root))
+)
+const structures = new Structures(analysis.analyse, (repositoryId) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(CHANNEL.structureChanged, repositoryId)
   }
 })
 let activeRoot: string | undefined
@@ -82,7 +99,7 @@ function registerIpc(): void {
 
   ipcMain.handle(CHANNEL.closeRepository, async (_, id: unknown) => {
     if (typeof id !== 'string') return
-    await repositories.close(id)
+    await Promise.all([repositories.close(id), structures.close(id)])
     await saveSession()
   })
 
@@ -168,11 +185,60 @@ function registerIpc(): void {
       : undefined
   )
 
-  ipcMain.handle(CHANNEL.applyChange, (_, changeId: unknown) =>
-    typeof changeId === 'string'
-      ? repositories.applyChange(changeId)
-      : { applied: false, reason: t.notUnderstood }
+  ipcMain.handle(
+    CHANNEL.structureView,
+    async (_, repositoryId: unknown, parent: unknown, tests: unknown) => {
+      const valid =
+        typeof repositoryId === 'string' &&
+        (parent === undefined || typeof parent === 'string') &&
+        typeof tests === 'boolean'
+      if (!valid) return { ok: false, reason: t.notUnderstood }
+      const root = repositories.rootOf(repositoryId)
+      if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+      try {
+        return { ok: true, view: await structures.view(repositoryId, root, parent, tests) }
+      } catch (error) {
+        return { ok: false, reason: t.analysisFailed(String(error)) }
+      }
+    }
   )
+
+  ipcMain.handle(CHANNEL.planAdopt, async (_, repositoryId: unknown) => {
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    try {
+      // Planned against the Draft the view showed, and the declaration as it is on disk now.
+      const structure = await structures.structureOf(repositoryId as string, root)
+      return repositories.hold(
+        repositoryId as string,
+        await planAdopt(nodeFileSystem(root), structure)
+      )
+    } catch (error) {
+      return { ok: false, reason: t.analysisFailed(String(error)) }
+    }
+  })
+
+  ipcMain.handle(
+    CHANNEL.planStructureRepair,
+    async (_, repositoryId: unknown, problem: unknown) => {
+      const repair = structureRepairRequest(problem)
+      if (!repair) return { ok: false, reason: t.notUnderstood }
+      const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+      if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+      return repositories.hold(
+        repositoryId as string,
+        await planRepair(nodeFileSystem(root), repair)
+      )
+    }
+  )
+
+  ipcMain.handle(CHANNEL.applyChange, async (_, changeId: unknown) => {
+    if (typeof changeId !== 'string') return { applied: false, reason: t.notUnderstood }
+    const result = await repositories.applyChange(changeId)
+    // The declaration may have changed: what the Structure view shows is analysed again.
+    if (result.applied) structures.refresh(result.repository.id)
+    return result
+  })
 
   ipcMain.handle(CHANNEL.discardChange, (_, changeId: unknown) => {
     if (typeof changeId === 'string') repositories.discardChange(changeId)
@@ -295,4 +361,6 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   void repositories.closeAll()
+  void structures.closeAll()
+  void analysis.stop()
 })

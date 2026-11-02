@@ -1,6 +1,6 @@
 <script lang="ts">
   import { RELATION_TYPES, type DecisionLog } from '@adr-tool/core'
-  import { NODE, SAME_LAYER_REACH, layoutGraph, type GraphEdge } from '../lib/graph-layout'
+  import { NODE, layoutGraph, pathOf } from '../lib/graph-layout'
   import { problemsOf } from '../lib/problems'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -12,10 +12,12 @@
   // lines; the lines are one SVG underneath.
   let { log }: { log: DecisionLog } = $props()
 
+  // `relates-to` does not say which of the two builds on the other.
   const layout = $derived(
     layoutGraph(
       log.adrs.map((adr) => adr.id),
-      log.relations
+      log.relations,
+      { decidesLayer: (relation) => relation.type !== 'relates-to' }
     )
   )
   const adrOf = $derived(new Map(log.adrs.map((adr) => [adr.id, adr])))
@@ -31,33 +33,6 @@
         ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
   })
-
-  /** How far a curve reaches out before it turns. */
-  const BEND = NODE.gapX / 2
-
-  /** The line of an edge: level where it leaves, arrives and passes a layer, curved in between. */
-  function pathOf({ points, sameLayer }: GraphEdge): string {
-    const [start, ...rest] = points
-    if (!start) return ''
-    if (sameLayer) {
-      const end = rest[0]!
-      // A curve reaches three quarters as far as its control points.
-      const reach = (SAME_LAYER_REACH * 4) / 3 - 4
-      return `M${start.x} ${start.y}C${start.x + reach} ${start.y} ${end.x + reach} ${end.y} ${end.x} ${end.y}`
-    }
-    const direction = Math.sign(rest.at(-1)!.x - start.x)
-    let path = `M${start.x} ${start.y}`
-    let from = start
-    rest.forEach((point, position) => {
-      const passing = position < rest.length - 1
-      // A waypoint is the middle of its layer: the line crosses the whole layer at that height.
-      const to = passing ? { x: point.x - (direction * NODE.width) / 2, y: point.y } : point
-      path += `C${from.x + direction * BEND} ${from.y} ${to.x - direction * BEND} ${to.y} ${to.x} ${to.y}`
-      from = passing ? { x: point.x + (direction * NODE.width) / 2, y: point.y } : to
-      if (passing) path += `L${from.x} ${from.y}`
-    })
-    return path
-  }
 </script>
 
 <div class="graph">
@@ -90,10 +65,10 @@
           </defs>
           {#each layout.edges as edge, position (position)}
             <path
-              class="{edge.relation.type} {edge.relation.state}"
-              class:touching={edge.relation.from === selectedId || edge.relation.to === selectedId}
+              class="{edge.edge.type} {edge.edge.state}"
+              class:touching={edge.edge.from === selectedId || edge.edge.to === selectedId}
               d={pathOf(edge)}
-              marker-end={edge.relation.type === 'relates-to' ? undefined : 'url(#arrow)'}
+              marker-end={edge.edge.type === 'relates-to' ? undefined : 'url(#arrow)'}
             />
           {/each}
         </svg>

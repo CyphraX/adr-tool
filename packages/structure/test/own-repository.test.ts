@@ -121,7 +121,7 @@ it('finds the Dependency from app to core, and the Source File Dependencies behi
       // The main process, under tsconfig.node.json of app's solution-style tsconfig.json …
       'packages/app/src/main/repositories.ts',
       // … the renderer, under tsconfig.web.json …
-      'packages/app/src/renderer/src/lib/graph-layout.ts',
+      'packages/app/src/renderer/src/lib/state.svelte.ts',
       // … and its Svelte components, read from their script blocks.
       'packages/app/src/renderer/src/components/RelationsGraph.svelte'
     ])

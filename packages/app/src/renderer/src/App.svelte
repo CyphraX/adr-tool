@@ -11,6 +11,9 @@
   import RelationsGraph from './components/RelationsGraph.svelte'
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
+  import StructureDetail from './components/StructureDetail.svelte'
+  import StructureGraph from './components/StructureGraph.svelte'
+  import StructureSidebar from './components/StructureSidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import {
     LIMITS,
@@ -100,6 +103,24 @@
         <p>{t.welcome.noRepositoryLead}</p>
         <button class="primary" onclick={() => app.open()}>{t.tabs.open}</button>
       </main>
+    {:else if app.active.module === 'structure'}
+      {@const structure = app.active.structure}
+      {#if structure.view}
+        <div class="panes structure" style:--sidebar="{sidebarWidth}px">
+          <StructureSidebar />
+          <StructureGraph view={structure.view} />
+          <StructureDetail view={structure.view} />
+        </div>
+      {:else if structure.error}
+        <main class="message">
+          <h1>{t.structure.failed}</h1>
+          <p>{structure.error}</p>
+        </main>
+      {:else}
+        <main class="message">
+          <p>{t.structure.analysing}</p>
+        </main>
+      {/if}
     {:else if repository.logs.length === 0}
       <main class="message">
         {#if repository.problems.length > 0}
@@ -191,6 +212,11 @@
       var(--sidebar) 0 var(--middle, minmax(340px, 1fr))
       0 minmax(0, 1.4fr);
     min-height: 0;
+  }
+
+  /* The Structure view: what was found, the drawing, and what the selection stands for. */
+  .panes.structure {
+    grid-template-columns: var(--sidebar) minmax(0, 2fr) minmax(300px, 1fr);
   }
 
   /* A drawing needs room; the ADR next to it is there to be glanced at. */

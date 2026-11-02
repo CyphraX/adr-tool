@@ -5,7 +5,8 @@
   "description": "The UI-free core of the Structure module: Components, Source Files, Dependencies. No Electron, no DOM, no disk access of its own",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./model": "./src/model.ts"
   },
   "scripts": {
     "test": "vitest run",

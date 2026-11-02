@@ -3,8 +3,9 @@ import type { Relation, RelationType } from '@adr-tool/core'
 import {
   NODE,
   SAME_LAYER_REACH,
-  layoutGraph,
-  type GraphLayout
+  layoutGraph as layoutLayers,
+  type GraphLayout,
+  type LayoutEdge
 } from '../src/renderer/src/lib/graph-layout'
 
 const relation = (from: string, type: RelationType, to: string): Relation => ({
@@ -14,8 +15,13 @@ const relation = (from: string, type: RelationType, to: string): Relation => ({
   state: 'in-effect'
 })
 
-const at = (layout: GraphLayout, id: string) => layout.nodes.find((node) => node.id === id)!
-const layerOf = (layout: GraphLayout, id: string): number => at(layout, id).layer
+/** As the Relations graph lays a Decision Log out: `relates-to` does not decide a layer. */
+const layoutGraph = (ids: readonly string[], relations: readonly Relation[]) =>
+  layoutLayers(ids, relations, { decidesLayer: (relation) => relation.type !== 'relates-to' })
+
+const at = (layout: GraphLayout<LayoutEdge>, id: string) =>
+  layout.nodes.find((node) => node.id === id)!
+const layerOf = (layout: GraphLayout<LayoutEdge>, id: string): number => at(layout, id).layer
 
 describe('the layout of the Relations graph', () => {
   it('reads from left to right: what a decision builds on, replaces or refines stands left of it', () => {
@@ -50,8 +56,8 @@ describe('the layout of the Relations graph', () => {
         relation('3', 'depends-on', '1')
       ]
     )
-    const long = layout.edges.find(({ relation }) => relation.from === '3' && relation.to === '1')!
-    const short = layout.edges.find(({ relation }) => relation.from === '3' && relation.to === '2')!
+    const long = layout.edges.find(({ edge }) => edge.from === '3' && edge.to === '1')!
+    const short = layout.edges.find(({ edge }) => edge.from === '3' && edge.to === '2')!
     expect(short.points).toHaveLength(2)
     expect(long.points).toHaveLength(3)
     // Its waypoint has a place of its own in the middle layer: not where ADR 2 is.
@@ -78,7 +84,7 @@ describe('the layout of the Relations graph', () => {
         relation('3', 'relates-to', '1')
       ]
     )
-    for (const { relation: drawn, points } of layout.edges) {
+    for (const { edge: drawn, points } of layout.edges) {
       const [from, to] = [at(layout, drawn.from), at(layout, drawn.to)]
       const near = (point: { x: number }, node: { x: number }): boolean =>
         point.x >= node.x && point.x <= node.x + NODE.width
@@ -96,7 +102,7 @@ describe('the layout of the Relations graph', () => {
         relation('1', 'relates-to', '2')
       ]
     )
-    const starts = layout.edges.map(({ points, relation: drawn }) =>
+    const starts = layout.edges.map(({ points, edge: drawn }) =>
       drawn.from === '2' ? points[0]!.y : points.at(-1)!.y
     )
     expect(new Set(starts).size).toBe(3)
@@ -148,5 +154,40 @@ describe('the layout of the Relations graph', () => {
       }
     }
     expect(layout.edges).toHaveLength(relations.length)
+  })
+})
+
+describe('the layout of a level of Components', () => {
+  const dependency = (from: string, to: string) => ({ from, to })
+
+  it('puts what is depended on to the left, and the members of a Cycle into one layer', () => {
+    // b and c depend on each other; a depends on b; c depends on d.
+    const layout = layoutLayers(
+      ['a', 'b', 'c', 'd'],
+      [dependency('a', 'b'), dependency('b', 'c'), dependency('c', 'b'), dependency('c', 'd')],
+      { groups: [['b', 'c']] }
+    )
+    const layer = (id: string) => layout.nodes.find((node) => node.id === id)!.layer
+    expect(['d', 'b', 'c', 'a'].map(layer)).toEqual([0, 1, 1, 2])
+    const inside = layout.edges.filter(({ edge }) =>
+      [edge.from, edge.to].every((id) => 'bc'.includes(id))
+    )
+    expect(inside.map(({ sameLayer }) => sameLayer)).toEqual([true, true])
+    // Two members of one layer never overlap.
+    const [b, c] = [at(layout, 'b'), at(layout, 'c')]
+    expect(Math.abs(b.y - c.y)).toBeGreaterThanOrEqual(NODE.height)
+  })
+
+  it('draws the nodes no edge touches as well, when asked to', () => {
+    const layout = layoutLayers(['a', 'b', 'c'], [dependency('a', 'b')], { keepUnconnected: true })
+    expect(layout.nodes.map((node) => node.id)).toEqual(['a', 'b', 'c'])
+    expect(layout.unrelated).toBe(0)
+  })
+
+  it('leaves out an edge to a node that is not drawn', () => {
+    const layout = layoutLayers(['a', 'b'], [dependency('a', 'b'), dependency('a', 'gone')], {
+      keepUnconnected: true
+    })
+    expect(layout.edges.map(({ edge }) => edge.to)).toEqual(['b'])
   })
 })

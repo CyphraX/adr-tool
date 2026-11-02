@@ -1,6 +1,4 @@
-import type { Relation } from '@adr-tool/core'
-
-/** The box of an ADR in the graph, and the room between boxes. */
+/** The box of a node in the graph — an ADR, a Component — and the room between boxes. */
 export const NODE = { width: 184, height: 36, gapX: 52, gapY: 12, padding: 16 }
 
 /** The room an edge takes where it passes a layer it has no ADR in, and the room between two of them. */
@@ -9,38 +7,56 @@ const WAYPOINT = { height: 8, gap: 4 }
 /** How far apart two edges between the same two ADRs leave and arrive. */
 const PARALLEL = 7
 
-/** How far the line between two ADRs of one layer reaches out to the right of them. */
+/** How far the line between two nodes of one layer reaches out to the right of them. */
 export const SAME_LAYER_REACH = 40
+
+/** What the layout needs to know of an edge: it points from the node that builds on the other. */
+export interface LayoutEdge {
+  readonly from: string
+  readonly to: string
+}
+
+export interface LayoutOptions<E extends LayoutEdge> {
+  /** Whether an edge decides which of its ends stands left. All of them do unless this says otherwise. */
+  readonly decidesLayer?: (edge: E) => boolean
+  /** Draw the nodes no edge touches as well, instead of only counting them. */
+  readonly keepUnconnected?: boolean
+  /**
+   * Nodes that share a layer, whatever their edges say among themselves: the members of a
+   * Cycle. Their edges to each other are drawn as between two nodes of one layer.
+   */
+  readonly groups?: readonly (readonly string[])[]
+}
 
 export interface GraphNode {
   readonly id: string
-  /** 0 is the leftmost column: the ADRs that build on nothing. */
+  /** 0 is the leftmost column: the nodes that build on nothing. */
   readonly layer: number
   /** The top left corner. */
   readonly x: number
   readonly y: number
 }
 
-export interface GraphEdge {
-  readonly relation: Relation
+export interface GraphEdge<E extends LayoutEdge> {
+  readonly edge: E
   /**
-   * From the ADR that carries the Relation to its target: where the line leaves, the middle
-   * of every layer it passes, where it arrives. Two ADRs of one layer are joined on their right.
+   * From the node the edge leaves to the node it points at: where the line leaves, the middle
+   * of every layer it passes, where it arrives. Two nodes of one layer are joined on their right.
    */
   readonly points: readonly { readonly x: number; readonly y: number }[]
   readonly sameLayer: boolean
 }
 
-export interface GraphLayout {
+export interface GraphLayout<E extends LayoutEdge> {
   readonly nodes: readonly GraphNode[]
-  readonly edges: readonly GraphEdge[]
+  readonly edges: readonly GraphEdge<E>[]
   readonly width: number
   readonly height: number
-  /** ADRs that have no Relation and are not drawn. */
+  /** Nodes that no edge touches and that are not drawn. */
   readonly unrelated: number
 }
 
-/** A place in a layer: an ADR, or the waypoint of an edge that passes through. */
+/** A place in a layer: a node, or the waypoint of an edge that passes through. */
 interface Slot {
   readonly id: string | undefined
   readonly size: number
@@ -56,22 +72,35 @@ const mean = (values: number[]): number =>
   values.reduce((sum, value) => sum + value, 0) / values.length
 
 /**
- * A layered drawing of the Relations of one Decision Log, hand-made for what these graphs
- * are: tens of ADRs, mostly chains (docs/plan.md, decision 5).
+ * A layered drawing, hand-made for what these graphs are: tens of nodes, mostly chains
+ * (docs/plan.md, decision 5) — the Relations of a Decision Log, the Dependencies of one level
+ * of Components (docs/plan-structure.md, decision 4).
  *
- * Left to right is "builds on": an ADR stands right of everything it supersedes, amends or
- * depends on — so a chain of supersessions reads like a time line. `relates-to` does not
- * say which of the two builds on the other, and does not decide a layer. Within a layer,
- * ADRs are ordered so that edges cross as little as a few sweeps can manage; an edge that
- * skips layers gets a waypoint in each, so it runs between the boxes and not through them.
+ * Left to right is "builds on": a node stands right of everything its edges point at — an
+ * ADR right of what it supersedes, a Component right of what it depends on. An edge that
+ * does not say which of the two builds on the other (`relates-to`) does not decide a layer,
+ * and the members of a group share one. Within a layer, nodes are ordered so that edges
+ * cross as little as a few sweeps can manage; an edge that skips layers gets a waypoint in
+ * each, so it runs between the boxes and not through them.
  */
-export function layoutGraph(ids: readonly string[], relations: readonly Relation[]): GraphLayout {
-  const related = new Set(relations.flatMap(({ from, to }) => [from, to]))
-  const shown = ids.filter((id) => related.has(id))
+export function layoutGraph<E extends LayoutEdge>(
+  ids: readonly string[],
+  given: readonly E[],
+  options: LayoutOptions<E> = {}
+): GraphLayout<E> {
+  const known = new Set(ids)
+  const connections = given.filter(({ from, to }) => known.has(from) && known.has(to))
+  const related = new Set(connections.flatMap(({ from, to }) => [from, to]))
+  const shown = options.keepUnconnected ? [...ids] : ids.filter((id) => related.has(id))
   const unrelated = ids.length - shown.length
   if (shown.length === 0) return { nodes: [], edges: [], width: 0, height: 0, unrelated }
 
-  const layerOf = layersOf(shown, relations)
+  const decides = options.decidesLayer ?? ((): boolean => true)
+  const layerOf = layersOf(
+    shown,
+    connections.filter((connection) => decides(connection)),
+    options.groups ?? []
+  )
   const depth = shown.reduce((deepest, id) => Math.max(deepest, layerOf.get(id)!), 0) + 1
   const layers: Slot[][] = Array.from({ length: depth }, () => [])
   const slot = (id: string | undefined, layer: number): Slot => {
@@ -83,9 +112,10 @@ export function layoutGraph(ids: readonly string[], relations: readonly Relation
   const slotOf = new Map(shown.map((id) => [id, slot(id, layerOf.get(id)!)]))
 
   // Every edge as a run of slots from its left end to its right end, one per layer.
-  const runs = relations.map((relation) => {
-    const [a, b] = [layerOf.get(relation.from)!, layerOf.get(relation.to)!]
-    const [left, right] = a <= b ? [relation.from, relation.to] : [relation.to, relation.from]
+  const runs = connections.map((connection) => {
+    const [a, b] = [layerOf.get(connection.from)!, layerOf.get(connection.to)!]
+    const [left, right] =
+      a <= b ? [connection.from, connection.to] : [connection.to, connection.from]
     const run = [slotOf.get(left)!]
     for (let layer = Math.min(a, b) + 1; layer < Math.max(a, b); layer++) {
       run.push(slot(undefined, layer))
@@ -95,7 +125,7 @@ export function layoutGraph(ids: readonly string[], relations: readonly Relation
       run[position - 1]!.right.push(run[position]!)
       run[position]!.left.push(run[position - 1]!)
     }
-    return { relation, run, first: Math.min(a, b), reversed: a > b, sameLayer: a === b }
+    return { connection, run, first: Math.min(a, b), reversed: a > b, sameLayer: a === b }
   })
 
   orderLayers(layers)
@@ -111,32 +141,32 @@ export function layoutGraph(ids: readonly string[], relations: readonly Relation
     return { id, layer: layerOf.get(id)!, x: x(layerOf.get(id)!), y: y(placed) }
   })
 
-  // Two ADRs can have several Relations between them; their lines run side by side.
-  const between = (relation: Relation): string => [relation.from, relation.to].sort().join('\n')
-  const lanes = new Map<string, Relation[]>()
-  for (const relation of relations) {
-    lanes.set(between(relation), [...(lanes.get(between(relation)) ?? []), relation])
+  // Two nodes can have several edges between them; their lines run side by side.
+  const between = (connection: E): string => [connection.from, connection.to].sort().join('\n')
+  const lanes = new Map<string, E[]>()
+  for (const connection of connections) {
+    lanes.set(between(connection), [...(lanes.get(between(connection)) ?? []), connection])
   }
-  const laneOf = (relation: Relation): number => {
-    const lane = lanes.get(between(relation))!
-    return (lane.indexOf(relation) - (lane.length - 1) / 2) * PARALLEL
+  const laneOf = (connection: E): number => {
+    const lane = lanes.get(between(connection))!
+    return (lane.indexOf(connection) - (lane.length - 1) / 2) * PARALLEL
   }
 
-  const edges = runs.map(({ relation, run, first, reversed, sameLayer }): GraphEdge => {
-    const aside = laneOf(relation)
+  const edges = runs.map(({ connection, run, first, reversed, sameLayer }): GraphEdge<E> => {
+    const aside = laneOf(connection)
     const points = run.map((placed, position) => {
       const column = x(first + position)
       const middle = y(placed) + placed.size / 2
-      // An edge leaves an ADR on the side it is going to; a waypoint is the middle of its layer.
+      // An edge leaves a node on the side it is going to; a waypoint is the middle of its layer.
       if (placed.id === undefined) return { x: column + NODE.width / 2, y: middle }
       const onTheRight = sameLayer || position === 0
       return { x: onTheRight ? column + NODE.width : column, y: middle + aside }
     })
     if (sameLayer) {
-      const target = slotOf.get(relation.to)!
+      const target = slotOf.get(connection.to)!
       points.push({ x: x(first) + NODE.width, y: y(target) + target.size / 2 + aside })
     }
-    return { relation, points: reversed ? points.reverse() : points, sameLayer }
+    return { edge: connection, points: reversed ? points.reverse() : points, sameLayer }
   })
 
   const bottom = slots.reduce((most, placed) => Math.max(most, y(placed) + placed.size), 0)
@@ -151,19 +181,29 @@ export function layoutGraph(ids: readonly string[], relations: readonly Relation
 }
 
 /**
- * The layer of every ADR: 0 for one that builds on nothing, otherwise one more than the
- * highest layer it builds on. A Relation that would close a cycle is left out of this: a
- * cycle of `supersedes` is a Problem and reported as one, and the drawing has to come out
- * all the same. Without recursion: a chain can be as long as a Decision Log.
+ * The layer of every node: 0 for one that builds on nothing, otherwise one more than the
+ * highest layer it builds on. The members of a group stand together as one. An edge that
+ * would close a cycle beyond the groups is left out of this: a cycle of `supersedes` is a
+ * Problem and reported as one, and the drawing has to come out all the same. Without
+ * recursion: a chain can be as long as a Decision Log.
  */
-function layersOf(ids: readonly string[], relations: readonly Relation[]): Map<string, number> {
+function layersOf(
+  ids: readonly string[],
+  connections: readonly LayoutEdge[],
+  groups: readonly (readonly string[])[]
+): Map<string, number> {
+  const unitOf = new Map<string, string>()
+  for (const group of groups) for (const member of group) unitOf.set(member, group[0]!)
+  const unit = (id: string): string => unitOf.get(id) ?? id
+
   const targets = new Map<string, string[]>()
-  for (const { type, from, to } of relations) {
-    if (type !== 'relates-to') targets.set(from, [...(targets.get(from) ?? []), to])
+  for (const { from, to } of connections) {
+    const [a, b] = [unit(from), unit(to)]
+    if (a !== b) targets.set(a, [...(targets.get(a) ?? []), b])
   }
   const layers = new Map<string, number>()
   const visiting = new Set<string>()
-  for (const start of ids) {
+  for (const start of new Set(ids.map(unit))) {
     const path = [start]
     while (path.length > 0) {
       const id = path.at(-1)!
@@ -186,7 +226,7 @@ function layersOf(ids: readonly string[], relations: readonly Relation[]): Map<s
       path.pop()
     }
   }
-  return layers
+  return new Map(ids.map((id) => [id, layers.get(unit(id))!]))
 }
 
 /** Sweep left to right and back a few times, each layer sorted by where its neighbours stand. */
@@ -235,4 +275,31 @@ function placeLayers(layers: Slot[][]): void {
     for (let layer = 1; layer < layers.length; layer++) place(layers[layer]!, 'left')
     for (let layer = layers.length - 2; layer >= 0; layer--) place(layers[layer]!, 'right')
   }
+}
+
+/** How far a curve reaches out before it turns. */
+const BEND = NODE.gapX / 2
+
+/** The line of an edge, as SVG: level where it leaves, arrives and passes a layer, curved in between. */
+export function pathOf({ points, sameLayer }: GraphEdge<LayoutEdge>): string {
+  const [start, ...rest] = points
+  if (!start) return ''
+  if (sameLayer) {
+    const end = rest[0]!
+    // A curve reaches three quarters as far as its control points.
+    const reach = (SAME_LAYER_REACH * 4) / 3 - 4
+    return `M${start.x} ${start.y}C${start.x + reach} ${start.y} ${end.x + reach} ${end.y} ${end.x} ${end.y}`
+  }
+  const direction = Math.sign(rest.at(-1)!.x - start.x)
+  let path = `M${start.x} ${start.y}`
+  let from = start
+  rest.forEach((point, position) => {
+    const passing = position < rest.length - 1
+    // A waypoint is the middle of its layer: the line crosses the whole layer at that height.
+    const to = passing ? { x: point.x - (direction * NODE.width) / 2, y: point.y } : point
+    path += `C${from.x + direction * BEND} ${from.y} ${to.x - direction * BEND} ${to.y} ${to.x} ${to.y}`
+    from = passing ? { x: point.x + (direction * NODE.width) / 2, y: point.y } : to
+    if (passing) path += `L${from.x} ${from.y}`
+  })
+  return path
 }

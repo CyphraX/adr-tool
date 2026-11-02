@@ -1,0 +1,13 @@
+# A small shop with a Cycle between two Components and another between two files,
+# to look at in the app's Structure view (README.md, "Development").
+components:
+  catalog:
+    paths: [src/catalog/**]
+  cart:
+    paths: [src/cart/**]
+  pricing:
+    paths: [src/pricing/**]
+  billing:
+    name: Billing
+    description: Invoices, and what they are made of
+    paths: [src/billing/**]

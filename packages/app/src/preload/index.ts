@@ -29,6 +29,16 @@ const api: Api = {
     ipcRenderer.on(CHANNEL.repositoryChanged, handler)
     return () => ipcRenderer.removeListener(CHANNEL.repositoryChanged, handler)
   },
+  structureView: (repositoryId, parent, tests) =>
+    ipcRenderer.invoke(CHANNEL.structureView, repositoryId, parent, tests),
+  onStructureChanged: (listener) => {
+    const handler = (_: unknown, repositoryId: string): void => listener(repositoryId)
+    ipcRenderer.on(CHANNEL.structureChanged, handler)
+    return () => ipcRenderer.removeListener(CHANNEL.structureChanged, handler)
+  },
+  planAdopt: (repositoryId) => ipcRenderer.invoke(CHANNEL.planAdopt, repositoryId),
+  planStructureRepair: (repositoryId, problem) =>
+    ipcRenderer.invoke(CHANNEL.planStructureRepair, repositoryId, problem),
   setUnsaved: (unsaved) => ipcRenderer.invoke(CHANNEL.setUnsaved, unsaved),
   onCloseRequested: (listener) => {
     const handler = (): void => listener()
