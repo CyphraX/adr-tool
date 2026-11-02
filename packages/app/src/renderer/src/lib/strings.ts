@@ -33,6 +33,32 @@ interface ReviewWording {
 
 const many = (count: number, one: string, more: string): string => (count === 1 ? one : more)
 
+/** A count as the window writes it: 9,115. */
+const count = (value: number): string => value.toLocaleString('en')
+
+/** The metrics of section 5 of the Structure format, as the window names and shows them. */
+export const METRICS = [
+  'files',
+  'lines',
+  'efferent',
+  'afferent',
+  'instability',
+  'fanOut',
+  'fanIn',
+  'cohesion',
+  'internalShare'
+] as const
+export type MetricKey = (typeof METRICS)[number]
+
+interface MetricWording {
+  /** In the heading of a column. */
+  short: string
+  /** On the Component page. */
+  long: string
+  /** Its definition, in the tooltip of either. */
+  definition: string
+}
+
 export const t = {
   cancel: 'Cancel',
   close: 'Close',
@@ -257,6 +283,120 @@ export const t = {
       weakest: 'weakest Dependency of a Cycle',
       weight: (count: number): string =>
         many(count, 'One Source File Dependency', `${count} Source File Dependencies`)
+    },
+
+    views: {
+      label: 'Show this level as',
+      graph: 'Graph',
+      matrix: 'Matrix',
+      metrics: 'Metrics'
+    },
+
+    metric: {
+      files: {
+        short: 'Files',
+        long: 'Source Files',
+        definition: 'Size: the Source Files it contains.'
+      },
+      lines: {
+        short: 'Lines',
+        long: 'Lines',
+        definition:
+          'Size: the lines of the Source Files it contains. A file has as many lines as line breaks, and one more when text follows the last one.'
+      },
+      efferent: {
+        short: 'Ce',
+        long: 'Efferent coupling, Ce',
+        definition:
+          'Efferent coupling, Ce: the Source Files inside that depend on at least one Source File outside.'
+      },
+      afferent: {
+        short: 'Ca',
+        long: 'Afferent coupling, Ca',
+        definition:
+          'Afferent coupling, Ca: the Source Files outside that depend on at least one Source File inside.'
+      },
+      instability: {
+        short: 'I',
+        long: 'Instability, I',
+        definition:
+          'Instability, I = Ce / (Ca + Ce): 0 is maximally stable, 1 maximally unstable. Undefined when both are zero.'
+      },
+      fanOut: {
+        short: 'Fan-out',
+        long: 'Fan-out',
+        definition: 'Fan-out: the Components with the same parent that this one depends on.'
+      },
+      fanIn: {
+        short: 'Fan-in',
+        long: 'Fan-in',
+        definition: 'Fan-in: the Components with the same parent that depend on this one.'
+      },
+      cohesion: {
+        short: 'H',
+        long: 'Relational cohesion, H',
+        definition:
+          'Relational cohesion, H = (R + 1) / N, with N the Source Files inside and R the Dependencies among them.'
+      },
+      internalShare: {
+        short: 'Internal',
+        long: 'Internal share',
+        definition:
+          'Internal share: the Dependencies among the files inside, divided by all Dependencies that start or end inside. Undefined when there are none.'
+      }
+    } satisfies Record<MetricKey, MetricWording>,
+    /** A metric's value as a cell or the page shows it. */
+    value: (key: MetricKey, value: number | undefined): string =>
+      value === undefined
+        ? '–'
+        : key === 'instability' || key === 'cohesion'
+          ? value.toFixed(2)
+          : key === 'internalShare'
+            ? `${Math.round(value * 100)} %`
+            : count(value),
+    undefinedValue: 'undefined: nothing to divide by',
+
+    metrics: {
+      label: 'The metrics of the nodes of this level',
+      node: 'Node',
+      howToRead:
+        'Each Component is measured on the Source Files it contains; outside is everything else, Unassigned files included. Test files count only when they are included, type-only Dependencies always. Point at a heading for its definition. Own files and Unassigned have a size and no other metric.',
+      javaLowerBound:
+        'Java is read without a classpath: where there is Java, these numbers are a lower bound.'
+    },
+
+    matrix: {
+      label: 'The dependency structure matrix of this level',
+      howToRead:
+        'Read a row across: a number is how many Source File Dependencies the row has on the column. Below the diagonal a row uses what stands above it; above the diagonal, in red, lies what closes a Cycle. A box marks the rows of a Cycle.',
+      expand: (name: string): string => `Expand ${name} into its parts`,
+      collapse: (name: string): string => `Fold ${name} back`,
+      cell: (from: string, to: string, weight: number): string =>
+        `${from} uses ${to}: ${many(weight, 'one Source File Dependency', `${weight} Source File Dependencies`)}`,
+      legend: 'What the cells mean',
+      below: 'uses what stands above',
+      above: 'closes a Cycle',
+      cycle: 'the rows of a Cycle'
+    },
+
+    page: {
+      component: 'Component',
+      id: 'ID',
+      patterns: 'Patterns',
+      paths: 'paths',
+      tests: 'tests',
+      none: 'none',
+      size: (files: number, lines: number): string =>
+        `${many(files, 'One Source File', `${count(files)} Source Files`)}, ${many(lines, 'one line', `${count(lines)} lines`)}`,
+      testFiles: (tests: number, counted: boolean): string =>
+        counted
+          ? many(tests, 'One of them a test', `${count(tests)} of them tests`)
+          : many(tests, 'One test file, left out', `${count(tests)} test files, left out`),
+      empty: 'It contains no Source File, and so has no metrics.',
+      metrics: 'Metrics',
+      cycles: 'Cycles it is part of',
+      noCycle: 'None at its level.',
+      atItsLevel: 'At its own level, among the Components beside it.'
     },
 
     detail: {

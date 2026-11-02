@@ -1,31 +1,52 @@
 <script lang="ts">
-  import type { StructureEdge, StructureNode, StructureView } from '../../../shared/ipc'
+  import type {
+    StructureComponent,
+    StructureEdge,
+    StructureNeighbour,
+    StructureNode,
+    StructureView
+  } from '../../../shared/ipc'
   import { app } from '../lib/state.svelte'
-  import { t } from '../lib/strings'
+  import { METRICS, t } from '../lib/strings'
+  import { nodeLabel } from '../lib/structure'
 
-  // What the selection in the Structure view stands for: a node with its Dependencies, a
-  // line with the Source File Dependencies behind it, a Cycle with its example round trip,
-  // or one of the lists of what the analysis could not do.
+  // What the selection in the Structure view stands for: a Component with its page — the
+  // declaration, the metrics, the Dependencies at its level, its Cycles — another node with
+  // its Dependencies, a line or a cell with the Source File Dependencies behind it, a Cycle
+  // with its example round trip, or one of the lists of what the analysis could not do.
   let { view }: { view: StructureView } = $props()
 
   const selection = $derived(app.active?.structure.selection)
-  const nodeOf = $derived(new Map(view.nodes.map((node) => [node.id, node])))
+  // The matrix may show other rows than the drawing: what is in front is asked first.
+  const inMatrix = $derived(app.active?.structure.show === 'matrix')
+  const nodes = $derived<readonly StructureNode[]>(
+    inMatrix ? [...view.matrix.rows, ...view.nodes] : [...view.nodes, ...view.matrix.rows]
+  )
+  const edges = $derived<readonly StructureEdge[]>(
+    inMatrix ? [...view.matrix.cells, ...view.edges] : [...view.edges, ...view.matrix.cells]
+  )
+  const nodeOf = (id: string): StructureNode | undefined => nodes.find((node) => node.id === id)
+  const edgeOf = (from: string, to: string): StructureEdge | undefined =>
+    edges.find((edge) => edge.from === from && edge.to === to)
+  const pageOf = (id: string): StructureComponent | undefined =>
+    view.components.find((component) => component.id === id)
 
   function labelOf(id: string): string {
-    const node = nodeOf.get(id)
-    if (!node) return id
-    switch (node.kind) {
-      case 'own-files':
-        return t.structure.graph.ownFiles(node.name)
-      case 'unassigned':
-        return t.structure.graph.unassigned
-      default:
-        return node.name
-    }
+    const node = nodeOf(id)
+    return node ? nodeLabel(node) : (pageOf(id)?.name ?? id)
   }
 
   const selectEdge = (edge: { from: string; to: string }): void =>
     app.selectInStructure({ kind: 'edge', from: edge.from, to: edge.to })
+  const selectNode = (id: string): void => app.selectInStructure({ kind: 'node', id })
+
+  /** The Cycle of the level in view with the same round trip, to select it. */
+  const cycleIndex = (roundTrip: readonly { id: string }[]): number =>
+    view.cycles.findIndex(
+      (cycle) =>
+        cycle.roundTrip.length === roundTrip.length &&
+        cycle.roundTrip.every((id, position) => id === roundTrip[position]!.id)
+    )
 </script>
 
 {#snippet edgeButton(edge: StructureEdge, end: 'from' | 'to')}
@@ -36,34 +57,137 @@
   </li>
 {/snippet}
 
-{#snippet nodeDetail(node: StructureNode)}
-  {@const out = view.edges.filter((edge) => edge.from === node.id)}
-  {@const into = view.edges.filter((edge) => edge.to === node.id)}
-  <h2>{labelOf(node.id)}</h2>
-  {#if node.kind === 'source-file'}
-    <p class="path">{node.id}</p>
-  {:else}
-    <p class="faint">{t.structure.graph.files(node.files)}</p>
-  {/if}
-  {#if node.kind === 'component'}
-    <button class="action" onclick={() => app.openComponent(node.id)}>
-      {t.structure.detail.showParts}
-    </button>
-  {/if}
-  <h3>{t.structure.detail.dependsOn}</h3>
-  {#if out.length === 0}
+{#snippet dependencyList(list: readonly StructureEdge[], end: 'from' | 'to')}
+  {#if list.length === 0}
     <p class="faint">{t.structure.detail.nothing}</p>
   {:else}
     <ul class="edges">
-      {#each out as edge (edge.to)}{@render edgeButton(edge, 'to')}{/each}
+      {#each list as edge (edge[end])}{@render edgeButton(edge, end)}{/each}
     </ul>
   {/if}
+{/snippet}
+
+{#snippet nodeDetail(node: StructureNode)}
+  <h2>{nodeLabel(node)}</h2>
+  {#if node.kind === 'source-file'}
+    <p class="path">{node.id}</p>
+    <p class="faint">{t.structure.page.size(node.files, node.lines)}</p>
+  {:else}
+    <p class="faint">{t.structure.page.size(node.files, node.lines)}</p>
+  {/if}
+  <h3>{t.structure.detail.dependsOn}</h3>
+  {@render dependencyList(
+    edges.filter((edge) => edge.from === node.id),
+    'to'
+  )}
   <h3>{t.structure.detail.usedBy}</h3>
-  {#if into.length === 0}
+  {@render dependencyList(
+    edges.filter((edge) => edge.to === node.id),
+    'from'
+  )}
+{/snippet}
+
+{#snippet neighbours(page: StructureComponent, list: readonly StructureNeighbour[], out: boolean)}
+  {#if list.length === 0}
     <p class="faint">{t.structure.detail.nothing}</p>
   {:else}
     <ul class="edges">
-      {#each into as edge (edge.from)}{@render edgeButton(edge, 'from')}{/each}
+      {#each list as neighbour (neighbour.id)}
+        {@const from = out ? page.id : neighbour.id}
+        {@const to = out ? neighbour.id : page.id}
+        <li>
+          {#if edgeOf(from, to)}
+            <button class="link" onclick={() => selectEdge({ from, to })}
+              >{nodeLabel(neighbour)}</button
+            >
+          {:else}
+            <span>{nodeLabel(neighbour)}</span>
+          {/if}
+          <span class="faint">{t.structure.graph.weight(neighbour.weight)}</span>
+          {#if neighbour.typeOnly}<span class="tag">{t.structure.detail.typeOnly}</span>{/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+{/snippet}
+
+{#snippet componentPage(page: StructureComponent)}
+  <p class="kind">{t.structure.page.component}</p>
+  <h2>{page.name}</h2>
+  <p><span class="faint">{t.structure.page.id}</span> <code>{page.id}</code></p>
+  {#if page.description}<p class="description">{page.description}</p>{/if}
+  {#if page.metrics}
+    <p class="faint">
+      {t.structure.page.size(page.metrics.files, page.metrics.lines)}{#if page.testFiles > 0}<br
+        />{t.structure.page.testFiles(page.testFiles, view.tests)}{/if}
+    </p>
+    <button class="action" onclick={() => app.openComponent(page.id)}>
+      {t.structure.detail.showParts}
+    </button>
+  {:else}
+    <p class="faint">{t.structure.page.empty}</p>
+  {/if}
+
+  <h3>{t.structure.page.patterns}</h3>
+  <dl class="patterns">
+    <dt>{t.structure.page.paths}</dt>
+    <dd>
+      {#each page.paths as pattern (pattern)}<code>{pattern}</code>{:else}<span class="faint"
+          >{t.structure.page.none}</span
+        >{/each}
+    </dd>
+    <dt>{t.structure.page.tests}</dt>
+    <dd>
+      {#each page.tests as pattern (pattern)}<code>{pattern}</code>{:else}<span class="faint"
+          >{t.structure.page.none}</span
+        >{/each}
+    </dd>
+  </dl>
+
+  {#if page.metrics}
+    {@const metrics = page.metrics}
+    <h3>{t.structure.page.metrics}</h3>
+    <dl class="metrics">
+      {#each METRICS.slice(2) as key (key)}
+        {@const value = key === 'files' || key === 'lines' ? undefined : metrics[key]}
+        <dt title={t.structure.metric[key].definition}>{t.structure.metric[key].long}</dt>
+        <dd
+          title={value === undefined
+            ? t.structure.undefinedValue
+            : t.structure.metric[key].definition}
+        >
+          {t.structure.value(key, value)}
+        </dd>
+      {/each}
+    </dl>
+    {#if page.java}<p class="faint note">{t.structure.metrics.javaLowerBound}</p>{/if}
+  {/if}
+
+  <p class="faint note">{t.structure.page.atItsLevel}</p>
+  <h3>{t.structure.detail.dependsOn}</h3>
+  {@render neighbours(page, page.dependsOn, true)}
+  <h3>{t.structure.detail.usedBy}</h3>
+  {@render neighbours(page, page.usedBy, false)}
+
+  <h3>{t.structure.page.cycles}</h3>
+  {#if page.cycles.length === 0}
+    <p class="faint">{t.structure.page.noCycle}</p>
+  {:else}
+    <ul class="cycles">
+      {#each page.cycles as cycle, position (position)}
+        {@const index = page.level === view.parent ? cycleIndex(cycle.roundTrip) : -1}
+        {@const trip = [...cycle.roundTrip, cycle.roundTrip[0]!].map(nodeLabel).join(' → ')}
+        <li>
+          {#if index >= 0}
+            <button class="link" onclick={() => app.selectInStructure({ kind: 'cycle', index })}
+              >{trip}</button
+            >
+          {:else}
+            <span>{trip}</span>
+          {/if}
+          {#if cycle.typeOnly}<span class="tag">{t.structure.detail.typeOnly}</span>{/if}
+        </li>
+      {/each}
     </ul>
   {/if}
 {/snippet}
@@ -88,21 +212,21 @@
 {/snippet}
 
 <aside aria-label={t.structure.detail.label}>
-  {#if selection?.kind === 'node' && nodeOf.get(selection.id)}
-    {@render nodeDetail(nodeOf.get(selection.id)!)}
+  {#if selection?.kind === 'node' && (nodeOf(selection.id) || pageOf(selection.id))}
+    {@const node = nodeOf(selection.id)}
+    {@const page = pageOf(selection.id)}
+    {#if page && (!node || node.kind === 'component')}
+      {@render componentPage(page)}
+    {:else if node}
+      {@render nodeDetail(node)}
+    {/if}
   {:else if selection?.kind === 'edge'}
-    {@const edge = view.edges.find(
-      (candidate) => candidate.from === selection.from && candidate.to === selection.to
-    )}
+    {@const edge = edgeOf(selection.from, selection.to)}
     {#if edge}
       <h2>
-        <button class="link" onclick={() => app.selectInStructure({ kind: 'node', id: edge.from })}
-          >{labelOf(edge.from)}</button
-        >
+        <button class="link" onclick={() => selectNode(edge.from)}>{labelOf(edge.from)}</button>
         <span aria-hidden="true">→</span>
-        <button class="link" onclick={() => app.selectInStructure({ kind: 'node', id: edge.to })}
-          >{labelOf(edge.to)}</button
-        >
+        <button class="link" onclick={() => selectNode(edge.to)}>{labelOf(edge.to)}</button>
       </h2>
       <p class="faint">{t.structure.graph.weight(edge.weight)}</p>
       <ul class="dependencies">
@@ -126,9 +250,7 @@
     <p class="trip">
       {#each [...cycle.roundTrip, cycle.roundTrip[0]!] as member, position (position)}
         {#if position > 0}<span class="arrow" aria-hidden="true">→</span>{/if}
-        <button class="link" onclick={() => app.selectInStructure({ kind: 'node', id: member })}
-          >{labelOf(member)}</button
-        >
+        <button class="link" onclick={() => selectNode(member)}>{labelOf(member)}</button>
       {/each}
     </p>
     {#if cycle.weakest}
@@ -293,5 +415,50 @@
 
   .trip {
     line-height: 1.8;
+  }
+
+  .kind {
+    color: var(--ink-faint);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+
+  .description {
+    margin-top: 6px;
+  }
+
+  .note {
+    margin-top: 10px;
+    font-size: 12px;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 3px 14px;
+    margin: 0;
+  }
+
+  dt {
+    color: var(--ink-soft);
+  }
+
+  dd {
+    margin: 0;
+  }
+
+  .patterns dd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+
+  .metrics dt {
+    cursor: help;
+  }
+
+  .metrics dd {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 </style>

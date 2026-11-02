@@ -30,6 +30,9 @@ export type MiddleView = 'adrs' | 'graph' | 'problems'
 /** The modules of the suite the window switches between, per repository. */
 export type Module = 'decisions' | 'structure'
 
+/** What the middle of the Structure view shows of a level: the drawing, the matrix, or the metrics. */
+export type StructureShow = 'graph' | 'matrix' | 'metrics'
+
 /** What is selected in the Structure view: a node, a line, a Cycle, or one of the lists. */
 export type StructureSelection =
   | { kind: 'node'; id: string }
@@ -42,6 +45,9 @@ export type StructureSelection =
 interface StructureTab {
   parent: string | undefined
   tests: boolean
+  show: StructureShow
+  /** The Components whose rows the matrix shows expanded. */
+  expanded: string[]
   /** The level as it was last analysed; kept while it is analysed again. */
   view: StructureView | undefined
   loading: boolean
@@ -298,10 +304,18 @@ class AppState {
   async loadStructure(tab: Tab | undefined = this.active): Promise<void> {
     if (!tab) return
     const { parent, tests } = tab.structure
+    // A plain copy: what is reactive cannot be sent.
+    const expanded = [...tab.structure.expanded]
     tab.structure.loading = true
-    const result = await window.api.structureView(tab.repository.id, parent, tests)
+    const result = await window.api.structureView(tab.repository.id, parent, tests, expanded)
     // Somebody went elsewhere in the meantime: their request is the one that counts.
-    if (tab.structure.parent !== parent || tab.structure.tests !== tests) return
+    if (
+      tab.structure.parent !== parent ||
+      tab.structure.tests !== tests ||
+      tab.structure.expanded.join('\n') !== expanded.join('\n')
+    ) {
+      return
+    }
     tab.structure.loading = false
     if (!result.ok) {
       tab.structure.error = result.reason
@@ -311,6 +325,7 @@ class AppState {
     tab.structure.error = undefined
     tab.structure.view = view
     tab.structure.parent = view.parent
+    tab.structure.expanded = [...view.matrix.expanded]
     if (!stillThere(tab.structure.selection, view)) tab.structure.selection = undefined
   }
 
@@ -319,7 +334,24 @@ class AppState {
     const tab = this.active
     if (!tab) return
     tab.structure.parent = id
+    tab.structure.expanded = []
     tab.structure.selection = undefined
+    void this.loadStructure(tab)
+  }
+
+  /** Show the level as a drawing, as a matrix, or as a table of its metrics. */
+  showInStructure(show: StructureShow): void {
+    if (this.active) this.active.structure.show = show
+  }
+
+  /** Expand the row of a Component in the matrix into the rows of the level below it, or fold it back. */
+  expandInMatrix(id: string, expand: boolean): void {
+    const tab = this.active
+    if (!tab || tab.structure.expanded.includes(id) === expand) return
+    tab.structure.expanded = expand
+      ? [...tab.structure.expanded, id]
+      : // Folding a Component folds what was expanded inside it.
+        tab.structure.expanded.filter((other) => other !== id && !other.startsWith(`${id}/`))
     void this.loadStructure(tab)
   }
 
@@ -841,6 +873,8 @@ function newTab(repository: OpenRepository): Tab {
     structure: {
       parent: undefined,
       tests: false,
+      show: 'graph',
+      expanded: [],
       view: undefined,
       loading: false,
       error: undefined,
@@ -855,9 +889,15 @@ function stillThere(selection: StructureSelection | undefined, view: StructureVi
     case undefined:
       return false
     case 'node':
-      return view.nodes.some((node) => node.id === selection.id)
+      return (
+        view.nodes.some((node) => node.id === selection.id) ||
+        view.matrix.rows.some((row) => row.id === selection.id) ||
+        view.components.some((component) => component.id === selection.id)
+      )
     case 'edge':
-      return view.edges.some((edge) => edge.from === selection.from && edge.to === selection.to)
+      return [...view.edges, ...view.matrix.cells].some(
+        (edge) => edge.from === selection.from && edge.to === selection.to
+      )
     case 'cycle':
       return selection.index < view.cycles.length
     case 'not-resolved':

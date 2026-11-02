@@ -2,11 +2,21 @@ import { createHash } from 'node:crypto'
 import { watch, type FSWatcher } from 'chokidar'
 import {
   levelOf,
+  matrixOf,
+  metricsOf,
+  sizeOf,
   type DeclaredComponent,
   type Level,
+  type LevelNode,
+  type Metrics,
   type Structure
 } from '@adr-tool/structure/model'
-import type { StructureNode, StructureView } from '../shared/ipc'
+import type {
+  StructureComponent,
+  StructureNeighbour,
+  StructureNode,
+  StructureView
+} from '../shared/ipc'
 import type { Analysis } from './analysis'
 
 /** Editors, formatters and git touch many files at once; one analysis covers them all. */
@@ -51,11 +61,12 @@ export class Structures {
     repositoryId: string,
     root: string,
     parent: string | undefined,
-    tests: boolean
+    tests: boolean,
+    expanded: readonly string[] = []
   ): Promise<StructureView> {
     const entry = this.entryOf(repositoryId, root)
     const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
-    return viewOf(repositoryId, analysis, parent, tests)
+    return viewOf(repositoryId, analysis, parent, tests, expanded)
   }
 
   /** The Structure the last analysis found, to plan against. */
@@ -129,44 +140,85 @@ export class Structures {
 }
 
 /**
- * A level as the window shows it: the nodes with their names and sizes, the edges with the
- * Source File Dependencies behind them, and what the analysis found. Below a Component that
- * is no longer there, the top level.
+ * A level as the window shows it: the nodes with their names, sizes and metrics, the edges
+ * with the Source File Dependencies behind them, the matrix with the Components in
+ * `expanded` expanded, the pages of the Components that are shown, and what the analysis
+ * found. Below a Component that is no longer there, the top level.
  */
 export function viewOf(
   repositoryId: string,
   analysis: Analysis,
   parent: string | undefined,
-  tests: boolean
+  tests: boolean,
+  expanded: readonly string[] = []
 ): StructureView {
   const { structure, dependencies } = analysis
-  const level: Level =
-    levelOf(structure, dependencies.dependencies, parent, { tests }) ??
-    levelOf(structure, dependencies.dependencies, undefined, { tests })!
+  const { lineCounts } = dependencies
+  const levels = new Map<string | undefined, Level | undefined>()
+  const levelAt = (below: string | undefined): Level | undefined => {
+    if (!levels.has(below)) {
+      levels.set(below, levelOf(structure, dependencies.dependencies, below, { tests }))
+    }
+    return levels.get(below)
+  }
+  const level = levelAt(parent) ?? levelAt(undefined)!
 
   const byId = new Map<string, DeclaredComponent>()
-  const collect = (list: readonly DeclaredComponent[]): void => {
+  const parentOf = new Map<string, string | undefined>()
+  const collect = (list: readonly DeclaredComponent[], above: string | undefined): void => {
     for (const component of list) {
       byId.set(component.id, component)
-      collect(component.children)
+      parentOf.set(component.id, above)
+      collect(component.children, component.id)
     }
   }
-  collect(structure.components)
+  collect(structure.components, undefined)
+  const metrics = metricsOf(structure, dependencies.dependencies, lineCounts, { tests })
 
-  const nodes = level.nodes.map((node): StructureNode => ({
+  const nameOf = (node: Pick<LevelNode, 'kind' | 'id'>): string =>
+    node.kind === 'source-file'
+      ? node.id.slice(node.id.lastIndexOf('/') + 1)
+      : (byId.get(node.id)?.name ?? node.id)
+  const nodeOf = (node: LevelNode): StructureNode => ({
     kind: node.kind,
     id: node.id,
-    name:
-      node.kind === 'source-file'
-        ? node.id.slice(node.id.lastIndexOf('/') + 1)
-        : (byId.get(node.id)?.name ?? node.id),
-    files: node.files.length
-  }))
+    name: nameOf(node),
+    ...sizeOf(node.files, lineCounts),
+    ...(node.kind === 'component' && metrics.has(node.id) ? { metrics: metrics.get(node.id)! } : {})
+  })
+
+  const matrix = matrixOf(structure, dependencies.dependencies, level.parent, expanded, {
+    tests
+  })!
   const segments = level.parent?.split('/') ?? []
   const path = segments.map((_, index) => {
     const id = segments.slice(0, index + 1).join('/')
     return { id, name: byId.get(id)?.name ?? id }
   })
+
+  // Every Component the level or the matrix shows, expanded ones included, gets its page.
+  const shown = new Set([
+    ...level.nodes.filter((node) => node.kind === 'component').map((node) => node.id),
+    ...matrix.rows.filter((row) => row.node.kind === 'component').map((row) => row.node.id),
+    ...matrix.groups.map((group) => group.id)
+  ])
+  const testsInside = new Map<string, number>()
+  const javaInside = new Set<string>()
+  for (const file of structure.sourceFiles) {
+    const java = file.language === 'java' && (tests || !file.test)
+    for (let id = file.component; id !== undefined; id = parentOf.get(id)) {
+      if (file.test) testsInside.set(id, (testsInside.get(id) ?? 0) + 1)
+      if (java) javaInside.add(id)
+    }
+  }
+  const components = [...shown].map((id) =>
+    pageOf(byId.get(id)!, parentOf.get(id), levelAt(parentOf.get(id))!, {
+      metrics: metrics.get(id),
+      testFiles: testsInside.get(id) ?? 0,
+      java: javaInside.has(id),
+      nameOf
+    })
+  )
 
   return {
     repositoryId,
@@ -186,9 +238,64 @@ export function viewOf(
     path,
     parent: level.parent,
     tests,
-    nodes,
+    nodes: level.nodes.map(nodeOf),
     edges: level.edges,
+    cycles: level.cycles,
+    matrix: {
+      rows: matrix.rows.map((row) => ({
+        ...nodeOf(row.node),
+        depth: row.depth,
+        expandable: row.expandable
+      })),
+      groups: matrix.groups.map((group) => ({ ...group, name: byId.get(group.id)!.name })),
+      cycles: matrix.cycles,
+      cells: matrix.cells,
+      expanded: matrix.groups.map((group) => group.id)
+    },
+    components
+  }
+}
+
+/** The page of one Component: its declaration, its metrics, and its Dependencies at its level. */
+function pageOf(
+  component: DeclaredComponent,
+  parent: string | undefined,
+  level: Level,
+  found: {
+    readonly metrics: Metrics | undefined
+    readonly testFiles: number
+    readonly java: boolean
+    readonly nameOf: (node: Pick<LevelNode, 'kind' | 'id'>) => string
+  }
+): StructureComponent {
+  const kindOf = new Map(level.nodes.map((node) => [node.id, node.kind]))
+  const ref = (id: string): Pick<StructureNode, 'kind' | 'id' | 'name'> => {
+    const kind = kindOf.get(id)!
+    return { kind, id, name: found.nameOf({ kind, id }) }
+  }
+  const neighbour = (
+    id: string,
+    edge: { readonly weight: number; readonly typeOnly: boolean }
+  ): StructureNeighbour => ({ ...ref(id), weight: edge.weight, typeOnly: edge.typeOnly })
+  return {
+    id: component.id,
+    name: component.name,
+    ...(component.description === undefined ? {} : { description: component.description }),
+    paths: component.paths,
+    tests: component.tests,
+    level: parent,
+    testFiles: found.testFiles,
+    java: found.java,
+    ...(found.metrics ? { metrics: found.metrics } : {}),
+    dependsOn: level.edges
+      .filter((edge) => edge.from === component.id)
+      .map((edge) => neighbour(edge.to, edge)),
+    usedBy: level.edges
+      .filter((edge) => edge.to === component.id)
+      .map((edge) => neighbour(edge.from, edge)),
     cycles: level.cycles
+      .filter((cycle) => cycle.members.includes(component.id))
+      .map((cycle) => ({ roundTrip: cycle.roundTrip.map(ref), typeOnly: cycle.typeOnly }))
   }
 }
 

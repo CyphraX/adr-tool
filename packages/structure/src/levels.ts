@@ -101,6 +101,27 @@ export function levelOf(
           ]
   }
 
+  const edges = edgesAmong(nodes, dependencies)
+
+  const isFileLevel = nodes.some((node) => node.kind === 'source-file')
+  const cycles = findCycles(
+    // A bag of unrelated files would tie everything together.
+    nodes.filter((node) => node.kind !== 'unassigned').map((node) => node.id),
+    edges,
+    { weakest: !isFileLevel }
+  )
+  return { parent, nodes, edges, cycles }
+}
+
+/**
+ * The Dependencies between nodes that each stand for their own Source Files: weighted, with
+ * the Source File Dependencies behind them, in the order of `from`, then `to`. Those within
+ * one node are left out, and so are those of files no node stands for.
+ */
+export function edgesAmong(
+  nodes: readonly Pick<LevelNode, 'id' | 'files'>[],
+  dependencies: readonly Dependency[]
+): LevelEdge[] {
   const nodeOf = new Map<string, string>()
   for (const node of nodes) for (const file of node.files) nodeOf.set(file, node.id)
   const behind = new Map<string, { from: string; to: string; dependencies: Dependency[] }>()
@@ -113,7 +134,7 @@ export function levelOf(
     edge.dependencies.push(dependency)
     behind.set(key, edge)
   }
-  const edges = [...behind.values()]
+  return [...behind.values()]
     .map(({ from, to, dependencies: list }): LevelEdge => ({
       from,
       to,
@@ -122,15 +143,6 @@ export function levelOf(
       dependencies: list
     }))
     .sort((a, b) => compare(a.from, b.from) || compare(a.to, b.to))
-
-  const isFileLevel = nodes.some((node) => node.kind === 'source-file')
-  const cycles = findCycles(
-    // A bag of unrelated files would tie everything together.
-    nodes.filter((node) => node.kind !== 'unassigned').map((node) => node.id),
-    edges,
-    { weakest: !isFileLevel }
-  )
-  return { parent, nodes, edges, cycles }
 }
 
 function find(components: readonly DeclaredComponent[], id: string): DeclaredComponent | undefined {

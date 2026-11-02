@@ -74,8 +74,12 @@ export function findCycles(
     .sort((a, b) => compare(a.members[0]!, b.members[0]!))
 }
 
-/** Tarjan's algorithm, without recursion: a level of Source Files can be thousands deep. */
-function stronglyConnected(
+/**
+ * The strongly connected groups of a graph, single nodes included, by Tarjan's algorithm —
+ * without recursion: a level of Source Files can be thousands deep. A group comes after every
+ * group it reaches.
+ */
+export function stronglyConnected(
   nodes: readonly string[],
   successors: ReadonlyMap<string, readonly string[]>
 ): string[][] {

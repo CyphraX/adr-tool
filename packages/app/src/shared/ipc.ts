@@ -10,6 +10,8 @@ import type {
 import type {
   Cycle,
   Dependency,
+  MatrixCycle,
+  Metrics,
   NotAnalysed,
   NotResolved,
   StructureProblem
@@ -141,6 +143,10 @@ export interface StructureNode {
   readonly name: string
   /** How many Source Files it stands for. */
   readonly files: number
+  /** The lines of those files. */
+  readonly lines: number
+  /** A Component's metrics (section 5). The other nodes have a size and nothing else. */
+  readonly metrics?: Metrics
 }
 
 /** The Dependencies from one node of a level to another, and the Source File Dependencies behind them. */
@@ -150,6 +156,70 @@ export interface StructureEdge {
   readonly weight: number
   readonly typeOnly: boolean
   readonly dependencies: readonly Dependency[]
+}
+
+/** A row of the matrix: a node of the level, or of a level below a Component expanded around it. */
+export interface StructureRow extends StructureNode {
+  /** 0 on the level itself, one more for each Component expanded around it. */
+  readonly depth: number
+  /** A Component that contains Source Files: its row can be expanded. */
+  readonly expandable: boolean
+}
+
+/**
+ * The dependency structure matrix of the level (section 5): rows in its order, row i and
+ * column i the same node. A cell is the Dependency of its row on its column.
+ */
+export interface StructureMatrix {
+  readonly rows: readonly StructureRow[]
+  /** The Components expanded, each over the rows from `first` to `last`; the outer first. */
+  readonly groups: readonly {
+    readonly id: string
+    readonly name: string
+    readonly depth: number
+    readonly first: number
+    readonly last: number
+  }[]
+  /** The rows the members of each Cycle take up, at whatever level; the outer first. */
+  readonly cycles: readonly MatrixCycle[]
+  /** The cells that hold something. */
+  readonly cells: readonly StructureEdge[]
+  /** The Components that are expanded: those asked for that are still there. */
+  readonly expanded: readonly string[]
+}
+
+/** A node at the level of a Component, and the Dependency between the two. */
+export interface StructureNeighbour {
+  readonly kind: StructureNode['kind']
+  readonly id: string
+  readonly name: string
+  readonly weight: number
+  readonly typeOnly: boolean
+}
+
+/** What the Component page shows of one Component: the declaration, the metrics, the Dependencies. */
+export interface StructureComponent {
+  readonly id: string
+  readonly name: string
+  readonly description?: string
+  readonly paths: readonly string[]
+  readonly tests: readonly string[]
+  /** The Component whose children it is one of; `undefined` at the top. */
+  readonly level: string | undefined
+  /** The test files it contains, counted or not. */
+  readonly testFiles: number
+  /** It contains Java that is counted: its metrics are a lower bound. */
+  readonly java: boolean
+  /** `undefined` when it contains no Source File. */
+  readonly metrics?: Metrics
+  /** At its own level: what it depends on, and what depends on it. */
+  readonly dependsOn: readonly StructureNeighbour[]
+  readonly usedBy: readonly StructureNeighbour[]
+  /** The Cycles at its own level that it is a member of, each by its example round trip. */
+  readonly cycles: readonly {
+    readonly roundTrip: readonly Pick<StructureNode, 'kind' | 'id' | 'name'>[]
+    readonly typeOnly: boolean
+  }[]
 }
 
 /**
@@ -186,6 +256,9 @@ export interface StructureView {
   readonly nodes: readonly StructureNode[]
   readonly edges: readonly StructureEdge[]
   readonly cycles: readonly Cycle[]
+  readonly matrix: StructureMatrix
+  /** The Components the level and the matrix show, for their pages. */
+  readonly components: readonly StructureComponent[]
 }
 
 export type StructureResult =
@@ -251,7 +324,9 @@ export interface Api {
   structureView(
     repositoryId: string,
     parent: string | undefined,
-    tests: boolean
+    tests: boolean,
+    /** The Components whose rows the matrix shows expanded. */
+    expanded: readonly string[]
   ): Promise<StructureResult>
   /** Called when the analysis of a repository changed: files changed, or a change was applied. */
   onStructureChanged(listener: (repositoryId: string) => void): () => void

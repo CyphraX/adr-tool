@@ -187,16 +187,21 @@ function registerIpc(): void {
 
   ipcMain.handle(
     CHANNEL.structureView,
-    async (_, repositoryId: unknown, parent: unknown, tests: unknown) => {
+    async (_, repositoryId: unknown, parent: unknown, tests: unknown, expanded: unknown) => {
       const valid =
         typeof repositoryId === 'string' &&
         (parent === undefined || typeof parent === 'string') &&
-        typeof tests === 'boolean'
+        typeof tests === 'boolean' &&
+        Array.isArray(expanded) &&
+        expanded.every((id) => typeof id === 'string')
       if (!valid) return { ok: false, reason: t.notUnderstood }
       const root = repositories.rootOf(repositoryId)
       if (root === undefined) return { ok: false, reason: t.repositoryClosed }
       try {
-        return { ok: true, view: await structures.view(repositoryId, root, parent, tests) }
+        return {
+          ok: true,
+          view: await structures.view(repositoryId, root, parent, tests, expanded as string[])
+        }
       } catch (error) {
         return { ok: false, reason: t.analysisFailed(String(error)) }
       }
