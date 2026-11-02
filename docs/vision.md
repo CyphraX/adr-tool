@@ -142,11 +142,12 @@ Architecture evaluation: a qualitative judgement, backed by what the other modul
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | ADRs, Templates, Component declarations, Rules, applied Patterns, Diagrams, Annotations, Assessments, Quality Scenarios, Findings, Risks, Technical Debt Items | code model, Dependencies, metrics, Cycles, Violations, Drift, history figures, Problems |
 
-Derived data enters the repository in exactly three places, each deliberately:
+Derived data enters the repository in exactly four places, each deliberately:
 
 1. an **Exception** — a declaration that names a Violation by its fingerprint;
 2. the **Baseline** — a set of Violation fingerprints;
-3. the **Snapshot** inside an Assessment — frozen metric values kept as evidence.
+3. the **Snapshot** inside an Assessment — frozen metric values kept as evidence;
+4. the **SVG of a Diagram** — its picture, committed beside it so that GitHub shows it and documents can embed it.
 
 ## On disk, in a user's repository
 
