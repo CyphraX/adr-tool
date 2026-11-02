@@ -45,8 +45,40 @@ const SAME_IN_GERMAN = new Set([
   'Fan-out'
 ])
 
+/** Arguments to try a text that is a function with: a name or a count, a list, an object. */
+const SAMPLES: unknown[] = ['2026-03-01', 3, ['a.md', 'b.md'], { id: '0042', title: 'T' }]
+
+/** What a text that is a function says, with the first sample arguments it takes. */
+function sampled(text: (...values: unknown[]) => unknown, other: unknown): [unknown, unknown] {
+  for (const sample of SAMPLES) {
+    const values = Array.from({ length: Math.max(1, text.length) }, () => sample)
+    try {
+      const said = text(...values)
+      if (typeof said !== 'string' || said === '' || said.includes('undefined')) continue
+      return [said, (other as (...values: unknown[]) => unknown)(...values)]
+    } catch {
+      // Not this kind of value: the next sample.
+    }
+  }
+  return [undefined, undefined]
+}
+
+/** Texts with a value in them that German writes as English does, by where they stand. */
+const SAME_AT = new Set([
+  'dashboard.total',
+  'dashboard.adrCount',
+  'structure.graph.directory',
+  'structure.value',
+  'structure.page.filesIn'
+])
+
 /** Every text of `english` that `german` says the same, by where it stands. */
 function untranslated(english: unknown, german: unknown, at = ''): string[] {
+  if (typeof english === 'function') {
+    if (SAME_AT.has(at)) return []
+    const [said, other] = sampled(english as (...values: unknown[]) => unknown, german)
+    return untranslated(said, other, at)
+  }
   if (typeof english === 'string') {
     return english === german && !SAME_IN_GERMAN.has(english) ? [`${at}: ${english}`] : []
   }

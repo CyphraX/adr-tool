@@ -14,24 +14,31 @@ type Sentence = (values: unknown) => string
  * says of another is a code of its own module.
  */
 function some(detail: Said): Record<string, unknown> {
+  // Each value stands out in the sentence, so that a sentence that drops one is seen to.
   const known: Record<string, unknown> = {
     format: 'madr-2',
     type: 'amends',
-    number: 7,
-    added: 13,
-    removed: 2,
-    numbers: ['20', '200'],
-    keeps: ['Proposed', 'Clarifies [2. B](0002-b.md)'],
-    files: ['src/a.ts', 'src/b.ts'],
-    reasons: [{ code: 'waits-for-successor', values: { adr: '0001-a', successor: '0002-b' } }],
-    why: { code: 'successor-in-status-text', values: {} },
+    number: 731,
+    added: 913,
+    removed: 482,
+    numbers: ['417', '4170'],
+    keeps: ['‹keep-1›', '‹keep-2›'],
+    files: ['src/‹file-1›.ts', 'src/‹file-2›.ts'],
+    reasons: [
+      { code: 'waits-for-successor', values: { adr: '‹reason›', successor: '‹successor›' } }
+    ],
+    why: { code: 'not-a-list', values: { key: '‹why-key›' } },
     detail
   }
   return new Proxy(known, { get: (values, key: string) => values[key] ?? `‹${key}›` })
 }
 
 const MODULES = [
-  { name: 'core', sentences: SENTENCES, detail: { code: 'expected-list', values: {} } },
+  {
+    name: 'core',
+    sentences: SENTENCES,
+    detail: { code: 'not-a-date', values: { value: '‹detail-value›' } }
+  },
   {
     name: 'structure',
     sentences: STRUCTURE_SENTENCES,
@@ -61,10 +68,10 @@ describe('German', () => {
         const german = (DE as unknown as Record<string, Sentence>)[code]!(values)
         expect(german, code).not.toBe((english as Sentence)(values))
         expect(german, code).not.toMatch(/undefined|\[object Object\]|‹(format|type|why|detail)›/)
-        // A value the English sentence names, the German one names too.
-        for (const value of (english as Sentence)(values).match(/‹\w+›/g) ?? []) {
-          expect(german, `${code}: ${value}`).toContain(value)
-        }
+        // A value the English sentence names, the German one names too: every marked value,
+        // every number, and the name of a format.
+        const named = (english as Sentence)(values).match(/‹[\w-]+›|\b\d{3,}\b|MADR 2/g) ?? []
+        for (const value of named) expect(german, `${code}: ${value}`).toContain(value)
       }
     }
   })

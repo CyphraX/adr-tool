@@ -43,13 +43,16 @@ const SEGMENT_RULE =
 
 /** The start every refusal to write a foreign file shares. */
 const foreign = (v: { adr: string; format: ForeignFormat }): string =>
-  `${v.adr} ist im Format von ${FORMAT[v.format]} geschrieben. Das Tool liest dieses Format und schreibt es nie.`
+  `${v.adr} ist im Format von ${FORMAT[v.format]} geschrieben. Das Werkzeug liest dieses Format und schreibt es nie.`
 
 /** What keeps a section in the text: `„Proposed“, „Clarifies […](…)“`. */
 const quoted = (what: readonly string[]): string => what.map((one) => `„${one}“`).join(', ')
 
 /** The Status as a sentence names it: one of the five values, or what is written, in quotes. */
-const has = (v: { adr: string; is: string }): string => `${v.adr} hat den Status ${v.is}.`
+/** A Status that is none of the five values comes in English quotes; German quotes it its own way. */
+const germanQuotes = (is: string): string => is.replace(/^"(.*)"$/s, '„$1“')
+const has = (v: { adr: string; is: string }): string =>
+  `${v.adr} hat den Status ${germanQuotes(v.is)}.`
 
 /** What another sentence said, inside this one; a plain text is passed on as it is. */
 const german = (said: Said | string): string =>
@@ -68,7 +71,7 @@ export const DE: Wording<Codes> = {
   'target-not-in-repository': (v) =>
     `${v.adr} ${RELATES[v.type]} ${v.target}, aber ${v.target} ist kein ADR dieses Repositorys.`,
   'frontmatter-unreadable': (v) =>
-    `Das Frontmatter von ${v.adr} kann nicht gelesen werden. Es muss korrigiert werden, bevor das Tool hineinschreiben kann.`,
+    `Das Frontmatter von ${v.adr} kann nicht gelesen werden. Es muss korrigiert werden, bevor das Werkzeug hineinschreiben kann.`,
 
   // A foreign format is read and never written.
   'foreign-format': (v) => `${foreign(v)} Es muss zuerst migriert werden.`,
@@ -162,7 +165,7 @@ export const DE: Wording<Codes> = {
   'successor-not-in-log': (v) =>
     `${v.adr} nennt „${v.successor}“ als seinen Nachfolger, aber das ist kein ADR dieses Decision Logs. Es wird geschrieben, wie es dasteht, und bleibt ein Problem.`,
   'listed-status-stays': (v) =>
-    `Der Status von ${v.adr} bleibt in der Liste unter seinem Titel: Das Tool kennt „${v.status}“ nicht.`,
+    `Der Status von ${v.adr} bleibt in der Liste unter seinem Titel: Das Werkzeug kennt „${v.status}“ nicht.`,
   'listed-twice': (v) =>
     `Die Liste unter dem Titel von ${v.adr} nennt ${v.item} zweimal: Beide Einträge bleiben in seinem Text.`,
   'links-section-stays': (v) =>
@@ -185,11 +188,11 @@ export const DE: Wording<Codes> = {
   // Metadata the tool must not write into.
   'not-single-value': (v) => `„${v.key}“ ist kein einzelner Wert`,
   'block-scalar': (v) =>
-    `„${v.key}“ ist als Block über mehrere Zeilen geschrieben, den das Tool nicht an Ort und Stelle ändern kann. Der Wert muss in einem Editor auf eine Zeile geschrieben werden.`,
+    `„${v.key}“ ist als Block über mehrere Zeilen geschrieben, den das Werkzeug nicht an Ort und Stelle ändern kann. Der Wert muss in einem Editor auf eine Zeile geschrieben werden.`,
   'not-a-list': (v) => `„${v.key}“ ist keine Liste`,
   'empty-block-list': (v) => `„${v.key}“ ist eine leere Blockliste`,
   'item-by-hand': (v) =>
-    `„${v.key}“ ist so geschrieben, dass das Tool keinen Eintrag herausnehmen kann. „${v.item}“ muss in einem Editor entfernt werden.`,
+    `„${v.key}“ ist so geschrieben, dass das Werkzeug keinen Eintrag herausnehmen kann. „${v.item}“ muss in einem Editor entfernt werden.`,
   'key-taken': (v) => `„${v.key}“ ist bereits vorhanden`,
   'frontmatter-never-closed': () => 'Das Frontmatter wird nie geschlossen',
   'frontmatter-not-yaml': (v) => `Das Frontmatter ist kein gültiges YAML: ${v.message}`,

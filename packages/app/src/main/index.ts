@@ -352,6 +352,9 @@ function registerIpc(): void {
     if (isLanguage(language)) setLanguage(language)
   })
 
+  // A reload from the page is a navigation, which the window refuses (`will-navigate` below).
+  ipcMain.handle(CHANNEL.reloadWindow, (event) => event.sender.reload())
+
   ipcMain.handle(CHANNEL.setUnsaved, (event, holdsText: unknown) => {
     if (holdsText === true) unsaved.add(event.sender.id)
     else unsaved.delete(event.sender.id)
