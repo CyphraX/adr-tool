@@ -122,7 +122,7 @@ export const de: typeof en = {
   },
 
   repositoryProblems: {
-    entry: 'Probleme des Repositorys',
+    entry: 'Repository-Probleme',
     entryHint:
       'Alle Probleme dieses Repositorys in einer Liste: seiner Decision Logs, der Deklaration seiner Komponenten und der Traces dazwischen',
     counting:

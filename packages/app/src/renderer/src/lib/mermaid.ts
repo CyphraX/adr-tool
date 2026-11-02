@@ -164,6 +164,8 @@ export function mermaidSaid(error: unknown): string {
   const said = [...new Set([lines[0], lines.length > 1 ? lines.at(-1) : undefined])]
     .filter(Boolean)
     .join(' ')
+    // What the parser expected can be a list of twenty tokens: the first few say enough.
+    .replace(/(Expecting (?:'[^']*', ){4})(?:'[^']*', )+/, '$1…, ')
   return said.length > SAID_AT_MOST ? `${said.slice(0, SAID_AT_MOST - 1)}…` : said
 }
 

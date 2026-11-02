@@ -111,6 +111,11 @@ describe('a block that cannot be drawn', () => {
     expect(mermaidSaid('No diagram type detected matching given configuration for text: x')).toBe(
       'No diagram type detected matching given configuration for text: x'
     )
+    expect(
+      mermaidSaid(
+        "Parse error on line 2:\n...b(\n---^\nExpecting 'SQE', 'PE', '-)', 'PIPE', 'TEXT', 'TAGSTART', got 'PS'"
+      )
+    ).toBe("Parse error on line 2: Expecting 'SQE', 'PE', '-)', 'PIPE', …, got 'PS'")
     expect(mermaidSaid(new Error('x'.repeat(400)))).toHaveLength(300)
   })
 })

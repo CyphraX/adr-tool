@@ -173,7 +173,7 @@ export const en = {
   /** Every Problem of the repository in front, of every module (docs/plan-vision.md, part 2). */
   repositoryProblems: {
     /** The row in the sidebar of every module that leads there. */
-    entry: 'Problems of the repository',
+    entry: 'Repository Problems',
     entryHint:
       'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, and of the Traces between them',
     counting: 'Structure is still analysing the code: its Problems are counted once it is done.',
