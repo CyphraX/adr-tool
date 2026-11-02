@@ -87,12 +87,10 @@ describe('The branches git has besides the one checked out', () => {
     const branches = await gitIn(root).branches()
     // `done` is merged into main: it does nothing main has not.
     expect(branches).toEqual([
-      {
-        names: ['feature/kafka', 'origin/feature/kafka'],
-        sha: kafka,
-        date: '2026-03-02T12:00:00+00:00'
-      }
+      { names: ['feature/kafka', 'origin/feature/kafka'], sha: kafka, date: expect.any(String) }
     ])
+    // ISO 8601; how UTC is written depends on git's version.
+    expect(Date.parse(branches![0]!.date)).toBe(Date.parse('2026-03-02T12:00:00Z'))
   })
 
   it('reads a directory of a commit tree by tree, and blobs by their size first', async () => {
