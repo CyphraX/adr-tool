@@ -41,7 +41,7 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
 
   // The packages of the workspace are the top level.
   const top = structure.components.map((component) => component.id)
-  expect(top).toEqual(['app', 'core', 'kernel', 'structure'])
+  expect(top).toEqual(['app', 'cli', 'core', 'kernel', 'structure'])
   expect(structure.components.find((component) => component.id === 'core')!.paths).toEqual([
     'packages/core/**'
   ])
@@ -130,6 +130,8 @@ it('finds the Dependency from app to core, and the Source File Dependencies behi
   expect(
     edges.filter((edge) => /^(?:core > structure|structure > core|kernel > )/.test(edge))
   ).toEqual([])
+  // The command line composes both cores, as the app does.
+  expect(edges).toEqual(expect.arrayContaining(['cli > core', 'cli > structure']))
   expect(top.cycles).toEqual([])
 
   const behind = top.edges.find((edge) => edge.from === 'app' && edge.to === 'core')!

@@ -8,11 +8,11 @@ export function adrsOf(problem: Problem): readonly string[] {
 /** A Problem as one ADR shows it. */
 export interface ReportedProblem {
   problem: Problem
-  /** The ADR whose unreadable frontmatter is the only reason this is reported. */
-  cause?: string
+  /** The root cause on another ADR that is the only reason this is reported, and that ADR. */
+  cause?: { readonly adr: string; readonly problem: Problem }
 }
 
-/** The Problems reported on this ADR. What merely follows from another ADR's broken file says so. */
+/** The Problems reported on this ADR. What merely follows from another ADR's root cause says so. */
 export function problemsOf(groups: readonly ProblemGroup[], id: string): ReportedProblem[] {
   return groups.flatMap(({ problem, consequences }) => {
     const [cause] = adrsOf(problem)
@@ -20,7 +20,10 @@ export function problemsOf(groups: readonly ProblemGroup[], id: string): Reporte
       ...(adrsOf(problem).includes(id) ? [{ problem }] : []),
       ...consequences
         .filter((consequence) => cause !== id && adrsOf(consequence).includes(id))
-        .map((consequence) => ({ problem: consequence, ...(cause !== undefined && { cause }) }))
+        .map((consequence) => ({
+          problem: consequence,
+          ...(cause !== undefined && { cause: { adr: cause, problem } })
+        }))
     ]
   })
 }

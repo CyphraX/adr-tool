@@ -4,8 +4,8 @@
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import {
-    CONSEQUENCES_LEAD,
     NO_REPAIR,
+    describeConsequences,
     describeProblem,
     noRepairIn,
     prefixOf,
@@ -80,7 +80,7 @@
 
           {#if consequences.length > 0}
             <div class="consequences">
-              <p>{CONSEQUENCES_LEAD}</p>
+              <p>{describeConsequences(problem)}</p>
               <ul>
                 {#each consequences as consequence, index (index)}
                   <li>

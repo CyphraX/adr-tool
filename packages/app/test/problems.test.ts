@@ -28,9 +28,12 @@ describe('the Problems one ADR shows', () => {
     expect(adrsOf(groups[2]!.problem)).toEqual([])
   })
 
-  it('name the broken file that a Problem merely follows from', () => {
+  it('name the root cause on another ADR that a Problem merely follows from', () => {
     expect(problemsOf(groups, '0001-old')).toEqual([
-      { problem: groups[0]!.consequences[1], cause: '0002-new' }
+      {
+        problem: groups[0]!.consequences[1],
+        cause: { adr: '0002-new', problem: groups[0]!.problem }
+      }
     ])
   })
 

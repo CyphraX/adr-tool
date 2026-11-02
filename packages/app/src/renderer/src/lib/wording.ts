@@ -6,7 +6,6 @@ import {
   type DecisionLog,
   type FileChange,
   type ForeignFormat,
-  type Problem,
   type Relation,
   type RelationType,
   type Repair,
@@ -153,46 +152,5 @@ export function noRepairIn(adr: Adr): string {
 export const NO_REPAIR =
   'The tool cannot know what was meant here. Fix the frontmatter of the file in an editor; the view follows.'
 
-/** Above the Problems that are listed under an ADR whose frontmatter cannot be read. */
-export const CONSEQUENCES_LEAD =
-  'Reported only because this file cannot be read. Fix its frontmatter first, then look again: some of this may turn out to be real.'
-
-/** Next to a Problem on one ADR that is only reported because of another ADR's broken file. */
-export function describeCause(cause: string): string {
-  return `Reported only because the frontmatter of ${cause} cannot be read.`
-}
-
-export function describeProblem(problem: Problem): string {
-  switch (problem.kind) {
-    case 'unterminated-frontmatter':
-      return 'The frontmatter opens with --- and is never closed. Metadata cannot be read or written until that is fixed.'
-    case 'invalid-frontmatter':
-      return `The frontmatter cannot be read: ${problem.detail}`
-    case 'invalid-metadata':
-      return `${problem.key}: ${problem.detail}`
-    case 'status-not-lowercase':
-      return `The Status is written "${problem.written}". It has to be lowercase.`
-    case 'unknown-target':
-      return `${problem.key} names ${problem.target}, which is not in this Decision Log.`
-    case 'self-reference':
-      return `${problem.key} names this ADR itself.`
-    case 'unknown-component':
-      return `affects names ${problem.component}, which is not a declared Component.`
-    case 'missing-back-reference':
-      return `${problem.source} has been accepted and points here, but ${problem.key} does not list it.`
-    case 'unfounded-back-reference':
-      return `${problem.key} lists ${problem.source}, which has no such Relation in effect.`
-    case 'not-marked-superseded':
-      return `${problem.source} has been accepted and supersedes this ADR, but its Status is not superseded.`
-    case 'superseded-without-successor':
-      return 'The Status is superseded, but no accepted ADR supersedes this one.'
-    case 'supersedes-cycle':
-      return `These ADRs supersede each other in a circle: ${problem.adrs.join(', ')}.`
-    case 'duplicate-number':
-      return `Number ${problem.number} is used by ${problem.adrs.join(' and ')}.`
-    case 'invalid-configuration':
-      return `${problem.path} cannot be used: ${problem.detail}`
-    case 'missing-log-directory':
-      return `The configured directory ${problem.path} does not exist.`
-  }
-}
+// What a Problem says is the same in the window and on the command line: `core` words it.
+export { describeCause, describeConsequences, describeProblem } from '@adr-tool/core'
