@@ -18,6 +18,12 @@ export interface Dependency {
   readonly typeOnly: boolean
   /** The lines of `from` on which its uses of `to` begin, in order. */
   readonly lines: readonly number[]
+  /**
+   * Of a Dependency that is not type-only as a whole: those of its lines on which every use of
+   * `to` is type-only, in order — what a Rule that ignores type-only uses leaves out. Absent
+   * where there is none.
+   */
+  readonly typeOnlyLines?: readonly number[]
 }
 
 /** A use whose target cannot be determined. It is neither a Dependency nor the use of a Library. */
@@ -97,7 +103,17 @@ export async function analyseDependencies(
     )
   }
 
-  const pairs = new Map<string, { from: string; to: string; typeOnly: boolean; lines: number[] }>()
+  const pairs = new Map<
+    string,
+    {
+      from: string
+      to: string
+      typeOnly: boolean
+      lines: number[]
+      /** Per line: whether every use that begins on it is type-only. */
+      typed: Map<number, boolean>
+    }
+  >()
   const notResolved: NotResolved[] = []
   const libraries: LibraryUse[] = []
   const notAnalysed: NotAnalysed[] = []
@@ -105,10 +121,12 @@ export async function analyseDependencies(
   const depend = (from: string, to: string, typeOnly: boolean, line: number): void => {
     const key = `${from}\n${to}`
     const pair = pairs.get(key)
-    if (pair === undefined) pairs.set(key, { from, to, typeOnly, lines: [line] })
-    else {
+    if (pair === undefined) {
+      pairs.set(key, { from, to, typeOnly, lines: [line], typed: new Map([[line, typeOnly]]) })
+    } else {
       pair.typeOnly &&= typeOnly
       if (!pair.lines.includes(line)) pair.lines.push(line)
+      pair.typed.set(line, (pair.typed.get(line) ?? true) && typeOnly)
     }
   }
 
@@ -160,8 +178,12 @@ export async function analyseDependencies(
   notResolved.push(...resolved.notResolved)
   libraries.push(...resolved.libraries)
 
-  const dependencies = [...pairs.values()]
-    .map((pair) => ({ ...pair, lines: [...pair.lines].sort((a, b) => a - b) }))
+  const dependencies: Dependency[] = [...pairs.values()]
+    .map(({ typed, ...pair }) => {
+      const lines = [...pair.lines].sort((a, b) => a - b)
+      const typeOnlyLines = pair.typeOnly ? [] : lines.filter((line) => typed.get(line))
+      return { ...pair, lines, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
+    })
     .sort((a, b) => byPath(a.from, b.from) || byPath(a.to, b.to))
   return { dependencies, notResolved, libraries, notAnalysed, lineCounts }
 }

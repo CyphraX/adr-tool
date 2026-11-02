@@ -116,13 +116,25 @@ interface Parted {
   readonly common: string | undefined
 }
 
+/**
+ * A Dependency as a Rule that ignores type-only uses sees it: without the lines on which every
+ * use is type-only, so that no annotation stands on an import the Rule does not count.
+ */
+function counted(rule: Rule, dependency: Dependency): Dependency {
+  const typed = dependency.typeOnlyLines
+  if (!rule.ignoreTypeOnly || typed === undefined) return dependency
+  const { from, to, typeOnly } = dependency
+  return { from, to, typeOnly, lines: dependency.lines.filter((line) => !typed.includes(line)) }
+}
+
 /** The Dependencies a Rule counts — test files and type-only ones as it says — where they stand. */
 function parted(rule: Rule, model: Model): Parted[] {
   const { ofFile, test } = chains(model.structure)
   const result: Parted[] = []
-  for (const dependency of model.dependencies) {
-    if (!rule.tests && (test.has(dependency.from) || test.has(dependency.to))) continue
-    if (rule.ignoreTypeOnly && dependency.typeOnly) continue
+  for (const written of model.dependencies) {
+    if (!rule.tests && (test.has(written.from) || test.has(written.to))) continue
+    if (rule.ignoreTypeOnly && written.typeOnly) continue
+    const dependency = counted(rule, written)
     const from = ofFile.get(dependency.from)
     const to = ofFile.get(dependency.to)
     if (from === undefined || to === undefined) continue

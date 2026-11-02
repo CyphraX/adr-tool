@@ -62,7 +62,7 @@ A file without any of them, or an empty file, has no Rules. A repository without
 | `why`  | one sentence, required         | Why the Rule holds, in the architect's words. Every message about a Violation of the Rule carries it. |
 | `kind` | one of the kinds of section 2, required | What the Rule says. |
 | `tests` | `excluded` (default) or `included` | Whether test files count (structure-format.md, section 2, "Tests"). As in Structure's views, Cycles and metrics, they are left out unless the Rule takes them in. |
-| `type-only` | `counted` (default) or `ignored` | Whether type-only Dependencies count (structure-format.md, section 3). They count, as in Structure's metrics: a type couples code at compile time too. A Rule that is only about run time ignores them. Not for `threshold`, whose metric says what it counts. |
+| `type-only` | `counted` (default) or `ignored` | Whether type-only Dependencies count (structure-format.md, section 3). They count, as in Structure's metrics: a type couples code at compile time too. A Rule that is only about run time ignores them: then a Dependency that is type-only as a whole is not counted, and of one that is not, the lines whose every use is type-only are not pointed at. Not for `threshold`, whose metric says what it counts. |
 
 `tests` and `type-only` are read for every kind that counts Dependencies: `must-not-depend`, `may-only-depend`, `layers` and `no-cycles`. `tests` is read for `threshold` too.
 

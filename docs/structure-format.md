@@ -144,7 +144,7 @@ A Source File that cannot be parsed is **not analysed**: it stays in the model, 
 
 A **Dependency** is directed, from the Source File that uses to the Source File that is used, both inside the repository. Several uses between the same two files are one Dependency. A file never depends on itself.
 
-A Dependency is **type-only** when it exists for the compiler only and is gone at run time. It is type-only only if every use between the two files is.
+A Dependency is **type-only** when it exists for the compiler only and is gone at run time. It is type-only only if every use between the two files is. Of a Dependency that is not, each line of its imports is known to be type-only or not — type-only where every use that begins on it is — so that what counts only the uses at run time (a Rule of Conformance with `type-only: ignored`) points at no line that is about types alone.
 
 A use whose target cannot be determined is **not resolved**: it is counted and listed, and it is neither a Dependency nor the use of a Library. The suite never guesses.
 

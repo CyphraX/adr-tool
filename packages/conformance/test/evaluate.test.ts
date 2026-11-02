@@ -9,6 +9,45 @@ const rule = (id: string, ...lines: string[]): string[] => [
 ]
 const rules = (...items: string[][]): string => yaml('rules:', ...items.flat())
 
+describe('type-only (docs/conformance-format.md, section 1)', () => {
+  // The review's probe: a type-only import and a value import of one file, on lines of their own.
+  const files = {
+    '.arch/components.yml':
+      'components:\n  a:\n    paths: [src/a/**]\n  b:\n    paths: [src/b/**]\n',
+    'src/a/a.ts': [
+      '// header',
+      "import type { T } from '../b/b'",
+      'import {',
+      '  b,',
+      "} from '../b/b'",
+      "export { c } from '../b/c'",
+      ''
+    ].join('\n'),
+    'src/b/b.ts': 'export const b = 1; export type T = number\n',
+    'src/b/c.ts': 'export const c = 1\n'
+  }
+  const lines = (report: Awaited<ReturnType<typeof checked>>) =>
+    report.violations.flatMap((violation) =>
+      violation.dependencies.map((one) => `${one.from}:${one.lines} ${one.to}`)
+    )
+
+  it('counts the lines of type-only uses by default', async () => {
+    const report = await checked(
+      files,
+      rules(rule('a-not-b', 'kind: must-not-depend', 'from: a', 'to: b'))
+    )
+    expect(lines(report)).toEqual(['src/a/a.ts:2,3 src/b/b.ts', 'src/a/a.ts:6 src/b/c.ts'])
+  })
+
+  it('leaves out the lines of type-only uses where the Rule ignores them', async () => {
+    const report = await checked(
+      files,
+      rules(rule('a-not-b', 'kind: must-not-depend', 'type-only: ignored', 'from: a', 'to: b'))
+    )
+    expect(lines(report)).toEqual(['src/a/a.ts:3 src/b/b.ts', 'src/a/a.ts:6 src/b/c.ts'])
+  })
+})
+
 describe('must-not-depend (docs/conformance-format.md, section 2)', () => {
   it('finds a Dependency from one Component to another, with the imports behind it', async () => {
     const report = await checked(

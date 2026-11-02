@@ -170,7 +170,7 @@ it('computes the metrics of this repository as their definitions say', async () 
   // of the scale.
   expect(metrics.get('kernel')!.instability).toBe(0)
   expect(metrics.get('app')!.instability).toBe(1)
-  // It uses the cores of both modules and the export of the command line, and reaches the
-  // kernel only through them.
-  expect(metrics.get('app')).toMatchObject({ fanOut: 3, fanIn: 0 })
+  // It uses the cores of the three modules and the export of the command line, and reaches
+  // the kernel only through them.
+  expect(metrics.get('app')).toMatchObject({ fanOut: 4, fanIn: 0 })
 })
