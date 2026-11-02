@@ -10,6 +10,11 @@ import '@fontsource/ibm-plex-mono/400.css'
 import './main.css'
 
 import App from './App.svelte'
+import { language } from './lib/language'
+
+// What the main process says is said in the language of the window too.
+document.documentElement.lang = language
+void window.api.setLanguage(language)
 
 const app = mount(App, {
   target: document.getElementById('app')!

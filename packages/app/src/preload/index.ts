@@ -55,6 +55,7 @@ const api: Api = {
   planRename: (repositoryId, component, segment) =>
     ipcRenderer.invoke(CHANNEL.planRename, repositoryId, component, segment),
   setUnsaved: (unsaved) => ipcRenderer.invoke(CHANNEL.setUnsaved, unsaved),
+  setLanguage: (language) => ipcRenderer.invoke(CHANNEL.setLanguage, language),
   onCloseRequested: (listener) => {
     const handler = (): void => listener()
     ipcRenderer.on(CHANNEL.closeRequested, handler)
