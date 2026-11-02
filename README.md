@@ -37,13 +37,17 @@ ADR_TOOL_REPO="$PWD/packages/structure/test/fixtures/shop" pnpm dev
 
 ![The Structure view of this repository: its packages, app selected with what it depends on](docs/screenshots/s3-structure.png)
 
+Above the drawing, **Matrix** shows the same level as a dependency structure matrix — a row's numbers are its Dependencies on the columns, and what lies above the diagonal closes a Cycle; a Component's row expands into its parts — and **Metrics** as a table of size, coupling, instability, cohesion and internal share, each with its definition on the heading. A selected Component shows its page on the right.
+
+![The metrics of this repository's packages, and the page of structure](docs/screenshots/s5-metrics.png)
+
 `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm build` are what CI runs, on Linux for now; Windows and macOS are switched off until distribution (see [roadmap.md](docs/roadmap.md)).
 
 ## Layout
 
 - `packages/kernel` — what every module of the suite needs and none of them owns: the file-system port, splice edits and change sets ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)).
 - `packages/core` — the domain core of the Decisions module in pure TypeScript. No Electron, no DOM, no disk access of its own; its type check fails if it reaches for any of them.
-- `packages/structure` — the core of the Structure module, under the same guard: Components, Source Files and who owns them, the Draft, Adopt, and the Dependencies and Cycles of TypeScript, JavaScript, Svelte and Java ([structure-format.md](docs/structure-format.md)). Java is read with `tree-sitter-java` as WebAssembly, whose two `.wasm` files the caller hands in. It reads build files as text and never runs anything of the repository it looks at ([ADR-0007](docs/adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)), and parses without a type checker ([ADR-0008](docs/adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)). Its entry `@adr-tool/structure/model` is everything but the parsers: that is what the app's main process and renderer use, while the analysis runs in a worker thread.
+- `packages/structure` — the core of the Structure module, under the same guard: Components, Source Files and who owns them, the Draft, Adopt, the Dependencies and Cycles of TypeScript, JavaScript, Svelte and Java, the metrics and the dependency structure matrix ([structure-format.md](docs/structure-format.md)). Java is read with `tree-sitter-java` as WebAssembly, whose two `.wasm` files the caller hands in. It reads build files as text and never runs anything of the repository it looks at ([ADR-0007](docs/adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)), and parses without a type checker ([ADR-0008](docs/adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)). Its entry `@adr-tool/structure/model` is everything but the parsers: that is what the app's main process and renderer use, while the analysis runs in a worker thread.
 - `packages/app` — the Electron + Svelte 5 desktop app. The renderer is sandboxed and talks to the main process only through the preload bridge.
 
 Prettier never formats Markdown in this repository, and the fixtures under `packages/core/test/fixtures` are exempt from git's line-ending normalization: the tool promises never to change a byte it was not asked to change ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)), and its own repository is its first test case.

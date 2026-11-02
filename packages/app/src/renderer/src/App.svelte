@@ -12,7 +12,7 @@
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import StructureDetail from './components/StructureDetail.svelte'
-  import StructureGraph from './components/StructureGraph.svelte'
+  import StructureCenter from './components/StructureCenter.svelte'
   import StructureSidebar from './components/StructureSidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import {
@@ -108,7 +108,7 @@
       {#if structure.view}
         <div class="panes structure" style:--sidebar="{sidebarWidth}px">
           <StructureSidebar />
-          <StructureGraph view={structure.view} />
+          <StructureCenter view={structure.view} />
           <StructureDetail view={structure.view} />
         </div>
       {:else if structure.error}
@@ -214,7 +214,8 @@
     min-height: 0;
   }
 
-  /* The Structure view: what was found, the drawing, and what the selection stands for. */
+  /* The Structure view: what was found, the level as drawing, matrix or table, and what the
+     selection stands for. */
   .panes.structure {
     grid-template-columns: var(--sidebar) minmax(0, 2fr) minmax(300px, 1fr);
   }

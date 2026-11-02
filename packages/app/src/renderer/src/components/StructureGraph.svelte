@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { StructureEdge, StructureNode, StructureView } from '../../../shared/ipc'
+  import type { StructureEdge, StructureView } from '../../../shared/ipc'
   import { NODE, layoutGraph, pathOf } from '../lib/graph-layout'
   import { app } from '../lib/state.svelte'
+  import { nodeLabel } from '../lib/structure'
   import { t } from '../lib/strings'
 
   // One level of the Components as a drawing: left to right is "depends on", so what is used
@@ -39,41 +40,9 @@
     selection?.kind === 'node' && (edge.from === selection.id || edge.to === selection.id)
   /** Heavier Dependencies are drawn heavier, without drowning the light ones. */
   const strokeOf = (weight: number): number => 1.2 + Math.min(4, Math.log2(weight)) * 0.6
-
-  function labelOf(node: StructureNode): string {
-    switch (node.kind) {
-      case 'own-files':
-        return t.structure.graph.ownFiles(node.name)
-      case 'unassigned':
-        return t.structure.graph.unassigned
-      default:
-        return node.name
-    }
-  }
 </script>
 
 <div class="graph">
-  <div class="head">
-    <nav class="way" aria-label={t.structure.graph.way}>
-      {#if view.path.length === 0}
-        <span class="here">{t.structure.graph.top}</span>
-      {:else}
-        <button onclick={() => app.openComponent(undefined)}>{t.structure.graph.top}</button>
-        {#each view.path as step, position (step.id)}
-          <span class="between" aria-hidden="true">›</span>
-          {#if position === view.path.length - 1}
-            <span class="here">{step.name}</span>
-          {:else}
-            <button onclick={() => app.openComponent(step.id)}>{step.name}</button>
-          {/if}
-        {/each}
-      {/if}
-    </nav>
-    {#if view.origin === 'draft'}
-      <span class="badge">{t.structure.graph.draft}</span>
-    {/if}
-  </div>
-
   {#if layout.nodes.length === 0}
     <p class="empty">{t.structure.graph.empty}</p>
   {:else}
@@ -130,12 +99,12 @@
               style:top="{placedNode.y}px"
               style:width="{NODE.width}px"
               style:height="{NODE.height}px"
-              title={node.kind === 'source-file' ? node.id : labelOf(node)}
+              title={node.kind === 'source-file' ? node.id : nodeLabel(node)}
               aria-pressed={selection?.kind === 'node' && selection.id === node.id}
               onclick={() => app.selectInStructure({ kind: 'node', id: node.id })}
               ondblclick={() => node.kind === 'component' && app.openComponent(node.id)}
             >
-              <span class="name">{labelOf(node)}</span>
+              <span class="name">{nodeLabel(node)}</span>
               {#if node.kind !== 'source-file'}
                 <span class="files">{node.files}</span>
               {/if}
@@ -181,54 +150,9 @@
   .graph {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-width: 0;
     min-height: 0;
-    background: var(--panel-raised);
-    border-right: 1px solid var(--line);
-  }
-
-  .head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: none;
-    min-height: 37px;
-    padding: 6px 14px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .way {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 2px 6px;
-    min-width: 0;
-  }
-
-  .way button {
-    color: var(--focus);
-  }
-
-  .way button:hover {
-    text-decoration: underline;
-  }
-
-  .here {
-    font-weight: 600;
-  }
-
-  .between {
-    color: var(--ink-faint);
-  }
-
-  .badge {
-    margin-left: auto;
-    padding: 1px 8px;
-    border: 1px solid var(--proposed);
-    border-radius: 9px;
-    color: var(--proposed);
-    font-size: 11.5px;
-    font-weight: 600;
   }
 
   .canvas {

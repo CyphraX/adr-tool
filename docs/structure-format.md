@@ -215,11 +215,11 @@ In Structure a Cycle is a fact. It becomes a Violation only through a Rule of th
 
 ## 5. Metrics (part 5)
 
-Every metric is shown with its definition. All of them are computed per Component on the Source Files it contains; "outside" means outside what it contains. By default test files are left out and type-only Dependencies count; Unassigned files count as outside. A Component that contains no Source File has no metrics.
+Every metric is shown with its definition. All of them are computed per Component on the Source Files it contains; "outside" means outside what it contains. By default test files are left out and type-only Dependencies count; Unassigned files count as outside. A Component that contains no Source File has no metrics. "Dependencies" are Source File Dependencies here, each pair of files once, as in section 3.
 
 | Metric                 | Definition                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Size                   | Source Files contained; lines of those files.                                                                 |
+| Size                   | Source Files contained; lines of those files. A file has as many lines as line breaks, and one more when text follows the last one; a file that cannot be read has none. |
 | Efferent coupling, Ce  | Source Files inside that depend on at least one Source File outside.                                          |
 | Afferent coupling, Ca  | Source Files outside that depend on at least one Source File inside.                                          |
 | Instability, I         | Ce / (Ca + Ce); undefined when both are zero. 0 is maximally stable, 1 maximally unstable.                    |
@@ -229,7 +229,11 @@ Every metric is shown with its definition. All of them are computed per Componen
 
 Ce, Ca and I follow Robert C. Martin's definitions, with the Source File in the place of the class.
 
-**The dependency structure matrix** lists the nodes of one level as rows and columns, expandable along the hierarchy. Within a level, rows are in topological order, so that a Dependency of a row on an earlier row lies below the diagonal; whatever lies above the diagonal closes a Cycle. A cell holds the weight and opens the same list of Source File Dependencies as the edge in the graph. Graph and matrix are two views of one model and share filter and selection.
+**The dependency structure matrix** lists the nodes of one level as rows and columns, in the same order. The cell in the row of A and the column of B holds the Dependency from A to B: its weight, and the same list of Source File Dependencies as the edge in the graph opens. The diagonal stays empty. Graph and matrix are two views of one model and share filter and selection.
+
+- **Order.** Within a level, rows are in topological order, so that a Dependency of a row on an earlier row lies below the diagonal; whatever lies above the diagonal closes a Cycle — or a round trip through `(unassigned)`, which section 4 does not call one. The members of a Cycle come as one, and so do those of such a round trip. A row, or a Cycle, comes as soon as everything it depends on outside of itself has come; among those that could come next, the one with the member that is first in the order of the level's nodes: the Components as declared, the own files before the children, `(unassigned)` last, Source Files by path.
+- **Inside a Cycle** the order keeps what lies above the diagonal light. The members are placed one by one: the first member that depends on no member still to be placed; when there is none, the member whose Dependencies from the members still to be placed outweigh its Dependencies on them the most, the first such in the level's order. In a Cycle of two this puts the lighter of the two Dependencies above the diagonal.
+- **Expanding.** The row of a Component that contains Source Files can be expanded into the rows of the level below it, in that level's order, where the Component stood — and so on, down to Source Files. A cell then holds the Dependencies from the Source Files of its row to those of its column, whatever level each of them is at. The rule still holds: what lies above the diagonal closes a Cycle, at one level or another.
 
 ## 6. Problems (part 2)
 

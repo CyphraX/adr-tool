@@ -1,6 +1,7 @@
 /**
  * Everything of `structure` but the parsers: Components and who owns which Source File, the
- * Draft, Adopt and the Repair, the levels of the hierarchy and their Cycles. It does not load
+ * Draft, Adopt and the Repair, the levels of the hierarchy and their Cycles, the metrics and
+ * the matrix. It does not load
  * TypeScript, so the app's main process and its renderer can use it; the analysis that reads
  * code runs elsewhere and hands its Dependencies in (ADR-0008).
  */
@@ -20,3 +21,12 @@ export {
   type LevelOptions
 } from './levels'
 export type { Cycle } from './cycles'
+export { metricsOf, sizeOf, type Metrics, type Size } from './metrics'
+export {
+  matrixOf,
+  orderOf,
+  type Matrix,
+  type MatrixCycle,
+  type MatrixGroup,
+  type MatrixRow
+} from './matrix'

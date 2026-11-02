@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { metricsOf } from '@adr-tool/structure/model'
 import { analyse, readCache, writeCache, type Analysis } from '../src/main/analysis'
 import { Structures, viewOf } from '../src/main/structures'
 
@@ -74,6 +75,13 @@ describe('the analysis of a repository, as the app runs it', () => {
     expect(analysis.dependencies.notAnalysed).toEqual([])
     expect(analysis.dependencies.dependencies).toHaveLength(11)
     expect(Object.values(cache.files).every(({ extraction }) => 'java' in extraction)).toBe(true)
+    // Its numbers are a lower bound, and its pages say so.
+    const pages = viewOf('maven', analysis, undefined, false).components
+    expect(pages.map((page) => [page.id, page.java])).toEqual([
+      ['cart', true],
+      ['catalog', true],
+      ['web', true]
+    ])
   })
 
   it('keeps its cache in a file that a crash cannot leave half written', async () => {
@@ -95,9 +103,12 @@ describe('a level as the window gets it', () => {
   it('names the nodes, counts their files, and says what was found on the way', () => {
     const view = viewOf('repo', analysis, undefined, false)
     expect(view.origin).toBe('declared')
-    expect(view.nodes).toEqual([
-      { kind: 'component', id: 'shop', name: 'Shop', files: 2 },
-      { kind: 'component', id: 'billing', name: 'billing', files: 1 }
+    // index.ts has two lines since the cache test above.
+    expect(
+      view.nodes.map(({ kind, id, name, files, lines }) => ({ kind, id, name, files, lines }))
+    ).toEqual([
+      { kind: 'component', id: 'shop', name: 'Shop', files: 2, lines: 3 },
+      { kind: 'component', id: 'billing', name: 'billing', files: 1, lines: 2 }
     ])
     expect(view.edges.map((edge) => `${edge.from} > ${edge.to} ${edge.weight}`)).toEqual([
       'billing > shop 1',
@@ -121,7 +132,7 @@ describe('a level as the window gets it', () => {
       { id: 'shop/cart', name: 'Cart' }
     ])
     expect(view.nodes).toEqual([
-      { kind: 'source-file', id: 'src/shop/cart/cart.ts', name: 'cart.ts', files: 1 }
+      { kind: 'source-file', id: 'src/shop/cart/cart.ts', name: 'cart.ts', files: 1, lines: 1 }
     ])
   })
 
@@ -134,6 +145,112 @@ describe('a level as the window gets it', () => {
   it('includes test files on request', () => {
     const view = viewOf('repo', analysis, 'billing', true)
     expect(view.nodes.map((node) => node.name)).toEqual(['invoice.test.ts', 'invoice.ts'])
+  })
+
+  it('gives each Component of the level the metrics structure computes, and other nodes a size', () => {
+    const { structure, dependencies } = analysis
+    const metrics = metricsOf(structure, dependencies.dependencies, dependencies.lineCounts)
+    const view = viewOf('repo', analysis, undefined, false)
+    expect(view.nodes.map((node) => node.metrics)).toEqual([
+      metrics.get('shop'),
+      metrics.get('billing')
+    ])
+    expect(view.nodes[0]!.metrics).toMatchObject({
+      efferent: 1,
+      afferent: 1,
+      instability: 0.5,
+      fanOut: 1,
+      fanIn: 1,
+      cohesion: 1,
+      internalShare: 1 / 3
+    })
+    expect(viewOf('repo', analysis, 'shop/cart', false).nodes[0]!.metrics).toBeUndefined()
+  })
+
+  it('lays the level out as a matrix, with the Components asked for expanded where they stood', () => {
+    const view = viewOf('repo', analysis, undefined, false, ['shop', 'gone'])
+    expect(view.matrix.rows.map((row) => [row.kind, row.id, row.depth, row.expandable])).toEqual([
+      ['component', 'shop/cart', 1, true],
+      ['own-files', 'shop', 1, false],
+      ['component', 'billing', 0, true]
+    ])
+    expect(view.matrix.expanded).toEqual(['shop'])
+    expect(view.matrix.groups).toEqual([{ id: 'shop', name: 'Shop', depth: 0, first: 0, last: 1 }])
+    expect(view.matrix.cycles).toEqual([{ first: 0, last: 2, typeOnly: false }])
+    expect(view.matrix.cells.map((cell) => `${cell.from} > ${cell.to} ${cell.weight}`)).toEqual([
+      'billing > shop/cart 1',
+      'shop > shop/cart 1',
+      'shop/cart > billing 1'
+    ])
+  })
+
+  it('gives every Component it shows a page: declaration, metrics, Dependencies at its level, Cycles', () => {
+    const view = viewOf('repo', analysis, undefined, false, ['shop'])
+    expect(view.components.map((component) => component.id)).toEqual([
+      'shop',
+      'billing',
+      'shop/cart'
+    ])
+    const shop = view.components[0]!
+    expect(shop).toMatchObject({
+      id: 'shop',
+      name: 'Shop',
+      paths: ['src/shop/**'],
+      tests: [],
+      level: undefined,
+      testFiles: 0,
+      java: false,
+      dependsOn: [
+        { kind: 'component', id: 'billing', name: 'billing', weight: 1, typeOnly: false }
+      ],
+      usedBy: [{ kind: 'component', id: 'billing', name: 'billing', weight: 1, typeOnly: true }],
+      cycles: [
+        {
+          roundTrip: [
+            { kind: 'component', id: 'billing', name: 'billing' },
+            { kind: 'component', id: 'shop', name: 'Shop' }
+          ],
+          typeOnly: false
+        }
+      ]
+    })
+    expect(shop.metrics).toEqual(view.nodes[0]!.metrics)
+    expect(view.components[1]).toMatchObject({ id: 'billing', testFiles: 1 })
+    // Below shop, cart is used by the files shop owns itself.
+    expect(view.components[2]).toMatchObject({
+      level: 'shop',
+      dependsOn: [],
+      usedBy: [{ kind: 'own-files', id: 'shop', name: 'Shop', weight: 1, typeOnly: false }],
+      cycles: []
+    })
+  })
+})
+
+// The done-when of part 5 (docs/plan-structure.md): what the window gets for this repository
+// are the numbers `structure` computes, which its own tests check against the definitions.
+describe('this repository, as the window gets it', () => {
+  it('shows the metrics structure computes for each Component', async () => {
+    const own = fileURLToPath(new URL('../../../', import.meta.url))
+    const { analysis } = await analyse(own, undefined)
+    const { structure, dependencies } = analysis
+    const metrics = metricsOf(structure, dependencies.dependencies, dependencies.lineCounts)
+    const view = viewOf('repo', analysis, undefined, false)
+    expect(view.nodes.map((node) => node.id)).toEqual([
+      'app',
+      'core',
+      'kernel',
+      'structure',
+      '(unassigned)'
+    ])
+    for (const node of view.nodes.filter((node) => node.kind === 'component')) {
+      expect(node.metrics).toEqual(metrics.get(node.id))
+    }
+    expect(view.nodes.find((node) => node.id === 'kernel')!.metrics!.instability).toBe(0)
+    // Nothing above the diagonal: this repository has no Cycle.
+    const rows = view.matrix.rows.map((row) => row.id)
+    expect(
+      view.matrix.cells.filter((cell) => rows.indexOf(cell.from) < rows.indexOf(cell.to))
+    ).toEqual([])
   })
 })
 

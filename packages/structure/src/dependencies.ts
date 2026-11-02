@@ -49,6 +49,8 @@ export interface Dependencies {
   readonly notResolved: readonly NotResolved[]
   readonly libraries: readonly LibraryUse[]
   readonly notAnalysed: readonly NotAnalysed[]
+  /** How many lines each Source File has that could be read (section 5, Size). */
+  readonly lineCounts: ReadonlyMap<string, number>
 }
 
 /** How many files are read at a time: enough to keep the disk busy, few enough for any limit. */
@@ -56,6 +58,13 @@ const READ_AT_ONCE = 32
 const DECLARATION_FILE = /\.d\.(?:[^/]+\.)?[cm]?ts$/
 
 const byPath = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
+/** As many lines as line breaks, and one more when text follows the last one. */
+export function linesOf(text: string): number {
+  let breaks = 0
+  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) breaks++
+  return text.length > 0 && !text.endsWith('\n') ? breaks + 1 : breaks
+}
 
 /**
  * The Dependencies among the Source Files of a repository, and what could not be resolved.
@@ -74,10 +83,12 @@ export async function analyseDependencies(
 
   /** `null`: the file could not be read. `undefined`: its language is not read. */
   const extractions = new Map<string, Extraction | null | undefined>()
+  const lineCounts = new Map<string, number>()
   for (let start = 0; start < sourceFiles.length; start += READ_AT_ONCE) {
     await Promise.all(
       sourceFiles.slice(start, start + READ_AT_ONCE).map(async ({ path }) => {
         const text = await fs.readText(path).catch(() => undefined)
+        if (text !== undefined) lineCounts.set(path, linesOf(text))
         extractions.set(path, text === undefined ? null : extract(path, text))
       })
     )
@@ -148,5 +159,5 @@ export async function analyseDependencies(
   const dependencies = [...pairs.values()]
     .map((pair) => ({ ...pair, lines: [...pair.lines].sort((a, b) => a - b) }))
     .sort((a, b) => byPath(a.from, b.from) || byPath(a.to, b.to))
-  return { dependencies, notResolved, libraries, notAnalysed }
+  return { dependencies, notResolved, libraries, notAnalysed, lineCounts }
 }

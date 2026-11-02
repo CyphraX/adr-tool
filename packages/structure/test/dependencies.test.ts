@@ -100,7 +100,42 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
 
   it('do not read Java without a reader for it, which needs the WebAssembly of tree-sitter', async () => {
     const result = await analyse({ 'src/main/java/a/A.java': 'package a; import b.B;' })
-    expect(result).toEqual({ dependencies: [], notResolved: [], libraries: [], notAnalysed: [] })
+    expect(result).toEqual({
+      dependencies: [],
+      notResolved: [],
+      libraries: [],
+      notAnalysed: [],
+      // Its lines are counted all the same.
+      lineCounts: new Map([['src/main/java/a/A.java', 1]])
+    })
+  })
+
+  it('count the lines of every Source File that can be read, for the size of section 5', async () => {
+    const repository = {
+      'empty.ts': '',
+      'one.ts': 'export {}',
+      'ended.ts': 'export {}\n',
+      'windows.ts': 'export {}\r\nexport {}\r\n',
+      'gaps.ts': '\n\nexport {}',
+      // Java is counted even where it is not parsed.
+      'One.java': 'class One {}\n'
+    }
+    const files = [...Object.keys(repository), 'gone.ts']
+    const { lineCounts } = await analyseDependencies(
+      memoryFileSystem(repository),
+      files,
+      sourceFilesAmong(files)
+    )
+    expect(lineCounts).toEqual(
+      new Map([
+        ['empty.ts', 0],
+        ['one.ts', 1],
+        ['ended.ts', 1],
+        ['windows.ts', 2],
+        ['gaps.ts', 3],
+        ['One.java', 1]
+      ])
+    )
   })
 
   it('extract each file through the function handed in, where the app puts its cache', async () => {

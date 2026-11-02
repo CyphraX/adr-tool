@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { analyseDependencies, levelOf, openStructure } from '../src'
+import { analyseDependencies, levelOf, matrixOf, openStructure } from '../src'
 import { nodeFileSystem, repositoryFiles } from './repository-files'
 
 // The fixture to look at in the app (README.md, "Development"): what it shows is pinned here.
@@ -41,4 +41,18 @@ it('shows a Cycle between two Components with its weakest Dependency, and one be
   expect(cart.cycles.map((cycle) => cycle.members)).toEqual([
     ['src/cart/cart.ts', 'src/cart/line.ts']
   ])
+})
+
+it('puts the Dependency that closes the Cycle above the diagonal of the matrix', async () => {
+  const fs = nodeFileSystem(root)
+  const files = repositoryFiles(root)
+  const structure = await openStructure(fs, files)
+  const { dependencies } = await analyseDependencies(fs, files, structure.sourceFiles)
+
+  const matrix = matrixOf(structure, dependencies)!
+  const rows = matrix.rows.map((row) => row.node.id)
+  expect(rows).toEqual(['catalog', 'pricing', 'cart', 'billing'])
+  const above = matrix.cells.filter((cell) => rows.indexOf(cell.from) < rows.indexOf(cell.to))
+  // The weakest Dependency of the Cycle, the one the graph draws dotted.
+  expect(above.map((cell) => [cell.from, cell.to, cell.weight])).toEqual([['pricing', 'cart', 1]])
 })

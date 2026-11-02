@@ -29,8 +29,8 @@ const api: Api = {
     ipcRenderer.on(CHANNEL.repositoryChanged, handler)
     return () => ipcRenderer.removeListener(CHANNEL.repositoryChanged, handler)
   },
-  structureView: (repositoryId, parent, tests) =>
-    ipcRenderer.invoke(CHANNEL.structureView, repositoryId, parent, tests),
+  structureView: (repositoryId, parent, tests, expanded) =>
+    ipcRenderer.invoke(CHANNEL.structureView, repositoryId, parent, tests, expanded),
   onStructureChanged: (listener) => {
     const handler = (_: unknown, repositoryId: string): void => listener(repositoryId)
     ipcRenderer.on(CHANNEL.structureChanged, handler)

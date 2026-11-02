@@ -2,7 +2,15 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { analyseDependencies, extractorOf, levelOf, openStructure, prepareJava } from '../src'
+import {
+  analyseDependencies,
+  extractorOf,
+  levelOf,
+  metricsOf,
+  openStructure,
+  prepareJava
+} from '../src'
+import { metricsByDefinition } from './metrics-by-definition'
 import { nodeFileSystem, repositoryFiles } from './repository-files'
 
 // The Java fixture to look at in the app (README.md, "Development"), and the done-when of
@@ -57,4 +65,15 @@ it('shows the Dependencies of a multi-module Maven project, within a package and
   // The module cart holds two packages, so the Draft has a Component for each.
   const cart = levelOf(structure, analysis.dependencies, 'cart/cart')!
   expect(cart.cycles.map((cycle) => cycle.members.map(short))).toEqual([['Cart', 'Line']])
+
+  // Its metrics, tests included, follow from the Dependencies as for TypeScript.
+  const { dependencies, lineCounts } = analysis
+  expect(metricsOf(structure, dependencies, lineCounts, { tests: true })).toEqual(
+    metricsByDefinition(structure, dependencies, lineCounts, true)
+  )
+  expect(metricsOf(structure, dependencies, lineCounts).get('web')).toMatchObject({
+    efferent: 2,
+    afferent: 0,
+    instability: 1
+  })
 })
