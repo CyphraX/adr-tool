@@ -2,6 +2,7 @@ import { isMap, isSeq, parseDocument } from 'yaml'
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import { scalarText } from '../metadata/scalar'
 import type { Problem } from '../problems/problem'
+import { REPOSITORY_NAME } from '../relations/reference'
 import type { NamingScheme } from './naming'
 
 export const CONFIG_PATH = '.adr/config.yml'
@@ -20,6 +21,8 @@ export interface Discovery {
   readonly by: 'config' | 'adr-dir' | 'default' | 'none'
   readonly locations: readonly LogLocation[]
   readonly problems: readonly Problem[]
+  /** The name the repository gives itself in `.adr/config.yml`, which other repositories use. */
+  readonly name?: string
 }
 
 /**
@@ -30,11 +33,17 @@ export interface Discovery {
  */
 export async function discoverLogs(fs: FileSystem): Promise<Discovery> {
   const config = await fs.readText(CONFIG_PATH)
-  if (config !== undefined) {
-    const found = readConfig(config)
-    if (found.problems.length > 0 || found.locations.length > 0) return { by: 'config', ...found }
+  const found = config === undefined ? undefined : readConfig(config)
+  if (found && (found.problems.length > 0 || found.locations.length > 0)) {
+    return { by: 'config', ...found }
   }
+  // A configuration that names the repository and no Decision Log still names it.
+  const named = found?.name === undefined ? {} : { name: found.name }
+  return { ...(await discoverElsewhere(fs)), ...named }
+}
 
+/** Steps 2 and 3 of section 6: adr-tools' `.adr-dir`, then the well-known directories. */
+async function discoverElsewhere(fs: FileSystem): Promise<Discovery> {
   const adrDir = await fs.readText(ADR_DIR_PATH)
   if (adrDir !== undefined) {
     const path = normalizePath(adrDir.split(/\r?\n/)[0] ?? '')
@@ -53,7 +62,7 @@ export async function discoverLogs(fs: FileSystem): Promise<Discovery> {
   return { by: existing.length > 0 ? 'default' : 'none', locations: existing, problems: [] }
 }
 
-function readConfig(text: string): Pick<Discovery, 'locations' | 'problems'> {
+function readConfig(text: string): Pick<Discovery, 'locations' | 'problems' | 'name'> {
   const invalid = (detail: string): Pick<Discovery, 'locations' | 'problems'> => ({
     locations: [],
     problems: [{ kind: 'invalid-configuration', path: CONFIG_PATH, detail }]
@@ -64,8 +73,17 @@ function readConfig(text: string): Pick<Discovery, 'locations' | 'problems'> {
   if (doc.contents === null) return { locations: [], problems: [] }
   if (!isMap(doc.contents)) return invalid('Expected a mapping')
 
+  const named = doc.contents.get('name', true)
+  const name = scalarText(named)
+  if (named !== undefined && named !== null && (name === undefined || !REPOSITORY_NAME.test(name))) {
+    return invalid(
+      '"name" must be made of letters, digits, ".", "_" and "-", and start with a letter or a digit'
+    )
+  }
+  const withName = name === undefined ? {} : { name }
+
   const logs = doc.contents.get('logs', true)
-  if (logs === undefined || logs === null) return { locations: [], problems: [] }
+  if (logs === undefined || logs === null) return { locations: [], problems: [], ...withName }
   if (!isSeq(logs)) return invalid('"logs" must be a list')
 
   const locations: LogLocation[] = []
@@ -83,5 +101,5 @@ function readConfig(text: string): Pick<Discovery, 'locations' | 'problems'> {
     if (locations.some((location) => location.path === path)) continue
     locations.push({ path, ...(naming !== undefined && { naming }) })
   }
-  return { locations, problems: [] }
+  return { locations, problems: [], ...withName }
 }

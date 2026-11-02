@@ -21,7 +21,8 @@ const CODES: Record<Problem['kind'], true> = {
   'supersedes-cycle': true,
   'duplicate-number': true,
   'invalid-configuration': true,
-  'missing-log-directory': true
+  'missing-log-directory': true,
+  'other-repository': true
 }
 
 export type ProblemCode = Problem['kind']
@@ -64,6 +65,8 @@ export function describeProblem(problem: Problem): string {
       return `${problem.path} cannot be used: ${problem.detail}`
     case 'missing-log-directory':
       return `The configured directory ${problem.path} does not exist.`
+    case 'other-repository':
+      return `${problem.key} names ${problem.target}, an ADR of another repository. Only depends-on and relates-to may lead out of the repository.`
   }
 }
 

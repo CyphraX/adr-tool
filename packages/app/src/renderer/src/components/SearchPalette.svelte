@@ -1,19 +1,35 @@
 <script lang="ts">
-  import { searchLogs } from '../lib/search'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { STATUS_LABEL, prefixOf } from '../lib/wording'
+  import { searchAll } from '../lib/together'
+  import { STATUS_LABEL, logName, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   // Full-text search with quick jump: type, arrow, Enter. It searches every Decision Log of
-  // the repository in front, in what is already loaded — nothing is read for it.
+  // every open repository, the one in front first, in what is already loaded — nothing is
+  // read for it.
   const LIMIT = 12
 
   let dialog = $state<HTMLDialogElement>()
   let chosen = $state(0)
 
+  const repositories = $derived(app.tabs.map((tab) => tab.repository))
   const logs = $derived(app.active?.repository.repository.logs ?? [])
-  const all = $derived(searchLogs(logs, app.searching?.query ?? '', app.log?.path))
+  const all = $derived(
+    searchAll(
+      repositories,
+      app.searching?.query ?? '',
+      app.activeId === undefined
+        ? undefined
+        : { repositoryId: app.activeId, ...(app.log && { log: app.log.path }) }
+    )
+  )
+  // Where a hit is: its repository when several are open, its log when there are several.
+  const whereOf = (hit: (typeof all)[number]): string =>
+    [
+      ...(repositories.length > 1 ? [hit.repository] : []),
+      ...(logs.length > 1 || repositories.length > 1 ? [logName(hit.logPath)] : [])
+    ].join(' · ')
   const found = $derived(all.slice(0, LIMIT))
   // The files can change under an open palette, and the list with them.
   const position = $derived(Math.min(chosen, found.length - 1))
@@ -27,7 +43,7 @@
     if (event.key === 'Enter') {
       event.preventDefault()
       const hit = found[position]
-      if (hit) app.jumpTo(hit.logPath, hit.adr.id)
+      if (hit) app.jumpTo(hit.logPath, hit.adr.id, hit.repositoryId)
       return
     }
     const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
@@ -56,7 +72,7 @@
 
     {#if found.length > 0}
       <div id="hits" class="hits" role="listbox" aria-label={t.searching.found}>
-        {#each found as hit, index (hit.logPath + hit.adr.id)}
+        {#each found as hit, index (hit.repositoryId + hit.logPath + hit.adr.id)}
           {@const status = statusKey(hit.adr)}
           <!-- The keyboard is handled by the input above. -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -67,7 +83,7 @@
             role="option"
             tabindex="-1"
             aria-selected={index === position}
-            onclick={() => app.jumpTo(hit.logPath, hit.adr.id)}
+            onclick={() => app.jumpTo(hit.logPath, hit.adr.id, hit.repositoryId)}
             onmousemove={() => (chosen = index)}
           >
             <span class="line">
@@ -75,7 +91,7 @@
               <span class="prefix">{prefixOf(hit.adr)}</span>
               <span class="title">{hit.adr.title ?? hit.adr.id}</span>
               <span class="where">
-                {logs.length > 1 ? `${hit.logPath} · ` : ''}{hit.adr.metadata.rawStatus ??
+                {whereOf(hit) ? `${whereOf(hit)} · ` : ''}{hit.adr.metadata.rawStatus ??
                   STATUS_LABEL[status]}
               </span>
             </span>

@@ -86,7 +86,8 @@ describe('the language of the window (part 12)', () => {
       { kind: 'supersedes-cycle', adrs: ['0001-a', '0002-b'] },
       { kind: 'duplicate-number', number: 1, adrs: ['0001-a', '0001-b'] },
       { kind: 'invalid-configuration', path: '.adr/config.yml', detail: 'x' },
-      { kind: 'missing-log-directory', path: 'docs/adr' }
+      { kind: 'missing-log-directory', path: 'docs/adr' },
+      { kind: 'other-repository', adr: '0001-a', key: 'supersedes', target: 'b:docs/adr/0001-x' }
     ]
     expect(problems.map((problem) => problem.kind).sort()).toEqual([...PROBLEM_CODES].sort())
     for (const problem of problems) {

@@ -72,4 +72,24 @@ describe('discoverLogs', () => {
       ])
     }
   })
+
+  it('reads the name a repository gives itself, with or without Decision Logs configured', async () => {
+    const named = memoryFileSystem({
+      '.adr/config.yml': 'name: payments\nlogs:\n  - path: docs/adr\n'
+    })
+    expect((await discoverLogs(named)).name).toBe('payments')
+    const nameOnly = memoryFileSystem({ '.adr/config.yml': 'name: shop.web\n', 'docs/adr/0001-a.md': ADR })
+    expect(await discoverLogs(nameOnly)).toEqual({
+      by: 'default',
+      locations: [{ path: 'docs/adr' }],
+      problems: [],
+      name: 'shop.web'
+    })
+    for (const name of ['-shop', 'a b', '[x]', 'pay:ments']) {
+      const wrong = memoryFileSystem({ '.adr/config.yml': `name: "${name}"\n` })
+      expect((await discoverLogs(wrong)).problems).toMatchObject([
+        { kind: 'invalid-configuration', path: '.adr/config.yml' }
+      ])
+    }
+  })
 })

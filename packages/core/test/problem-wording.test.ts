@@ -24,7 +24,8 @@ describe('what a Problem is called and how it reads', () => {
       'supersedes-cycle',
       'duplicate-number',
       'invalid-configuration',
-      'missing-log-directory'
+      'missing-log-directory',
+      'other-repository'
     ])
   })
 

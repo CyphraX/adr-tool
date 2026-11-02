@@ -109,6 +109,7 @@ The code of a Problem is its kind in `core` (`packages/core/src/problems/problem
 | `duplicate-number` | Two ADRs of a `sequential` log share a number |
 | `invalid-configuration` | `.adr/config.yml` or `.adr-dir` cannot be used as written |
 | `missing-log-directory` | A configured Decision Log directory does not exist |
+| `other-repository` | `supersedes`, `amends`, `superseded-by` or `amended-by` names an ADR of another repository (`<name>:<log>/<ID>`); only `depends-on` and `relates-to` may ([file-format.md, section 3](file-format.md#3-metadata)) |
 
 A new kind of Problem gets a new code. A code is never given a different meaning, and is renamed only with a note in this document.
 

@@ -41,9 +41,13 @@ export {
   absoluteReference,
   isQualified,
   normalReference,
+  outsideReference,
+  outsideTo,
   parseReference,
   qualified,
   referenceTo,
+  REPOSITORY_NAME,
+  type OutsideReference,
   type Reference
 } from './relations/reference'
 export type { BackReferenceKey, Problem } from './problems/problem'

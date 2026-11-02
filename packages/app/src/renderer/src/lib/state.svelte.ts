@@ -25,6 +25,7 @@ import { recordedIn } from './history'
 import { chooseLanguage } from './language'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
+import { outsideRelations } from './together'
 import { moveOf, type StatusKey } from './views'
 
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
@@ -35,7 +36,16 @@ export type StatusFilter = Status | 'unknown' | 'all'
  * Problems — or what other branches do to the ADRs of every log.
  */
 export type MiddleView =
-  'adrs' | 'graph' | 'timeline' | 'board' | 'dashboard' | 'problems' | 'branches'
+  | 'adrs'
+  | 'graph'
+  | 'timeline'
+  | 'board'
+  | 'dashboard'
+  | 'problems'
+  | 'branches'
+  /** Every ADR of every open repository, and every Problem (docs/plan-roadmap.md, part 13). */
+  | 'all-adrs'
+  | 'all-problems'
 
 /** The modules of the suite the window switches between, per repository. */
 export type Module = 'decisions' | 'structure'
@@ -267,6 +277,9 @@ class AppState {
   searching = $state<{ query: string } | undefined>(undefined)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
+
+  /** The Relations that lead from an ADR of one open repository to an ADR of another. */
+  readonly outside = $derived(outsideRelations(this.tabs.map((tab) => tab.repository)))
 
   /** The Decision Log in view: the selected one, or the first. */
   readonly log = $derived.by((): DecisionLog | undefined => {
@@ -693,12 +706,22 @@ class AppState {
     this.searching = undefined
   }
 
-  /** Go to an ADR of any Decision Log of the repository in front, from wherever the view is. */
-  jumpTo(logPath: string, id: string): void {
+  /**
+   * Go to an ADR of any Decision Log of the repository in front, or of another open one, from
+   * wherever the view is. Seen from every repository at once, the view stays that.
+   */
+  jumpTo(logPath: string, id: string, repositoryId: string | undefined = this.activeId): void {
     this.searching = undefined
+    const across = this.active?.view === 'all-adrs' || this.active?.view === 'all-problems'
+    const from = this.active?.view
     const arrive = (): void => {
+      if (repositoryId !== this.activeId) {
+        this.activeId = repositoryId
+        void window.api.setActiveRepository(repositoryId)
+      }
       const tab = this.active
       if (!tab) return
+      if (across && from) tab.view = from
       // An ADR is shown where ADRs are, whichever module was in front.
       tab.module = 'decisions'
       tab.logPath = logPath
@@ -708,7 +731,10 @@ class AppState {
       const drawn = this.log?.relations.some(({ from, to }) => from === id || to === id)
       // The timeline and the board show every ADR of the log.
       const shown =
-        tab.view === 'timeline' || tab.view === 'board' || (tab.view === 'graph' && drawn)
+        across ||
+        tab.view === 'timeline' ||
+        tab.view === 'board' ||
+        (tab.view === 'graph' && drawn)
       if (!shown) tab.view = 'adrs'
       const adr = this.log?.adrs.find((candidate) => candidate.id === id)
       if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
@@ -716,7 +742,9 @@ class AppState {
       }
     }
     // The ADR that is open already stays open, editor and all; only the list follows.
-    if (logPath === this.log?.path && id === this.active?.selectedId) arrive()
+    const there =
+      repositoryId === this.activeId && logPath === this.log?.path && id === this.active?.selectedId
+    if (there) arrive()
     else this.leaveEditor(arrive)
   }
 

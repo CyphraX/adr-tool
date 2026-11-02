@@ -142,7 +142,24 @@ export const en = {
     branches: 'Branches',
     otherBranches: 'Other branches',
     otherBranchesHint:
-      'ADRs that branches which are not checked out add or decide, read from git without checking anything out'
+      'ADRs that branches which are not checked out add or decide, read from git without checking anything out',
+    together: 'Open repositories',
+    allAdrs: 'Every ADR',
+    allAdrsHint: 'The ADRs of every repository that is open, in one list',
+    allProblems: 'Every Problem',
+    allProblemsHint: 'The Problems of every repository that is open, in one list'
+  },
+
+  /** Every open repository at once (docs/plan-roadmap.md, part 13). */
+  together: {
+    adrs: 'Every ADR of the open repositories',
+    problems: 'Every Problem of the open repositories',
+    count: (adrs: number, repositories: number): string =>
+      `${many(adrs, 'One ADR', `${adrs} ADRs`)} in ${repositories} repositories`,
+    noProblems: 'No Problems in any open repository.',
+    noneHere: 'No Problems.',
+    repository: 'The repository itself',
+    hint: 'Select an ADR to read it: the repository it belongs to comes to the front.'
   },
 
   export: {
@@ -287,7 +304,12 @@ export const en = {
     corrections: 'Corrections',
     corrected: 'Corrected',
     showChange: 'Show the change',
-    problems: 'Problems'
+    problems: 'Problems',
+    otherRepositories: 'Relations to other repositories',
+    /** An ADR of another repository that cannot be shown: why not. */
+    repositoryNotOpen: (repository: string): string => `${repository} is not open`,
+    notInRepository: (repository: string): string => `not in ${repository}`,
+    showIn: (repository: string): string => `Show it in ${repository}`
   },
 
   editor: {

@@ -33,7 +33,10 @@ export interface OpenRepository {
   readonly id: string
   /** The directory the user opened, for display only. */
   readonly root: string
-  /** The last part of `root`: the label of the repository's tab. */
+  /**
+   * The label of the repository's tab, and how another repository names it in a Relation: the
+   * name it gives itself in `.adr/config.yml`, or the last part of `root`.
+   */
   readonly name: string
   readonly repository: Repository
   /**

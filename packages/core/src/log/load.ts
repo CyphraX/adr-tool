@@ -30,6 +30,11 @@ export interface Repository {
   readonly logs: readonly DecisionLog[]
   /** Problems of the repository as a whole: configuration that cannot be used, a missing directory. */
   readonly problems: readonly Problem[]
+  /**
+   * The name the repository gives itself in `.adr/config.yml`, by which other repositories
+   * name it (docs/file-format.md, section 3). Without one, its directory's name is used.
+   */
+  readonly name?: string
 }
 
 /**
@@ -66,7 +71,12 @@ export async function openRepository(
       options
     )
   )
-  return { discoveredBy: discovery.by, logs, problems }
+  return {
+    discoveredBy: discovery.by,
+    logs,
+    problems,
+    ...(discovery.name !== undefined && { name: discovery.name })
+  }
 }
 
 /** Read one Decision Log on its own, or `undefined` when its directory does not exist. */

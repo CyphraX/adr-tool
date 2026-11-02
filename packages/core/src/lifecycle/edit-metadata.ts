@@ -5,7 +5,7 @@ import type { MetadataKey } from '../metadata/keys'
 import { addToList, removeFromList } from '../metadata/write'
 import { RELATION_TYPES, type RelationType } from '../relation'
 import { Refusal, plan } from './pending'
-import { isQualified, normalReference } from '../relations/reference'
+import { isQualified, normalReference, outsideReference } from '../relations/reference'
 import { named, requireTarget, writable, type AnyAdr } from './rules'
 
 /**
@@ -84,7 +84,9 @@ export function planEditMetadata(
     }
     for (const { key, added } of changes) {
       if (key === 'depends-on' || key === 'relates-to') {
-        for (const target of added) other(log, id, target)
+        // An ADR of another repository is taken as written: only where both are open is it
+        // known (docs/file-format.md, section 3).
+        for (const target of added) if (!outsideReference(target)) other(log, id, target)
       }
       if (key === 'affects') for (const component of added) declared(components, component)
     }

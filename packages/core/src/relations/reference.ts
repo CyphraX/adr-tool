@@ -48,3 +48,33 @@ export function absoluteReference(from: string, reference: string): { log: strin
 export function isQualified(reference: string): boolean {
   return reference.includes('/')
 }
+
+/** The name a repository gives itself (docs/file-format.md, section 6). */
+export const REPOSITORY_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+
+/** An ADR of another repository, as a Relation names it: `<name>:<log>/<ID>`. */
+export interface OutsideReference {
+  /** The name of the repository. */
+  readonly repository: string
+  /** The directory of its Decision Log, `''` for the root; absent when the reference names none. */
+  readonly log?: string
+  readonly id: string
+}
+
+/**
+ * The ADR of another repository a reference names (docs/file-format.md, section 3), or
+ * `undefined` for one of this repository. Only `depends-on` and `relates-to` may name one.
+ */
+export function outsideReference(reference: string): OutsideReference | undefined {
+  const colon = reference.indexOf(':')
+  if (colon <= 0) return undefined
+  const repository = reference.slice(0, colon)
+  if (!REPOSITORY_NAME.test(repository)) return undefined
+  const inside = parseReference(reference.slice(colon + 1))
+  return inside.id === '' ? undefined : { repository, ...inside }
+}
+
+/** How a repository names the ADR `id` of the log `log` of the repository `repository`. */
+export function outsideTo(repository: string, log: string, id: string): string {
+  return `${repository}:${qualified(log, id)}`
+}
