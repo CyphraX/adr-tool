@@ -1,6 +1,6 @@
 # Context Map
 
-The Softarch Suite (working title) has one context per module; [docs/vision.md](docs/vision.md) describes the modules. A glossary lives under `docs/contexts/` until its module has a package of its own, and moves there then.
+Softarch Suite ([ADR-0011](docs/adr/0011-the-product-is-called-softarch-suite.md)) has one context per module; [docs/vision.md](docs/vision.md) describes the modules. A glossary lives under `docs/contexts/` until its module has a package of its own, and moves there then.
 
 ## Contexts
 

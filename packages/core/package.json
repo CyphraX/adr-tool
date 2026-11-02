@@ -2,7 +2,8 @@
   "name": "@adr-tool/core",
   "version": "0.0.0",
   "private": true,
-  "description": "The UI-free domain core of ADR Tool: no Electron, no DOM, no disk access of its own",
+  "license": "MIT",
+  "description": "The UI-free core of the Decisions module of Softarch Suite: no Electron, no DOM, no disk access of its own",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

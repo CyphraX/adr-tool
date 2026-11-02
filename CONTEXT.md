@@ -1,6 +1,6 @@
-# ADR Tool
+# Decisions
 
-A desktop application for browsing, writing and relating the Architecture Decision Records that live in a git repository.
+The Decisions module of Softarch Suite: browsing, writing and relating the Architecture Decision Records that live in a git repository. It was called ADR Tool until the suite got its name ([ADR-0011](docs/adr/0011-the-product-is-called-softarch-suite.md)).
 
 ## Language
 

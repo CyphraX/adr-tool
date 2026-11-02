@@ -76,7 +76,7 @@ export const t = {
     badConfiguration: "This repository's ADR configuration cannot be used",
     noAdrs: (repository: string): string => `No ADRs found in ${repository}`,
     whereItLooks:
-      "ADR Tool looks for `.adr/config.yml`, then for adr-tools' `.adr-dir`, then for the folders `docs/adr`, `doc/adr` and `docs/decisions`. As soon as one of them appears, the ADRs show up here.",
+      "Softarch Suite looks for `.adr/config.yml`, then for adr-tools' `.adr-dir`, then for the folders `docs/adr`, `doc/adr` and `docs/decisions`. As soon as one of them appears, the ADRs show up here.",
     orStartHere: 'Or start here: the first ADR is created in `docs/adr`.',
     createFirst: 'Create the first ADR',
     selectToRead: 'Select an ADR to read it.',

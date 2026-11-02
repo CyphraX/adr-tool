@@ -9,7 +9,7 @@ This list is meant to be complete, and for one developer that is only honest wit
 
 ## Name and branding
 
-- **Softarch Suite** is the working title from now on. The final name is settled before the first public release, after a check for clashes (trademarks, domains, npm, GitHub). That check is due before the release of the Decisions module, not before the suite.
+- **Softarch Suite** is the name ([ADR-0011](adr/0011-the-product-is-called-softarch-suite.md), decided 2026-11-02). The check for clashes in trademark registers, domains, npm and GitHub is still due before the first public release.
 - Icon idea: a stylised curved arrow whose arrowhead is a cotton ball.
 
 ## Principles
@@ -55,7 +55,7 @@ What the code is made of and how its parts depend on each other. Everything else
 - **Core**
   - Declare Components: hierarchy, Component ID, display name, path patterns; the derived Draft; a list of the Unassigned Source Files.
   - Code model for TypeScript/JavaScript (files parsed one by one and imports resolved with TypeScript's own module resolution — no program, no type checker; Svelte files through their script blocks) and Java (`tree-sitter-java` as WASM, resolution through imports and a symbol table per package). No JVM, in line with [ADR-0001](adr/0001-electron-svelte-typescript-throughout.md). Java stays imprecise below class level; accepted, because architecture analysis works on file, package and Component level.
-  - **Dependency** graph of the Components of one level at a time, going down the hierarchy; a Component without children shows its Source Files. A graph of all Source Files of a repository is never drawn — the matrix gives the overview. An edge between Components opens the Source File Dependencies behind it.
+  - **Dependency** graph of the Components of one level at a time, going down the hierarchy; below a Component without children, its directories, down to the Source Files. A graph of all Source Files of a repository is never drawn — the matrix gives the overview. An edge between Components opens the Source File Dependencies behind it.
   - **Cycles** among the Components of a level and among the Source Files of a Component.
   - Dependency structure matrix.
   - Metrics per Component: afferent and efferent coupling (Ca, Ce), instability, size, relational cohesion, the share of internal Dependencies.
