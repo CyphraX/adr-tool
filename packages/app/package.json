@@ -24,6 +24,7 @@
     "web-tree-sitter": "^0.27.0"
   },
   "devDependencies": {
+    "@adr-tool/cli": "workspace:*",
     "@adr-tool/core": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@codemirror/commands": "^6.11.1",

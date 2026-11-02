@@ -1,6 +1,7 @@
-import { app, dialog, ipcMain, protocol, shell, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, protocol, session, shell, BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
@@ -365,12 +366,20 @@ function registerIpc(): void {
 
 /**
  * A page of an export as a PDF, A4, one ADR per page: loaded in a window nobody sees, which
- * runs no script and navigates nowhere — the page itself fetches nothing from elsewhere.
+ * runs no script, navigates nowhere, has no frames, and loads nothing but the files of the
+ * export in `site` — whatever the page asked for, nothing else of the disk ends up printed.
  */
-async function printToPdf(url: string): Promise<Buffer> {
+async function printToPdf(url: string, site: string): Promise<Buffer> {
+  // A session of its own, in memory: what it allows holds for this window alone.
+  const printing = session.fromPartition('export-print')
+  const inside = pathToFileURL(site).href + '/'
+  printing.webRequest.onBeforeRequest((details, callback) =>
+    callback({ cancel: details.resourceType === 'subFrame' || !details.url.startsWith(inside) })
+  )
   const window = new BrowserWindow({
     show: false,
     webPreferences: {
+      session: printing,
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,

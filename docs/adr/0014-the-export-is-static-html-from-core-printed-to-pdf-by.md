@@ -22,5 +22,7 @@ The people who live with an architecture's decisions do not all open the tool: a
 
 - The export opens from disk, from a file share or from any static web host, in any browser, with nothing to install.
 - It is written only into an empty directory, a new one, or one an earlier export wrote and marked; a later export there removes the pages of ADRs that are gone, and nothing else.
-- Images an ADR shows are copied when they are files of the repository; nothing is fetched from the web, and an image from elsewhere becomes a link.
+- Images an ADR shows are copied when they are images — by their extension — and files of the repository that are not hidden; nothing is fetched from the web, and an image from elsewhere becomes a link. An ADR cannot take `.env`, `.git/` or a page of the export along by naming it as an image. An SVG is copied as it is: shown in a page it runs nothing, but opened on its own from a web host, a browser runs what it holds — as it would from the repository.
+- The export writes and removes nothing through a symbolic link that stands in its directory, and a file it writes is a new file: a directory from a checkout or a share cannot lead it elsewhere. `adr export` and the app write through the same code (`packages/cli/src/export.ts`).
+- The window that prints the PDF has a session of its own that loads the files of the export and nothing else, and no frames.
 - The command line exports HTML only. A PDF needs a browser engine, which the app has and the command line does not bring along; HTML from `adr export` prints to PDF in any browser, with the same page breaks.

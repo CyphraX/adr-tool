@@ -4,7 +4,7 @@ import type { Relation } from '../relations/graph'
 import { isQualified } from '../relations/reference'
 import type { RelationType } from '../relation'
 import type { Status } from '../status'
-import { renderBody, type Links } from './markdown'
+import { isImage, renderBody, type Links } from './markdown'
 import { STYLE } from './style'
 
 export interface ExportOptions {
@@ -28,14 +28,21 @@ export interface ExportedFile {
  * server or the network. Writing it is the caller's: `core` writes nothing.
  */
 export interface Export {
+  /** The pages and the style sheet; the marker is not among them (`marker`). */
   readonly files: readonly ExportedFile[]
   /**
-   * The images the ADRs show, as paths of the repository. Each is copied, byte for byte, to
-   * the same path in the export; the pages point there.
+   * The images the ADRs show, as paths of the repository: files with the extension of an image,
+   * none of them hidden (`isImage`). Each is copied, byte for byte, to the same path in the
+   * export; the pages point there.
    */
   readonly images: readonly string[]
   /** The page with every exported ADR, one per printed page: what a PDF is made from. */
   readonly print: string
+  /**
+   * The marker, naming the files of the export: the pages and the images of `copied`. It is
+   * written last, once the images that could be copied are known.
+   */
+  readonly marker: (copied: readonly string[]) => ExportedFile
 }
 
 /**
@@ -136,6 +143,7 @@ export function exportSite(repository: Repository, options: ExportOptions): Expo
       return hrefFrom(exported.page, target.page) + (heading ? `#${heading}` : '')
     },
     image: (path) => {
+      if (!isImage(path)) return undefined
       images.add(path)
       return hrefFrom(print ? PRINT_PAGE : exported.page, path)
     },
@@ -193,9 +201,8 @@ export function exportSite(repository: Repository, options: ExportOptions): Expo
     `<main class="print">\n${articles.join('\n')}\n</main>`
   )
   files.push({ path: PRINT_PAGE, text: print })
-  const copied = [...images].sort()
   // What the export consists of: a later export into the directory removes what it no longer has.
-  files.push({
+  const marker = (copied: readonly string[]): ExportedFile => ({
     path: EXPORT_MARKER,
     text: `${JSON.stringify(
       {
@@ -203,13 +210,13 @@ export function exportSite(repository: Repository, options: ExportOptions): Expo
         date: options.date,
         title: options.title,
         logs: logs.map((log) => log.path),
-        files: [...files.map((file) => file.path), ...copied].sort()
+        files: [...new Set([...files.map((file) => file.path), ...copied])].sort()
       },
       null,
       2
     )}\n`
   })
-  return { files, images: copied, print }
+  return { files, images: [...images].sort(), print, marker }
 }
 
 /** An ADR as people name it: its number or ID, and its title. */

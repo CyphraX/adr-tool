@@ -14,8 +14,11 @@ export interface Links {
    * file is not exported: the link is then text.
    */
   readonly link: (path: string, fragment: string) => string | undefined
-  /** Where an image of the repository is in the export; it is copied there. */
-  readonly image: (path: string) => string
+  /**
+   * Where an image of the repository is in the export, where it is copied to; `undefined` for
+   * a file that is no image (`imageOf`): the image is then its alt text.
+   */
+  readonly image: (path: string) => string | undefined
   /**
    * The `id` of a heading of the ADR, from its slug as GitHub makes it; a link to `#slug` in
    * the same ADR leads there.
@@ -72,6 +75,23 @@ export function repositoryPath(directory: string, reference: string): string | u
   return segments.length === 0 ? undefined : segments.join('/')
 }
 
+/** The extensions of the images an export copies: those the app shows (main/assets.ts). */
+const IMAGE = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i
+
+/**
+ * Whether a path of the repository is an image the export may copy: a file with the extension
+ * of one, and not one that is hidden — the export never takes `.git/` or `.env` along, whatever
+ * an ADR names.
+ */
+export const isImage = (path: string): boolean =>
+  IMAGE.test(path) && !path.split('/').some((segment) => segment.startsWith('.'))
+
+/**
+ * The ids `remark-rehype` gives footnotes start with `user-content-`, and the sanitizer puts
+ * the same prefix in front again; the pages have no script that ids could clobber.
+ */
+const unprefixed = (id: string): string => id.replace(/^(?:user-content-)+/, '')
+
 const decodeFragment = (fragment: string): string => {
   try {
     return decodeURIComponent(fragment)
@@ -84,21 +104,39 @@ const decodeFragment = (fragment: string): string => {
 function rehypeExport() {
   return (tree: HtmlNode, file: { data: object }): void => {
     const links = (file.data as { links: Links }).links
-    const slugs = new Map<string, number>()
+    // As github-slugger counts: the second heading of a name is `-1`, and a suffix that is
+    // taken already by a heading of that name is skipped.
+    const occurrences = new Map<string, number>()
+    const unique = (slug: string): string => {
+      let result = slug
+      while (occurrences.has(result)) {
+        const count = occurrences.get(slug)! + 1
+        occurrences.set(slug, count)
+        result = `${slug}-${count}`
+      }
+      occurrences.set(result, 0)
+      return result
+    }
     const visit = (node: HtmlNode): void => {
       const properties = node.properties
       if (node.type === 'element' && properties) {
-        if (/^h[1-6]$/.test(node.tagName ?? '')) {
-          // The second heading of a name is `-1`, as on GitHub.
-          const slug = slugOf(textOf(node))
-          const seen = slugs.get(slug) ?? 0
-          slugs.set(slug, seen + 1)
-          properties['id'] = links.heading(seen === 0 ? slug : `${slug}-${seen}`)
+        const id = properties['id']
+        if (/^h[1-6]$/.test(node.tagName ?? '') && typeof id !== 'string') {
+          properties['id'] = links.heading(unique(slugOf(textOf(node))))
+        } else if (typeof id === 'string') {
+          // The footnotes, and the heading above them, keep the ids they were given.
+          properties['id'] = links.heading(unprefixed(id))
+        }
+        const described = properties['ariaDescribedBy']
+        if (Array.isArray(described)) {
+          properties['ariaDescribedBy'] = described.map((one) =>
+            links.heading(unprefixed(String(one)))
+          )
         }
         if (node.tagName === 'a' && typeof properties['href'] === 'string') {
           const href = properties['href']
           if (href.startsWith('#')) {
-            properties['href'] = `#${links.heading(decodeFragment(href.slice(1)))}`
+            properties['href'] = `#${links.heading(unprefixed(decodeFragment(href.slice(1))))}`
           } else if (!/^(?:https?:|mailto:)/i.test(href)) {
             const path = repositoryPath(links.directory, href)
             const fragment = decodeFragment(/#(.*)$/.exec(href)?.[1] ?? '')
@@ -113,10 +151,17 @@ function rehypeExport() {
           const source = properties['src']
           const path =
             typeof source === 'string' ? repositoryPath(links.directory, source) : undefined
-          if (path !== undefined) properties['src'] = links.image(path)
-          else {
+          const copied = path === undefined ? undefined : links.image(path)
+          const alt = typeof properties['alt'] === 'string' ? properties['alt'] : ''
+          if (copied !== undefined) properties['src'] = copied
+          else if (path !== undefined) {
+            // A file of the repository that is no image is not copied: its alt text stays.
+            node.type = 'text'
+            node.value = alt
+            delete node.tagName
+            delete node.properties
+          } else {
             // An image from elsewhere would be fetched from the network: it is a link to it.
-            const alt = typeof properties['alt'] === 'string' ? properties['alt'] : ''
             node.tagName = 'a'
             node.properties =
               typeof source === 'string' && /^https?:/i.test(source) ? { href: source } : {}
