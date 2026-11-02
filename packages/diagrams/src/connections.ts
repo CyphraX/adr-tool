@@ -3,7 +3,12 @@
  * the Diagram and the code (docs/diagrams-format.md, section 4). Both are derived from
  * Structure's Dependencies whenever they are asked for, and never stored.
  */
-import { everyComponent, type Dependency, type Structure } from '@adr-tool/structure/model'
+import {
+  edgesAmong,
+  everyComponent,
+  type Dependency,
+  type Structure
+} from '@adr-tool/structure/model'
 import { connectionsOf, elementsOf, type Diagram } from './diagram'
 import { englishOf, type DiagramsSaid } from './sentences'
 
@@ -23,7 +28,7 @@ export interface SuggestedConnection {
   readonly weight: number
   /** Every Dependency behind it is type-only. */
   readonly typeOnly: boolean
-  /** The Source File Dependencies behind it, in the order of their paths. */
+  /** The Source File Dependencies behind it, in the order Structure gives them: of `from`, then `to`. */
   readonly dependencies: readonly Dependency[]
   /** The Diagram connects the two this way already. */
   readonly drawn: boolean
@@ -47,8 +52,6 @@ export type Drift =
       readonly typeOnly: boolean
       readonly dependencies: readonly Dependency[]
     }
-
-const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /**
  * For each Source File, the shown Component it counts for: the deepest shown one that contains
@@ -95,28 +98,18 @@ export function suggestConnections(
   options: ConnectionOptions = {}
 ): SuggestedConnection[] {
   if (model.origin !== 'declared') return []
-  const counts = countingFor(diagram, model, options)
-  const behind = new Map<string, { from: string; to: string; dependencies: Dependency[] }>()
-  for (const dependency of dependencies) {
-    const from = counts.get(dependency.from)
-    const to = counts.get(dependency.to)
-    if (from === undefined || to === undefined || from === to) continue
-    const key = `${from}\n${to}`
-    const found = behind.get(key) ?? { from, to, dependencies: [] }
-    found.dependencies.push(dependency)
-    behind.set(key, found)
+  // Each shown Component stands for the Source Files that count for it, as a node of Structure's
+  // levels stands for its own.
+  const files = new Map<string, string[]>()
+  for (const [file, id] of countingFor(diagram, model, options)) {
+    files.set(id, [...(files.get(id) ?? []), file])
   }
+  const nodes = [...files].map(([id, list]) => ({ id, files: list }))
   const drawn = new Set(connectionsOf(diagram).map(({ from, to }) => `${from}\n${to}`))
-  return [...behind.values()]
-    .map(({ from, to, dependencies: list }): SuggestedConnection => ({
-      from,
-      to,
-      weight: list.length,
-      typeOnly: list.every((dependency) => dependency.typeOnly),
-      dependencies: [...list].sort((a, b) => compare(a.from, b.from) || compare(a.to, b.to)),
-      drawn: drawn.has(`${from}\n${to}`)
-    }))
-    .sort((a, b) => compare(a.from, b.from) || compare(a.to, b.to))
+  return edgesAmong(nodes, dependencies).map((edge) => ({
+    ...edge,
+    drawn: drawn.has(`${edge.from}\n${edge.to}`)
+  }))
 }
 
 /**
