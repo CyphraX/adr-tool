@@ -572,10 +572,18 @@ class AppState {
   }
 
   show(view: MiddleView): void {
-    if (!this.active) return
-    this.active.view = view
-    // Branches move without the working tree knowing: what they hold is asked for again.
-    if (view === 'branches') void this.loadBranches(this.active)
+    const tab = this.active
+    if (!tab) return
+    if (view !== 'branches') {
+      tab.view = view
+      return
+    }
+    // The ADR of a branch takes the place of the ADR that is open, and of its editor.
+    this.leaveEditor(() => {
+      tab.view = view
+      // Branches move without the working tree knowing: what they hold is asked for again.
+      void this.loadBranches(tab)
+    })
   }
 
   /** Ask git what the branches that are not checked out do to the ADRs. */
@@ -589,16 +597,28 @@ class AppState {
     branches.overview = overview
     branches.loading = false
     // The ADR that is open may be gone from the overview: its branch was merged or deleted.
+    // When the branch has a new commit, it is read as that commit has it.
     const open = branches.selected
     if (open && !overview?.branches.some((branch) => branch.sha === open.sha)) {
-      branches.selected = undefined
-      branches.adr = undefined
+      const moved = overview?.branches.find(
+        (branch) =>
+          branch.names.includes(open.branch) && branch.adrs.some((adr) => adr.path === open.path)
+      )
+      if (moved) void this.showBranchAdr(moved.sha, open.path, open.branch, tab)
+      else {
+        branches.selected = undefined
+        branches.adr = undefined
+      }
     }
   }
 
   /** Open an ADR as a branch has it, read-only. */
-  async showBranchAdr(sha: string, path: string, branch: string): Promise<void> {
-    const tab = this.active
+  async showBranchAdr(
+    sha: string,
+    path: string,
+    branch: string,
+    tab: Tab | undefined = this.active
+  ): Promise<void> {
     if (!tab) return
     tab.branches.selected = { sha, path, branch }
     tab.branches.adr = undefined

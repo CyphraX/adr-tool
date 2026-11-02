@@ -4,7 +4,16 @@
 
   // The ADR itself, set as a document: the same in the reading view and in the editor's preview.
   // With a base, the images it names next to it in its repository are shown.
-  let { markdown, base }: { markdown: string; base?: DocumentBase | undefined } = $props()
+  let {
+    markdown,
+    base,
+    onfile = (fileName: string) => app.selectByFileName(fileName)
+  }: {
+    markdown: string
+    base?: DocumentBase | undefined
+    /** A link to a file next to the ADR: by default, the ADR of this log it names is selected. */
+    onfile?: (fileName: string) => void
+  } = $props()
   const html = $derived(renderMarkdown(markdown, base))
 
   // Nothing navigates inside the app. A link to another ADR of this log selects it;
@@ -15,7 +24,7 @@
     if (!href) return
     event.preventDefault()
     if (/^https?:\/\//i.test(href)) void window.api.openExternal(href)
-    else app.selectByFileName(decodeURIComponent(href.split(/[?#]/)[0]!.split('/').pop()!))
+    else onfile(decodeURIComponent(href.split(/[?#]/)[0]!.split('/').pop()!))
   }
 </script>
 

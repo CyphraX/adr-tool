@@ -19,6 +19,14 @@ describe('discoverLogs', () => {
     })
   })
 
+  it('takes a directory listed twice for one Decision Log, as its first entry has it', async () => {
+    const fs = memoryFileSystem({
+      '.adr/config.yml':
+        'logs:\n  - path: docs/adr\n    naming: sequential\n  - path: docs/adr/\n    naming: date\n'
+    })
+    expect((await discoverLogs(fs)).locations).toEqual([{ path: 'docs/adr', naming: 'sequential' }])
+  })
+
   it("falls back to adr-tools' .adr-dir, also when written on Windows", async () => {
     const fs = memoryFileSystem({ '.adr-dir': 'doc\\architecture\r\n', 'docs/adr/0001-a.md': ADR })
     expect(await discoverLogs(fs)).toEqual({

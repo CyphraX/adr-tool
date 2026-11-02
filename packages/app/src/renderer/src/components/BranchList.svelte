@@ -7,8 +7,14 @@
   const branches = $derived(app.active?.branches)
   const overview = $derived(branches?.overview)
   const selected = $derived(branches?.selected)
-  // With one Decision Log there is no need to say which one an ADR belongs to.
-  const severalLogs = $derived((app.active?.repository.repository.logs.length ?? 0) > 1)
+  // With one Decision Log there is no need to say which one an ADR belongs to; a branch may
+  // have one that the working tree has not.
+  const severalLogs = $derived(
+    new Set([
+      ...(app.active?.repository.repository.logs.map((log) => log.path) ?? []),
+      ...(overview?.branches.flatMap((branch) => branch.adrs.map((adr) => adr.log)) ?? [])
+    ]).size > 1
+  )
 
   const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
   const dated = (iso: string): string => {
@@ -25,15 +31,21 @@
     </button>
   </div>
 
-  <div class="rows" aria-label={t.branches.label} aria-busy={branches?.loading}>
+  <div class="rows" role="region" aria-label={t.branches.label} aria-busy={branches?.loading}>
     {#if overview === undefined}
-      <p class="empty">{branches?.loading ? t.branches.asking : t.branches.none}</p>
+      <p class="empty">{branches?.loading ? t.branches.asking : t.branches.failed}</p>
+    {:else if overview.failed}
+      <p class="empty">{t.branches.failed}</p>
     {:else if overview.branches.length === 0}
       <p class="empty">{t.branches.none}</p>
-    {:else}
+    {/if}
+    {#if overview && overview.unread.length > 0}
+      <p class="unread">{t.branches.unread(overview.unread.join(', '))}</p>
+    {/if}
+    {#if overview && overview.branches.length > 0}
       {#each overview.branches as branch (branch.sha)}
         {@const [name, ...others] = branch.names}
-        <section aria-label={name}>
+        <div class="branch" role="group" aria-label={name}>
           <h3>
             <span class="name">{name}</span>
             {#if others.length > 0}
@@ -58,13 +70,17 @@
               </span>
               <span class="status">
                 <StatusMark {status} />
-                {STATUS_LABEL[status]}
+                {adr.rawStatus ?? STATUS_LABEL[status]}
               </span>
               <span class="change">
                 {#if adr.change === 'added'}
                   <span class="tag" title={t.branches.addedHint}>{t.branches.added}</span>
-                {:else if adr.statusHere}
-                  <span class="tag">{t.branches.here(STATUS_LABEL[adr.statusHere])}</span>
+                {:else if adr.statusHere || adr.rawStatusHere}
+                  <span class="tag">
+                    {t.branches.here(
+                      adr.rawStatusHere ?? STATUS_LABEL[adr.statusHere ?? 'unknown']
+                    )}
+                  </span>
                 {/if}
               </span>
               {#if adr.sameNumber.length > 0}
@@ -74,7 +90,7 @@
               {/if}
             </button>
           {/each}
-        </section>
+        </div>
       {/each}
     {/if}
   </div>
@@ -128,7 +144,14 @@
     color: var(--ink-soft);
   }
 
-  section + section {
+  .unread {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    color: var(--problem);
+    font-size: 12px;
+  }
+
+  .branch + .branch {
     border-top: 1px solid var(--line);
   }
 

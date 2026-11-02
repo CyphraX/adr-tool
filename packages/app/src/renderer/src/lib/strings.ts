@@ -130,6 +130,9 @@ export const t = {
     refresh: 'Refresh',
     asking: 'Asking git…',
     none: 'No other branch adds or decides an ADR that this branch does not have.',
+    failed: 'Git could not list the branches.',
+    unread: (names: string): string =>
+      `Git could not read every ADR of ${names}: what they add or decide is not shown.`,
     also: (names: string): string => `also ${names}`,
     lastCommit: (date: string): string => `last commit ${date}`,
     added: 'new',

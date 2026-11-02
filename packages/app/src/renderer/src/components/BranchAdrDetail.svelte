@@ -2,12 +2,20 @@
   import type { Adr } from '@adr-tool/core'
   import { t } from '../lib/strings'
   import { STATUS_LABEL, prefixOf } from '../lib/wording'
+  import { app } from '../lib/state.svelte'
   import MarkdownDocument from './MarkdownDocument.svelte'
   import StatusStamp from './StatusStamp.svelte'
 
   // An ADR as a branch that is not checked out has it: read, never written.
-  let { adr, branch }: { adr: Adr; branch: string } = $props()
+  let { adr, sha, branch }: { adr: Adr; sha: string; branch: string } = $props()
   const status = $derived(adr.metadata.status ?? 'unknown')
+
+  // A link to another ADR leads to it as the same branch has it.
+  const directory = $derived(adr.path.slice(0, Math.max(0, adr.path.lastIndexOf('/'))))
+  const openOnBranch = (fileName: string): void => {
+    if (!fileName.endsWith('.md')) return
+    void app.showBranchAdr(sha, directory ? `${directory}/${fileName}` : fileName, branch)
+  }
 
   const facts = $derived(
     [
@@ -41,7 +49,7 @@
     {/if}
   </header>
   <div class="reading">
-    <MarkdownDocument markdown={adr.body} />
+    <MarkdownDocument markdown={adr.body} onfile={openOnBranch} />
   </div>
 </article>
 

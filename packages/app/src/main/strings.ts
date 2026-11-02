@@ -4,6 +4,10 @@
  * texts are in the renderer (lib/strings.ts, lib/wording.ts); what `core` says when it
  * refuses an operation is `core`'s.
  */
+/** `a`, `a and b`, `a, b and c`. */
+const list = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
+
 export const t = {
   openRepository: 'Open repository',
   notCommittedYet: 'Not committed yet',
@@ -39,7 +43,7 @@ export const t = {
       `git could not take ${files} out of the index again, where the app had announced them for the commit. \`git rm --cached\` with their paths does that; the files on disk stay as they are.`
   },
   branches: {
-    numberTaken: (number: number, branch: string, id: string): string =>
-      `On the branch ${branch}, ${id} has the number ${number} too. Whichever of the two is merged second has to be renumbered.`
+    numberTaken: (number: number, branches: readonly string[], id: string): string =>
+      `On the ${branches.length === 1 ? 'branch' : 'branches'} ${list(branches)}, ${id} has the number ${number} too. Whichever of the two is merged second has to be renumbered.`
   }
 }

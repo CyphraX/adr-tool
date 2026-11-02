@@ -79,6 +79,8 @@ function readConfig(text: string): Pick<Discovery, 'locations' | 'problems'> {
     if (naming !== undefined && naming !== 'sequential' && naming !== 'date') {
       return invalid(`"naming" must be sequential or date, not "${naming}"`)
     }
+    // A directory listed twice is one Decision Log; the first entry for it counts.
+    if (locations.some((location) => location.path === path)) continue
     locations.push({ path, ...(naming !== undefined && { naming }) })
   }
   return { locations, problems: [] }

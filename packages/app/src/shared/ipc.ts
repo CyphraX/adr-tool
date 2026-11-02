@@ -364,6 +364,10 @@ export interface OtherBranch {
 
 export interface BranchOverview {
   readonly branches: readonly OtherBranch[]
+  /** The branches git could not read: what they do is not known. */
+  readonly unread: readonly string[]
+  /** Git could not list the branches. */
+  readonly failed?: boolean
 }
 
 export type CommitResult =

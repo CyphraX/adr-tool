@@ -194,7 +194,11 @@
           {#if app.active.view === 'branches'}
             {@const branches = app.active.branches}
             {#if branches.selected && branches.adr}
-              <BranchAdrDetail adr={branches.adr} branch={branches.selected.branch} />
+              <BranchAdrDetail
+                adr={branches.adr}
+                sha={branches.selected.sha}
+                branch={branches.selected.branch}
+              />
             {:else}
               <main class="message on-paper">
                 <p>

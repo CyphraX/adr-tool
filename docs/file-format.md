@@ -171,7 +171,7 @@ The tool looks, in this order, and stops at the first step that yields something
 3. The directories `docs/adr`, `doc/adr` and `docs/decisions`; each one that exists is a Decision Log.
 4. Nothing found: the repository has no Decision Log yet. The first ADR is created in `docs/adr` (section 7).
 
-Opening a repository never writes. `.adr/` is created the first time something has to be configured.
+A directory listed twice in `logs` is one Decision Log; its first entry counts. Opening a repository never writes. `.adr/` is created the first time something has to be configured.
 
 ```yaml
 # .adr/config.yml

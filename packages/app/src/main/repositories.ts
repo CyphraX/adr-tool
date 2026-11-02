@@ -74,6 +74,10 @@ interface Entry {
   reload?: NodeJS.Timeout
   /** What was read from other branches: commits do not change. */
   readonly branches: BranchCache
+  /** The overview that is being made, and the one asked for while it is. */
+  overview?: { running: Promise<BranchOverview>; next?: Promise<BranchOverview> }
+  /** The commits the last overview listed: those whose ADRs the renderer may ask for. */
+  listed?: ReadonlySet<string>
 }
 
 /**
@@ -247,8 +251,9 @@ export class Repositories {
     if (!plan.ok || numbered === undefined || log.naming !== 'sequential') {
       return this.hold(repositoryId, plan)
     }
-    const overview = await branchOverview(gitIn(entry.root), repository, entry.branches)
-    const taken = numberWarnings(overview, log.path, numbered, log.naming)
+    // Without what the branches have, the plan goes without the warning.
+    const overview = await this.overviewOf(entry).catch(() => undefined)
+    const taken = overview ? numberWarnings(overview, log.path, numbered, log.naming) : []
     return this.hold(
       repositoryId,
       taken.length > 0 ? { ...plan, warnings: [...(plan.warnings ?? []), ...taken] } : plan
@@ -259,16 +264,40 @@ export class Repositories {
   async branches(repositoryId: string): Promise<BranchOverview | undefined> {
     const entry = this.entries.get(repositoryId)
     if (!entry) return undefined
-    const git = gitIn(entry.root)
-    if (!(await git.workingTree())) return undefined
-    const here = await openRepository(nodeFileSystem(entry.root))
-    return branchOverview(git, here, entry.branches)
+    if ((await gitIn(entry.root).directory()) === undefined) return undefined
+    const overview = await this.overviewOf(entry)
+    entry.listed = new Set(overview.branches.map((branch) => branch.sha))
+    return overview
   }
 
-  /** An ADR as a branch has it, read-only: only one the overview listed for that commit. */
+  /**
+   * One overview at a time for a repository: what is asked for while one is made gets the
+   * next one, made once it is done — and one for every request that came in the meantime.
+   */
+  private overviewOf(entry: Entry): Promise<BranchOverview> {
+    const make = (): Promise<BranchOverview> => {
+      const running = (async () => {
+        const here = await openRepository(nodeFileSystem(entry.root))
+        return branchOverview(gitIn(entry.root), here, entry.branches)
+      })()
+      entry.overview = { running }
+      const done = (): void => {
+        if (entry.overview?.running === running && !entry.overview.next) entry.overview = undefined
+      }
+      running.then(done, done)
+      return running
+    }
+    const current = entry.overview
+    if (!current) return make()
+    current.next ??= current.running.then(make, make)
+    return current.next
+  }
+
+  /** An ADR as a branch has it, read-only: only one of a commit the last overview listed. */
   async branchAdr(repositoryId: string, sha: string, path: string): Promise<Adr | undefined> {
     const entry = this.entries.get(repositoryId)
-    return entry && branchAdr(gitIn(entry.root), sha, path, entry.branches)
+    if (!entry?.listed?.has(sha)) return undefined
+    return branchAdr(gitIn(entry.root), sha, path, entry.branches)
   }
 
   /**

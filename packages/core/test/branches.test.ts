@@ -55,7 +55,80 @@ describe('What a branch did to the ADRs (docs/plan-roadmap.md, part 8)', () => {
 
     expect(branchChanges(branch, here, base)).toEqual([])
     // Without the merge base, the branch would seem to add it.
-    expect(branchChanges(branch, here, undefined).map((adr) => adr.id)).toEqual(['0002-second'])
+    expect(branchChanges(branch, here, 'unrelated').map((adr) => adr.id)).toEqual(['0002-second'])
+  })
+
+  it('takes an ADR renamed on the branch for the one it was, and lists what it decided', async () => {
+    const base = await open(MAIN)
+    const here = await open(MAIN)
+    const renamed = await open({
+      'docs/adr/0001-first.md': MAIN['docs/adr/0001-first.md'],
+      'docs/adr/0002-better-second.md': MAIN['docs/adr/0002-second.md']
+    })
+    // A rename keeps the number: it takes none from anybody.
+    expect(branchChanges(renamed, here, base)).toEqual([])
+
+    const accepted = await open({
+      'docs/adr/0001-first.md': MAIN['docs/adr/0001-first.md'],
+      'docs/adr/0002-better-second.md': adr('accepted', 'Second')
+    })
+    expect(branchChanges(accepted, here, base)).toEqual([
+      expect.objectContaining({
+        id: '0002-better-second',
+        change: 'status',
+        statusHere: 'proposed',
+        sameNumber: []
+      })
+    ])
+  })
+
+  it('finds an ADR the working tree renamed under its new ID', async () => {
+    const base = await open(MAIN)
+    const here = await open({
+      'docs/adr/0001-first.md': MAIN['docs/adr/0001-first.md'],
+      'docs/adr/0002-renamed.md': MAIN['docs/adr/0002-second.md']
+    })
+    const branch = await open({ ...MAIN, 'docs/adr/0002-second.md': adr('accepted', 'Second') })
+
+    expect(branchChanges(branch, here, base)).toEqual([
+      expect.objectContaining({
+        id: '0002-second',
+        change: 'status',
+        status: 'accepted',
+        statusHere: 'proposed',
+        sameNumber: []
+      })
+    ])
+  })
+
+  it('tells one Status it cannot read from another', async () => {
+    const draft = { ...MAIN, 'docs/adr/0002-second.md': adr('draft', 'Second') }
+    const base = await open(draft)
+    const here = await open(draft)
+    const branch = await open({ ...MAIN, 'docs/adr/0002-second.md': adr('wip', 'Second') })
+
+    expect(branchChanges(branch, here, base)).toEqual([
+      expect.objectContaining({
+        id: '0002-second',
+        change: 'status',
+        rawStatus: 'wip',
+        rawStatusHere: 'draft'
+      })
+    ])
+  })
+
+  it('without a merge base it can read, lists only what the working tree does not have', async () => {
+    const here = await open(MAIN)
+    const branch = await open({
+      ...MAIN,
+      'docs/adr/0002-second.md': adr('accepted', 'Second'),
+      'docs/adr/0003-kafka.md': adr('proposed', 'Use Kafka')
+    })
+
+    // Whether the branch accepted 0002, or the working tree took it back, cannot be told.
+    expect(branchChanges(branch, here, 'unknown').map((adr) => [adr.id, adr.change])).toEqual([
+      ['0003-kafka', 'added']
+    ])
   })
 
   it('leaves out what the working tree has already, as the branch has it', async () => {
