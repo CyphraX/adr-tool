@@ -3,6 +3,7 @@ import { memoryFileSystem, openRepository } from '@adr-tool/core'
 import type { OpenRepository } from '../src/shared/ipc'
 import {
   everyAdr,
+  outsideCandidates,
   outsideOf,
   outsideRelations,
   problemsAcross,
@@ -76,6 +77,25 @@ describe('the repositories seen together (part 13)', () => {
     ])
   })
 
+  it('offers the ADRs of the other open repositories by the reference a Relation writes', async () => {
+    const repositories = await twoRepositories()
+    expect(outsideCandidates(repositories, 'a').map((one) => one.id)).toEqual([
+      'payments:docs/adr/0001-ledger',
+      'payments:docs/adr/0002-broken'
+    ])
+    // A repository that shares the name of the one in front, or of one before it, is not offered:
+    // a reference by that name would lead elsewhere.
+    const twin = await open('c', 'shop', { 'docs/adr/0001-x.md': adr('status: accepted', '# X\n') })
+    expect(outsideCandidates([...repositories, twin], 'a').map((one) => one.repositoryId)).toEqual([
+      'b',
+      'b'
+    ])
+    expect(outsideCandidates([...repositories, twin], 'b').map((one) => one.repositoryId)).toEqual([
+      'a',
+      'a'
+    ])
+  })
+
   it('searches every open repository, the one in front first where hits tie', async () => {
     const repositories = await twoRepositories()
     const hits = searchAll(repositories, 'ledger', { repositoryId: 'b', log: 'docs/adr' })
@@ -99,5 +119,13 @@ describe('the repositories seen together (part 13)', () => {
       ['shop', 0],
       ['payments', 1]
     ])
+    // Each Problem leads to the ADR it is about, in its repository.
+    const [broken] = problems[1]!.logs[0]!.groups
+    expect(broken!.problem.kind).toBe('invalid-frontmatter')
+    expect(broken!.subjects.map((one) => [one.repositoryId, one.log, one.adr.id])).toEqual([
+      ['b', 'docs/adr', '0002-broken']
+    ])
+    // A log without Problems is left out.
+    expect(problems[0]!.logs).toEqual([])
   })
 })

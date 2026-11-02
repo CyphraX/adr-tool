@@ -21,6 +21,7 @@
   import StructureSidebar from './components/StructureSidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import TimelineView from './components/TimelineView.svelte'
+  import TogetherView from './components/TogetherView.svelte'
   import {
     LIMITS,
     fitMiddle,
@@ -188,6 +189,8 @@
             <BoardView log={app.log} />
           {:else if app.active.view === 'dashboard' && app.log}
             <DashboardView log={app.log} />
+          {:else if app.active.view === 'all-adrs' || app.active.view === 'all-problems'}
+            <TogetherView />
           {:else}
             <AdrList />
           {/if}
@@ -230,7 +233,9 @@
               <p>
                 {app.active.view === 'problems'
                   ? t.welcome.selectToSeeProblems
-                  : t.welcome.selectToRead}
+                  : app.active.view === 'all-adrs' || app.active.view === 'all-problems'
+                    ? t.together.hint
+                    : t.welcome.selectToRead}
               </p>
             </main>
           {/if}
