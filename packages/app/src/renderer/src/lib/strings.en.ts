@@ -1,4 +1,4 @@
-import type { RelationType } from '@adr-tool/core'
+import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 import type { Refusal } from './views'
 
@@ -36,6 +36,14 @@ const many = (count: number, one: string, more: string): string => (count === 1 
 
 /** A count as the window writes it: 9,115. */
 const count = (value: number): string => value.toLocaleString('en')
+
+/** What a line of the Relations graph says, read out: "ADR 0003 (…) supersedes ADR 0001 (…)". */
+const LINE_VERB: Record<RelationType, string> = {
+  supersedes: 'supersedes',
+  amends: 'amends',
+  'depends-on': 'depends on',
+  'relates-to': 'relates to'
+}
 
 /** The metrics of section 5 of the Structure format, as the window names and shows them. */
 export const METRICS = [
@@ -647,7 +655,31 @@ export const en = {
         count,
         'One ADR has no Relation and is not drawn.',
         `${count} ADRs have no Relation and are not drawn.`
-      )
+      ),
+    /** … while some Relation types are left out. */
+    unrelatedShown: (count: number): string =>
+      many(
+        count,
+        'One ADR has no Relation of the types shown and is not drawn.',
+        `${count} ADRs have no Relation of the types shown and are not drawn.`
+      ),
+    noneShown: 'No Relation of the types ticked below. Tick a type to draw its Relations.',
+    filterHint: 'Show or hide the Relations of this type',
+    /** The buttons that change the size of the drawing; on a Mac the key is ⌘. */
+    zoom: (mac: boolean): string =>
+      `Size of the drawing. ${mac ? '⌘' : 'Ctrl'} and the mouse wheel change it too.`,
+    smaller: 'Smaller',
+    larger: 'Larger',
+    percent: (percent: number): string => `${percent}%`,
+    actualSize: 'Show it at its actual size',
+    fit: 'Fit',
+    fitHint: 'Show all of the drawing in the pane',
+    /** The lines, read out: a list a screen reader finds beside the drawing. */
+    spoken: 'The Relations in the drawing',
+    adrName: (prefix: string, title: string, log: string | undefined): string =>
+      log === undefined ? `ADR ${prefix} (${title})` : `ADR ${prefix} (${title}) of ${log}`,
+    line: (from: string, type: RelationType, to: string, state: RelationState): string =>
+      `${from} ${LINE_VERB[type]} ${to}${state === 'pending' ? ', proposed' : state === 'void' ? ', which never took effect' : ''}`
   },
 
   searching: {

@@ -3,7 +3,13 @@ import type { Relation, RelationType } from '@adr-tool/core'
 import {
   NODE,
   SAME_LAYER_REACH,
+  ZOOM,
+  fitScale,
   layoutGraph as layoutLayers,
+  relationsShown,
+  scrollAfterZoom,
+  stepScale,
+  wheelScale,
   type GraphLayout,
   type LayoutEdge
 } from '../src/renderer/src/lib/graph-layout'
@@ -154,6 +160,103 @@ describe('the layout of the Relations graph', () => {
       }
     }
     expect(layout.edges).toHaveLength(relations.length)
+  })
+})
+
+describe('the Relations graph filtered by Relation type', () => {
+  const relations = [
+    relation('2', 'supersedes', '1'),
+    relation('3', 'depends-on', '2'),
+    relation('4', 'relates-to', '1'),
+    relation('5', 'amends', 'docs/decisions/0001-a'),
+    relation('docs/decisions/0002-b', 'depends-on', '5')
+  ]
+  const own = ['1', '2', '3', '4', '5']
+  const guests = ['docs/decisions/0001-a', 'docs/decisions/0002-b']
+  const drawn = (types: RelationType[], selected?: string) => {
+    const shown = relationsShown(own, guests, relations, types)
+    const layout = layoutLayers(shown.ids, shown.relations, {
+      decidesLayer: (one) => one.type !== 'relates-to',
+      keep: selected === undefined ? [] : [selected]
+    })
+    return {
+      ids: layout.nodes.map((node) => node.id).sort(),
+      edges: layout.edges.length,
+      unrelated: layout.unrelated
+    }
+  }
+
+  it('draws every Relation, and the ADRs of other logs they lead to, when every type is shown', () => {
+    expect(drawn(['supersedes', 'amends', 'depends-on', 'relates-to'])).toEqual({
+      ids: ['1', '2', '3', '4', '5', ...guests].sort(),
+      edges: 5,
+      unrelated: 0
+    })
+  })
+
+  it('leaves out the Relations of a type that is not shown, and the ADRs left without one', () => {
+    expect(drawn(['supersedes'])).toEqual({ ids: ['1', '2'], edges: 1, unrelated: 3 })
+    // An ADR of another log is only drawn for a Relation that is: it is not counted either.
+    expect(drawn(['depends-on'])).toEqual({
+      ids: ['2', '3', '5', 'docs/decisions/0002-b'],
+      edges: 2,
+      unrelated: 2
+    })
+    expect(drawn([])).toEqual({ ids: [], edges: 0, unrelated: 5 })
+  })
+
+  it('keeps the selected ADR in the drawing, with a Relation shown or without', () => {
+    expect(drawn(['supersedes'], '4')).toEqual({ ids: ['1', '2', '4'], edges: 1, unrelated: 2 })
+    expect(drawn([], '3')).toEqual({ ids: ['3'], edges: 0, unrelated: 4 })
+  })
+})
+
+describe('the zoom of a drawing', () => {
+  it('steps by a quarter, to whole percents that meet again on the way back', () => {
+    expect(stepScale(1, 1)).toBe(1.25)
+    expect(stepScale(1.25, -1)).toBe(1)
+    let scale = 1
+    for (let step = 0; step < 4; step++) scale = stepScale(scale, -1)
+    for (let step = 0; step < 4; step++) scale = stepScale(scale, 1)
+    expect(scale).toBe(1)
+    expect(stepScale(ZOOM.max, 1)).toBe(ZOOM.max)
+    expect(stepScale(ZOOM.min, -1)).toBe(ZOOM.min)
+  })
+
+  it('follows the wheel smoothly: down is smaller, up is larger, within the limits', () => {
+    expect(wheelScale(1, 100)).toBeLessThan(1)
+    expect(wheelScale(1, -100)).toBeGreaterThan(1)
+    // A trackpad turns by a few pixels, and still zooms.
+    expect(wheelScale(1, 2)).toBeLessThan(1)
+    expect(wheelScale(1, 3, 1)).toBeCloseTo(wheelScale(1, 120), 10)
+    expect(wheelScale(1, 100_000)).toBe(ZOOM.min)
+    expect(wheelScale(1, -100_000)).toBe(ZOOM.max)
+  })
+
+  it('fits the whole drawing into the pane, and never draws it larger than it is', () => {
+    expect(fitScale({ width: 2000, height: 500 }, { width: 1000, height: 800 })).toBe(0.5)
+    expect(fitScale({ width: 600, height: 1800 }, { width: 1000, height: 600 })).toBe(0.33)
+    expect(fitScale({ width: 300, height: 200 }, { width: 1000, height: 800 })).toBe(1)
+    expect(fitScale({ width: 5172, height: 980 }, { width: 819, height: 756 })).toBe(0.15)
+    expect(fitScale({ width: 40_000, height: 200 }, { width: 1000, height: 800 })).toBe(ZOOM.min)
+    expect(fitScale({ width: 0, height: 0 }, { width: 1000, height: 800 })).toBe(1)
+  })
+
+  it('keeps the point under the cursor where it is', () => {
+    const scroll = { left: 120, top: 40 }
+    const cursor = { x: 300, y: 200 }
+    const after = scrollAfterZoom(scroll, cursor, 1, 2)
+    // The point of the drawing under the cursor, before and after.
+    const point = (at: typeof scroll, scale: number) => ({
+      x: (at.left + cursor.x) / scale,
+      y: (at.top + cursor.y) / scale
+    })
+    expect(point(after, 2)).toEqual(point(scroll, 1))
+    const back = point(scrollAfterZoom(after, cursor, 2, 0.9), 0.9)
+    expect(back.x).toBeCloseTo(point(scroll, 1).x, 9)
+    expect(back.y).toBeCloseTo(point(scroll, 1).y, 9)
+    // The pane cannot scroll to before its start.
+    expect(scrollAfterZoom({ left: 0, top: 0 }, cursor, 1, 0.5)).toEqual({ left: 0, top: 0 })
   })
 })
 
