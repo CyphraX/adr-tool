@@ -8,7 +8,8 @@ import { fillTemplate, loadTemplate } from '../templates/templates'
 import type { Eol } from '../text/source'
 import type { Today } from './decide'
 import { Refusal, plan } from './pending'
-import { requireTarget } from './rules'
+import { isQualified } from '../relations/reference'
+import { named, requireTarget } from './rules'
 
 export interface NewAdr extends Today {
   readonly title: string
@@ -33,8 +34,12 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
 
     const relation = adr.relation
     if (relation) {
-      const target = log.adrs.find((candidate) => candidate.id === relation.target)
-      if (!target) throw new Refusal(`There is no ADR ${relation.target} in this Decision Log.`)
+      const target = named(log, relation.target)
+      if (!target) {
+        throw new Refusal(
+          `There is no ADR ${relation.target} in this ${isQualified(relation.target) ? 'repository' : 'Decision Log'}.`
+        )
+      }
       requireTarget(relation.type, target)
     }
 

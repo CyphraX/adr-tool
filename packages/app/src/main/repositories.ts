@@ -48,6 +48,7 @@ const FIRST_LOG: DecisionLog = {
   naming: 'sequential',
   adrs: [],
   relations: [],
+  guests: [],
   problems: []
 }
 

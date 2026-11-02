@@ -56,6 +56,17 @@ export interface Adr {
   readonly metadataWritable: boolean
 }
 
+/**
+ * An ADR of another Decision Log of the repository, as a log sees it: everything the tool
+ * reads from its file but its body. Relations across logs name it by its reference.
+ */
+export interface GuestAdr extends Omit<Adr, 'body'> {
+  /** How the log names it: `<log>/<ID>` (docs/file-format.md, section 3). */
+  readonly reference: string
+  /** The directory of its own Decision Log. */
+  readonly log: string
+}
+
 const NO_MIGRATION = {
   successorInText:
     'names its successor in its Status text, where adr-tools writes a link. As a `status` that would be read the way MADR means it, and say something else than it says now. Make it a link line by hand — Superseded by [2. Title](0002-title.md) — and it can be migrated.'

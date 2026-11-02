@@ -88,7 +88,11 @@ export function groupProblems(log: {
 }
 
 /** Whether `adr` itself names `target` in its Relations of `type`, or another file says so. */
-export function carries(adr: Adr, type: RelationType, target: string): boolean {
+export function carries(
+  adr: Pick<Adr, 'metadata' | 'impliedSupersedes'>,
+  type: RelationType,
+  target: string
+): boolean {
   const implied = type === 'supersedes' ? (adr.impliedSupersedes ?? []) : []
   return adr.metadata.relations[type].includes(target) || implied.includes(target)
 }

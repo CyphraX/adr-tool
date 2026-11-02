@@ -1,7 +1,8 @@
 import type { Adr } from '../adr/adr'
 import type { NamingScheme } from '../log/naming'
 import { BACK_REFERENCE_KEYS } from '../relation'
-import type { Relation } from '../relations/graph'
+import type { LogContext, Relation } from '../relations/graph'
+import { normalReference } from '../relations/reference'
 import type { BackReferenceKey, Problem } from './problem'
 
 const MIRRORED = Object.entries(BACK_REFERENCE_KEYS) as [
@@ -16,9 +17,11 @@ const MIRRORED = Object.entries(BACK_REFERENCE_KEYS) as [
 export function checkConsistency(
   adrs: readonly Adr[],
   relations: readonly Relation[],
-  scheme: NamingScheme
+  scheme: NamingScheme,
+  log: LogContext = { path: '', guests: [] }
 ): Problem[] {
   const byId = new Map(adrs.map((adr) => [adr.id, adr]))
+  const guests = new Set(log.guests.map((guest) => guest.reference))
   const inEffect = relations.filter((relation) => relation.state === 'in-effect')
   const problems: Problem[] = []
 
@@ -27,8 +30,13 @@ export function checkConsistency(
 
     // The Relation is authoritative: every one in effect needs its mirror on the target …
     for (const { from, to } of founded) {
-      const target = byId.get(to)!
-      if (!target.metadata.backReferences[key].includes(from)) {
+      // A target in another log is that log's to check.
+      const target = byId.get(to)
+      if (!target) continue
+      const mirrored = target.metadata.backReferences[key].map((item) =>
+        normalReference(log.path, item)
+      )
+      if (!mirrored.includes(from)) {
         problems.push({ kind: 'missing-back-reference', adr: to, key, source: from })
       }
       if (type === 'supersedes' && target.metadata.status !== 'superseded') {
@@ -38,14 +46,15 @@ export function checkConsistency(
 
     // … and every Back-reference needs a Relation in effect behind it.
     for (const adr of adrs) {
-      for (const source of adr.metadata.backReferences[key]) {
+      for (const written of adr.metadata.backReferences[key]) {
+        const source = normalReference(log.path, written)
         if (source === adr.id) problems.push({ kind: 'self-reference', adr: adr.id, key })
-        else if (!byId.has(source)) {
-          problems.push({ kind: 'unknown-target', adr: adr.id, key, target: source })
+        else if (!byId.has(source) && !guests.has(source)) {
+          problems.push({ kind: 'unknown-target', adr: adr.id, key, target: written })
         } else if (
           !founded.some((relation) => relation.from === source && relation.to === adr.id)
         ) {
-          problems.push({ kind: 'unfounded-back-reference', adr: adr.id, key, source })
+          problems.push({ kind: 'unfounded-back-reference', adr: adr.id, key, source: written })
         }
       }
     }

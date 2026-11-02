@@ -15,15 +15,15 @@ const NAMING_KEYS = [...RELATION_TYPES, ...Object.values(BACK_REFERENCE_KEYS)]
 type NamingKey = (typeof NAMING_KEYS)[number]
 
 /** The keys under which `adr` names the ADR `id`. */
-function namingKeys(adr: Adr, id: string): NamingKey[] {
+function namingKeys(adr: Pick<Adr, 'metadata'>, id: string): NamingKey[] {
   const lists = { ...adr.metadata.relations, ...adr.metadata.backReferences }
   return NAMING_KEYS.filter((key) => lists[key].includes(id))
 }
 
 /**
  * Renumber an ADR that shares its number with another one (docs/file-format.md, section 5):
- * its file gets the next number of the log, and every Relation and Back-reference of the
- * log that names the old ID is rewritten where it stands. No body is touched; the ADRs
+ * its file gets the next number of the log, and every Relation and Back-reference that names
+ * the old ID — in this log, and as `<log>/<ID>` in the others — is rewritten where it stands. No body is touched; the ADRs
  * whose text mentions the old ID come back as warnings.
  */
 export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Promise<Plan> {
@@ -77,6 +77,26 @@ export function planRenumber(fs: FileSystem, log: DecisionLog, id: string): Prom
       }
       for (const key of keys) {
         await pending.write(other.path, (view) => replaceInList(view, key, id, to))
+      }
+    }
+
+    // The other logs of the repository name it with this log's directory.
+    const [before, after] = [`${log.path}/${id}`, `${log.path}/${to}`]
+    for (const guest of log.guests ?? []) {
+      const keys = namingKeys(guest, before)
+      if (!guest.metadataWritable) {
+        if ((await fs.readText(guest.path))?.includes(before)) {
+          throw new Refusal(
+            `The frontmatter of ${guest.reference} cannot be read, and the file mentions ${before}. Fix it before ${id} is renumbered.`
+          )
+        }
+        continue
+      }
+      if (guest.foreign && keys.length > 0) {
+        requireOwnFormat(guest, ` It mentions ${before}: migrate it first.`)
+      }
+      for (const key of keys) {
+        await pending.write(guest.path, (view) => replaceInList(view, key, before, after))
       }
     }
 

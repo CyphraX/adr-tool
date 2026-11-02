@@ -1089,7 +1089,7 @@ function stillThere(selection: StructureSelection | undefined, view: StructureVi
   }
 }
 
-export function statusKey(adr: Adr): Status | 'unknown' {
+export function statusKey(adr: Pick<Adr, 'metadata'>): Status | 'unknown' {
   return adr.metadata.status ?? 'unknown'
 }
 

@@ -74,7 +74,7 @@ Rules:
 - **Absent means default.** A missing `status` is `accepted` — in a file that does not keep its Status in its text (section 8). A missing list is empty. The tool removes a key rather than leaving an empty list behind.
 - **Dates** are calendar dates, `YYYY-MM-DD`, written unquoted. Quoted dates are read too. There are no times.
 - `decided` must not be present while the Status is `proposed`.
-- **IDs in Relations** are bare IDs of ADRs in the same Decision Log — `0003-postgres-write-model`, not `ADR-3`, not a path, not a Markdown link.
+- **IDs in Relations** name ADRs — `0003-postgres-write-model`, not `ADR-3`, not a file name, not a Markdown link. A bare ID names an ADR of the same Decision Log. An ADR of another Decision Log of the repository is named by that log's directory and its ID, joined by `/`: `docs/adr/0003-postgres-write-model` — the directory as section 6 finds it, relative to the repository root, with `/` between its parts and none at its end. The same holds for Back-references: an ADR of `docs/adr` superseded by one of `docs/decisions` lists `docs/decisions/0001-new` in `superseded-by`. A directory-qualified ID that names the ADR's own log means the same as the bare ID; the tool writes the bare one. A Relation never leaves the repository (that is section 6's concern, and the roadmap's).
 - **Component IDs in `affects`** are IDs as `.arch/components.yml` declares them — `core/metadata`, not a directory, not a display name. A Trace is recorded on the ADR alone: nothing is written into the declaration, and which ADRs affect a Component is computed ([ADR-0009](adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)).
 - **Lists** may be written in flow style (`[a, b]`) or block style; both are read, and a single value where a list is expected is read as a list of one. The tool keeps the style a list already has. It writes new lists in flow style, and `corrections` in block style. It adds an item at the end and takes an item out where it stands; it never reorders a list. A comment inside a flow list, next to the item to take out, belongs to nobody the tool could name: it refuses, and a person removes the item.
 - **New keys** are inserted in the order of the table above, relative to the tool's keys that are already there. Existing keys are never reordered.
@@ -95,18 +95,18 @@ Rules:
 | Operation  | In the ADR itself                                   | In other files |
 | ---------- | --------------------------------------------------- | -------------- |
 | Create     | new file; `status: proposed`, `created`; for Supersede or Amend also `supersedes` or `amends` | nothing |
-| Accept     | `status: accepted`, `decided`                       | every `supersedes` target: `status: superseded`, this ID added to `superseded-by`; every `amends` target: this ID added to `amended-by` |
+| Accept     | `status: accepted`, `decided`                       | every `supersedes` target: `status: superseded`, this ADR added to `superseded-by`; every `amends` target: this ADR added to `amended-by` — by its bare ID in the same log, as `<log>/<ID>` in another (section 3) |
 | Reject     | `status: rejected`, `decided`                       | nothing |
 | Deprecate  | `status: deprecated`                                | nothing |
 | Correction | the author's edit of the body, plus one entry appended to `corrections` | nothing |
 | Edit Metadata | items added to or removed from `decision-makers`, `tags`, `depends-on`, `relates-to`, `affects` — and, while the ADR is `proposed`, `supersedes` and `amends` | nothing |
-| Renumber   | the file is renamed; its bytes do not change        | every Relation and Back-reference that names the old ID names the new one |
+| Renumber   | the file is renamed; its bytes do not change        | every Relation and Back-reference that names the old ID names the new one, in every Decision Log of the repository |
 | Rename of a Component | — (it is an operation on `.arch/components.yml`, [structure-format.md](structure-format.md), section 1) | every item of `affects` that names the old Component ID, or an ID below it, names the new one |
 | Migration  | the Metadata as it was read from the foreign format; a `## Status` section that the Metadata holds completely is taken out (section 8) | the successor of a superseded MADR ADR: this ID added to `supersedes` |
 
 - Supersede may target an ADR that is `accepted` or `deprecated`; Amend only one that is `accepted`.
 - `supersedes` and `amends` are fixed once an ADR is no longer `proposed`: they took effect when it was accepted, or never will. (Migration writes them as the foreign format had them, which changes no Relation: section 8.) `decision-makers`, `tags`, `depends-on`, `relates-to` and `affects` can be edited at any Status. Such an edit is not a Correction and leaves no entry in `corrections`: a Correction is about the text of the decision, and these keys are filing, not text. git still shows who changed them.
-- An item that is added must be valid — an ID of another ADR in the same Decision Log, and for `supersedes` and `amends` one that may be superseded or amended; for `affects`, the ID of a Component that `.arch/components.yml` declares. While that file declares nothing, or cannot be read, no Component can be added: the Draft's IDs follow directories and are no name to write down. An item that is already there can be removed wherever the list may be edited, valid or not: that is how a `depends-on` or `relates-to` Relation to an ADR that does not exist is repaired. A broken `supersedes` or `amends` on an ADR that is no longer `proposed` is not edited here; it is a Problem, and repairing it belongs to the Problems view.
+- An item that is added must be valid — another ADR of the repository, by its bare ID in the same Decision Log or as `<log>/<ID>` in another, and for `supersedes` and `amends` one that may be superseded or amended; for `affects`, the ID of a Component that `.arch/components.yml` declares. While that file declares nothing, or cannot be read, no Component can be added: the Draft's IDs follow directories and are no name to write down. An item that is already there can be removed wherever the list may be edited, valid or not: that is how a `depends-on` or `relates-to` Relation to an ADR that does not exist is repaired. A broken `supersedes` or `amends` on an ADR that is no longer `proposed` is not edited here; it is a Problem, and repairing it belongs to the Problems view.
 - A Relation on an ADR that is `proposed` or `rejected` has no effect on its target. The app may show it as pending; nothing is written.
 - An effect stays when the ADR that caused it is later deprecated or superseded itself.
 
@@ -116,7 +116,7 @@ Two branches that each added "the next ADR" leave a `sequential` Decision Log wi
 
 - Renumber is for an ADR that shares its number with another one, in a `sequential` log. Every other ID stays frozen: tickets, commit messages and wikis point to it.
 - The new number is the highest number of the log plus one, written as wide as a new ADR's would be (section 7). The rest of the file name — the slug, as it was written — stays.
-- Wherever an ADR of the log names the old ID in `supersedes`, `amends`, `depends-on`, `relates-to`, `superseded-by` or `amended-by`, the item is rewritten where it stands: its position, its quoting and everything around it stay.
+- Wherever an ADR names the renumbered ADR in `supersedes`, `amends`, `depends-on`, `relates-to`, `superseded-by` or `amended-by` — by its bare ID in its own log, as `<log>/<old ID>` in another log of the repository —, the item is rewritten where it stands, in the same form: its position, its quoting and everything around it stay. The refusals below hold for the files of every log.
 - The body of an ADR is its author's (section 4), also here. Text that mentions the old ID — a Markdown link to the old file name, say — is not changed; the tool names the ADRs that have such text, and correcting a dead link is what a Correction is for.
 - Renumber is refused when the ADR names itself in a Relation, and when an ADR whose frontmatter cannot be read, or one in a foreign format (section 8), mentions the old ID anywhere in its file — or names the ADR's number, as MADR 4 does (`superseded by ADR-0002`): the tool cannot tell what it would leave behind, or may not write it.
 - A heading that carries the old number (`# 3. Title`) stays as it is, like all text; the tool says so, and the title is shown with that number from then on.
@@ -132,11 +132,11 @@ A Component's ID changes when its segment does ([structure-format.md](structure-
 
 ### Consistency — what counts as a Problem
 
-- A Relation or Back-reference that names an ID which does not exist in the Decision Log, or the ADR's own ID.
+- A Relation or Back-reference that names an ADR which does not exist — an ID that is not in the Decision Log, a directory that is no Decision Log of the repository, an ID that is not in that one —, or the ADR's own ID.
 - An item of `affects` that names no Component of `.arch/components.yml`. Traces are checked only against a declaration that can be read: the Draft's IDs are a proposal that follows directories, and a declaration that cannot be read is a Problem of its own, which comes first.
-- A `supersedes` or `amends` Relation on an ADR that has been accepted, without the matching Back-reference on its target — or a Back-reference without such a Relation. The Relation is authoritative; the repair rewrites the Back-reference.
+- A `supersedes` or `amends` Relation on an ADR that has been accepted, without the matching Back-reference on its target — or a Back-reference without such a Relation. The Relation is authoritative; the repair rewrites the Back-reference. This holds across Decision Logs as within one; a Problem is reported in the log of the ADR it is about.
 - An ADR that is `superseded` although no ADR that has been accepted supersedes it, or the reverse.
-- A cycle of `supersedes` Relations.
+- A cycle of `supersedes` Relations — within a log, or through the logs it passes; each log reports the cycles its ADRs are part of.
 - Two ADRs with the same number in a `sequential` log.
 - Metadata that breaks section 2 or 3: invalid YAML, a Status outside the five values, a malformed date, a value of the wrong type, `decided` on a `proposed` ADR.
 
@@ -147,7 +147,7 @@ Some Problems have a Repair. A Repair is an operation like any other: it is plan
 | Problem | The Repair writes |
 | ------- | ----------------- |
 | The Status is not written in lowercase | the Status in lowercase; its quoting stays |
-| A Relation or Back-reference names an ID that is not in the Decision Log, or the ADR's own ID | the item is taken out of its list, where it stands |
+| A Relation or Back-reference names an ADR that does not exist, or the ADR's own ID | the item is taken out of its list, where it stands |
 | `affects` names a Component that is not declared | the item is taken out of `affects`, where it stands. Where the Component was renamed by hand, the Trace is mended in the Metadata dialog instead: the Repair cannot know the new ID |
 | A Back-reference is missing | the ID is added to `superseded-by` or `amended-by` of the target |
 | A Back-reference without a Relation in effect behind it | the item is taken out of `superseded-by` or `amended-by` |

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { repairsOf, type Adr, type Problem } from '@adr-tool/core'
+  import { repairsOf, type Problem } from '@adr-tool/core'
   import { adrsOf } from '../lib/problems'
+  import { namedIn, type Named } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import {
@@ -15,15 +16,24 @@
 
   const selectedId = $derived(app.selected?.id)
 
-  /** The ADRs a Problem is reported on, as far as they are (still) in the log. */
-  function subjects(problem: Problem): Adr[] {
-    return adrsOf(problem).flatMap((id) => app.log?.adrs.find((adr) => adr.id === id) ?? [])
+  /**
+   * The ADRs a Problem is reported on, as far as they are (still) there: of this log, or — in a
+   * cycle through several logs — of another one.
+   */
+  function subjects(problem: Problem): Named[] {
+    const log = app.log
+    return log ? adrsOf(problem).flatMap((id) => namedIn(log, id) ?? []) : []
   }
 </script>
 
-{#snippet subject(adr: Adr)}
-  <button class="adr" class:selected={adr.id === selectedId} onclick={() => app.select(adr.id)}>
+{#snippet subject({ adr, log }: Named)}
+  <button
+    class="adr"
+    class:selected={log === undefined && adr.id === selectedId}
+    onclick={() => (log === undefined ? app.select(adr.id) : app.jumpTo(log, adr.id))}
+  >
     <StatusMark status={statusKey(adr)} />
+    {#if log !== undefined}<span class="log">{log}</span>{/if}
     <span class="prefix">{prefixOf(adr)}</span>
     <span class="title">{adr.title ?? adr.id}</span>
   </button>
@@ -46,9 +56,10 @@
         {@const log = app.log}
         {@const repairs = log ? repairsOf(log, problem) : []}
         <li class="group">
-          {#each subjects(problem) as adr (adr.id)}
+          {#each subjects(problem) as named (named.id)}
+            {@const adr = named.adr}
             <div class="subject">
-              {@render subject(adr)}
+              {@render subject(named)}
               {#if log && repairs.length > 1}
                 <!-- Several repairs: any one of them repairs the Problem, and the person says which. -->
                 {#each repairs.filter((repair) => repair.adr === adr.id) as repair, nth (nth)}
@@ -74,7 +85,7 @@
               {repairLabel(repairs[0]!, log)}
             </button>
           {:else if repairs.length === 0}
-            {@const foreign = subjects(problem).find((adr) => adr.foreign)}
+            {@const foreign = subjects(problem).find(({ adr }) => adr.foreign)?.adr}
             <p class="by-hand">{foreign ? noRepairIn(foreign) : NO_REPAIR}</p>
           {/if}
 
@@ -189,6 +200,12 @@
 
   .adr :global(svg) {
     flex: none;
+  }
+
+  .log {
+    flex: none;
+    font-size: 12px;
+    color: var(--ink-faint);
   }
 
   .prefix {

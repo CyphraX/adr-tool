@@ -1,4 +1,4 @@
-import { readAdr, type Adr } from '../adr/adr'
+import { readAdr, type Adr, type GuestAdr } from '../adr/adr'
 import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import { checkConsistency, checkTraces } from '../problems/check'
 import type { Problem } from '../problems/problem'
@@ -15,6 +15,11 @@ export interface DecisionLog {
   readonly adrs: readonly Adr[]
   readonly relations: readonly Relation[]
   readonly problems: readonly Problem[]
+  /**
+   * The ADRs of the repository's other Decision Logs, without their bodies: what a Relation
+   * across logs names (`docs/adr/0002-old`), and what the picker offers.
+   */
+  readonly guests: readonly GuestAdr[]
 }
 
 export interface Repository {
@@ -44,21 +49,68 @@ export async function openRepository(
 ): Promise<Repository> {
   const discovery = await discoverLogs(fs)
   const problems = [...discovery.problems]
-  const logs: DecisionLog[] = []
+  const read: ReadLog[] = []
   for (const location of discovery.locations) {
-    const log = await loadDecisionLog(fs, location, options)
-    if (log) logs.push(log)
+    const log = await readLog(fs, location)
+    if (log) read.push(log)
     else problems.push({ kind: 'missing-log-directory', path: location.path })
   }
+  // Relations cross logs: each log is checked with the ADRs of all the others as its guests.
+  const guests = read.map((log) => log.adrs.map((adr) => guestOf(log.path, adr)))
+  const logs = read.map((log, position) =>
+    checkLog(
+      log,
+      guests.flatMap((ones, other) => (other === position ? [] : ones)),
+      options
+    )
+  )
   return { discoveredBy: discovery.by, logs, problems }
 }
 
-/** Read one Decision Log, or `undefined` when its directory does not exist. */
+/** Read one Decision Log on its own, or `undefined` when its directory does not exist. */
 export async function loadDecisionLog(
   fs: FileSystem,
   location: LogLocation,
   options: OpenOptions = {}
 ): Promise<DecisionLog | undefined> {
+  const log = await readLog(fs, location)
+  return log && checkLog(log, [], options)
+}
+
+/** A Decision Log as its files say it, before it is checked. */
+interface ReadLog {
+  readonly path: string
+  readonly naming: NamingScheme
+  readonly adrs: readonly Adr[]
+  readonly problems: readonly Problem[]
+}
+
+function guestOf(log: string, adr: Adr): GuestAdr {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { body, ...rest } = adr
+  return { ...rest, reference: `${log}/${adr.id}`, log }
+}
+
+function checkLog(log: ReadLog, guests: readonly GuestAdr[], options: OpenOptions): DecisionLog {
+  const context = { path: log.path, guests }
+  const graph = relationsOf(log.adrs, context)
+  const problems = [
+    ...log.problems,
+    ...graph.problems,
+    ...checkConsistency(log.adrs, graph.relations, log.naming, context)
+  ]
+  if (options.components) problems.push(...checkTraces(log.adrs, options.components))
+  return {
+    path: log.path,
+    naming: log.naming,
+    adrs: log.adrs,
+    relations: graph.relations,
+    problems,
+    guests
+  }
+}
+
+async function readLog(fs: FileSystem, location: LogLocation): Promise<ReadLog | undefined> {
   const entries = await fs.list(location.path)
   if (!entries) return undefined
 
@@ -96,11 +148,12 @@ export async function loadDecisionLog(
     problems.push(...one.problems)
   })
 
-  const adrs = withImpliedSupersessions(read, successors)
-  const graph = relationsOf(adrs)
-  problems.push(...graph.problems, ...checkConsistency(adrs, graph.relations, naming))
-  if (options.components) problems.push(...checkTraces(adrs, options.components))
-  return { path: location.path, naming, adrs, relations: graph.relations, problems }
+  return {
+    path: location.path,
+    naming,
+    adrs: withImpliedSupersessions(read, successors),
+    problems
+  }
 }
 
 /**
