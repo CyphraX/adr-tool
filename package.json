@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "pnpm --filter @adr-tool/app dev",
     "adr": "node packages/cli/dist/adr.mjs",
+    "mcp": "node packages/mcp/dist/adr-mcp.mjs",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",

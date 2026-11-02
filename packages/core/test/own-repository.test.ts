@@ -47,7 +47,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     ],
     [10, '0010-the-suite-is-open-source-under-the-mit-licence', 'accepted'],
     [11, '0011-the-product-is-called-softarch-suite', 'accepted'],
-    [12, '0012-committing-an-adr-runs-git-commit-for-its-files-only', 'accepted']
+    [12, '0012-committing-an-adr-runs-git-commit-for-its-files-only', 'accepted'],
+    [13, '0013-agents-write-adrs-through-the-mcp-server-as-previewed-change', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
