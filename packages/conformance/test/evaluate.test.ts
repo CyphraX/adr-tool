@@ -203,7 +203,7 @@ describe('layers', () => {
     ])
     const skip = report.violations[2]!
     expect(sentenceAt(skip, skip.dependencies[0])).toBe(
-      'web may only depend on the layer right below it, and persistence lies further down: src/web/page.ts:2 imports src/persistence/db.ts.'
+      'web must not depend on persistence, which lies more than one layer below it: src/web/page.ts:2 imports src/persistence/db.ts.'
     )
   })
 
@@ -231,19 +231,33 @@ describe('no-cycles', () => {
     ])
     const [top] = report.violations
     expect(sentenceAt(top!, top!.dependencies[0])).toBe(
-      'billing, persistence and web depend on each other in a Cycle: billing -> web -> billing: src/billing/invoice.ts:2 imports src/web/format.ts.'
+      'billing, persistence and web depend on each other in a Cycle, for example billing -> web -> billing, with billing -> web as its weakest Dependency: src/billing/invoice.ts:2 imports src/web/format.ts.'
     )
     expect(top!.cycle).toEqual({
       members: ['billing', 'persistence', 'web'],
       roundTrip: ['billing', 'web'],
+      weakest: { from: 'billing', to: 'web' },
       typeOnly: false
     })
+    // Every Dependency among the members lies on the Cycle, and each import is annotated:
+    // the one that closed it may be any of them.
+    expect(top!.dependencies.map((one) => `${one.from}:${one.lines} ${one.to}`)).toEqual([
+      'src/billing/invoice.ts:2 src/web/format.ts',
+      'src/billing/invoices/list.ts:1 src/persistence/db.ts',
+      'src/persistence/db.ts:1 src/web/page.ts',
+      'src/web/page.ts:1 src/billing/invoice.ts',
+      'src/web/page.ts:2 src/persistence/db.ts'
+    ])
     expect(report.violations[1]!.said).toEqual({
       code: 'no-cycles',
-      values: { members: ['features/a', 'features/b'], roundTrip: ['features/a', 'features/b'] }
+      values: {
+        members: ['features/a', 'features/b'],
+        roundTrip: ['features/a', 'features/b'],
+        weakest: ['features/a', 'features/b']
+      }
     })
     expect(sentenceAt(report.violations[1]!, report.violations[1]!.dependencies[0])).toBe(
-      'features/a and features/b depend on each other in a Cycle: src/features/a/x.ts:1 imports src/features/b/y.ts.'
+      'features/a and features/b depend on each other in a Cycle, with features/a -> features/b as its weakest Dependency: src/features/a/x.ts:1 imports src/features/b/y.ts.'
     )
   })
 
@@ -258,6 +272,47 @@ describe('no-cycles', () => {
       'src/features/a/x.ts 1',
       'src/features/b/y.ts 1'
     ])
+  })
+
+  it('puts every import on a Cycle behind it, not only those of its weakest Dependency', async () => {
+    // The review's probe: a uses b once, b uses a twice; b2.ts is Jonas's new import.
+    const report = await checked(
+      {
+        '.arch/components.yml':
+          'components:\n  a:\n    paths: [src/a/**]\n  b:\n    paths: [src/b/**]\n',
+        'src/a/a1.ts': "import { b } from '../b/b'\n",
+        'src/b/b.ts': 'export const b = 1\n',
+        'src/b/b1.ts': "import { a } from '../a/a1'\n",
+        'src/b/b2.ts': "// new\nimport { a } from '../a/a1'\n"
+      },
+      rules(rule('no-cycles', 'kind: no-cycles', "among: '*'"))
+    )
+    const [cycle] = report.violations
+    expect(cycle!.cycle!.weakest).toEqual({ from: 'a', to: 'b' })
+    expect(cycle!.dependencies.map((one) => `${one.from}:${one.lines}`)).toEqual([
+      'src/a/a1.ts:1',
+      'src/b/b1.ts:1',
+      'src/b/b2.ts:2'
+    ])
+  })
+
+  it('says a long Cycle of Source Files in short, and puts each of its imports behind it', async () => {
+    // Seven files in a ring, and one shortcut across it that lies on a Cycle too.
+    const names = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+    const files: Record<string, string> = {
+      '.arch/components.yml': 'components:\n  ring:\n    paths: [src/**]\n'
+    }
+    names.forEach((name, index) => {
+      const next = names[(index + 1) % names.length]
+      files[`src/${name}.ts`] =
+        `import { ${next} } from './${next}'\n${name === 'c' ? "import { f } from './f'\n" : ''}`
+    })
+    const report = await checked(files, rules(rule('ring', 'kind: no-cycles', 'inside: ring')))
+    const [ring] = report.violations
+    expect(ring!.dependencies).toHaveLength(8)
+    expect(sentenceAt(ring!, ring!.dependencies[0])).toBe(
+      'src/a.ts, src/b.ts, src/c.ts, src/d.ts, src/e.ts and 2 more depend on each other in a Cycle, for example src/a.ts -> src/b.ts -> src/c.ts -> src/f.ts -> src/g.ts -> src/a.ts: src/a.ts:1 imports src/b.ts.'
+    )
   })
 
   it('leaves out a Cycle that is type-only when asked', async () => {

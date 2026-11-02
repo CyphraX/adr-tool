@@ -8,6 +8,7 @@ import {
   findCycles,
   metricsOf,
   UNASSIGNED,
+  type Cycle,
   type DeclaredComponent,
   type Dependency,
   type Metrics,
@@ -42,10 +43,14 @@ export interface Violation {
   /** Of a Dependency: the source and the target Component; `(unassigned)` for no Component. */
   readonly from?: string
   readonly to?: string
-  /** Of a Cycle: its members, one round trip through them, and whether it is type-only. */
+  /**
+   * Of a Cycle: its members, one round trip through them as an example, among Components the
+   * weakest Dependency on that round trip as a hint where to cut, and whether it is type-only.
+   */
   readonly cycle?: {
     readonly members: readonly string[]
     readonly roundTrip: readonly string[]
+    readonly weakest?: { readonly from: string; readonly to: string }
     readonly typeOnly: boolean
   }
   /** Of a threshold: the Component and its value. */
@@ -53,8 +58,8 @@ export interface Violation {
   readonly value?: number
   /**
    * The Source File Dependencies behind the Violation, with the lines of their imports: of a
-   * Dependency, all of them; of a Cycle among Components, those of its weakest Dependency; of a
-   * Cycle among Source Files, those of its round trip; of a threshold, none.
+   * Dependency, all of them; of a Cycle, every one among its members — each lies on the Cycle,
+   * whichever is new; of a threshold, none.
    */
   readonly dependencies: readonly Dependency[]
 }
@@ -241,8 +246,11 @@ function cyclesAmong(rule: CyclesRule, model: Model): Violation[] {
     edges.set(key, edge)
   }
   return findCycles(nodes, [...edges.values()], { weakest: true }).map((cycle) => {
-    const weakest = cycle.weakest!
-    return cycleViolation(rule, cycle, edges.get(`${weakest.from}\n${weakest.to}`)!.dependencies)
+    const inside = new Set(cycle.members)
+    const among = [...edges.values()]
+      .filter((edge) => inside.has(edge.from) && inside.has(edge.to))
+      .flatMap((edge) => edge.dependencies)
+    return cycleViolation(rule, cycle, among)
   })
 }
 
@@ -276,27 +284,36 @@ function cyclesInside(rule: CyclesRule, model: Model): Violation[] {
       const key = cycle.members.join('\n')
       if (reported.has(key)) continue
       reported.add(key)
-      const trip = cycle.roundTrip.map((from, index) =>
-        byPair.get(`${from}\n${cycle.roundTrip[(index + 1) % cycle.roundTrip.length]}`)!
+      const members = new Set(cycle.members)
+      const among = [...byPair.values()].filter(
+        (dependency) => members.has(dependency.from) && members.has(dependency.to)
       )
-      violations.push(cycleViolation(rule, cycle, trip))
+      violations.push(cycleViolation(rule, cycle, among))
     }
   }
   return violations.sort((a, b) => compare(a.cycle!.members[0]!, b.cycle!.members[0]!))
 }
 
+/**
+ * The Violation of a Cycle: in a strongly connected group every Dependency among the members
+ * lies on a round trip through them, so each is behind it — the import that closed the Cycle
+ * and the ones that were there before.
+ */
 function cycleViolation(
   rule: CyclesRule,
-  cycle: { members: readonly string[]; roundTrip: readonly string[]; typeOnly: boolean },
+  cycle: Pick<Cycle, 'members' | 'roundTrip' | 'weakest' | 'typeOnly'>,
   dependencies: readonly Dependency[]
 ): Violation {
-  const { members, roundTrip, typeOnly } = cycle
+  const { members, roundTrip, weakest, typeOnly } = cycle
   return {
     rule,
     fingerprint: { kind: 'cycle', rule: rule.id, cycle: members },
-    said: { code: 'no-cycles', values: { members, roundTrip } },
-    cycle: { members, roundTrip, typeOnly },
-    dependencies
+    said: {
+      code: 'no-cycles',
+      values: { members, roundTrip, ...(weakest && { weakest: [weakest.from, weakest.to] }) }
+    },
+    cycle: { members, roundTrip, ...(weakest && { weakest }), typeOnly },
+    dependencies: [...dependencies].sort((a, b) => compare(a.from, b.from) || compare(a.to, b.to))
   }
 }
 

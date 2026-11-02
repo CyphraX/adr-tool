@@ -13,6 +13,7 @@ import {
   type SaidBy,
   type Sentences
 } from '@adr-tool/kernel'
+import { UNASSIGNED } from '@adr-tool/structure/model'
 
 /** What makes a Rule ID, as the end of a sentence about one. */
 export const RULE_ID_RULE =
@@ -24,11 +25,30 @@ const english = (said: Said | string): string =>
     ? said
     : (SENTENCES as unknown as Record<string, (values: unknown) => string>)[said.code]!(said.values)
 
-/** A list of names as a sentence has them: `a`, `a and b`, `a, b and c`. */
+/** How many names one sentence lists before it counts the rest. */
+export const LISTED_AT_MOST = 5
+
+/**
+ * A list of names as a sentence has them: `a`, `a and b`, `a, b and c`; past five,
+ * `a, b, c, d, e and 3 more`, so that a Cycle of forty files is still one readable line.
+ */
 export function listed(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? ''
+  if (names.length > LISTED_AT_MOST) {
+    return `${names.slice(0, LISTED_AT_MOST).join(', ')} and ${names.length - LISTED_AT_MOST} more`
+  }
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 }
+
+/** A round trip, back to where it starts: `a -> b -> c -> a`; past five, the rest as `…`. */
+const tripOf = (trip: readonly string[]): string =>
+  [...trip.slice(0, LISTED_AT_MOST), ...(trip.length > LISTED_AT_MOST ? ['…'] : []), trip[0]!].join(
+    ' -> '
+  )
+
+/** A target of a Dependency in a sentence: a Component, or the files of none. */
+const target = (to: string): string =>
+  to === UNASSIGNED ? 'Source Files that belong to no Component' : to
 
 /** A number as a person reads it: whole numbers as they are, others to two places. */
 export const formatNumber = (value: number): string =>
@@ -109,19 +129,24 @@ export const SENTENCES = {
   // What a Violation is (docs/conformance-format.md, section 3): a code is the kind of its Rule.
   'must-not-depend': (v: { from: string; to: string }): string =>
     `${v.from} must not depend on ${v.to}`,
+  // `to` is `(unassigned)` for the Source Files of no Component; the sentence words it.
   'may-only-depend': (v: { from: string; to: string; allowed: readonly string[] }): string =>
     v.allowed.length === 0
-      ? `${v.from} may depend on no other Component, and depends on ${v.to}`
-      : `${v.from} may only depend on ${listed(v.allowed)}, and depends on ${v.to}`,
+      ? `${v.from} may depend on no other Component, and depends on ${target(v.to)}`
+      : `${v.from} may only depend on ${listed(v.allowed)}, and depends on ${target(v.to)}`,
   layers: (v: { from: string; to: string; where: 'above' | 'further-below' }): string =>
     v.where === 'above'
       ? `${v.from} must not depend on ${v.to}, which lies in a layer above it`
-      : `${v.from} may only depend on the layer right below it, and ${v.to} lies further down`,
-  // Two depend on each other both ways; for more, one round trip says how.
-  'no-cycles': (v: { members: readonly string[]; roundTrip: readonly string[] }): string =>
-    v.members.length === 2
-      ? `${listed(v.members)} depend on each other in a Cycle`
-      : `${listed(v.members)} depend on each other in a Cycle: ${[...v.roundTrip, v.roundTrip[0]!].join(' -> ')}`,
+      : `${v.from} must not depend on ${v.to}, which lies more than one layer below it`,
+  // Two depend on each other both ways; for more, one round trip is the example. Among
+  // Components, the weakest Dependency on it is a hint where to cut.
+  'no-cycles': (v: {
+    members: readonly string[]
+    roundTrip: readonly string[]
+    /** The source and the target Component of the weakest Dependency on the round trip. */
+    weakest?: readonly string[]
+  }): string =>
+    `${listed(v.members)} depend on each other in a Cycle${v.members.length > 2 ? `, for example ${tripOf(v.roundTrip)}` : ''}${v.weakest ? `, with ${v.weakest.join(' -> ')} as its weakest Dependency` : ''}`,
   threshold: (v: {
     metric: string
     component: string

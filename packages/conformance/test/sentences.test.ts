@@ -9,4 +9,22 @@ describe('the sentences of conformance', () => {
       expect(CONFORMANCE_SENTENCES).toHaveProperty([code])
     }
   })
+
+  it('list five names, and count the rest', () => {
+    const seven = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+    expect(CONFORMANCE_SENTENCES['no-cycles']({ members: seven, roundTrip: seven })).toBe(
+      'a, b, c, d, e and 2 more depend on each other in a Cycle, for example a -> b -> c -> d -> e -> … -> a'
+    )
+    expect(
+      CONFORMANCE_SENTENCES['may-only-depend']({ from: 'x', to: 'y', allowed: seven.slice(0, 5) })
+    ).toBe('x may only depend on a, b, c, d and e, and depends on y')
+  })
+
+  it('word the Source Files of no Component as such', () => {
+    expect(
+      CONFORMANCE_SENTENCES['may-only-depend']({ from: 'x', to: '(unassigned)', allowed: [] })
+    ).toBe(
+      'x may depend on no other Component, and depends on Source Files that belong to no Component'
+    )
+  })
 })

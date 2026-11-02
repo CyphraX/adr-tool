@@ -288,7 +288,7 @@ describe('adr check (docs/cli.md)', () => {
     const { code, out, err } = await adrIn(root, 'check')
     expect([code, err]).toEqual([1, ''])
     expect(lines(out)).toEqual([
-      'web/src/main/java/com/shop/web/Page.java:4: web-on-top: web may only depend on the layer right below it, and catalog lies further down: web/src/main/java/com/shop/web/Page.java:4 imports catalog/src/main/java/com/shop/catalog/Search.java. The web shows the shop; it goes through the cart.',
+      'web/src/main/java/com/shop/web/Page.java:4: web-on-top: web must not depend on catalog, which lies more than one layer below it: web/src/main/java/com/shop/web/Page.java:4 imports catalog/src/main/java/com/shop/catalog/Search.java. The web shows the shop; it goes through the cart.',
       'cart/src/main/java/com/shop/cart/Cart.java:8: cart-in-order: cart/src/main/java/com/shop/cart/Cart.java and cart/src/main/java/com/shop/cart/Line.java depend on each other in a Cycle: cart/src/main/java/com/shop/cart/Cart.java:8 imports cart/src/main/java/com/shop/cart/Line.java. Cart and Line should be readable one after the other.',
       'cart/src/main/java/com/shop/cart/Line.java:6: cart-in-order: cart/src/main/java/com/shop/cart/Cart.java and cart/src/main/java/com/shop/cart/Line.java depend on each other in a Cycle: cart/src/main/java/com/shop/cart/Line.java:6 imports cart/src/main/java/com/shop/cart/Cart.java. Cart and Line should be readable one after the other.',
       '',

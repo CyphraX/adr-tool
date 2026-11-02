@@ -167,8 +167,8 @@ A Dependency is ruled by the layering when its source and its target are both in
 
 A Rule has `among` or `inside`, not both.
 
-- **`among`** takes the matched Components as the nodes of a graph — `'*'` the top level, `core/*` the children of `core` — with a Dependency from one node to another wherever a Dependency between their files stands there, as above. Every Cycle among them, as Structure finds Cycles (structure-format.md, section 4, "Cycles"), is a Violation. The Source File Dependencies behind it are those of its weakest Dependency, which Structure names as the candidate for cutting.
-- **`inside`** looks at the Source Files each matched Component contains, its children's included: every Cycle among them is a Violation. A Cycle inside a Component that another matched Component contains as well is reported once, for the innermost one. The Source File Dependencies behind it are those of its round trip.
+- **`among`** takes the matched Components as the nodes of a graph — `'*'` the top level, `core/*` the children of `core` — with a Dependency from one node to another wherever a Dependency between their files stands there, as above. Every Cycle among them, as Structure finds Cycles (structure-format.md, section 4, "Cycles"), is a Violation. The Source File Dependencies behind it are every one between files of two of its members: in a Cycle — a strongly connected group, as Structure finds it — each of them lies on a round trip, so each is part of what ties the members together, and `adr check` puts each import on its line. The new import that closed the Cycle is among them, whichever it is. The weakest Dependency on the example round trip, which Structure names as the candidate for cutting, is named in the sentence as a hint.
+- **`inside`** looks at the Source Files each matched Component contains, its children's included: every Cycle among them is a Violation. A Cycle inside a Component that another matched Component contains as well is reported once, for the innermost one. The Source File Dependencies behind it are every one among its members, as for `among`.
 - A Cycle of type-only Dependencies alone does not exist at run time, as Structure marks it; with `type-only: ignored` it is not found at all.
 
 ### `threshold`
@@ -248,10 +248,12 @@ billing must not depend on web: packages/billing/src/invoice.ts:3 imports packag
 | Code | The sentence |
 | ---- | ------------ |
 | `must-not-depend` | `<from>` must not depend on `<to>` |
-| `may-only-depend` | `<from>` may only depend on `<allowed>` (or: may depend on no other Component), and depends on `<to>` |
+| `may-only-depend` | `<from>` may only depend on `<allowed>` (or: may depend on no other Component), and depends on `<to>` — or, where `<to>` is `(unassigned)`, on Source Files that belong to no Component |
 | `layers` | `<from>` must not depend on `<to>`, which lies in a layer above it (in `strict` mode also: which lies more than one layer below it) |
-| `no-cycles` | `<members>` depend on each other in a Cycle (with three or more members: and one round trip through them) |
+| `no-cycles` | `<members>` depend on each other in a Cycle; with three or more members, for example `<a -> b -> c -> a>`, one round trip through them; among Components, with `<from -> to>` as its weakest Dependency |
 | `threshold` | The metric `<metric>` of `<component>` is `<value>`, above the maximum of `<max>` (or: below the minimum of `<min>`) |
+
+A list of more than five names — the members of a long Cycle of Source Files, the Components a Rule allows — names the first five and counts the rest: `a, b, c, d, e and 3 more`; a round trip of more than five steps ends in `… -> a`. One message stays one readable line; each import still has its own.
 
 ## 4. Exceptions (part 3)
 
