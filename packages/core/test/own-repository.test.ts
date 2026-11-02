@@ -50,7 +50,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [12, '0012-committing-an-adr-runs-git-commit-for-its-files-only', 'accepted'],
     [13, '0013-agents-write-adrs-through-the-mcp-server-as-previewed-change', 'accepted'],
     [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted'],
-    [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted']
+    [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted'],
+    [17, '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -113,6 +114,16 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       from: '0015-a-change-set-is-written-beside-its-files-and-renamed-into',
       to: '0004-operations-return-change-sets',
       state: 'in-effect'
-    }
+    },
+    ...[
+      '0002-never-reserialize-markdown',
+      '0007-the-analysis-never-executes-anything-from-the-analysed',
+      '0009-traces-are-recorded-on-the-source-only-unlike-back'
+    ].map((to) => ({
+      type: 'depends-on',
+      from: '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint',
+      to,
+      state: 'in-effect'
+    }))
   ])
 })
