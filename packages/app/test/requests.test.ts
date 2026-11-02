@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createRequest,
+  diagramsRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
@@ -165,5 +166,32 @@ describe('a new ADR as the renderer asks for it', () => {
     ]) {
       expect(createRequest(request)).toBeUndefined()
     }
+  })
+})
+
+describe('the drawn Mermaid blocks an export is asked with', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><style>.a{fill:#fff}</style><g/></svg>'
+
+  it('go on by their source when each is an SVG and nothing else', () => {
+    expect(diagramsRequest([{ source: 'graph TD; a-->b', svg: `  ${svg}\n` }])).toEqual(
+      new Map([['graph TD; a-->b', svg]])
+    )
+  })
+
+  it('leave out a drawing that could run or fetch something, or is no SVG, and its block stays code', () => {
+    const asked = [
+      { source: 'script', svg: '<svg><script>alert(1)</script></svg>' },
+      { source: 'handler', svg: '<svg><g onclick="alert(1)"/></svg>' },
+      { source: 'html', svg: '<svg><foreignObject><div/></foreignObject></svg>' },
+      { source: 'link', svg: '<svg><a href="javascript:alert(1)"/></svg>' },
+      { source: 'page', svg: '<p>not a drawing</p>' },
+      { source: 'trailing', svg: `${svg}<script>alert(1)</script>` },
+      { source: 42, svg },
+      { source: 'none' },
+      'graph TD'
+    ]
+    expect(diagramsRequest(asked)).toEqual(new Map())
+    expect(diagramsRequest(undefined)).toEqual(new Map())
+    expect(diagramsRequest({ source: 'a', svg })).toEqual(new Map())
   })
 })

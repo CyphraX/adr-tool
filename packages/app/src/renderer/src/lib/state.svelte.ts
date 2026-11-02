@@ -1,6 +1,7 @@
 import {
   RELATION_TYPES,
   groupProblems,
+  mermaidSources,
   type Adr,
   type DecisionLog,
   type FileChange,
@@ -10,7 +11,6 @@ import {
   type TemplateInfo
 } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
-import { mermaidSources } from '@adr-tool/core/export'
 import type {
   BranchOverview,
   CommitPlan,
