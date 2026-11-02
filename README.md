@@ -287,19 +287,20 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 
 | Package | Contents |
 | --- | --- |
-| [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets |
+| [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, the git port with a scripted history for tests ([ADR-0020](docs/adr/0020-git-is-a-port-of-the-kernel-implemented-once-for-node.md)), splice edits, change sets |
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
-| [`packages/cli`](packages/cli) | The command line, `adr lint` and `adr export`, built on both cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
+| [`packages/review`](packages/review) | The core of the Review module, under the same guard: Annotations with their Anchors, Replies and Traces to ADRs, and how an Anchor is found again across commits, renames and rebases ([ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)). It reads git through the kernel's port; the window follows |
+| [`packages/cli`](packages/cli) | The command line, `adr lint` and `adr export`, built on both cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)). `@adr-tool/cli/git` is the one way the suite runs git, for the app as well |
 | [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
 ### Conventions
 
-- **Language.** Code and documents use the terms of [CONTEXT.md](CONTEXT.md) (Decisions) and [docs/contexts/structure/CONTEXT.md](docs/contexts/structure/CONTEXT.md) (Structure). [CONTEXT-MAP.md](CONTEXT-MAP.md) maps the two.
+- **Language.** Code and documents use the terms of [CONTEXT.md](CONTEXT.md) (Decisions), [docs/contexts/structure/CONTEXT.md](docs/contexts/structure/CONTEXT.md) (Structure) and the glossaries of the other modules under [docs/contexts/](docs/contexts/), Review's among them. [CONTEXT-MAP.md](CONTEXT-MAP.md) maps them.
 - **Decisions.** Every decision of consequence is recorded as an ADR in [docs/adr/](docs/adr/), written in the suite's own format.
 - **Bytes.** Prettier never formats Markdown in this repository. The fixtures under `packages/core/test/fixtures` are exempt from git's line-ending normalization. The tool promises never to change a byte it was not asked to change, and this repository is its first test case.
-- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.en.ts` and `wording.en.ts`, with the German beside them (`strings.de.ts`, `wording.de.ts`); the main process has its own in `packages/app/src/main/strings.ts`. What `core` and `structure` say in sentences carries a code, and the window words it by that code. Tests check that no component carries text of its own and that nothing English is left in the German.
+- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.en.ts` and `wording.en.ts`, with the German beside them (`strings.de.ts`, `wording.de.ts`); the main process has its own in `packages/app/src/main/strings.ts`. What `core`, `structure` and `review` say in sentences carries a code, and the window words it by that code. Tests check that no component carries text of its own and that nothing English is left in the German.
 
 ## Documentation
 
@@ -315,6 +316,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [docs/design.md](docs/design.md) | How the window looks and behaves, for every module |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
+| [docs/review-format.md](docs/review-format.md) | The contract of the Review module: Annotations, their Anchors and Replies, how an Anchor is found again, and the Problems |
 | [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` with its output, codes and exit codes, and `adr export` |
 | [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
@@ -348,7 +350,7 @@ Changes go through pull requests against `main`, and CI must pass. Before you op
 1. Run the five CI checks locally: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test` and `pnpm build`.
 2. Use the terms of the glossaries.
 3. Write down a decision of consequence as an ADR.
-4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md) or [docs/structure-format.md](docs/structure-format.md).
+4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md), [docs/structure-format.md](docs/structure-format.md) or [docs/review-format.md](docs/review-format.md).
 
 ## License
 
