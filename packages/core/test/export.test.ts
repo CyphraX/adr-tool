@@ -52,7 +52,7 @@ const fileOf = (files: readonly { path: string; text: string }[], path: string):
 
 describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
   it('has an index, a page per ADR where its file is, a page to print, and its marker', async () => {
-    const { files } = await exported()
+    const { files, marker } = await exported()
     expect(files.map((file) => file.path).sort()).toEqual(
       [
         'docs/adr/0001-use-postgres.html',
@@ -60,11 +60,13 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
         'index.html',
         PRINT_PAGE,
         'services/billing/adr/0001-invoices.html',
-        EXPORT_MARKER,
         'style.css'
       ].sort()
     )
-    expect(JSON.parse(fileOf(files, EXPORT_MARKER))).toEqual({
+    // The marker names the images that were copied, and no others.
+    expect(marker([]).path).toBe(EXPORT_MARKER)
+    expect(JSON.parse(marker([]).text).files).not.toContain('docs/adr/img/schema.png')
+    expect(JSON.parse(marker(['docs/adr/img/schema.png']).text)).toEqual({
       generator: 'Softarch Suite',
       date: '2026-11-02',
       title: 'Shop & Co',
@@ -121,6 +123,52 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
     expect(page).toContain('<img src="../../docs/adr/img/schema.png" alt="Schema">')
     expect(page).toContain('<a href="https://example.com/x.png">Remote</a>')
     expect(page).toContain(`content="default-src 'none'; style-src 'self'; img-src 'self'"`)
+  })
+
+  it('copies no file that is not an image, nor a hidden one, whatever an ADR names', async () => {
+    const repository = await openRepository(
+      memoryFileSystem({
+        'docs/adr/0001-a.md': adr(
+          'status: accepted',
+          '# A\n\n![page](../../index.html) ![env](/.env) ![git](/.git/x.png) ![marker](/softarch-export.json) ![odd](/%20a.png) ![drive](/c:d.png) ![ok](a.PNG)\n'
+        )
+      })
+    )
+    const { files, images } = exportSite(repository, { title: 'T', date: '2026-11-02' })
+    expect(images).toEqual(['docs/adr/a.PNG'])
+    const page = fileOf(files, 'docs/adr/0001-a.html')
+    expect(page).toContain(
+      '<p>page env git marker odd drive <img src="../../docs/adr/a.PNG" alt="ok"></p>'
+    )
+  })
+
+  it('gives headings the ids GitHub gives them, and links footnotes to theirs', async () => {
+    const repository = await openRepository(
+      memoryFileSystem({
+        'docs/adr/0001-a.md': adr(
+          'status: accepted',
+          '# A\n\n## Context\n\n## Context\n\n## Context-1\n\nSee[^1].\n\n[^1]: Below.\n'
+        )
+      })
+    )
+    const { files, print } = exportSite(repository, { title: 'T', date: '2026-11-02' })
+    const page = fileOf(files, 'docs/adr/0001-a.html')
+    expect([...page.matchAll(/<h2[^>]* id="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      'context',
+      'context-1',
+      'context-1-1',
+      'footnote-label'
+    ])
+    const ids = new Set([...page.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]))
+    const fragments = [...page.matchAll(/href="#([^"]+)"/g)].map((match) => match[1])
+    expect(fragments.length).toBeGreaterThan(1)
+    expect(fragments.filter((fragment) => !ids.has(fragment))).toEqual([])
+    expect(page).toContain('aria-describedby="footnote-label"')
+    // In print too, each ADR's footnotes are its own.
+    const printed = new Set([...print.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]))
+    const leading = [...print.matchAll(/href="#([^"]+)"/g)].map((match) => match[1])
+    expect(leading.filter((fragment) => !printed.has(fragment))).toEqual([])
+    expect([...printed].filter((id) => id!.includes('fn-1')).length).toBeGreaterThan(0)
   })
 
   it('runs nothing an ADR brings along', async () => {

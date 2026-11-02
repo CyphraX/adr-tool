@@ -1,5 +1,6 @@
 import {
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -105,6 +106,57 @@ describe('adr export (docs/cli.md)', () => {
     )
   })
 
+  it('copies no file through a link with the name of an image, nor one it cannot write', async () => {
+    const root = directory({
+      'docs/adr/0001-a.md': adr(
+        'accepted',
+        '# A\n\n![Env](env.png) ![Config](config.svg) ![Odd](../../%20assets/a.png) ![Fine](ok.png)\n'
+      ),
+      '.env': 'SECRET=1\n',
+      '.git/config': '[remote "origin"]\n',
+      ' assets/a.png': PNG,
+      'docs/adr/ok.png': PNG
+    })
+    symlinkSync('../../.env', join(root, 'docs/adr/env.png'))
+    symlinkSync('../../.git/config', join(root, 'docs/adr/config.svg'))
+    const out = join(directory(), 'site')
+    const { code, err } = await adrIn(root, 'export', '--out', out)
+    expect(code).toBe(0)
+    expect(err).toContain('docs/adr/env.png leads to a file that is hidden or no image')
+    expect(err).toContain('docs/adr/config.svg leads to a file that is hidden or no image')
+    expect(filesBelow(out)).toEqual([
+      'docs/adr/0001-a.html',
+      'docs/adr/ok.png',
+      'index.html',
+      'print.html',
+      'softarch-export.json',
+      'style.css'
+    ])
+    const marker = JSON.parse(readFileSync(join(out, 'softarch-export.json'), 'utf8'))
+    expect(marker.files).not.toContain('docs/adr/env.png')
+    // A path the export could not write as it is becomes its alt text, as a hidden file does.
+    expect(readFileSync(join(out, 'docs/adr/0001-a.html'), 'utf8')).toContain('Odd')
+  })
+
+  it('names in the marker of a stopped export no image it would not copy', async () => {
+    const root = directory({
+      'docs/adr/0001-a.md': adr('accepted', '# A\n\n![Big](big.png) ![Pic](pic.png)\n'),
+      'docs/adr/pic.png': PNG
+    })
+    const out = join(directory(), 'site')
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(0)
+    // Someone puts a file where the missing image would go, and a link where the other goes.
+    writeFileSync(join(out, 'docs/adr/big.png'), 'mine')
+    rmSync(join(out, 'docs/adr/pic.png'))
+    symlinkSync(join(root, 'docs/adr/pic.png'), join(out, 'docs/adr/pic.png'))
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(2)
+    const marker = JSON.parse(readFileSync(join(out, 'softarch-export.json'), 'utf8'))
+    expect(marker.files).not.toContain('docs/adr/big.png')
+    rmSync(join(out, 'docs/adr/pic.png'))
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(0)
+    expect(readFileSync(join(out, 'docs/adr/big.png'), 'utf8')).toBe('mine')
+  })
+
   it('writes into an empty directory or an earlier export, and nowhere else', async () => {
     const root = directory({
       'docs/adr/0001-a.md': adr('accepted', '# A\n'),
@@ -127,6 +179,71 @@ describe('adr export (docs/cli.md)', () => {
     expect(filesBelow(out)).toContain('mine.txt')
   })
 
+  it('writes and removes nothing through a symbolic link that stands in the export', async () => {
+    const root = directory({ 'docs/adr/0001-a.md': adr('accepted', '# A\n') })
+    const elsewhere = directory({ 'victim.txt': 'keep', 'notes.txt': 'keep' })
+    const out = join(directory(), 'site')
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(0)
+
+    // A directory of the export is a link to elsewhere, and the marker names a file there.
+    rmSync(join(out, 'docs'), { recursive: true })
+    symlinkSync(elsewhere, join(out, 'docs'))
+    const marker = JSON.parse(readFileSync(join(out, 'softarch-export.json'), 'utf8'))
+    writeFileSync(
+      join(out, 'softarch-export.json'),
+      JSON.stringify({ ...marker, files: [...marker.files, 'docs/victim.txt'] })
+    )
+    const { code, err } = await adrIn(root, 'export', '--out', out)
+    expect(code).toBe(2)
+    expect(err).toContain('docs in')
+    expect(err).toContain('is a symbolic link: the export writes nothing through one')
+    expect(filesBelow(elsewhere)).toEqual(['notes.txt', 'victim.txt'])
+
+    // A file of the export is a link to elsewhere: it is not written through either.
+    rmSync(join(out, 'docs'))
+    rmSync(join(out, 'style.css'))
+    symlinkSync(join(elsewhere, 'notes.txt'), join(out, 'style.css'))
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(2)
+    expect(readFileSync(join(elsewhere, 'notes.txt'), 'utf8')).toBe('keep')
+
+    // A hard link: the export writes a file of its own, and the other stays as it was.
+    rmSync(join(out, 'style.css'))
+    linkSync(join(elsewhere, 'notes.txt'), join(out, 'style.css'))
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(0)
+    expect(readFileSync(join(elsewhere, 'notes.txt'), 'utf8')).toBe('keep')
+    expect(readFileSync(join(out, 'style.css'), 'utf8')).toContain(':root')
+  })
+
+  it('removes only what the marker names as the export writes it, and only what is gone', async () => {
+    const root = directory({
+      'docs/adr/0001-first.md': adr('accepted', '# First\n\n![Gone](img/gone.png)\n')
+    })
+    const out = join(directory(), 'site')
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(0)
+    // An image that could not be copied is not the export's: a file someone puts there stays.
+    const marker = JSON.parse(readFileSync(join(out, 'softarch-export.json'), 'utf8'))
+    expect(marker.files).not.toContain('docs/adr/img/gone.png')
+    mkdirSync(join(out, 'docs/adr/img'))
+    writeFileSync(join(out, 'docs/adr/img/gone.png'), 'mine')
+    writeFileSync(
+      join(out, 'softarch-export.json'),
+      JSON.stringify({
+        ...marker,
+        files: ['./index.html', 'docs//adr/0001-first.html', 'style.css/', '../outside.txt']
+      })
+    )
+    const again = await adrIn(root, 'export', '--out', out)
+    expect(again.code).toBe(0)
+    expect(filesBelow(out)).toEqual([
+      'docs/adr/0001-first.html',
+      'docs/adr/img/gone.png',
+      'index.html',
+      'print.html',
+      'softarch-export.json',
+      'style.css'
+    ])
+  })
+
   it('exports the Decision Logs named with --log', async () => {
     const root = directory({
       '.adr/config.yml': 'logs:\n  - path: docs/adr\n  - path: billing/adr\n',
@@ -137,6 +254,18 @@ describe('adr export (docs/cli.md)', () => {
     const { code, out: said } = await adrIn(root, 'export', '--out', out, '--log', 'billing/adr/')
     expect(code).toBe(0)
     expect(said).toMatch(/^Exported 1 ADR of 1 Decision Log/)
+    // A log named twice is one log.
+    const twice = await adrIn(
+      root,
+      'export',
+      '--out',
+      out,
+      '--log',
+      'billing/adr',
+      '--log',
+      './billing/adr'
+    )
+    expect(twice.out).toMatch(/^Exported 1 ADR of 1 Decision Log /)
     expect(filesBelow(out)).toContain('billing/adr/0001-b.html')
     expect(filesBelow(out)).not.toContain('docs/adr/0001-a.html')
 
@@ -161,5 +290,14 @@ describe('adr export (docs/cli.md)', () => {
       expect(err).toMatch(said)
     }
     expect(existsSync(join(empty, 'site'))).toBe(false)
+
+    // A link that leads nowhere is no directory to write into.
+    const root = directory({ 'docs/adr/0001-a.md': adr('accepted', '# A\n') })
+    symlinkSync(join(root, 'nowhere'), join(root, 'dangling'))
+    const dangling = await adrIn(root, 'export', '--out', join(root, 'dangling'))
+    expect([dangling.code, dangling.err]).toEqual([
+      2,
+      `adr export: ${join(root, 'dangling')} is not a directory.\n`
+    ])
   })
 })

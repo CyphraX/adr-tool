@@ -7,4 +7,4 @@ export {
   type ExportOptions,
   type ExportedFile
 } from './site'
-export { repositoryPath } from './markdown'
+export { isImage, repositoryPath } from './markdown'

@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { exportTo } from './export'
+import { describeRefusal, exportTo } from './export'
 import { repositoryFiles } from './files'
 import { lint } from './lint'
 import { FORMATS, render, type Format } from './report'
@@ -69,7 +69,7 @@ export async function run(args: readonly string[], console: Console): Promise<nu
         warn
       })
       if (!result.ok) {
-        console.err(`adr export: ${result.reason}\n`)
+        console.err(`adr export: ${describeRefusal(result.reason)}\n`)
         return 2
       }
       const adrs = `${result.adrs} ${result.adrs === 1 ? 'ADR' : 'ADRs'}`
