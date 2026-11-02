@@ -33,8 +33,20 @@ export interface OpenRepository {
   /** The last part of `root`: the label of the repository's tab. */
   readonly name: string
   readonly repository: Repository
+  /**
+   * The Components the repository declares, which an ADR can name in `affects`, each parent
+   * before its children. Absent while nothing is declared that can be read: then the Traces
+   * are not checked either.
+   */
+  readonly components?: readonly ComponentName[]
   /** What git says about the directory. Absent without git, or outside a git repository. */
   readonly git?: GitState
+}
+
+/** A Component as a Trace names it, and as it is shown. */
+export interface ComponentName {
+  readonly id: string
+  readonly name: string
 }
 
 export interface GitState {
@@ -121,6 +133,15 @@ export interface MetadataEditRequest {
   readonly decisionMakers: readonly string[]
   readonly tags: readonly string[]
   readonly relations: Readonly<Record<RelationType, readonly string[]>>
+  /** The Components the ADR affects, by their Component IDs. */
+  readonly affects: readonly string[]
+}
+
+/** A new segment for a declared Component. What is valid is `structure`'s question. */
+export interface RenameRequest {
+  readonly repositoryId: string
+  readonly component: string
+  readonly segment: string
 }
 
 /** One of the repairs `core` offers for a Problem of the log. `core` checks that it still does. */
@@ -359,6 +380,11 @@ export interface Api {
   planAdopt(repositoryId: string): Promise<PlanResult>
   /** Plan the Repair of a Problem of the declaration. Nothing is written until the change is applied. */
   planStructureRepair(repositoryId: string, problem: StructureProblem): Promise<PlanResult>
+  /**
+   * Plan giving a declared Component a new segment, together with every Trace that names it.
+   * Nothing is written until the change is applied.
+   */
+  planRename(repositoryId: string, component: string, segment: string): Promise<PlanResult>
   /** Say whether the window holds text that is not on disk. While it does, closing it asks first. */
   setUnsaved(unsaved: boolean): Promise<void>
   /** Called when the window is to close while it holds unsaved text. Nothing closes until it was answered. */
@@ -381,6 +407,7 @@ export const CHANNEL = {
   planCreate: 'change:plan-create',
   planAdopt: 'change:plan-adopt',
   planStructureRepair: 'change:plan-structure-repair',
+  planRename: 'change:plan-rename',
   structureView: 'structure:view',
   readSourceFile: 'structure:read-source-file',
   structureChanged: 'structure:changed',

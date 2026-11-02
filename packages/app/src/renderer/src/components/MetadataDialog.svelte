@@ -1,14 +1,16 @@
 <script lang="ts">
   import type { Adr, RelationType } from '@adr-tool/core'
+  import type { ComponentName } from '../../../shared/ipc'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
-  import AdrPicker from './AdrPicker.svelte'
   import ChipInput from './ChipInput.svelte'
+  import Picker from './Picker.svelte'
   import StatusMark from './StatusMark.svelte'
 
-  // The Metadata a person maintains: who decided, tags, and Relations. Status and dates are
-  // not here; they change through Accept, Reject and Deprecate.
+  // The Metadata a person maintains: who decided, tags, Relations, and the Components the
+  // ADR affects. Status and dates are not here; they change through Accept, Reject and
+  // Deprecate.
   let dialog = $state<HTMLDialogElement>()
   const editing = $derived(app.editingMetadata)
   const adrs = $derived(app.log?.adrs ?? [])
@@ -27,6 +29,14 @@
       .filter((item, position, all) => all.indexOf(item) === position)
   const knownDecisionMakers = $derived(used((candidate) => candidate.metadata.decisionMakers))
   const knownTags = $derived(used((candidate) => candidate.metadata.tags))
+
+  // What the repository declares; nothing while there is only the Draft.
+  const declared = $derived(app.active?.repository.components)
+  const componentsLeft = $derived(
+    (declared ?? []).filter((component) => !editing?.affects.includes(component.id))
+  )
+  /** How deep a Component lies, for the indentation of the picker. */
+  const depthOf = (component: ComponentName): number => component.id.split('/').length - 1
 
   /** The ADRs a Relation of this type can still be added to. */
   function candidates(type: RelationType, chosen: string[]): Adr[] {
@@ -110,13 +120,65 @@
             {/each}
           </ul>
         {/if}
-        <AdrPicker
+        <Picker
           candidates={candidates(type, chosen)}
           label={t.metadata.addTo(RELATION_TYPE_LABEL[type])}
+          placeholder={t.metadata.pickerPlaceholder}
+          noneLeft={t.metadata.noneLeft}
+          textOf={(other) => `${other.id} ${prefixOf(other)} ${other.title ?? ''}`}
+          newestFirst
           onpick={(id) => chosen.push(id)}
-        />
+        >
+          {#snippet option(other)}
+            <StatusMark status={statusKey(other)} />
+            <span class="prefix">{prefixOf(other)}</span>
+            <span class="title">{other.title ?? other.id}</span>
+          {/snippet}
+        </Picker>
       </div>
     {/each}
+
+    <div class="field">
+      <h2>{t.metadata.components} <span class="about">{t.metadata.componentsAbout}</span></h2>
+      {#if editing.affects.length > 0}
+        <ul aria-label={t.metadata.components}>
+          {#each editing.affects as id (id)}
+            {@const component = declared?.find((candidate) => candidate.id === id)}
+            <li class:missing={!component}>
+              {#if component}
+                <span class="title">{component.name}</span>
+                {#if component.name !== component.id}<code>{component.id}</code>{/if}
+              {:else}
+                <span class="title">{t.metadata.notDeclared(id)}</span>
+              {/if}
+              <button
+                aria-label={t.metadata.remove(id)}
+                onclick={() => editing.affects.splice(editing.affects.indexOf(id), 1)}>×</button
+              >
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if declared}
+        <Picker
+          candidates={componentsLeft}
+          label={t.metadata.addTo(t.metadata.components)}
+          placeholder={t.metadata.componentPlaceholder}
+          noneLeft={t.metadata.noComponentLeft}
+          textOf={(component) => `${component.id} ${component.name}`}
+          onpick={(id) => editing.affects.push(id)}
+        >
+          {#snippet option(component)}
+            <span class="title" style:padding-left="{depthOf(component) * 14}px"
+              >{component.name}</span
+            >
+            {#if component.name !== component.id}<code>{component.id}</code>{/if}
+          {/snippet}
+        </Picker>
+      {:else}
+        <p class="hint inline">{t.metadata.noDeclaration}</p>
+      {/if}
+    </div>
 
     {#if !proposed}
       <p class="hint">{t.metadata.hintDecided}</p>
@@ -220,6 +282,13 @@
     color: var(--problem);
   }
 
+  code {
+    flex: none;
+    font-family: var(--code);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
   li button {
     flex: none;
     width: 18px;
@@ -238,6 +307,10 @@
     margin-top: 16px;
     color: var(--ink-soft);
     line-height: 1.55;
+  }
+
+  .hint.inline {
+    margin-top: 0;
   }
 
   footer {

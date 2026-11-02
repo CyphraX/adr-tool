@@ -17,6 +17,7 @@ import { Repositories } from './repositories'
 import {
   metadataEditRequest,
   migrationRequest,
+  renameRequest,
   repairRequest,
   structureRepairRequest
 } from './requests'
@@ -247,6 +248,15 @@ function registerIpc(): void {
         repositoryId as string,
         await planRepair(nodeFileSystem(root), repair)
       )
+    }
+  )
+
+  ipcMain.handle(
+    CHANNEL.planRename,
+    (_, repositoryId: unknown, component: unknown, segment: unknown) => {
+      const rename = renameRequest(repositoryId, component, segment)
+      if (!rename) return { ok: false, reason: t.notUnderstood }
+      return repositories.planRename(rename)
     }
   )
 

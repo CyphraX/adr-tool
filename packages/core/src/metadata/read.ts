@@ -24,6 +24,8 @@ export interface Metadata {
   readonly decisionMakers: readonly string[]
   readonly tags: readonly string[]
   readonly relations: Readonly<Record<RelationType, readonly string[]>>
+  /** The Components the ADR affects, by their Component IDs: a Trace into Structure. */
+  readonly affects: readonly string[]
   readonly backReferences: Readonly<Record<BackReferenceKey, readonly string[]>>
   readonly corrections: readonly Correction[]
   /** Which of the tool's keys the file actually contains, in the order of `METADATA_KEYS`. */
@@ -167,6 +169,7 @@ function metadataFrom(map: YAMLMap | undefined, adr: string, problems: Problem[]
       RelationType,
       string[]
     >,
+    affects: list('affects'),
     backReferences: {
       'superseded-by': list('superseded-by'),
       'amended-by': list('amended-by')

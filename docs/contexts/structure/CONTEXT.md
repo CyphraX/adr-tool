@@ -13,7 +13,7 @@ The stable identifier of a Component, a path of segments such as `core/metadata`
 _Avoid_: Name, key, path (the ID is not a folder)
 
 **Rename**:
-To give a Component a new Component ID — by changing a segment or by moving it to another parent — rewriting the declaration and everything that names the old ID in one step.
+To give a Component a new Component ID by changing its segment, rewriting the declaration and everything that names the old ID in one step. Moving a Component to another parent changes its ID too, but is done by hand; what it leaves dangling shows up as Problems.
 _Avoid_: Move, Renumber (that is for ADRs; Decisions avoids "rename" for it and means a file there)
 
 **Draft**:

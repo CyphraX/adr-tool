@@ -62,6 +62,8 @@ function candidatesOf(log: DecisionLog, problem: Problem): Repair[] {
       return [{ kind: 'remove-item', adr: problem.adr, key: problem.key, item: problem.target }]
     case 'self-reference':
       return [{ kind: 'remove-item', adr: problem.adr, key: problem.key, item: problem.adr }]
+    case 'unknown-component':
+      return [{ kind: 'remove-item', adr: problem.adr, key: 'affects', item: problem.component }]
     case 'missing-back-reference':
       return [
         { kind: 'add-back-reference', adr: problem.adr, key: problem.key, item: problem.source }

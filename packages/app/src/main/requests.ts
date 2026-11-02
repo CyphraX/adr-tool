@@ -1,6 +1,11 @@
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
-import type { MetadataEditRequest, MigrationRequest, RepairRequest } from '../shared/ipc'
+import type {
+  MetadataEditRequest,
+  MigrationRequest,
+  RenameRequest,
+  RepairRequest
+} from '../shared/ipc'
 
 /**
  * What the renderer sends is untrusted until it has been looked at: the renderer shows ADRs
@@ -13,7 +18,8 @@ export function metadataEditRequest(request: unknown): MetadataEditRequest | und
     ['repositoryId', 'logPath', 'adrId'].every((field) => typeof given[field] === 'string') &&
     isStrings(given['decisionMakers']) &&
     isStrings(given['tags']) &&
-    RELATION_TYPES.every((type) => isStrings(relations[type]))
+    RELATION_TYPES.every((type) => isStrings(relations[type])) &&
+    isStrings(given['affects'])
   if (!valid) return undefined
   // Only what is named here goes on: whatever else the request carries is left behind.
   return {
@@ -22,8 +28,19 @@ export function metadataEditRequest(request: unknown): MetadataEditRequest | und
     adrId: given['adrId'],
     decisionMakers: given['decisionMakers'],
     tags: given['tags'],
-    relations: Object.fromEntries(RELATION_TYPES.map((type) => [type, relations[type]]))
+    relations: Object.fromEntries(RELATION_TYPES.map((type) => [type, relations[type]])),
+    affects: given['affects']
   } as MetadataEditRequest
+}
+
+/** Which Component, and its new segment. Whether either is valid is `structure`'s question. */
+export function renameRequest(
+  repositoryId: unknown,
+  component: unknown,
+  segment: unknown
+): RenameRequest | undefined {
+  if (typeof repositoryId !== 'string' || typeof component !== 'string') return undefined
+  return typeof segment === 'string' ? { repositoryId, component, segment } : undefined
 }
 
 /** A repair is rebuilt field by field. Whether the log has a Problem it repairs is `core`'s question. */

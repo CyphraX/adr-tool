@@ -14,7 +14,7 @@ export {
   type WritableFileSystem
 } from '@adr-tool/kernel'
 
-export { openRepository, type DecisionLog, type Repository } from './log/load'
+export { openRepository, type DecisionLog, type OpenOptions, type Repository } from './log/load'
 export { DEFAULT_LOG_PATHS } from './log/discover'
 export type { NamingScheme } from './log/naming'
 export { FOREIGN_FORMAT_NAMES, type Adr, type ForeignFormat } from './adr/adr'
@@ -32,6 +32,7 @@ export { planEditBody, recordsCorrection, type BodyEdit } from './lifecycle/edit
 export { planCreate, type NewAdr } from './lifecycle/create'
 export { planEditMetadata, type MetadataEdit } from './lifecycle/edit-metadata'
 export { planRenumber } from './lifecycle/renumber'
+export { planRenameTraces } from './lifecycle/rename-traces'
 export { planMigration } from './lifecycle/migrate'
 export { planRepair, repairsOf, type Repair } from './lifecycle/repair'
 export { nextPrefix } from './log/new-id'

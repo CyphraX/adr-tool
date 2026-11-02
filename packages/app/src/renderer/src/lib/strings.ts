@@ -148,6 +148,10 @@ export const t = {
     decisionMakers: 'Decision-makers',
     tags: 'Tags',
     relations: 'Relations',
+    affects: 'Affects',
+    components: 'Components',
+    notDeclared: 'not a declared Component',
+    showComponent: (name: string): string => `Show ${name} in Structure`,
     corrections: 'Corrections',
     corrected: 'Corrected',
     showChange: 'Show the change',
@@ -209,6 +213,13 @@ export const t = {
     addTo: (list: string): string => `Add to ${list}`,
     noneLeft: 'No ADR left to add',
     pickerPlaceholder: 'Add an ADR: number or title',
+    components: 'Components',
+    componentsAbout: 'The parts of the code this decision affects.',
+    notDeclared: (id: string): string => `${id} — not a declared Component`,
+    noComponentLeft: 'No Component left to add',
+    componentPlaceholder: 'Add a Component: name or ID',
+    noDeclaration:
+      'Components can be named once they are declared. Adopt the Draft in the Structure view first.',
     hintDecided:
       'What this ADR supersedes or amends was fixed when it was decided. Status and dates change through the actions of the ADR, never here.',
     hintProposed: 'Status and dates change through the actions of the ADR, never here.',
@@ -414,7 +425,17 @@ export const t = {
       metrics: 'Metrics',
       cycles: 'Cycles it is part of',
       noCycle: 'None at its level.',
-      atItsLevel: 'At its own level, among the Components beside it.'
+      atItsLevel: 'At its own level, among the Components beside it.',
+      decisions: 'Decisions',
+      noDecision: 'No ADR affects it.',
+      inside: (name: string): string => `through ${name}`,
+      rename: 'Rename',
+      renameLabel: (name: string): string => `New segment for ${name}`,
+      renameHint: (id: string): string =>
+        `The ID ${id} changes, and the IDs of the Components inside it with it. Every ADR that names one of them is rewritten in the same change.`,
+      notASegment:
+        'Lowercase letters, digits and dashes, starting and ending with a letter or a digit.',
+      preview: 'Preview'
     },
 
     detail: {
@@ -532,6 +553,11 @@ export const t = {
       action: 'Adopt',
       title: 'Adopt the Draft',
       refused: 'The Draft cannot be adopted'
+    },
+    rename: {
+      action: 'Rename',
+      title: (from: string, to: string): string => `Rename ${from} to ${to}`,
+      refused: (id: string): string => `Cannot rename ${id}`
     },
     structureRepair: {
       action: 'Repair',

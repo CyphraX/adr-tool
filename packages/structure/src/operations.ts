@@ -1,7 +1,8 @@
 import { plan, Refusal, type FileSystem, type Plan } from '@adr-tool/kernel'
-import { DECLARATION_PATH, type StructureProblem } from './problems'
+import { everyComponent, isSegment, readDeclaration } from './declaration'
+import { DECLARATION_PATH, SEGMENT_RULE, type StructureProblem } from './problems'
 import type { Structure } from './structure'
-import { insertComponents, removePattern, renderComponents } from './write'
+import { insertComponents, removePattern, renameSegment, renderComponents } from './write'
 
 const asText = (text: string): string => text
 
@@ -43,4 +44,37 @@ export function planRepair(fs: FileSystem, problem: StructureProblem): Promise<P
       removePattern(text, problem.component, problem.key, problem.pattern)
     )
   })
+}
+
+/** What a Rename tells its caller: the ID before and after, for the Traces and the view to follow. */
+export type RenamePlan = Plan<{ readonly renamed: { readonly from: string; readonly to: string } }>
+
+/**
+ * Rename (docs/structure-format.md, section 1): give the declared Component `id` a new segment,
+ * in `.arch/components.yml` as it is on disk now. This is the declaration's half; what names
+ * the Component elsewhere — the Traces of the ADRs — is the caller's to rewrite with it.
+ */
+export async function planRename(fs: FileSystem, id: string, segment: string): Promise<RenamePlan> {
+  const parent = id.includes('/') ? id.slice(0, id.lastIndexOf('/') + 1) : ''
+  const to = parent + segment
+  const planned = await plan(fs, asText, async (pending) => {
+    if (!isSegment(segment)) {
+      throw new Refusal(`"${segment}" is not a valid segment of a Component ID. ${SEGMENT_RULE}`)
+    }
+    const declaration = readDeclaration(await fs.readText(DECLARATION_PATH))
+    if (declaration.kind === 'absent') {
+      throw new Refusal('Only a declared Component can be renamed. Adopt the Draft first.')
+    }
+    if (declaration.kind === 'unreadable') {
+      throw new Refusal(`${DECLARATION_PATH} cannot be read: ${declaration.detail}`)
+    }
+    const declared = new Set(everyComponent(declaration.components).map((one) => one.id))
+    if (!declared.has(id)) {
+      throw new Refusal(`${DECLARATION_PATH} declares no Component ${id}. Look at the file again.`)
+    }
+    if (to === id) throw new Refusal(`${id} has that segment already.`)
+    if (declared.has(to)) throw new Refusal(`There is a Component ${to} already.`)
+    await pending.write(DECLARATION_PATH, (text) => renameSegment(text, id, segment))
+  })
+  return planned.ok ? { ...planned, renamed: { from: id, to } } : planned
 }

@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { applyChangeSet, memoryFileSystem } from '@adr-tool/kernel'
+import { applyChangeSet, memoryFileSystem, type FileSystem } from '@adr-tool/kernel'
 import {
   analyseDependencies,
   DECLARATION_PATH,
@@ -18,11 +18,20 @@ const root = fileURLToPath(new URL('../../../', import.meta.url))
 const ids = (components: readonly DeclaredComponent[]): string[] =>
   components.flatMap((component) => [component.id, ...ids(component.children)])
 
-// The done-when of part 2 (docs/plan-structure.md). This repository declares no Components
-// yet, so what is read here is the Draft.
+/** This repository as it was before it adopted its Draft: without a declaration. */
+function undeclared(): FileSystem {
+  const fs = nodeFileSystem(root)
+  return {
+    readText: async (path) => (path === DECLARATION_PATH ? undefined : fs.readText(path)),
+    list: fs.list
+  }
+}
+
+// The done-when of part 2 (docs/plan-structure.md). This repository has declared its
+// Components since part 7; what is read here is the Draft it adopted then.
 it('drafts the Components of this repository from its pnpm workspace', async () => {
   const files = repositoryFiles(root)
-  const structure = await openStructure(nodeFileSystem(root), files)
+  const structure = await openStructure(undeclared(), files)
 
   expect(structure.origin).toBe('draft')
   expect(structure.problems).toEqual([])
@@ -74,7 +83,7 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
 
 it('adopts that Draft into a declaration that reads back as the same Components', async () => {
   const files = repositoryFiles(root)
-  const structure = await openStructure(nodeFileSystem(root), files)
+  const structure = await openStructure(undeclared(), files)
 
   // Planned against a copy in memory: this test must never write into the repository.
   const copy = memoryFileSystem({})
@@ -91,6 +100,12 @@ it('adopts that Draft into a declaration that reads back as the same Components'
   expect(adopted.problems).toEqual([])
   expect(adopted.components).toEqual(structure.components)
   expect(adopted.sourceFiles).toEqual(structure.sourceFiles)
+
+  // And that is what this repository declares: the Draft, adopted in the app (part 7).
+  const declared = await openStructure(nodeFileSystem(root), files)
+  expect(declared.origin).toBe('declared')
+  expect(declared.problems).toEqual([])
+  expect(declared.components).toEqual(structure.components)
 })
 
 // The done-when of part 3, as far as `structure` goes; the app shows the same in the second

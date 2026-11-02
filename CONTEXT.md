@@ -19,7 +19,7 @@ The file name of an ADR without its extension, e.g. `0003-postgres-write-model`,
 _Avoid_: Number (that is only the leading part people say aloud, "ADR-3"), slug, key
 
 **Metadata**:
-The structured, tool-owned part of an ADR — Status, creation and decision dates, decision-makers, tags, Relations, Corrections — as opposed to its free-form body, which the author owns. The title belongs to the body, not to the Metadata.
+The structured, tool-owned part of an ADR — Status, creation and decision dates, decision-makers, tags, Relations, the Components it affects, Corrections — as opposed to its free-form body, which the author owns. The title belongs to the body, not to the Metadata. The Components are a Trace into Structure, written on the ADR alone and named by their Component IDs.
 _Avoid_: Frontmatter (that is only its storage form), header, properties
 
 **Status**:

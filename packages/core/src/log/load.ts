@@ -1,6 +1,6 @@
 import { readAdr, type Adr } from '../adr/adr'
 import { joinPath, type FileSystem } from '@adr-tool/kernel'
-import { checkConsistency } from '../problems/check'
+import { checkConsistency, checkTraces } from '../problems/check'
 import type { Problem } from '../problems/problem'
 import { relationsOf, type Relation } from '../relations/graph'
 import { discoverLogs, type Discovery, type LogLocation } from './discover'
@@ -25,13 +25,28 @@ export interface Repository {
   readonly problems: readonly Problem[]
 }
 
+/**
+ * What the reader is told beyond the files of the Decision Logs. `core` does not know
+ * Structure: whoever opens the repository says which Components it declares.
+ */
+export interface OpenOptions {
+  /**
+   * The IDs of the Components the repository declares, which the Traces in `affects` are
+   * checked against. Left out, they are not checked: there is no declaration that can be read.
+   */
+  readonly components?: readonly string[]
+}
+
 /** Read every Decision Log of the repository behind `fs`. Reads only; never writes. */
-export async function openRepository(fs: FileSystem): Promise<Repository> {
+export async function openRepository(
+  fs: FileSystem,
+  options: OpenOptions = {}
+): Promise<Repository> {
   const discovery = await discoverLogs(fs)
   const problems = [...discovery.problems]
   const logs: DecisionLog[] = []
   for (const location of discovery.locations) {
-    const log = await loadDecisionLog(fs, location)
+    const log = await loadDecisionLog(fs, location, options)
     if (log) logs.push(log)
     else problems.push({ kind: 'missing-log-directory', path: location.path })
   }
@@ -41,7 +56,8 @@ export async function openRepository(fs: FileSystem): Promise<Repository> {
 /** Read one Decision Log, or `undefined` when its directory does not exist. */
 export async function loadDecisionLog(
   fs: FileSystem,
-  location: LogLocation
+  location: LogLocation,
+  options: OpenOptions = {}
 ): Promise<DecisionLog | undefined> {
   const entries = await fs.list(location.path)
   if (!entries) return undefined
@@ -83,6 +99,7 @@ export async function loadDecisionLog(
   const adrs = withImpliedSupersessions(read, successors)
   const graph = relationsOf(adrs)
   problems.push(...graph.problems, ...checkConsistency(adrs, graph.relations, naming))
+  if (options.components) problems.push(...checkTraces(adrs, options.components))
   return { path: location.path, naming, adrs, relations: graph.relations, problems }
 }
 

@@ -166,6 +166,65 @@ export function removePattern(
   return edits
 }
 
+/**
+ * Give the Component `id` the segment `segment`: its key is rewritten where it stands, with
+ * its quoting. The Components below it follow by themselves; nothing else in the file changes.
+ */
+export function renameSegment(text: string, id: string, segment: string): TextEdit[] {
+  const doc = parseDocument(text, { uniqueKeys: false })
+  let map: YAMLMap | undefined = isMap(doc.contents) ? doc.contents : undefined
+  let pair: Pair | undefined
+  for (const part of id.split('/')) {
+    const components = map && findPair(map, 'components')?.value
+    pair = isMap(components) ? findPair(components, part) : undefined
+    map = isMap(pair?.value) ? (pair.value as YAMLMap) : undefined
+  }
+  const key = pair?.key
+  const cannot = new Refusal(
+    `${DECLARATION_PATH} is written in a way the suite cannot rename ${id} in. Change the segment in an editor.`
+  )
+  if (!isScalar(key) || !key.range) throw cannot
+  const quoted =
+    key.type === 'QUOTE_DOUBLE'
+      ? JSON.stringify(segment)
+      : key.type === 'QUOTE_SINGLE'
+        ? `'${segment}'`
+        : scalar(segment)
+  const edits = [{ start: key.range[0], end: key.range[1], insert: quoted }]
+
+  // What is handed out reads back as the same Components, under the new IDs.
+  const parent = id.includes('/') ? id.slice(0, id.lastIndexOf('/') + 1) : ''
+  const to = parent + segment
+  const before = readDeclaration(text)
+  const after = readDeclaration(applyEdits(text, edits))
+  const same =
+    before.kind === 'declared' &&
+    after.kind === 'declared' &&
+    JSON.stringify(comparable(before.components, id, to)) ===
+      JSON.stringify(comparable(after.components, to, to))
+  if (!same) throw cannot
+  return edits
+}
+
+/**
+ * The Components as a Rename must leave them: every ID that is `from` or below it under `to`.
+ * The renamed Component's name is left out — without a `name` it is its segment.
+ */
+function comparable(components: readonly DeclaredComponent[], from: string, to: string): unknown {
+  return components.map((component) => {
+    const id =
+      component.id === from || component.id.startsWith(`${from}/`)
+        ? to + component.id.slice(from.length)
+        : component.id
+    return {
+      ...component,
+      id,
+      name: id === to ? undefined : component.name,
+      children: comparable(component.children, from, to)
+    }
+  })
+}
+
 const byHand = (): Refusal =>
   new Refusal(
     'The list is written in a way the suite cannot take an item out of. Remove the pattern in an editor.'

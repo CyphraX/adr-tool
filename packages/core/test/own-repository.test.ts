@@ -39,6 +39,11 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       8,
       '0008-dependencies-come-from-parsers-alone-without-a-type-checker',
       expect.stringMatching(/^(proposed|accepted)$/)
+    ],
+    [
+      9,
+      '0009-traces-are-recorded-on-the-source-only-unlike-back',
+      expect.stringMatching(/^(proposed|accepted)$/)
     ]
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
@@ -90,6 +95,12 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       from: '0008-dependencies-come-from-parsers-alone-without-a-type-checker',
       to: '0007-the-analysis-never-executes-anything-from-the-analysed',
       state: log.adrs[7]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
+    },
+    {
+      type: 'depends-on',
+      from: '0009-traces-are-recorded-on-the-source-only-unlike-back',
+      to: '0006-one-core-package-per-module-on-a-shared-kernel',
+      state: log.adrs[8]!.metadata.status === 'proposed' ? 'pending' : 'in-effect'
     }
   ])
 })

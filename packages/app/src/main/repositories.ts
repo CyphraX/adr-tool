@@ -4,7 +4,6 @@ import { watch, type FSWatcher } from 'chokidar'
 import {
   DEFAULT_LOG_PATHS,
   applyChangeSet,
-  openRepository,
   listTemplates,
   planAccept,
   planCreate,
@@ -30,12 +29,14 @@ import type {
   OpenRepository,
   PlanResult,
   MigrationRequest,
+  RenameRequest,
   RepairRequest
 } from '../shared/ipc'
 import { gitIn } from './git'
 import { historyChangeOf, historyOf } from './history'
 import { nodeFileSystem } from './node-file-system'
 import { t } from './strings'
+import { openWithTraces, planComponentRename } from './traces'
 import { watchPaths } from './watch-paths'
 
 const RELOAD_DELAY_MS = 150
@@ -130,12 +131,30 @@ export class Repositories {
 
   /** Plan an edit of the Metadata lists a person maintains: what was added, what was removed. */
   async planMetadataEdit(request: MetadataEditRequest): Promise<PlanResult> {
-    return this.plan(request.repositoryId, request.logPath, (fs, log) =>
-      planEditMetadata(fs, log, request.adrId, {
-        decisionMakers: request.decisionMakers,
-        tags: request.tags,
-        relations: request.relations
-      })
+    return this.plan(request.repositoryId, request.logPath, (fs, log, components) =>
+      planEditMetadata(
+        fs,
+        log,
+        request.adrId,
+        {
+          decisionMakers: request.decisionMakers,
+          tags: request.tags,
+          relations: request.relations,
+          affects: request.affects
+        },
+        components
+      )
+    )
+  }
+
+  /** Plan a Rename of a Component: the declaration and every Trace that names it, as they are on disk now. */
+  async planRename(request: RenameRequest): Promise<PlanResult> {
+    const entry = this.entries.get(request.repositoryId)
+    if (!entry) return { ok: false, reason: t.repositoryClosed }
+    const fs = nodeFileSystem(entry.root)
+    return this.hold(
+      request.repositoryId,
+      await planComponentRename(fs, request.component, request.segment)
     )
   }
 
@@ -173,25 +192,32 @@ export class Repositories {
 
   /**
    * Read the log afresh, let `core` plan against it, and hold the result for the renderer.
-   * Without a `logPath` the repository has no Decision Log yet, and the plan starts one.
+   * Without a `logPath` the repository has no Decision Log yet, and the plan starts one. The
+   * log is read with its Traces checked against the declaration, which `build` is handed too.
    */
   private async plan(
     repositoryId: string,
     logPath: string | undefined,
-    build: (fs: ReturnType<typeof nodeFileSystem>, log: DecisionLog) => Promise<Plan>
+    build: (
+      fs: ReturnType<typeof nodeFileSystem>,
+      log: DecisionLog,
+      components: string[] | undefined
+    ) => Promise<Plan>
   ): Promise<PlanResult> {
     const entry = this.entries.get(repositoryId)
     if (!entry) return { ok: false, reason: t.repositoryClosed }
 
     const fs = nodeFileSystem(entry.root)
-    const logs = (await openRepository(fs)).logs
+    const { repository, components } = await openWithTraces(fs)
+    const logs = repository.logs
     const log =
       logPath === undefined && logs.length === 0
         ? FIRST_LOG
         : logs.find((candidate) => candidate.path === (logPath ?? logs[0]?.path))
     if (!log) return { ok: false, reason: t.noLogAt(logPath) }
 
-    return this.hold(repositoryId, await build(fs, log))
+    const ids = components?.map((component) => component.id)
+    return this.hold(repositoryId, await build(fs, log, ids))
   }
 
   /**
@@ -242,7 +268,7 @@ export class Repositories {
     const entry = this.entries.get(repositoryId)
     if (!entry) return undefined
     const fs = nodeFileSystem(entry.root)
-    const adr = (await openRepository(fs)).logs
+    const adr = (await openWithTraces(fs)).repository.logs
       .find((log) => log.path === logPath)
       ?.adrs.find((candidate) => candidate.id === adrId)
     return adr && { root: entry.root, path: adr.path, text: await fs.readText(adr.path) }
@@ -275,8 +301,8 @@ export class Repositories {
 
   private async load(entry: Entry): Promise<OpenRepository> {
     const git = gitIn(entry.root)
-    const [repository, tree] = await Promise.all([
-      openRepository(nodeFileSystem(entry.root)),
+    const [{ repository, components }, tree] = await Promise.all([
+      openWithTraces(nodeFileSystem(entry.root)),
       git.workingTree()
     ])
     entry.gitDirectory ??= tree ? ((await git.directory()) ?? null) : undefined
@@ -292,6 +318,7 @@ export class Repositories {
       root: entry.root,
       name: basename(entry.root),
       repository,
+      ...(components && { components }),
       ...(tree && {
         git: { branch: tree.branch, changed: tree.changed.filter((path) => adrPaths.has(path)) }
       })
