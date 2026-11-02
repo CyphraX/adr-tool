@@ -161,6 +161,8 @@ Each module gets its own format specification, as [file-format.md](file-format.m
 
 ## Order after ADR v1
 
+From its third step on, this order is built as [plan-vision.md](plan-vision.md), part by part, for the people of [personas.md](personas.md).
+
 1. **Structure** — Components, Dependency graph, cycles, core metrics, the code viewer, and the first Trace (ADR affects Component). Built ([plan-structure.md](plan-structure.md)).
 2. **The rest of the Decisions roadmap** — decided by the author on 2026-11-02, ahead of Conformance: everything [roadmap.md](roadmap.md) lists apart from distribution, the MCP server and the export of ADRs included ([plan-roadmap.md](plan-roadmap.md)).
 3. **Conformance** — Rules, Patterns, Violations, Exceptions, `check` in CI. This is what carries the suite into teams.
