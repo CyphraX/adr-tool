@@ -1,6 +1,7 @@
 import { applyEdits, type TextEdit } from '../text/edit'
 import type { FileSystem } from '../fs/port'
 import type { ChangeSet, Plan } from './change-set'
+import type { Said } from './said'
 
 interface PendingFile {
   before: string
@@ -9,8 +10,18 @@ interface PendingFile {
   renameTo?: string
 }
 
-/** Why an operation cannot be done, in words for the person who asked for it. */
-export class Refusal extends Error {}
+/**
+ * Why an operation cannot be done, in words for the person who asked for it: the English
+ * sentence, and what was said as a code for a window in another language.
+ */
+export class Refusal extends Error {
+  constructor(
+    message: string,
+    readonly said?: Said
+  ) {
+    super(message)
+  }
+}
 
 /**
  * The files an operation is about to change. Every write is a set of splice edits against
@@ -88,7 +99,9 @@ export async function plan<View>(
   try {
     await build(pending)
   } catch (error) {
-    if (error instanceof Refusal) return { ok: false, reason: error.message }
+    if (error instanceof Refusal) {
+      return { ok: false, reason: error.message, ...(error.said && { said: error.said }) }
+    }
     throw error
   }
   return { ok: true, changeSet: pending.changeSet() }

@@ -1,3 +1,4 @@
+import type { Said } from './said'
 import type { WritableFileSystem } from '../fs/port'
 
 /** One file of a change set: its text when the change was planned, and its text afterwards. */
@@ -32,8 +33,15 @@ export type Plan<Outcome extends object = object> =
       readonly changeSet: ChangeSet
       /** What the person should look at before confirming. The operation can be done all the same. */
       readonly warnings?: readonly string[]
+      /** The warnings as codes, in the same order, where each has one (`Said`). */
+      readonly warned?: readonly Said[]
     } & Outcome)
-  | { readonly ok: false; readonly reason: string }
+  | {
+      readonly ok: false
+      readonly reason: string
+      /** The reason as a code, where it has one. */
+      readonly said?: Said
+    }
 
 /**
  * One change set out of several, as one operation: the halves of an operation that more than
