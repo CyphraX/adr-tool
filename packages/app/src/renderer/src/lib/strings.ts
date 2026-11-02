@@ -1,5 +1,6 @@
 import type { RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
+import type { Refusal } from './views'
 
 /**
  * What the window itself says: labels, hints, titles, questions — by where they stand, so
@@ -109,8 +110,14 @@ export const t = {
     root: '(repository root)',
     status: 'Status',
     all: 'All',
-    relations: 'Relations',
-    graph: 'Graph',
+    views: 'Views',
+    graph: 'Relations graph',
+    timeline: 'Timeline',
+    timelineHint: 'The ADRs by the dates they were created and decided',
+    board: 'Board',
+    boardHint: 'The ADRs by Status; drag one to Accept, Reject, Deprecate or Supersede it',
+    dashboard: 'Dashboard',
+    dashboardHint: 'The Decision Log in figures: Status, Problems, waiting proposals, Components',
     check: 'Check',
     problems: 'Problems',
     migrate: 'Migrate',
@@ -138,6 +145,80 @@ export const t = {
       `${adrs} ${adrs === 1 ? 'ADR' : 'ADRs'} exported to ${path}.`,
     open: 'Open',
     refused: 'Cannot export'
+  },
+
+  timeline: {
+    label: 'Timeline of the ADRs',
+    lead: 'Each ADR from the day it was created to the day it was decided. A proposed ADR runs on to today.',
+    empty: 'No ADR of this Decision Log names a date.',
+    undated: (count: number): string =>
+      `${count} ${many(count, 'ADR names', 'ADRs name')} no date:`,
+    span: (created: string | undefined, decided: string | undefined, waiting: boolean): string =>
+      [
+        created && `created ${created}`,
+        decided && `decided ${decided}`,
+        waiting && 'waiting for a decision'
+      ]
+        .filter(Boolean)
+        .join(', '),
+    /** A month on the axis: its short name, and the year in January and on the first line. */
+    month: (date: string, withYear: boolean): string => {
+      const name = new Date(`${date}T00:00:00Z`).toLocaleString('en', {
+        month: 'short',
+        timeZone: 'UTC'
+      })
+      return withYear ? `${name} ${date.slice(0, 4)}` : name
+    }
+  },
+
+  board: {
+    label: 'Board of the ADRs by Status',
+    lead: 'Drag an ADR to another Status. Each move is an operation of the tool, previewed before anything is written.',
+    empty: 'None',
+    drop: {
+      accept: 'Drop to accept',
+      reject: 'Drop to reject',
+      deprecate: 'Drop to deprecate',
+      supersede: 'Drop to write an ADR that supersedes it'
+    },
+    refusedTitle: (prefix: string): string => `ADR ${prefix} cannot move there`,
+    refused: {
+      foreign:
+        'It is written in a foreign format, which the tool reads and never writes. Migrate it first.',
+      unmigratable:
+        'It is written in a foreign format, which the tool reads and never writes, and it cannot be migrated as it stands: its header says why. Change its file by hand.',
+      unreadable: 'Its frontmatter cannot be read. Fix it first.',
+      unknown: 'Its Status is none of the five values. Fix its Status first.',
+      undecided: 'A proposed ADR is accepted or rejected first.',
+      decided:
+        'A decision is not taken back. An accepted or deprecated ADR is superseded by a new one, and an accepted one can be deprecated.',
+      rejected: 'A rejected ADR stays rejected. Write a new proposal instead.',
+      superseded: 'A superseded ADR stays superseded.'
+    } satisfies Record<Refusal, string>
+  },
+
+  dashboard: {
+    label: 'Dashboard of the Decision Log',
+    total: (count: number): string => `${count} ${many(count, 'ADR', 'ADRs')}`,
+    byStatus: 'By Status',
+    problems: 'Problems',
+    noProblems: 'No Problems.',
+    problemCount: (count: number): string =>
+      `${count} ${many(count, 'Problem', 'Problems')} to look at`,
+    showProblems: 'Show the Problems',
+    waiting: 'Waiting for a decision',
+    noneWaiting: 'No ADR is proposed.',
+    days: (days: number | undefined): string =>
+      days === undefined ? 'no date' : `${days} ${many(days, 'day', 'days')}`,
+    median: (days: number): string =>
+      `Half of them have waited ${days} ${many(days, 'day', 'days')} or less.`,
+    recent: 'Recent decisions',
+    noneDecided: 'No ADR names the date it was decided.',
+    components: 'Components affected',
+    noComponents: 'No ADR names a Component it affects.',
+    withoutComponent: (count: number): string =>
+      `${count} accepted ${many(count, 'ADR names', 'ADRs name')} no Component.`,
+    adrCount: (count: number): string => `${count} ${many(count, 'ADR', 'ADRs')}`
   },
 
   branches: {

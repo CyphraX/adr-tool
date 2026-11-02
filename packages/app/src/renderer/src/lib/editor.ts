@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language'
-import { Compartment, EditorState, type Range } from '@codemirror/state'
+import { Compartment, EditorState, Facet, Prec, StateField, type Range } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -13,7 +13,7 @@ import {
   type ViewUpdate
 } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import { liveMarks } from './live'
+import { liveMarks, liveTables, stepIntoTable, type LiveTable } from './live'
 
 // The source of an ADR is its raw material: monospace, quiet, with just enough emphasis to
 // find one's way. The colours come from the app's tokens, so light and dark follow.
@@ -144,10 +144,120 @@ const liveTheme = EditorView.theme({
   },
   '.cm-live-rule': { borderBottom: '1px solid var(--line-strong)' },
   '.cm-live-link': { color: 'var(--focus)', textDecoration: 'underline' },
-  '.cm-live-bullet': { color: 'var(--ink-soft)' }
+  '.cm-live-bullet': { color: 'var(--ink-soft)' },
+  // A table reads as in the preview: the interface's typeface, quiet lines between the cells.
+  '.cm-live-table': {
+    padding: '4px 0 8px',
+    fontFamily: 'var(--ui)',
+    fontSize: '14px',
+    lineHeight: '1.5',
+    cursor: 'text',
+    overflowX: 'auto'
+  },
+  '.cm-live-table table': { borderCollapse: 'collapse' },
+  '.cm-live-table th, .cm-live-table td': {
+    border: '1px solid var(--line-strong)',
+    padding: '4px 10px',
+    verticalAlign: 'top'
+  },
+  // A column the delimiter row aligns keeps its alignment.
+  '.cm-live-table th:not([align])': { textAlign: 'left' },
+  '.cm-live-table th': { fontWeight: '600', background: 'var(--panel)' },
+  '.cm-live-table code': { fontFamily: 'var(--code)', fontSize: '0.9em' }
 })
 
-const live = [livePlugin, liveTheme, EditorView.editorAttributes.of({ class: 'cm-live' })]
+/** How the live mode renders a table: as the preview does, sanitized. Without one, tables stay source. */
+const tableRenderer = Facet.define<
+  (markdown: string) => string,
+  ((markdown: string) => string) | undefined
+>({
+  combine: (values) => values[0]
+})
+
+/** A table of the text, drawn in place of its lines. A click into it puts the cursor there. */
+class Table extends WidgetType {
+  constructor(
+    readonly source: string,
+    readonly render: (markdown: string) => string
+  ) {
+    super()
+  }
+  override eq(other: Table): boolean {
+    return other.source === this.source
+  }
+  toDOM(): HTMLElement {
+    const box = document.createElement('div')
+    box.className = 'cm-live-table'
+    box.innerHTML = this.render(this.source)
+    // A link in the table is text to edit here, as everywhere in the editor: neither a click,
+    // nor a click of the middle button, nor a drag opens it.
+    const inert = (event: Event): void => {
+      if ((event.target as Element).closest('a, img')) event.preventDefault()
+    }
+    for (const type of ['click', 'auxclick', 'dragstart']) box.addEventListener(type, inert)
+    return box
+  }
+  override ignoreEvent(): boolean {
+    return false
+  }
+}
+
+function tablesOf(state: EditorState): DecorationSet {
+  const render = state.facet(tableRenderer)
+  if (!render) return Decoration.none
+  return Decoration.set(
+    liveTables(state).map((table) =>
+      Decoration.replace({
+        widget: new Table(state.doc.sliceString(table.from, table.to), render),
+        block: true
+      }).range(table.from, table.to)
+    )
+  )
+}
+
+/**
+ * The tables of the live mode. A table spans lines, and only a field of the state may replace
+ * whole lines; a plugin may not (docs/plan-roadmap.md, part 11).
+ */
+const tables = StateField.define<DecorationSet>({
+  create: tablesOf,
+  update: (value, transaction) =>
+    transaction.docChanged ||
+    transaction.selection ||
+    syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
+      ? tablesOf(transaction.state)
+      : value,
+  provide: (field) => EditorView.decorations.from(field)
+})
+
+/** The cursor moves a line down or up into a table, rather than over it. */
+const intoTable =
+  (direction: 1 | -1) =>
+  (view: EditorView): boolean => {
+    const drawn: LiveTable[] = []
+    view.state.field(tables).between(0, view.state.doc.length, (from, to) => {
+      drawn.push({ from, to })
+    })
+    const to = stepIntoTable(view.state, drawn, direction)
+    if (to === undefined) return false
+    view.dispatch({ selection: { anchor: to }, scrollIntoView: true })
+    return true
+  }
+
+const tableKeys = Prec.high(
+  keymap.of([
+    { key: 'ArrowDown', run: intoTable(1) },
+    { key: 'ArrowUp', run: intoTable(-1) }
+  ])
+)
+
+const live = [
+  livePlugin,
+  tables,
+  tableKeys,
+  liveTheme,
+  EditorView.editorAttributes.of({ class: 'cm-live' })
+]
 
 /** Where the live mode is switched on and off, per editor. */
 const liveMode = new Compartment()
@@ -164,6 +274,8 @@ export interface BodyEditorOptions {
   onSave: () => void
   /** Start in the live mode. */
   live?: boolean
+  /** How the live mode renders a table, as sanitized HTML. */
+  renderTable?: (markdown: string) => string
 }
 
 /** A CodeMirror 6 editor for the body of an ADR. It holds plain text; nothing is ever re-serialized. */
@@ -178,6 +290,7 @@ export function createBodyEditor(options: BodyEditorOptions): EditorView {
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage }),
         liveMode.of(options.live ? live : []),
+        options.renderTable ? tableRenderer.of(options.renderTable) : [],
         syntaxHighlighting(highlighting),
         theme,
         keymap.of([

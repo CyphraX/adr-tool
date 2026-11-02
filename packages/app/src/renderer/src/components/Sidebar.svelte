@@ -5,6 +5,13 @@
   import { MIGRATE_LOG_HINT, STATUS_LABEL, logName } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
+  // The views of a log beside its list and graph (docs/plan-roadmap.md, part 11).
+  const VIEWS = [
+    ['timeline', t.sidebar.timeline, t.sidebar.timelineHint],
+    ['board', t.sidebar.board, t.sidebar.boardHint],
+    ['dashboard', t.sidebar.dashboard, t.sidebar.dashboardHint]
+  ] as const
+
   const logs = $derived(app.active?.repository.repository.logs ?? [])
   const view = $derived(app.active?.view ?? 'adrs')
   const git = $derived(app.active?.repository.git)
@@ -73,7 +80,7 @@
   </section>
 
   <section>
-    <h2>{t.sidebar.relations}</h2>
+    <h2>{t.sidebar.views}</h2>
     <button
       class="row"
       class:current={view === 'graph'}
@@ -83,6 +90,17 @@
       <span class="label all">{t.sidebar.graph}</span>
       <span class="count">{app.log?.relations.length ?? 0}</span>
     </button>
+    {#each VIEWS as [candidate, label, hint] (candidate)}
+      <button
+        class="row"
+        class:current={view === candidate}
+        aria-pressed={view === candidate}
+        title={hint}
+        onclick={() => app.show(candidate)}
+      >
+        <span class="label all">{label}</span>
+      </button>
+    {/each}
   </section>
 
   <section>

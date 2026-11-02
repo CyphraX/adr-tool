@@ -3,7 +3,7 @@
   import type { EditorView } from '@codemirror/view'
   import { recordsCorrection, type Adr } from '@adr-tool/core'
   import { createBodyEditor, replaceText, setLive } from '../lib/editor'
-  import { baseOf } from '../lib/markdown'
+  import { baseOf, renderMarkdown } from '../lib/markdown'
   import { app, type EditorMode } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import MarkdownDocument from './MarkdownDocument.svelte'
@@ -30,7 +30,9 @@
         if (app.editing) app.editing.text = text
       },
       onSave: () => void app.save(),
-      live: app.editing?.mode === 'live'
+      live: app.editing?.mode === 'live',
+      // A table in the live mode is the preview's table, its images included.
+      renderTable: (markdown) => renderMarkdown(markdown, base)
     })
     view.focus()
     return () => view?.destroy()
