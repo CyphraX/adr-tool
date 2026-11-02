@@ -236,7 +236,7 @@ describe('a repair is refused', () => {
       { '0001-a': adr('status: accepted', 'tags: [keep]') },
       { kind: 'remove-item', adr: '0001-a', key: 'tags', item: 'keep' }
     )
-    expect(plan).toEqual({ ok: false, reason: 'This Problem is no longer there.' })
+    expect(plan).toMatchObject({ ok: false, reason: 'This Problem is no longer there.' })
   })
 
   it('when the Problem only follows from a file that cannot be read', async () => {
@@ -247,7 +247,7 @@ describe('a repair is refused', () => {
       },
       { kind: 'remove-item', adr: '0001-old', key: 'superseded-by', item: '0002-new' }
     )
-    expect(plan).toEqual({
+    expect(plan).toMatchObject({
       ok: false,
       reason: 'Reported only because the frontmatter of 0002-new cannot be read. Fix that first.'
     })

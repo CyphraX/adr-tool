@@ -133,7 +133,7 @@ export const en = {
   },
 
   /** Under a Problem without a Repair, when it is reported on an ADR in a foreign format. */
-  noRepairIn(adr: Pick<Adr, 'foreign' | 'noMigration'>): string {
+  noRepairIn(adr: Pick<Adr, 'foreign' | 'noMigration' | 'noMigrationSaid'>): string {
     if (!adr.foreign) return NO_REPAIR
     const never = `The tool reads the format of ${FOREIGN_FORMAT_NAMES[adr.foreign]} and never writes it.`
     return adr.noMigration === undefined

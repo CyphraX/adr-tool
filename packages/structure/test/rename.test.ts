@@ -110,36 +110,39 @@ describe('Rename', () => {
 describe('Rename is refused', () => {
   it('for a segment that is not one, or does not change anything', async () => {
     for (const segment of ['Domain', 'core/x', '', '-x', 'x-', 'a b']) {
-      expect(await rename(DECLARED, 'core', segment)).toEqual({
+      expect(await rename(DECLARED, 'core', segment)).toMatchObject({
         ok: false,
         reason: `"${segment}" is not a valid segment of a Component ID. A segment consists of lowercase letters, digits and dashes, and starts and ends with a letter or a digit.`
       })
     }
-    expect(await rename(DECLARED, 'core', 'core')).toEqual({
+    expect(await rename(DECLARED, 'core', 'core')).toMatchObject({
       ok: false,
       reason: 'core has that segment already.'
     })
   })
 
   it('for a segment a sibling has', async () => {
-    expect(await rename(DECLARED, 'app', 'core')).toEqual({
+    expect(await rename(DECLARED, 'app', 'core')).toMatchObject({
       ok: false,
       reason: 'There is a Component core already.'
     })
-    expect(await rename(DECLARED, 'core/metadata', 'lifecycle')).toEqual({
+    expect(await rename(DECLARED, 'core/metadata', 'lifecycle')).toMatchObject({
       ok: false,
       reason: 'There is a Component core/lifecycle already.'
     })
   })
 
   it('for a Component that is not declared, and on the Draft', async () => {
-    expect(await rename(DECLARED, 'kernel', 'base')).toEqual({
+    expect(await rename(DECLARED, 'kernel', 'base')).toMatchObject({
       ok: false,
       reason: `${DECLARATION_PATH} declares no Component kernel. Look at the file again.`
     })
     const draft = 'Only a declared Component can be renamed. Adopt the Draft first.'
-    expect(await rename(undefined, 'core', 'domain')).toEqual({ ok: false, reason: draft })
-    expect(await rename('# nothing yet\n', 'core', 'domain')).toEqual({ ok: false, reason: draft })
+    expect(await rename(undefined, 'core', 'domain')).toMatchObject({ ok: false, reason: draft })
+    expect(await rename('# nothing yet\n', 'core', 'domain')).toMatchObject({
+      ok: false,
+      reason: draft
+    })
   })
 
   it('while the file cannot be read', async () => {
@@ -158,7 +161,7 @@ describe('Rename is refused', () => {
       '  core:',
       '    paths: [b/**]'
     )
-    expect(await rename(twice, 'core', 'domain')).toEqual({
+    expect(await rename(twice, 'core', 'domain')).toMatchObject({
       ok: false,
       reason: `${DECLARATION_PATH} is written in a way the suite cannot rename core in. Change the segment in an editor.`
     })

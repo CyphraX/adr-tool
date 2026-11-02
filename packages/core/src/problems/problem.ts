@@ -1,4 +1,5 @@
 import type { MetadataKey } from '../metadata/keys'
+import type { CoreSaid } from '../sentences'
 
 export type BackReferenceKey = 'superseded-by' | 'amended-by'
 
@@ -10,13 +11,21 @@ export type Problem =
   /** The file opens frontmatter with `---` and never closes it. */
   | { readonly kind: 'unterminated-frontmatter'; readonly adr: string }
   /** The frontmatter is not valid YAML, not a mapping, or has duplicate keys. */
-  | { readonly kind: 'invalid-frontmatter'; readonly adr: string; readonly detail: string }
+  | {
+      readonly kind: 'invalid-frontmatter'
+      readonly adr: string
+      readonly detail: string
+      /** `detail` as a code, for a window in another language. */
+      readonly said?: CoreSaid
+    }
   /** A Metadata value has the wrong type or form: an unknown Status, a malformed date, … */
   | {
       readonly kind: 'invalid-metadata'
       readonly adr: string
       readonly key: MetadataKey
       readonly detail: string
+      /** `detail` as a code, for a window in another language. */
+      readonly said?: CoreSaid
     }
   /** The Status is one of the five values but not written in lowercase. */
   | { readonly kind: 'status-not-lowercase'; readonly adr: string; readonly written: string }
@@ -54,6 +63,12 @@ export type Problem =
   /** Several ADRs of a `sequential` log share a number. */
   | { readonly kind: 'duplicate-number'; readonly number: number; readonly adrs: readonly string[] }
   /** `.adr/config.yml` or `.adr-dir` cannot be used as written. */
-  | { readonly kind: 'invalid-configuration'; readonly path: string; readonly detail: string }
+  | {
+      readonly kind: 'invalid-configuration'
+      readonly path: string
+      readonly detail: string
+      /** `detail` as a code, for a window in another language. */
+      readonly said?: CoreSaid
+    }
   /** A configured Decision Log directory does not exist. */
   | { readonly kind: 'missing-log-directory'; readonly path: string }

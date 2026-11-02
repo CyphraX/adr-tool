@@ -8,6 +8,7 @@
     StructureNode,
     StructureView
   } from '../../../shared/ipc'
+  import { wordOf } from '../lib/said'
   import { app, statusKey } from '../lib/state.svelte'
   import { METRICS, t } from '../lib/strings'
   import { commonDirectory, nodeLabel, opens } from '../lib/structure'
@@ -479,7 +480,7 @@
             {:else}
               {@render fileLink(file.file, [file.line])}
               {@render lineLinks(file.file, [file.line])}
-              <span>{file.message}</span>
+              <span>{wordOf(file.said, file.message ?? '')}</span>
             {/if}
           </li>
         {/each}

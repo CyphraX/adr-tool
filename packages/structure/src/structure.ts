@@ -51,7 +51,9 @@ export async function openStructure(fs: FileSystem, files: RepositoryFiles): Pro
     origin: 'draft',
     components,
     sourceFiles: ownership.sourceFiles,
-    problems: unreadable ? [{ kind: 'unreadable-declaration', detail: declaration.detail }] : [],
+    problems: unreadable
+      ? [{ kind: 'unreadable-declaration', detail: declaration.detail, said: declaration.said }]
+      : [],
     hints: ownership.problems,
     canAdopt: !unreadable && components.length > 0
   }

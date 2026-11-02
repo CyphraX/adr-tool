@@ -105,15 +105,15 @@ const de: typeof en = {
   sourceFileUnreadable: (path: string): string =>
     `${path} lässt sich nicht lesen. Vielleicht wurde die Datei verschoben oder gelöscht, seit der Code analysiert wurde.`,
   changedSincePreview: (files: string): string =>
-    `Nichts wurde geschrieben: ${files} hat sich auf der Festplatte geändert, nachdem die Vorschau erstellt wurde. Versuchen Sie es noch einmal, um die Änderung gegen die aktuellen Dateien zu sehen.`,
+    `Nichts wurde geschrieben, denn seit der Vorschau hat sich auf der Festplatte etwas geändert: ${files}. Versuchen Sie es noch einmal, um die Änderung gegen die aktuellen Dateien zu sehen.`,
   writeFailed: (error: string): string =>
     `Nichts wurde geschrieben. ${sentence(error)} Jede Datei ist so, wie sie vorher war.`,
   writtenInPart: (error: string, stranded: readonly Stranded[]): string =>
     `Die Änderung ist nur zum Teil geschrieben. ${sentence(error)} Auch das Rückgängigmachen ist fehlgeschlagen, und diese Dateien sind nicht, wie sie waren: ${liste(
       stranded.map(({ path, textAt }) =>
         textAt === undefined
-          ? `${path}, die neu ist`
-          : `${path}, deren Text jetzt in ${textAt} steht`
+          ? `${path} (neu angelegt)`
+          : `${path} (der frühere Text steht jetzt in ${textAt})`
       )
     )}. Stellen Sie sie von Hand wieder her, bevor Sie es noch einmal versuchen.`,
   commit: {
@@ -126,7 +126,7 @@ const de: typeof en = {
     failed: 'git hat nicht committet und nicht gesagt, warum.',
     gone: 'Dieser Commit ist nicht mehr verfügbar. Versuchen Sie es noch einmal.',
     changedSincePreview: (files: string): string =>
-      `Nichts wurde committet: ${files} hat sich auf der Festplatte geändert, nachdem die Vorschau erstellt wurde. Versuchen Sie es noch einmal, um zu sehen, was jetzt committet würde.`,
+      `Nichts wurde committet, denn seit der Vorschau hat sich auf der Festplatte etwas geändert: ${files}. Versuchen Sie es noch einmal, um zu sehen, was jetzt committet würde.`,
     stillAnnounced: (files: string): string =>
       `git konnte ${files} nicht wieder aus dem Index nehmen, wo die App sie für den Commit angemeldet hatte. \`git rm --cached\` mit ihren Pfaden tut das; die Dateien auf der Festplatte bleiben, wie sie sind.`
   },

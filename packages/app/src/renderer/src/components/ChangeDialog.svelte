@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { wordWarnings } from '../lib/said'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import { summarizeChange } from '../lib/wording'
@@ -30,7 +31,7 @@
         <div class="warnings">
           {#if review.caution}<p>{review.caution.lead}</p>{/if}
           <ul>
-            {#each review.change.warnings as warning, position (position)}
+            {#each wordWarnings(review.change) as warning, position (position)}
               <li>{warning}</li>
             {/each}
           </ul>

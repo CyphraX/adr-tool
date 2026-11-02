@@ -208,7 +208,7 @@ describe('an item that is added', () => {
         'There is no ADR 0404-missing in this Decision Log.'
       )
     }
-    expect(await planEditMetadata(fs, log, '0404-missing', { tags: ['a'] })).toEqual({
+    expect(await planEditMetadata(fs, log, '0404-missing', { tags: ['a'] })).toMatchObject({
       ok: false,
       reason: 'There is no ADR 0404-missing in this Decision Log.'
     })
@@ -216,11 +216,13 @@ describe('an item that is added', () => {
 
   it('must be one line of text', async () => {
     const { fs, log } = await repository({ '0001-a': adr('status: proposed') })
-    expect(await planEditMetadata(fs, log, '0001-a', { tags: ['  '] })).toEqual({
+    expect(await planEditMetadata(fs, log, '0001-a', { tags: ['  '] })).toMatchObject({
       ok: false,
       reason: 'A tag is one line of text and cannot be empty.'
     })
-    expect(await planEditMetadata(fs, log, '0001-a', { decisionMakers: ['Kim\nBecker'] })).toEqual({
+    expect(
+      await planEditMetadata(fs, log, '0001-a', { decisionMakers: ['Kim\nBecker'] })
+    ).toMatchObject({
       ok: false,
       reason: 'A decision-maker is one line of text and cannot be empty.'
     })
@@ -283,7 +285,7 @@ describe('an item that is already there', () => {
 
   it('cannot be written around frontmatter that cannot be read', async () => {
     const { fs, log } = await repository({ '0001-a': '---\nstatus: [\n---\n# T\n' })
-    expect(await planEditMetadata(fs, log, '0001-a', { tags: ['a'] })).toEqual({
+    expect(await planEditMetadata(fs, log, '0001-a', { tags: ['a'] })).toMatchObject({
       ok: false,
       reason: 'The frontmatter of 0001-a cannot be read. Fix it before the tool writes to it.'
     })
@@ -293,7 +295,7 @@ describe('an item that is already there', () => {
     const { fs, log } = await repository({
       '0001-a': '---\ntags: [\n  a, # first\n  b\n]\n---\n# T\n'
     })
-    expect(await planEditMetadata(fs, log, '0001-a', { tags: ['b'] })).toEqual({
+    expect(await planEditMetadata(fs, log, '0001-a', { tags: ['b'] })).toMatchObject({
       ok: false,
       reason:
         '"tags" is written in a way the tool cannot take an item out of. Remove "a" in an editor.'

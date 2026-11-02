@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { PROBLEM_CODES, type FileChange, type Problem } from '@adr-tool/core'
+import {
+  PROBLEM_CODES,
+  memoryFileSystem,
+  openRepository,
+  type FileChange,
+  type Problem
+} from '@adr-tool/core'
 import { languageOf } from '../src/shared/language'
 import { setLanguage, t } from '../src/main/strings'
 import { de } from '../src/renderer/src/lib/strings.de'
@@ -39,8 +45,40 @@ const SAME_IN_GERMAN = new Set([
   'Fan-out'
 ])
 
+/** Arguments to try a text that is a function with: a name or a count, a list, an object. */
+const SAMPLES: unknown[] = ['2026-03-01', 3, ['a.md', 'b.md'], { id: '0042', title: 'T' }]
+
+/** What a text that is a function says, with the first sample arguments it takes. */
+function sampled(text: (...values: unknown[]) => unknown, other: unknown): [unknown, unknown] {
+  for (const sample of SAMPLES) {
+    const values = Array.from({ length: Math.max(1, text.length) }, () => sample)
+    try {
+      const said = text(...values)
+      if (typeof said !== 'string' || said === '' || said.includes('undefined')) continue
+      return [said, (other as (...values: unknown[]) => unknown)(...values)]
+    } catch {
+      // Not this kind of value: the next sample.
+    }
+  }
+  return [undefined, undefined]
+}
+
+/** Texts with a value in them that German writes as English does, by where they stand. */
+const SAME_AT = new Set([
+  'dashboard.total',
+  'dashboard.adrCount',
+  'structure.graph.directory',
+  'structure.value',
+  'structure.page.filesIn'
+])
+
 /** Every text of `english` that `german` says the same, by where it stands. */
 function untranslated(english: unknown, german: unknown, at = ''): string[] {
+  if (typeof english === 'function') {
+    if (SAME_AT.has(at)) return []
+    const [said, other] = sampled(english as (...values: unknown[]) => unknown, german)
+    return untranslated(said, other, at)
+  }
   if (typeof english === 'string') {
     return english === german && !SAME_IN_GERMAN.has(english) ? [`${at}: ${english}`] : []
   }
@@ -99,6 +137,23 @@ describe('the language of the window (part 12)', () => {
     )
   })
 
+  it('words the detail of a Problem and why a file has no Migration by their codes', async () => {
+    const repository = await openRepository(
+      memoryFileSystem({
+        'docs/adr/0001-a.md': '---\nstatus: approved\n---\n\n# A\n',
+        'docs/adr/0002-b.md': '# 2. B\n\nDate: 2026-01-01\n\n## Status\n\nSuperseded by 3\n'
+      })
+    )
+    const [log] = repository.logs
+    const problem = log!.problems.find((one) => one.kind === 'invalid-metadata')!
+    expect(enWording.describeProblem(problem)).toContain('approved')
+    expect(deWording.describeProblem(problem)).not.toBe(enWording.describeProblem(problem))
+    expect(deWording.describeProblem(problem)).toMatch(/^status: /)
+    const foreign = log!.adrs.find((adr) => adr.id === '0002-b')!
+    expect(foreign.noMigrationSaid).toBeDefined()
+    expect(deWording.describeForeign(foreign)).toContain('Dieses ADR nennt seinen Nachfolger')
+  })
+
   it('has the main process speak the language the window says', () => {
     expect(t.openRepository).toBe('Open repository')
     setLanguage('de')
@@ -121,7 +176,7 @@ describe('the language of the window (part 12)', () => {
     )
     setLanguage('de')
     expect(t.writtenInPart('EIO: i/o error', stranded)).toContain(
-      'docs/adr/0001-a.md, deren Text jetzt in docs/adr/.0001-a.md.k2x9q10.old steht und docs/adr/0002-b.md, die neu ist'
+      'docs/adr/0001-a.md (der frühere Text steht jetzt in docs/adr/.0001-a.md.k2x9q10.old) und docs/adr/0002-b.md (neu angelegt)'
     )
     setLanguage('en')
   })

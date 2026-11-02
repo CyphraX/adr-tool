@@ -158,18 +158,18 @@ describe('Renumber', () => {
 
   it('is only for an ADR that shares its number, in a log that has numbers', async () => {
     const { fs, log } = await repository(collided)
-    expect(await planRenumber(fs, log, '0002-services')).toEqual({
+    expect(await planRenumber(fs, log, '0002-services')).toMatchObject({
       ok: false,
       reason:
         'Renumber is for an ADR that shares its number with another one. 0002-services has its number to itself, and its ID stays as it is.'
     })
-    expect(await planRenumber(fs, log, '0404-missing')).toEqual({
+    expect(await planRenumber(fs, log, '0404-missing')).toMatchObject({
       ok: false,
       reason: 'There is no ADR 0404-missing in this Decision Log.'
     })
 
     const dated = await repository({ '20260919-a': adr(), '20260919-b': adr() })
-    expect(await planRenumber(dated.fs, dated.log, '20260919-a')).toEqual({
+    expect(await planRenumber(dated.fs, dated.log, '20260919-a')).toMatchObject({
       ok: false,
       reason: 'Only an ADR of a sequential Decision Log has a number.'
     })
@@ -177,7 +177,7 @@ describe('Renumber', () => {
 
   it('is refused when it could not tell what it would leave behind', async () => {
     const itself = await repository({ '0001-a': adr('relates-to: [0001-a]'), '0001-b': adr() })
-    expect(await planRenumber(itself.fs, itself.log, '0001-a')).toEqual({
+    expect(await planRenumber(itself.fs, itself.log, '0001-a')).toMatchObject({
       ok: false,
       reason: '0001-a names itself in relates-to. Remove that before it is renumbered.'
     })
@@ -187,7 +187,7 @@ describe('Renumber', () => {
       '0001-b': adr(),
       '0002-c': '---\nsupersedes: [0001-a\n---\n# Broken\n'
     })
-    expect(await planRenumber(unreadable.fs, unreadable.log, '0001-a')).toEqual({
+    expect(await planRenumber(unreadable.fs, unreadable.log, '0001-a')).toMatchObject({
       ok: false,
       reason:
         'The frontmatter of 0002-c cannot be read, and the file mentions 0001-a. Fix it before 0001-a is renumbered.'

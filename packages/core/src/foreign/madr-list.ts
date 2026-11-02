@@ -1,7 +1,8 @@
 import type { MetadataReading } from '../metadata/read'
 import type { Problem } from '../problems/problem'
 import { RELATION_TYPES, type RelationType } from '../relation'
-import { STATUSES, type Status } from '../status'
+import { detailed } from '../sentences'
+import type { Status } from '../status'
 import { headingOf, proseLinesIn, type ProseLine } from '../text/prose'
 import type { SourceView, Span } from '../text/source'
 import { LINK_WORDS, type ListKey } from './adr-tools'
@@ -101,13 +102,13 @@ export function readMadrList(
   const { metadata } = own
   const problems: Problem[] = [...own.problems]
   if (read.rawStatus !== undefined) {
-    const detail = `"${read.rawStatus}" is not one of ${STATUSES.join(', ')}`
-    problems.push({ kind: 'invalid-metadata', adr, key: 'status', detail })
+    const detail = detailed({ code: 'unknown-status', values: { status: read.rawStatus } })
+    problems.push({ kind: 'invalid-metadata', adr, key: 'status', ...detail })
   }
   // What the own reader checks against the Status, it could not check without one.
   if (metadata.decided !== undefined && read.status === 'proposed') {
-    const detail = 'A proposed ADR has not been decided yet'
-    problems.push({ kind: 'invalid-metadata', adr, key: 'decided', detail })
+    const detail = detailed({ code: 'decided-while-proposed', values: {} })
+    problems.push({ kind: 'invalid-metadata', adr, key: 'decided', ...detail })
   }
   const merged = (key: ListKey, written: readonly string[]): string[] => [
     ...new Set([...written, ...(read.lists.get(key) ?? [])])

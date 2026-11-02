@@ -17,9 +17,10 @@ import {
   type YAMLMap,
   type YAMLSeq
 } from 'yaml'
-import { applyEdits, Refusal, type TextEdit } from '@adr-tool/kernel'
+import { applyEdits, type Refusal, type TextEdit } from '@adr-tool/kernel'
 import { readDeclaration, type DeclaredComponent } from './declaration'
 import { DECLARATION_PATH, type PatternKey } from './problems'
+import { refusal, refuse } from './sentences'
 
 const eolOf = (text: string): string => (text.includes('\r\n') ? '\r\n' : '\n')
 const lineStart = (text: string, offset: number): number => text.lastIndexOf('\n', offset - 1) + 1
@@ -81,10 +82,13 @@ export function insertComponents(
   // The file may have moved on since the Draft was shown. What a person declared stays.
   const current = readDeclaration(text)
   if (current.kind === 'declared') {
-    throw new Refusal(`${DECLARATION_PATH} declares Components by now. Look at the file again.`)
+    refuse({ code: 'declared-by-now', values: { path: DECLARATION_PATH } })
   }
   if (current.kind === 'unreadable') {
-    throw new Refusal(`${DECLARATION_PATH} cannot be read: ${current.detail}`)
+    refuse({
+      code: 'unreadable-declaration',
+      values: { path: DECLARATION_PATH, detail: current.said }
+    })
   }
 
   const eol = eolOf(text)
@@ -120,9 +124,7 @@ export function insertComponents(
     result.problems.length === 0 &&
     JSON.stringify(result.components) === JSON.stringify(components)
   if (!same) {
-    throw new Refusal(
-      `${DECLARATION_PATH} is written in a way the suite cannot add Components to. Add them in an editor, or remove the file and adopt again.`
-    )
+    refuse({ code: 'cannot-add-components', values: { path: DECLARATION_PATH } })
   }
   return edits
 }
@@ -147,13 +149,13 @@ export function removePattern(
   const pair = map && findPair(map, key)
   const list = pair?.value
   if (!pair || !isSeq(list)) {
-    throw new Refusal(`${component} has no list "${key}" any more. Look at the file again.`)
+    refuse({ code: 'no-pattern-list', values: { component, key } })
   }
 
   const items = list.items
   const leaves = (item: unknown): boolean => isScalar(item) && textOf(item) === pattern
   if (!items.some(leaves)) {
-    throw new Refusal(`"${pattern}" is no longer in ${key} of ${component}.`)
+    refuse({ code: 'pattern-gone', values: { pattern, key, component } })
   }
   const edits = items.every(leaves)
     ? wholeKey(text, pair, list)
@@ -180,9 +182,7 @@ export function renameSegment(text: string, id: string, segment: string): TextEd
     map = isMap(pair?.value) ? (pair.value as YAMLMap) : undefined
   }
   const key = pair?.key
-  const cannot = new Refusal(
-    `${DECLARATION_PATH} is written in a way the suite cannot rename ${id} in. Change the segment in an editor.`
-  )
+  const cannot = refusal({ code: 'cannot-rename-in', values: { path: DECLARATION_PATH, id } })
   if (!isScalar(key) || !key.range) throw cannot
   const quoted =
     key.type === 'QUOTE_DOUBLE'
@@ -225,10 +225,7 @@ function comparable(components: readonly DeclaredComponent[], from: string, to: 
   })
 }
 
-const byHand = (): Refusal =>
-  new Refusal(
-    'The list is written in a way the suite cannot take an item out of. Remove the pattern in an editor.'
-  )
+const byHand = (): Refusal => refusal({ code: 'pattern-by-hand', values: {} })
 
 /** The key leaves with its list — when it has its lines to itself, as in a block map. */
 function wholeKey(text: string, pair: Pair, list: YAMLSeq): TextEdit[] {

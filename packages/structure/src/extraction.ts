@@ -4,6 +4,7 @@
  * file's path and text, so the same text yields the same extraction.
  */
 import type { JavaOutline, JavaReader } from './java/outline'
+import type { StructureSaid } from './sentences'
 import { languageOf } from './source-files'
 import { extractUses, type Use } from './typescript/extract'
 
@@ -11,7 +12,7 @@ import { extractUses, type Use } from './typescript/extract'
  * Changes whenever the same text would be extracted differently. What was cached under
  * another version is extracted again.
  */
-export const EXTRACTION_VERSION = 2
+export const EXTRACTION_VERSION = 3
 
 export type Extraction =
   /** TypeScript, JavaScript, Svelte: the module specifiers the code uses, as written. */
@@ -21,9 +22,15 @@ export type Extraction =
   /**
    * The file cannot be parsed. It keeps its Component and has no Dependencies of its own
    * (section 2, "Files that cannot be read"). `line` and `message` are the parser's first
-   * complaint.
+   * complaint; `said` is the message as a code, where it is the suite's own and not the
+   * TypeScript compiler's.
    */
-  | { readonly analysed: false; readonly line: number; readonly message: string }
+  | {
+      readonly analysed: false
+      readonly line: number
+      readonly message: string
+      readonly said?: StructureSaid
+    }
 
 /**
  * What is extracted from one file; `undefined` for a language that is not read. The app hands

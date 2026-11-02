@@ -11,11 +11,18 @@
   // the axis and the bars are drawn behind them.
   let { log }: { log: DecisionLog } = $props()
 
-  const today = localToday()
+  // Today, as long as the view is open: past midnight it is another day.
+  let today = $state(localToday())
+  $effect(() => {
+    const timer = setInterval(() => (today = localToday()), 60_000)
+    return () => clearInterval(timer)
+  })
   const timeline = $derived(timelineOf(log.adrs, today))
   const selectedId = $derived(app.selected?.id)
   const percent = (day: number): string => `${(positionOn(timeline, day) * 100).toFixed(3)}%`
-  const now = dayOf(today)!
+  const now = $derived(dayOf(today)!)
+  // The line of today, where today is on the axis: a log decided long ago ends before it.
+  const showsToday = $derived(now >= timeline.from && now < timeline.to)
 
   $effect(() => {
     if (selectedId)
@@ -70,30 +77,29 @@
                 {#each timeline.ticks as tick (tick)}
                   <span class="line" style:left={percent(tick)}></span>
                 {/each}
-                <span class="today" style:left={percent(now)}></span>
+                {#if showsToday}<span class="today" style:left={percent(now)}></span>{/if}
                 <span
                   class="bar"
                   class:waiting={row.waiting}
                   style:left={percent(row.start)}
                   style:width="calc({percent(row.end)} - {percent(row.start)})"
                 ></span>
-                <span class="sr">{t.timeline.span(created, decided, row.waiting)}</span>
               </span>
             </button>
           </li>
         {/each}
       </ol>
-      {#if timeline.undated.length > 0}
-        <div class="undated">
-          <p>{t.timeline.undated(timeline.undated.length)}</p>
-          {#each timeline.undated as adr (adr.id)}
-            <button class="link" onclick={() => app.select(adr.id)}>
-              {prefixOf(adr)}
-              {adr.title ?? adr.id}
-            </button>
-          {/each}
-        </div>
-      {/if}
+    </div>
+  {/if}
+  {#if timeline.undated.length > 0}
+    <div class="undated">
+      <p>{t.timeline.undated(timeline.undated.length)}</p>
+      {#each timeline.undated as adr (adr.id)}
+        <button class="link" onclick={() => app.select(adr.id)}>
+          {prefixOf(adr)}
+          {adr.title ?? adr.id}
+        </button>
+      {/each}
     </div>
   {/if}
 </div>
@@ -172,6 +178,8 @@
   .track {
     position: relative;
     display: block;
+    /* A label at the right end stays inside, rather than widening the view. */
+    overflow: hidden;
   }
 
   .tick {
@@ -289,20 +297,13 @@
     );
   }
 
-  .sr {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
   .undated {
     display: flex;
+    flex: none;
     flex-wrap: wrap;
     align-items: baseline;
     gap: 4px 12px;
-    padding-top: 12px;
+    padding: 12px 14px;
     color: var(--ink-soft);
   }
 
