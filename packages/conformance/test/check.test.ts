@@ -267,6 +267,41 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
     }
     expect(found(await checked(deeper, rules))).toEqual(found(await checked(shop, rules)))
   })
+
+  it('change with a child declared over the files of the parent that a Violation names', async () => {
+    // The review's probe (section 2): a/b uses a file of a's own; then that file gets a child.
+    const files = {
+      'src/a/own.ts': 'export const own = 1\n',
+      'src/a/b/x.ts': "import { own } from '../own'\n"
+    }
+    const declared = (...more: string[]) =>
+      yaml(
+        'components:',
+        '  a:',
+        '    paths: [src/a/**]',
+        '    components:',
+        '      b:',
+        '        paths: [src/a/b/**]',
+        ...more
+      )
+    const rules = yaml(
+      'rules:',
+      '  - {id: r, why: W., kind: may-only-depend, from: a/b, to: []}',
+      'exceptions:',
+      '  - {rule: r, from: a/b, to: a, reason: R.}'
+    )
+    const before = await checked({ ...files, '.arch/components.yml': declared() }, rules)
+    expect(found(before)).toEqual(['r: a/b -> a (accepted)'])
+    const after = await checked(
+      {
+        ...files,
+        '.arch/components.yml': declared('      core:', '        paths: [src/a/own.ts]')
+      },
+      rules
+    )
+    expect(found(after)).toEqual(['r: a/b -> a/core'])
+    expect(after.problems.map((problem) => problem.kind)).toEqual(['unmatched-exception'])
+  })
 })
 
 describe('justified-by names an ADR as the repository names it from outside a log', () => {
