@@ -106,6 +106,57 @@ describe('adr export (docs/cli.md)', () => {
     )
   })
 
+  it('copies no file through a link with the name of an image, nor one it cannot write', async () => {
+    const root = directory({
+      'docs/adr/0001-a.md': adr(
+        'accepted',
+        '# A\n\n![Env](env.png) ![Config](config.svg) ![Odd](../../%20assets/a.png) ![Fine](ok.png)\n'
+      ),
+      '.env': 'SECRET=1\n',
+      '.git/config': '[remote "origin"]\n',
+      ' assets/a.png': PNG,
+      'docs/adr/ok.png': PNG
+    })
+    symlinkSync('../../.env', join(root, 'docs/adr/env.png'))
+    symlinkSync('../../.git/config', join(root, 'docs/adr/config.svg'))
+    const out = join(directory(), 'site')
+    const { code, err } = await adrIn(root, 'export', '--out', out)
+    expect(code).toBe(0)
+    expect(err).toContain('docs/adr/env.png leads to a file that is hidden or no image')
+    expect(err).toContain('docs/adr/config.svg leads to a file that is hidden or no image')
+    expect(filesBelow(out)).toEqual([
+      'docs/adr/0001-a.html',
+      'docs/adr/ok.png',
+      'index.html',
+      'print.html',
+      'softarch-export.json',
+      'style.css'
+    ])
+    const marker = JSON.parse(readFileSync(join(out, 'softarch-export.json'), 'utf8'))
+    expect(marker.files).not.toContain('docs/adr/env.png')
+    // A path the export could not write as it is becomes its alt text, as a hidden file does.
+    expect(readFileSync(join(out, 'docs/adr/0001-a.html'), 'utf8')).toContain('Odd')
+  })
+
+  it('names in the marker of a stopped export no image it would not copy', async () => {
+    const root = directory({
+      'docs/adr/0001-a.md': adr('accepted', '# A\n\n![Big](big.png) ![Pic](pic.png)\n'),
+      'docs/adr/pic.png': PNG
+    })
+    const out = join(directory(), 'site')
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(0)
+    // Someone puts a file where the missing image would go, and a link where the other goes.
+    writeFileSync(join(out, 'docs/adr/big.png'), 'mine')
+    rmSync(join(out, 'docs/adr/pic.png'))
+    symlinkSync(join(root, 'docs/adr/pic.png'), join(out, 'docs/adr/pic.png'))
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(2)
+    const marker = JSON.parse(readFileSync(join(out, 'softarch-export.json'), 'utf8'))
+    expect(marker.files).not.toContain('docs/adr/big.png')
+    rmSync(join(out, 'docs/adr/pic.png'))
+    expect((await adrIn(root, 'export', '--out', out)).code).toBe(0)
+    expect(readFileSync(join(out, 'docs/adr/big.png'), 'utf8')).toBe('mine')
+  })
+
   it('writes into an empty directory or an earlier export, and nowhere else', async () => {
     const root = directory({
       'docs/adr/0001-a.md': adr('accepted', '# A\n'),
@@ -239,5 +290,14 @@ describe('adr export (docs/cli.md)', () => {
       expect(err).toMatch(said)
     }
     expect(existsSync(join(empty, 'site'))).toBe(false)
+
+    // A link that leads nowhere is no directory to write into.
+    const root = directory({ 'docs/adr/0001-a.md': adr('accepted', '# A\n') })
+    symlinkSync(join(root, 'nowhere'), join(root, 'dangling'))
+    const dangling = await adrIn(root, 'export', '--out', join(root, 'dangling'))
+    expect([dangling.code, dangling.err]).toEqual([
+      2,
+      `adr export: ${join(root, 'dangling')} is not a directory.\n`
+    ])
   })
 })

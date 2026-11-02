@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
+import { normalizePath } from '@adr-tool/kernel'
 
 /** Where the page of an ADR finds what its text points to. */
 export interface Links {
@@ -81,10 +82,12 @@ const IMAGE = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i
 /**
  * Whether a path of the repository is an image the export may copy: a file with the extension
  * of one, and not one that is hidden — the export never takes `.git/` or `.env` along, whatever
- * an ADR names.
+ * an ADR names. The path is one the export can write as it is: ` a.png` or `c:d.png` is none.
  */
 export const isImage = (path: string): boolean =>
-  IMAGE.test(path) && !path.split('/').some((segment) => segment.startsWith('.'))
+  normalizePath(path) === path &&
+  IMAGE.test(path) &&
+  !path.split('/').some((segment) => segment.startsWith('.'))
 
 /**
  * The ids `remark-rehype` gives footnotes start with `user-content-`, and the sanitizer puts

@@ -1,4 +1,5 @@
 import {
+  constants,
   copyFile,
   lstat,
   mkdir,
@@ -9,9 +10,9 @@ import {
   stat,
   writeFile
 } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { normalizePath, openRepository } from '@adr-tool/core'
-import { EXPORT_MARKER, PRINT_PAGE, exportSite } from '@adr-tool/core/export'
+import { EXPORT_MARKER, PRINT_PAGE, exportSite, isImage } from '@adr-tool/core/export'
 import { repositoryFiles, within } from './files'
 
 /** An image larger than this is not copied: it is no image of an ADR. */
@@ -104,18 +105,22 @@ export async function exportTo(request: ExportRequest): Promise<ExportResult> {
     title: request.title,
     date: request.date
   })
-  let copied: string[] = []
+  const images = await imagesToCopy(root, site.images, warn)
+  const copied = images.map((image) => image.path)
+  // What the earlier export had and this one has not.
+  const now = new Set([...site.files.map((file) => file.path), ...copied, EXPORT_MARKER])
+  const stale = before.filter((path) => !now.has(path))
   try {
     await mkdir(out, { recursive: true })
     const files = filesIn(await realpath(out), out)
-    // First a marker that names everything this export may write beside what the earlier one
+    // First a marker that names everything this export writes beside what the earlier one
     // wrote: an export that stops halfway is one the next export can write over.
-    await files.write(EXPORT_MARKER, site.marker([...before, ...site.images]).text)
+    await files.write(EXPORT_MARKER, site.marker([...before, ...copied]).text)
+    // The stale files go before anything is written: where a file system does not tell `A.html`
+    // from `a.html`, removing the earlier name afterwards would remove the new file.
+    for (const path of stale) await files.remove(path)
     for (const file of site.files) await files.write(file.path, file.text)
-    copied = await copyImages(root, site.images, files, warn)
-    // What the earlier export had and this one has not.
-    const now = new Set([...site.files.map((file) => file.path), ...copied, EXPORT_MARKER])
-    for (const stale of before.filter((path) => !now.has(path))) await files.remove(stale)
+    for (const image of images) await files.copy(image.source, image.path)
     await files.write(EXPORT_MARKER, site.marker(copied).text)
   } catch (error) {
     if (error instanceof Refused) return refused(error.refusal)
@@ -137,31 +142,39 @@ export async function exportTo(request: ExportRequest): Promise<ExportResult> {
 
 const refused = (reason: ExportRefusal): ExportResult => ({ ok: false, reason })
 
-/** Copy the images that are files of the repository, and say which are left out. */
-async function copyImages(
+/**
+ * The images to copy, each with the file it is read from: those that are files of the
+ * repository, the others named in a warning. Known before anything is written, so that the
+ * marker names no image the export does not copy.
+ */
+async function imagesToCopy(
   root: string,
   images: readonly string[],
-  files: Files,
   warn: (text: string) => void
-): Promise<string[]> {
-  const copied: string[] = []
+): Promise<{ path: string; source: string }[]> {
+  const found: { path: string; source: string }[] = []
   const realRoot = await realpath(root)
   for (const image of images) {
     // Only a file of the repository, and not one a symbolic link leads out of it to.
     const source = await realpath(resolve(root, image)).catch(() => undefined)
-    const info = source && within(realRoot, source) ? await stat(source) : undefined
+    const inside = source !== undefined && within(realRoot, source)
+    const info = inside ? await stat(source).catch(() => undefined) : undefined
     if (!source || !info?.isFile()) {
       warn(`${image} is shown by an ADR and is not a file of the repository: it is left out.`)
+      continue
+    }
+    // A link with the name of an image is no image: what it leads to is what would be copied.
+    if (!isImage(relative(realRoot, source).split(sep).join('/'))) {
+      warn(`${image} leads to a file that is hidden or no image: it is left out.`)
       continue
     }
     if (info.size > MAX_IMAGE_BYTES) {
       warn(`${image} is larger than 20 MiB: it is left out.`)
       continue
     }
-    await files.copy(source, image)
-    copied.push(image)
+    found.push({ path: image, source })
   }
-  return copied
+  return found
 }
 
 interface Files {
@@ -215,7 +228,7 @@ function filesIn(base: string, out: string): Files {
   return {
     write: async (path, text) =>
       writeFile(await fresh(path), text, { encoding: 'utf8', flag: 'wx' }),
-    copy: async (source, path) => copyFile(source, await fresh(path)),
+    copy: async (source, path) => copyFile(source, await fresh(path), constants.COPYFILE_EXCL),
     remove: async (path) => {
       const full = await place(path, true)
       if (full !== undefined) await rm(full)
@@ -230,7 +243,8 @@ function filesIn(base: string, out: string): Files {
  */
 async function earlierExport(out: string): Promise<string[] | ExportRefusal> {
   const info = await stat(out).catch(() => undefined)
-  if (!info) return []
+  // A symbolic link that leads nowhere is no directory to write into.
+  if (!info) return (await lstat(out).catch(() => undefined)) ? { kind: 'not-directory', out } : []
   if (!info.isDirectory()) return { kind: 'not-directory', out }
   const entries = await readdir(out)
   if (entries.length === 0) return []

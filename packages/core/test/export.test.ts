@@ -130,14 +130,16 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
       memoryFileSystem({
         'docs/adr/0001-a.md': adr(
           'status: accepted',
-          '# A\n\n![page](../../index.html) ![env](/.env) ![git](/.git/x.png) ![marker](/softarch-export.json) ![ok](a.PNG)\n'
+          '# A\n\n![page](../../index.html) ![env](/.env) ![git](/.git/x.png) ![marker](/softarch-export.json) ![odd](/%20a.png) ![drive](/c:d.png) ![ok](a.PNG)\n'
         )
       })
     )
     const { files, images } = exportSite(repository, { title: 'T', date: '2026-11-02' })
     expect(images).toEqual(['docs/adr/a.PNG'])
     const page = fileOf(files, 'docs/adr/0001-a.html')
-    expect(page).toContain('<p>page env git marker <img src="../../docs/adr/a.PNG" alt="ok"></p>')
+    expect(page).toContain(
+      '<p>page env git marker odd drive <img src="../../docs/adr/a.PNG" alt="ok"></p>'
+    )
   })
 
   it('gives headings the ids GitHub gives them, and links footnotes to theirs', async () => {
