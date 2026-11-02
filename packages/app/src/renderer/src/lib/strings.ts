@@ -117,7 +117,35 @@ export const t = {
     branch: 'Branch',
     branchHint: 'The branch that is checked out, and the ADR files with uncommitted changes',
     detached: 'detached HEAD',
-    uncommitted: (files: number): string => `${files} uncommitted`
+    uncommitted: (files: number): string => `${files} uncommitted`,
+    branches: 'Branches',
+    otherBranches: 'Other branches',
+    otherBranchesHint:
+      'ADRs that branches which are not checked out add or decide, read from git without checking anything out'
+  },
+
+  branches: {
+    label: 'ADRs on other branches',
+    lead: 'What branches that are not checked out add or decide, compared with this one. Read from git; nothing is checked out.',
+    refresh: 'Refresh',
+    asking: 'Asking git…',
+    none: 'No other branch adds or decides an ADR that this branch does not have.',
+    failed: 'Git could not list the branches.',
+    unread: (names: string): string =>
+      `Git could not read every ADR of ${names}: what they add or decide is not shown.`,
+    also: (names: string): string => `also ${names}`,
+    lastCommit: (date: string): string => `last commit ${date}`,
+    added: 'new',
+    addedHint: 'This branch has no ADR with this ID.',
+    here: (status: string): string => `${status} here`,
+    sameNumber: (ids: string): string => `Number taken here by ${ids}`,
+    sameNumberHint:
+      'Both ADRs have this number. Whichever of the two is merged second has to be renumbered.',
+    select: 'Select an ADR to read it as its branch has it.',
+    reading: 'Reading the ADR from git…',
+    gone: 'This ADR is no longer on the branch.',
+    readOnly: (branch: string): string =>
+      `As on ${branch}, read from git. Check out the branch to change it.`
   },
 
   list: {

@@ -64,7 +64,7 @@ The app runs locally: there is no backend, no account and no telemetry.
   ![The Problems of a Decision Log, each with its Repair](docs/screenshots/readme/problems.png)
 
 - **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body.
-- **git.** The app shows the branch that is checked out and the ADRs with uncommitted changes. For each ADR it shows its history, commit by commit, with the diff. **Commit** commits an ADR's file — and, if you like, those of the ADRs it supersedes or amends — with a message you see and can change. Nothing else that is changed or staged is taken along, and nothing is pushed ([ADR-0012](docs/adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md)).
+- **git.** The app shows the branch that is checked out and the ADRs with uncommitted changes. For each ADR it shows its history, commit by commit, with the diff. **Commit** commits an ADR's file — and, if you like, those of the ADRs it supersedes or amends — with a message you see and can change. Nothing else that is changed or staged is taken along, and nothing is pushed ([ADR-0012](docs/adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md)). **Other branches** lists the ADRs that branches which are not checked out add or decide, read from git without checking anything out, and a new ADR warns when another branch has given its number away already.
 - **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 2, 3 and 4, for [log4brains](https://github.com/thomvaill/log4brains) and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
 
@@ -299,7 +299,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
   - MADR 2.x and log4brains (built);
   - Relations across Decision Logs (built);
   - committing an ADR (built);
-  - a branch overview;
+  - a branch overview (built);
   - an MCP server for agents (built);
   - export, timeline, board and dashboard;
   - a German translation, and the repositories in the window seen together.

@@ -5,6 +5,7 @@ import {
   applyChangeSet,
   firstLog,
   listTemplates,
+  type Adr,
   openRepository,
   planAccept,
   planCreate,
@@ -24,6 +25,7 @@ import type {
   ApplyResult,
   BodyEditRequest,
   CommitPlanResult,
+  BranchOverview,
   CommitResult,
   CreateRequest,
   Decision,
@@ -35,6 +37,13 @@ import type {
   RenameRequest,
   RepairRequest
 } from '../shared/ipc'
+import {
+  branchAdr,
+  branchCache,
+  branchOverview,
+  numberWarnings,
+  type BranchCache
+} from './branches'
 import { planCommitOf } from './commit'
 import { commitFiles, gitIn } from './git'
 import { historyChangeOf, historyOf } from './history'
@@ -53,6 +62,12 @@ interface Entry {
   watcher?: FSWatcher
   watched: string[]
   reload?: NodeJS.Timeout
+  /** What was read from other branches: commits do not change. */
+  readonly branches: BranchCache
+  /** The overview that is being made, and the one asked for while it is. */
+  overview?: { running: Promise<BranchOverview>; next?: Promise<BranchOverview> }
+  /** The commits the last overview listed: those whose ADRs the renderer may ask for. */
+  listed?: ReadonlySet<string>
 }
 
 /**
@@ -82,7 +97,7 @@ export class Repositories {
   /** Open a directory, or return the repository that is already open for it. */
   async open(root: string): Promise<OpenRepository> {
     const existing = [...this.entries.values()].find((entry) => entry.root === root)
-    const entry = existing ?? { id: randomUUID(), root, watched: [] }
+    const entry = existing ?? { id: randomUUID(), root, watched: [], branches: branchCache() }
     this.entries.set(entry.id, entry)
     return this.load(entry)
   }
@@ -223,7 +238,59 @@ export class Repositories {
     if (!log) return { ok: false, reason: t.noLogAt(logPath) }
 
     const ids = components?.map((component) => component.id)
-    return this.hold(repositoryId, await build(fs, log, ids))
+    const plan = await build(fs, log, ids)
+    // A number that another branch gives an ADR of this log is taken twice once both are merged.
+    const numbered = plan.ok ? (plan.created?.id ?? plan.renamed?.to) : undefined
+    if (!plan.ok || numbered === undefined || log.naming !== 'sequential') {
+      return this.hold(repositoryId, plan)
+    }
+    // Without what the branches have, the plan goes without the warning.
+    const overview = await this.overviewOf(entry).catch(() => undefined)
+    const taken = overview ? numberWarnings(overview, log.path, numbered, log.naming) : []
+    return this.hold(
+      repositoryId,
+      taken.length > 0 ? { ...plan, warnings: [...(plan.warnings ?? []), ...taken] } : plan
+    )
+  }
+
+  /** The ADRs that other branches add or decide, against the working tree as it is on disk. */
+  async branches(repositoryId: string): Promise<BranchOverview | undefined> {
+    const entry = this.entries.get(repositoryId)
+    if (!entry) return undefined
+    if ((await gitIn(entry.root).directory()) === undefined) return undefined
+    const overview = await this.overviewOf(entry)
+    entry.listed = new Set(overview.branches.map((branch) => branch.sha))
+    return overview
+  }
+
+  /**
+   * One overview at a time for a repository: what is asked for while one is made gets the
+   * next one, made once it is done — and one for every request that came in the meantime.
+   */
+  private overviewOf(entry: Entry): Promise<BranchOverview> {
+    const make = (): Promise<BranchOverview> => {
+      const running = (async () => {
+        const here = await openRepository(nodeFileSystem(entry.root))
+        return branchOverview(gitIn(entry.root), here, entry.branches)
+      })()
+      entry.overview = { running }
+      const done = (): void => {
+        if (entry.overview?.running === running && !entry.overview.next) entry.overview = undefined
+      }
+      running.then(done, done)
+      return running
+    }
+    const current = entry.overview
+    if (!current) return make()
+    current.next ??= current.running.then(make, make)
+    return current.next
+  }
+
+  /** An ADR as a branch has it, read-only: only one of a commit the last overview listed. */
+  async branchAdr(repositoryId: string, sha: string, path: string): Promise<Adr | undefined> {
+    const entry = this.entries.get(repositoryId)
+    if (!entry?.listed?.has(sha)) return undefined
+    return branchAdr(gitIn(entry.root), sha, path, entry.branches)
   }
 
   /**

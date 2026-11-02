@@ -18,6 +18,13 @@ export {
 
 export { openRepository, type DecisionLog, type OpenOptions, type Repository } from './log/load'
 export { DEFAULT_LOG_PATHS } from './log/discover'
+export {
+  branchChanges,
+  numberTakenOn,
+  type BranchAdr,
+  type MergeBase,
+  type TakenNumber
+} from './log/branches'
 export { firstLog } from './log/first'
 export type { NamingScheme } from './log/naming'
 export {

@@ -9,6 +9,10 @@
   const view = $derived(app.active?.view ?? 'adrs')
   const git = $derived(app.active?.repository.git)
   const filter = $derived(app.active?.statusFilter ?? 'all')
+  // What other branches add or decide, once git has said.
+  const onBranches = $derived(
+    app.active?.branches.overview?.branches.reduce((sum, branch) => sum + branch.adrs.length, 0)
+  )
 
   const counts = $derived.by(() => {
     const result: Partial<Record<StatusFilter, number>> = { all: app.log?.adrs.length ?? 0 }
@@ -109,6 +113,20 @@
   </section>
 
   {#if git}
+    <section>
+      <h2>{t.sidebar.branches}</h2>
+      <button
+        class="row"
+        class:current={view === 'branches'}
+        aria-pressed={view === 'branches'}
+        title={t.sidebar.otherBranchesHint}
+        onclick={() => app.show('branches')}
+      >
+        <span class="label all">{t.sidebar.otherBranches}</span>
+        <span class="count">{onBranches ?? ''}</span>
+      </button>
+    </section>
+
     <footer title={t.sidebar.branchHint}>
       <span>{t.sidebar.branch}</span>
       <span class="branch">{git.branch ?? t.sidebar.detached}</span>

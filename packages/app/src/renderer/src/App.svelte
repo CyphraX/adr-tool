@@ -2,6 +2,8 @@
   import { onMount } from 'svelte'
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
+  import BranchAdrDetail from './components/BranchAdrDetail.svelte'
+  import BranchList from './components/BranchList.svelte'
   import ChangeDialog from './components/ChangeDialog.svelte'
   import CommitDialog from './components/CommitDialog.svelte'
   import HistoryDialog from './components/HistoryDialog.svelte'
@@ -169,6 +171,8 @@
           />
           {#if app.active.view === 'problems'}
             <ProblemsList />
+          {:else if app.active.view === 'branches'}
+            <BranchList />
           {:else if app.active.view === 'graph' && app.log}
             <RelationsGraph log={app.log} />
           {:else}
@@ -187,7 +191,26 @@
               />
             {/key}
           {/if}
-          {#if app.selected && app.log}
+          {#if app.active.view === 'branches'}
+            {@const branches = app.active.branches}
+            {#if branches.selected && branches.adr}
+              <BranchAdrDetail
+                adr={branches.adr}
+                sha={branches.selected.sha}
+                branch={branches.selected.branch}
+              />
+            {:else}
+              <main class="message on-paper">
+                <p>
+                  {branches.selected === undefined
+                    ? t.branches.select
+                    : branches.adr === null
+                      ? t.branches.gone
+                      : t.branches.reading}
+                </p>
+              </main>
+            {/if}
+          {:else if app.selected && app.log}
             <AdrDetail adr={app.selected} log={app.log} />
           {:else}
             <main class="message on-paper">

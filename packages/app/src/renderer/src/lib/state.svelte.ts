@@ -11,6 +11,7 @@ import {
 } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
 import type {
+  BranchOverview,
   CommitPlan,
   Decision,
   HistoryEntry,
@@ -26,8 +27,11 @@ import { logName, prefixOf } from './wording'
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
 
-/** What the middle pane shows of the log in view: its ADRs, their Relations as a graph, or its Problems. */
-export type MiddleView = 'adrs' | 'graph' | 'problems'
+/**
+ * What the middle pane shows of the log in view: its ADRs, their Relations as a graph, its
+ * Problems — or what other branches do to the ADRs of every log.
+ */
+export type MiddleView = 'adrs' | 'graph' | 'problems' | 'branches'
 
 /** The modules of the suite the window switches between, per repository. */
 export type Module = 'decisions' | 'structure'
@@ -71,6 +75,19 @@ interface StructureTab {
   code: CodeView | undefined
 }
 
+/** What branches that are not checked out do to the ADRs, as git was last asked. */
+interface BranchesTab {
+  /** `undefined` until git has answered, and without git. */
+  overview: BranchOverview | undefined
+  loading: boolean
+  /** Counts the requests, so that an answer that is overtaken is dropped. */
+  asked: number
+  /** The ADR of a branch that is open: its commit, its file, and what was read. */
+  selected: { sha: string; path: string; branch: string } | undefined
+  /** `undefined` while it is read; `null` when git no longer has it. */
+  adr: Adr | null | undefined
+}
+
 interface Tab {
   repository: OpenRepository
   module: Module
@@ -79,6 +96,7 @@ interface Tab {
   statusFilter: StatusFilter
   selectedId: string | undefined
   structure: StructureTab
+  branches: BranchesTab
 }
 
 /** What the dialog shows after an action was asked for. */
@@ -296,6 +314,7 @@ class AppState {
     this.tabs = session.repositories.map(newTab)
     this.activeId = session.activeId
     this.ready = true
+    for (const tab of this.tabs) void this.loadBranches(tab)
   }
 
   async open(): Promise<void> {
@@ -304,6 +323,7 @@ class AppState {
     this.leaveEditor(() => {
       if (!this.tabs.some((tab) => tab.repository.id === repository.id)) {
         this.tabs.push(newTab(repository))
+        void this.loadBranches(this.tabs.at(-1))
       }
       this.activeId = repository.id
     })
@@ -552,7 +572,59 @@ class AppState {
   }
 
   show(view: MiddleView): void {
-    if (this.active) this.active.view = view
+    const tab = this.active
+    if (!tab) return
+    if (view !== 'branches') {
+      tab.view = view
+      return
+    }
+    // The ADR of a branch takes the place of the ADR that is open, and of its editor.
+    this.leaveEditor(() => {
+      tab.view = view
+      // Branches move without the working tree knowing: what they hold is asked for again.
+      void this.loadBranches(tab)
+    })
+  }
+
+  /** Ask git what the branches that are not checked out do to the ADRs. */
+  async loadBranches(tab: Tab | undefined = this.active): Promise<void> {
+    if (!tab?.repository.git) return
+    const branches = tab.branches
+    const asked = ++branches.asked
+    branches.loading = true
+    const overview = await window.api.branches(tab.repository.id).catch(() => undefined)
+    if (asked !== branches.asked) return
+    branches.overview = overview
+    branches.loading = false
+    // The ADR that is open may be gone from the overview: its branch was merged or deleted.
+    // When the branch has a new commit, it is read as that commit has it.
+    const open = branches.selected
+    if (open && !overview?.branches.some((branch) => branch.sha === open.sha)) {
+      const moved = overview?.branches.find(
+        (branch) =>
+          branch.names.includes(open.branch) && branch.adrs.some((adr) => adr.path === open.path)
+      )
+      if (moved) void this.showBranchAdr(moved.sha, open.path, open.branch, tab)
+      else {
+        branches.selected = undefined
+        branches.adr = undefined
+      }
+    }
+  }
+
+  /** Open an ADR as a branch has it, read-only. */
+  async showBranchAdr(
+    sha: string,
+    path: string,
+    branch: string,
+    tab: Tab | undefined = this.active
+  ): Promise<void> {
+    if (!tab) return
+    tab.branches.selected = { sha, path, branch }
+    tab.branches.adr = undefined
+    const adr = await window.api.branchAdr(tab.repository.id, sha, path).catch(() => undefined)
+    const still = tab.branches.selected
+    if (still?.sha === sha && still.path === path) tab.branches.adr = adr ?? null
   }
 
   select(id: string): void {
@@ -1122,6 +1194,8 @@ class AppState {
     if (!tab) return
     tab.repository = repository
     this.rebaseMetadata(repository)
+    // A commit or a checkout changes what the other branches have that this one has not.
+    void this.loadBranches(tab)
 
     const editing = this.editing
     if (editing?.repositoryId !== repository.id) return
@@ -1164,7 +1238,8 @@ function newTab(repository: OpenRepository): Tab {
       loading: false,
       error: undefined,
       selection: undefined
-    }
+    },
+    branches: { overview: undefined, loading: false, asked: 0, selected: undefined, adr: undefined }
   }
 }
 
