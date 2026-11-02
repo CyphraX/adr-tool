@@ -5,6 +5,7 @@ import {
   DEFAULT_LOG_PATHS,
   applyChangeSet,
   listTemplates,
+  type Adr,
   openRepository,
   planAccept,
   planCreate,
@@ -24,6 +25,7 @@ import type {
   ApplyResult,
   BodyEditRequest,
   CommitPlanResult,
+  BranchOverview,
   CommitResult,
   CreateRequest,
   Decision,
@@ -35,6 +37,13 @@ import type {
   RenameRequest,
   RepairRequest
 } from '../shared/ipc'
+import {
+  branchAdr,
+  branchCache,
+  branchOverview,
+  numberWarnings,
+  type BranchCache
+} from './branches'
 import { planCommitOf } from './commit'
 import { commitFiles, gitIn } from './git'
 import { historyChangeOf, historyOf } from './history'
@@ -63,6 +72,8 @@ interface Entry {
   watcher?: FSWatcher
   watched: string[]
   reload?: NodeJS.Timeout
+  /** What was read from other branches: commits do not change. */
+  readonly branches: BranchCache
 }
 
 /**
@@ -92,7 +103,7 @@ export class Repositories {
   /** Open a directory, or return the repository that is already open for it. */
   async open(root: string): Promise<OpenRepository> {
     const existing = [...this.entries.values()].find((entry) => entry.root === root)
-    const entry = existing ?? { id: randomUUID(), root, watched: [] }
+    const entry = existing ?? { id: randomUUID(), root, watched: [], branches: branchCache() }
     this.entries.set(entry.id, entry)
     return this.load(entry)
   }
@@ -230,7 +241,34 @@ export class Repositories {
     if (!log) return { ok: false, reason: t.noLogAt(logPath) }
 
     const ids = components?.map((component) => component.id)
-    return this.hold(repositoryId, await build(fs, log, ids))
+    const plan = await build(fs, log, ids)
+    // A number that another branch gives an ADR of this log is taken twice once both are merged.
+    const numbered = plan.ok ? (plan.created?.id ?? plan.renamed?.to) : undefined
+    if (!plan.ok || numbered === undefined || log.naming !== 'sequential') {
+      return this.hold(repositoryId, plan)
+    }
+    const overview = await branchOverview(gitIn(entry.root), repository, entry.branches)
+    const taken = numberWarnings(overview, log.path, numbered, log.naming)
+    return this.hold(
+      repositoryId,
+      taken.length > 0 ? { ...plan, warnings: [...(plan.warnings ?? []), ...taken] } : plan
+    )
+  }
+
+  /** The ADRs that other branches add or decide, against the working tree as it is on disk. */
+  async branches(repositoryId: string): Promise<BranchOverview | undefined> {
+    const entry = this.entries.get(repositoryId)
+    if (!entry) return undefined
+    const git = gitIn(entry.root)
+    if (!(await git.workingTree())) return undefined
+    const here = await openRepository(nodeFileSystem(entry.root))
+    return branchOverview(git, here, entry.branches)
+  }
+
+  /** An ADR as a branch has it, read-only: only one the overview listed for that commit. */
+  async branchAdr(repositoryId: string, sha: string, path: string): Promise<Adr | undefined> {
+    const entry = this.entries.get(repositoryId)
+    return entry && branchAdr(gitIn(entry.root), sha, path, entry.branches)
   }
 
   /**

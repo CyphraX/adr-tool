@@ -37,5 +37,9 @@ export const t = {
       `Nothing was committed: ${files} changed on disk after the preview was made. Try again to see what would be committed now.`,
     stillAnnounced: (files: string): string =>
       `git could not take ${files} out of the index again, where the app had announced them for the commit. \`git rm --cached\` with their paths does that; the files on disk stay as they are.`
+  },
+  branches: {
+    numberTaken: (number: number, branch: string, id: string): string =>
+      `On the branch ${branch}, ${id} has the number ${number} too. Whichever of the two is merged second has to be renumbered.`
   }
 }

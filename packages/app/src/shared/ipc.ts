@@ -1,4 +1,6 @@
 import type {
+  Adr,
+  BranchAdr,
   ChangeSet,
   Correction,
   FileChange,
@@ -347,6 +349,23 @@ export interface CommitPlan {
 export type CommitPlanResult =
   { readonly ok: true; readonly plan: CommitPlan } | { readonly ok: false; readonly reason: string }
 
+/**
+ * A branch that is not checked out and does something to the ADRs that the working tree
+ * does not have yet (docs/plan-roadmap.md, part 8).
+ */
+export interface OtherBranch {
+  /** Every name of its commit, local branches first. */
+  readonly names: readonly string[]
+  readonly sha: string
+  /** When its last commit was made, ISO 8601. */
+  readonly date: string
+  readonly adrs: readonly BranchAdr[]
+}
+
+export interface BranchOverview {
+  readonly branches: readonly OtherBranch[]
+}
+
 export type CommitResult =
   | {
       readonly committed: true
@@ -410,6 +429,13 @@ export interface Api {
    */
   commit(planId: string, include: readonly string[], message: string): Promise<CommitResult>
   discardCommit(planId: string): Promise<void>
+  /**
+   * The ADRs that other branches add or decide, read from git without checking anything out.
+   * `undefined` without git.
+   */
+  branches(repositoryId: string): Promise<BranchOverview | undefined>
+  /** An ADR as the commit of a branch has it, read from git; `undefined` for any other file. */
+  branchAdr(repositoryId: string, sha: string, path: string): Promise<Adr | undefined>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
   applyChange(changeId: string): Promise<ApplyResult>
   discardChange(changeId: string): Promise<void>
@@ -476,6 +502,8 @@ export const CHANNEL = {
   planCommit: 'git:plan-commit',
   commit: 'git:commit',
   discardCommit: 'git:discard-commit',
+  branches: 'git:branches',
+  branchAdr: 'git:branch-adr',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
   openExternal: 'shell:open-external',

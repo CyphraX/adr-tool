@@ -33,6 +33,21 @@ export interface FileCommit {
   readonly previousPath: string
 }
 
+/** A branch that is not checked out: one commit, and every name git has for it. */
+export interface Branch {
+  /** `feature/kafka`, `origin/feature/kafka`: local branches first. */
+  readonly names: readonly string[]
+  readonly sha: string
+  /** When its last commit was made, ISO 8601. */
+  readonly date: string
+}
+
+/** A file as a commit has it: where it is below the directory, and its blob. */
+export interface TreeFile {
+  readonly path: string
+  readonly blob: string
+}
+
 export interface Git {
   workingTree(): Promise<WorkingTree | undefined>
   /** The commits that changed a file, newest first, through every rename. */
@@ -51,7 +66,24 @@ export interface Git {
    * without git.
    */
   files(): Promise<string[] | undefined>
+  /**
+   * The local and remote-tracking branches other than the one that is checked out and those
+   * that point at HEAD, the most recently committed to first, at most `MAX_BRANCHES` commits.
+   */
+  branches(): Promise<Branch[]>
+  /** The commit that HEAD and `sha` last had in common; `undefined` when they have none. */
+  mergeBase(sha: string): Promise<string | undefined>
+  /** The files below the directory as a commit has them, without what is too large to be an ADR. */
+  tree(sha: string): Promise<TreeFile[] | undefined>
+  /** The text of blobs, by their names, in one go. A blob git does not have is left out. */
+  blobs(names: readonly string[]): Promise<Map<string, string>>
 }
+
+/** How many branches are read at most: those with the most recent commits. */
+export const MAX_BRANCHES = 50
+
+/** A file larger than this is no ADR, and is not read from a branch. */
+const MAX_BLOB_BYTES = 1024 * 1024
 
 const FIELD = '\x1f'
 const RECORD = '\x1e'
@@ -71,10 +103,10 @@ const OBJECT_NAME = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
  * textconv or filter (`cat-file blob` prints the blob as it is).
  */
 export function gitIn(root: string, executable = 'git'): Git {
-  /** The output of a git command, read as UTF-8, or `undefined` when it fails. */
-  const run = (args: string[]): Promise<string | undefined> =>
+  /** The output of a git command, or `undefined` when it fails. */
+  const output = (args: string[], input?: string): Promise<Buffer | undefined> =>
     new Promise((resolve) => {
-      execFile(
+      const child = execFile(
         executable,
         [
           '--no-pager',
@@ -87,10 +119,22 @@ export function gitIn(root: string, executable = 'git'): Git {
           'core.fsmonitor=false',
           ...args
         ],
-        { cwd: root, timeout: 15_000, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+        {
+          cwd: root,
+          timeout: 15_000,
+          maxBuffer: 64 * 1024 * 1024,
+          windowsHide: true,
+          encoding: 'buffer'
+        },
         (error, stdout) => resolve(error ? undefined : stdout)
       )
+      // Without input, git must not wait for any.
+      child.stdin?.on('error', () => undefined)
+      child.stdin?.end(input)
     })
+  /** The output of a git command, read as UTF-8, or `undefined` when it fails. */
+  const run = async (args: string[]): Promise<string | undefined> =>
+    (await output(args))?.toString('utf8')
 
   /** `service/` when the directory is `service` below the top of the repository. */
   const folder = async (): Promise<string | undefined> =>
@@ -214,6 +258,92 @@ export function gitIn(root: string, executable = 'git'): Git {
       return [...new Set(listed.split('\0'))]
         .filter((path) => path !== '' && !gone.has(path))
         .sort()
+    },
+
+    async branches(): Promise<Branch[]> {
+      const format = [
+        '%(objectname)',
+        '%(objecttype)',
+        '%(symref)',
+        '%(committerdate:iso-strict)',
+        '%(refname)'
+      ].join('%1f')
+      const [head, current, refs] = await Promise.all([
+        run(['rev-parse', '--verify', '--quiet', 'HEAD']),
+        run(['symbolic-ref', '--quiet', 'HEAD']),
+        run([
+          'for-each-ref',
+          // The last key sorts first: the newest commit, then by name.
+          '--sort=refname',
+          '--sort=-committerdate',
+          `--format=${format}`,
+          'refs/heads',
+          'refs/remotes'
+        ])
+      ])
+      if (refs === undefined) return []
+      const checkedOut = current?.trim()
+      const headSha = head?.trim()
+
+      // A ref name holds no control character: neither the separator nor a line break.
+      const bySha = new Map<string, { local: string[]; remote: string[]; date: string }>()
+      for (const line of refs.split('\n')) {
+        const [sha, type, symref, date, ref] = line.split(FIELD)
+        if (!sha || !OBJECT_NAME.test(sha) || type !== 'commit' || symref || !date || !ref) continue
+        if (sha === headSha || ref === checkedOut) continue
+        const local = ref.startsWith('refs/heads/')
+        const name = ref.replace(/^refs\/(?:heads|remotes)\//, '')
+        const branch = bySha.get(sha) ?? { local: [], remote: [], date }
+        ;(local ? branch.local : branch.remote).push(name)
+        bySha.set(sha, branch)
+      }
+      return [...bySha]
+        .slice(0, MAX_BRANCHES)
+        .map(([sha, { local, remote, date }]) => ({ names: [...local, ...remote], sha, date }))
+    },
+
+    async mergeBase(sha: string): Promise<string | undefined> {
+      if (!OBJECT_NAME.test(sha)) return undefined
+      const base = (await run(['merge-base', 'HEAD', sha]))?.trim()
+      return base !== undefined && OBJECT_NAME.test(base) ? base : undefined
+    },
+
+    async tree(sha: string): Promise<TreeFile[] | undefined> {
+      if (!OBJECT_NAME.test(sha)) return undefined
+      // Run in the directory, ls-tree names what lies below it, relative to it.
+      const listing = await run(['ls-tree', '-r', '-z', '-l', sha, '--', '.'])
+      if (listing === undefined) return undefined
+      // `<mode> blob <name> <size>\t<path>`: a symbolic link or a submodule is no file to read.
+      return listing.split('\0').flatMap((entry) => {
+        const match = /^100(?:644|755) blob ([0-9a-f]+) +(\d+)\t(.+)$/s.exec(entry)
+        return match && OBJECT_NAME.test(match[1]!) && Number(match[2]) <= MAX_BLOB_BYTES
+          ? [{ path: match[3]!, blob: match[1]! }]
+          : []
+      })
+    },
+
+    async blobs(names: readonly string[]): Promise<Map<string, string>> {
+      const texts = new Map<string, string>()
+      const asked = [...new Set(names)].filter((name) => OBJECT_NAME.test(name))
+      if (asked.length === 0) return texts
+      // `<name> blob <size>\n<content>\n` for each; `<name> missing\n` for one git does not have.
+      const out = await output(['cat-file', '--batch'], asked.map((name) => `${name}\n`).join(''))
+      if (out === undefined) return texts
+      for (let position = 0; position < out.length;) {
+        const end = out.indexOf(10, position)
+        if (end < 0) break
+        const header = /^([0-9a-f]+) (\w+) (\d+)$/.exec(out.toString('utf8', position, end))
+        if (!header) {
+          position = end + 1
+          continue
+        }
+        const size = Number(header[3])
+        if (header[2] === 'blob') {
+          texts.set(header[1]!, out.toString('utf8', end + 1, end + 1 + size))
+        }
+        position = end + 1 + size + 1
+      }
+      return texts
     }
   }
 }

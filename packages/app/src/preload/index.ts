@@ -26,6 +26,9 @@ const api: Api = {
   commit: (planId, include, message) =>
     ipcRenderer.invoke(CHANNEL.commit, planId, include, message),
   discardCommit: (planId) => ipcRenderer.invoke(CHANNEL.discardCommit, planId),
+  branches: (repositoryId) => ipcRenderer.invoke(CHANNEL.branches, repositoryId),
+  branchAdr: (repositoryId, sha, path) =>
+    ipcRenderer.invoke(CHANNEL.branchAdr, repositoryId, sha, path),
   applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
   discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),
   openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url),

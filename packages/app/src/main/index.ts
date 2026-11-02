@@ -275,6 +275,16 @@ function registerIpc(): void {
     if (typeof planId === 'string') repositories.discardCommit(planId)
   })
 
+  ipcMain.handle(CHANNEL.branches, (_, repositoryId: unknown) =>
+    typeof repositoryId === 'string' ? repositories.branches(repositoryId) : undefined
+  )
+
+  ipcMain.handle(CHANNEL.branchAdr, (_, ...ids: unknown[]) =>
+    ids.length === 3 && ids.every((id) => typeof id === 'string')
+      ? repositories.branchAdr(...(ids as [string, string, string]))
+      : undefined
+  )
+
   ipcMain.handle(CHANNEL.applyChange, async (_, changeId: unknown) => {
     if (typeof changeId !== 'string') return { applied: false, reason: t.notUnderstood }
     const result = await repositories.applyChange(changeId)
