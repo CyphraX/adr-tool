@@ -67,8 +67,12 @@ _Avoid_: Backlink, inverse Relation, reverse link
 ### Housekeeping
 
 **Problem**:
-An inconsistency in a Decision Log that the tool detects and names — invalid Metadata, a Relation to an ADR that does not exist, a missing Back-reference, a duplicate number. Some Problems have a Repair.
+An inconsistency in a Decision Log that the tool detects and names — invalid Metadata, a Relation to an ADR that does not exist, a missing Back-reference, a duplicate number. Every Problem has a **code** (`unknown-target`), the same in the window and on the command line ([docs/cli.md](docs/cli.md)). Some Problems have a Repair.
 _Avoid_: Error, warning, issue, finding
+
+**Root cause**:
+A Problem that voids an ADR's Relations — its frontmatter cannot be read, or its Status is none of the five values — together with the Problems that are only reported because of it, on other ADRs and on itself. Those are listed under it, go away with it, and have no Repair of their own.
+_Avoid_: Cascade, follow-up error
 
 **Repair**:
 An operation the tool offers for a Problem, which writes the one thing that makes the Problem go away — always taking the Relation as authoritative, never the Back-reference or the `superseded` Status. A Problem has no Repair where the tool cannot know what was meant; a person fixes the file then.

@@ -216,7 +216,8 @@
           <li class:follows={cause !== undefined}>
             {describeProblem(problem)}
             {#if cause !== undefined}
-              <button class="cause" onclick={() => app.select(cause)}>{describeCause(cause)}</button
+              <button class="cause" onclick={() => app.select(cause.adr)}
+                >{describeCause(cause.problem)}</button
               >
             {/if}
             {#if cause === undefined && !editing}

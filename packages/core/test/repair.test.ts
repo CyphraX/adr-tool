@@ -130,8 +130,9 @@ describe('the repair of a Problem', () => {
     expect(await premise('status: rejected', 'amends: [0001-base]')).toEqual([
       '0002-more was rejected: its Relations never take effect.'
     ])
+    // A Status that cannot be read is the root cause, and the file is repaired, not this.
     expect(await premise('status: acepted', 'amends: [0001-base]')).toEqual([
-      'The Status of 0002-more cannot be read ("acepted"). If that ADR has been accepted, cancel and fix its Status instead: the Back-reference is right then.'
+      'Reported only because the Status of 0002-more is none of the five values, which voids its Relations. Fix that first.'
     ])
     expect(await premise('status: accepted')).toEqual([
       '0002-more does not name 0001-base in amends. If it should, cancel and add it to 0002-more by hand: the Back-reference is right then.'
@@ -243,8 +244,7 @@ describe('a repair is refused', () => {
     )
     expect(plan).toEqual({
       ok: false,
-      reason:
-        'This is only reported because the frontmatter of 0002-new cannot be read. Fix that file first.'
+      reason: 'Reported only because the frontmatter of 0002-new cannot be read. Fix that first.'
     })
   })
 })

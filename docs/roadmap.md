@@ -30,7 +30,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 
 ## Next — the first follow-ups after v1
 
-1. **`adr lint` CLI for CI.** Checks that Metadata is valid, that Relations and Back-references are consistent, and that no numbers collide. Built on `core`; this is what carries the tool into teams.
+1. ~~**`adr lint` CLI for CI.** Checks that Metadata is valid, that Relations and Back-references are consistent, and that no numbers collide. Built on `core`; this is what carries the tool into teams.~~ Built on 2026-11-02 ([cli.md](cli.md); [plan-roadmap.md](plan-roadmap.md), part 4).
 2. **More foreign formats:** the rest of MADR 2.x and log4brains (v1 reads their Status, from the list under the title, and nothing else).
 
 ## Later
@@ -40,7 +40,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 - Branch overview: `proposed` ADRs on branches that are not checked out, and a warning when a number is already taken on another branch
 - Relations across Decision Logs, written as `<log>/<ID>`; a bare ID keeps meaning "same log"
 - Live editor: table rendering
-- UI translations. The app's own texts are in two modules of the renderer and one of the main process, ready to be replaced. `core` still answers in English sentences — why it refuses an operation, what a change warns about, what is wrong with a piece of Metadata, why a foreign file has no Migration — and so does the wording of Problems once it has moved to `core` for `adr lint`; both need codes before the window can be translated whole
+- UI translations. The app's own texts are in two modules of the renderer and one of the main process, ready to be replaced. `core` still answers in English sentences — why it refuses an operation, what a change warns about, what is wrong with a piece of Metadata, why a foreign file has no Migration — and so does the wording of Problems, which has moved to `core` for `adr lint` and has its codes already; the rest needs codes before the window can be translated whole
 - Read-only export for non-technical readers (static site or PDF)
 - ADR → code links ("which ADRs affect this file?"): closed by the first Trace of Structure, part 7 — an ADR names the Components it affects in `affects`, and a Component lists its ADRs ([plan-structure.md](plan-structure.md)). From a file it is one step: its Component.
 - Aggregation across repositories, including Relations that cross repository boundaries
@@ -58,7 +58,7 @@ Before the first public release:
 
 With `adr lint`, because `core` has to say it first:
 
-- Problems are grouped under a root cause only when frontmatter cannot be read at all. A file that can be read but has a Status outside the five values voids its Relations, and what that causes on other ADRs is still listed Problem by Problem.
+- ~~Problems are grouped under a root cause only when frontmatter cannot be read at all. A file that can be read but has a Status outside the five values voids its Relations, and what that causes on other ADRs is still listed Problem by Problem.~~ Closed on 2026-11-02 (part 4): a Status outside the five values is a root cause too.
 
 With more foreign formats:
 

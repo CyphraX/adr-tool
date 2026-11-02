@@ -23,7 +23,15 @@ export { correctionsIn, type Correction, type Metadata } from './metadata/read'
 export { METADATA_KEYS, type MetadataKey } from './metadata/keys'
 export { hasBeenAccepted, type Relation, type RelationState } from './relations/graph'
 export type { BackReferenceKey, Problem } from './problems/problem'
-export { groupProblems, type ProblemGroup } from './problems/group'
+export { groupProblems, rootOf, type ProblemGroup } from './problems/group'
+export {
+  PROBLEM_CODES,
+  describeCause,
+  describeConsequences,
+  describeProblem,
+  type ProblemCode
+} from './problems/wording'
+export { locateProblem, type ProblemPlace } from './problems/locate'
 
 export { applyEdits, type TextEdit } from '@adr-tool/kernel'
 

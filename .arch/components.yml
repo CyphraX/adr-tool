@@ -10,6 +10,8 @@ components:
         paths: [packages/app/src/renderer/**]
       shared:
         paths: [packages/app/src/shared/**]
+  cli:
+    paths: [packages/cli/**]
   core:
     paths: [packages/core/**]
     components:

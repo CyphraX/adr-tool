@@ -156,11 +156,11 @@ Some Problems have a Repair. A Repair is an operation like any other: it is plan
 | A cycle of `supersedes` Relations | one `supersedes` item of the cycle is taken out; the person says which. What that Relation had caused on its target — the Back-reference, the `superseded` Status — is a Problem of its own afterwards, with its own Repair. Where several cycles share ADRs, what is left of them is reported again |
 | Two ADRs with the same number | Renumber of one of them; the person says which |
 
-- Taking a Back-reference out, or the `superseded` Status back, rests on what the other ADR says right now. The preview says what that is — the other ADR is still `proposed`, was `rejected`, has a Status that cannot be read, or does not name this one — so that a person can tell a stale Back-reference from a successor that needs fixing.
+- Taking a Back-reference out, or the `superseded` Status back, rests on what the other ADR says right now. The preview says what that is — the other ADR is still `proposed`, was `rejected`, or does not name this one — so that a person can tell a stale Back-reference from a successor that needs fixing.
 - One Repair repairs one Problem and is previewed on its own. There is no "repair everything".
 - When the Relation is what is wrong — the successor forgot its `supersedes`, say — the Repair is the wrong tool: `supersedes` and `amends` of an ADR that is no longer `proposed` are changed by hand, in the file.
 - No Repair for Metadata that breaks section 2 or 3 otherwise — frontmatter that cannot be read, a malformed date, a Status outside the five values, a value of the wrong type: the tool cannot know what was meant. A person fixes the file.
-- A Problem that is only reported because another ADR's frontmatter cannot be read has no Repair: the unreadable file is fixed first. A Repair that would write into an ADR whose frontmatter cannot be read is refused.
+- A Problem that is only reported because an ADR's frontmatter cannot be read, or because its Status is none of the five values and so voids its Relations, has no Repair: that file is fixed first. Such Problems are listed under their root cause, by the app and by `adr lint` ([cli.md](cli.md)). A Repair that would write into an ADR whose frontmatter cannot be read is refused.
 
 ## 6. Finding Decision Logs
 
