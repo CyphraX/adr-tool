@@ -96,8 +96,78 @@ describe('the repositories seen together (part 13)', () => {
     ])
   })
 
+  it("keeps a rejected ADR's Relation void, and a reference by its own name leads nowhere", async () => {
+    const repositories = [
+      await open('a', 'shop', {
+        'docs/adr/0001-a.md': adr(
+          'status: rejected\ndepends-on: [payments:docs/adr/0001-ledger]',
+          '# A\n'
+        ),
+        'docs/adr/0002-b.md': adr('status: accepted\nrelates-to: [shop:docs/adr/0001-a]', '# B\n')
+      }),
+      await open('b', 'payments', {
+        'docs/adr/0001-ledger.md': adr('status: accepted', '# Ledger\n')
+      })
+    ]
+    const relations = outsideRelations(repositories)
+    expect(relations.map((one) => [one.from.adr.id, one.state, one.to?.adr.id])).toEqual([
+      ['0001-a', 'void', '0001-ledger'],
+      ['0002-b', 'in-effect', undefined]
+    ])
+  })
+
+  it('offers no ADR of a repository whose name cannot be written in a reference', async () => {
+    const repositories = [
+      await open('a', 'shop', { 'docs/adr/0001-a.md': adr('status: accepted', '# A\n') }),
+      await open('b', 'Zahlungsverkehr Ü', {
+        'docs/adr/0001-ledger.md': adr('status: accepted', '# Ledger\n')
+      })
+    ]
+    expect(outsideCandidates(repositories, 'a')).toEqual([])
+  })
+
+  it('lists a root cause once, with what follows from it in another log of the repository', async () => {
+    const [repository] = [
+      await open('a', 'shop', {
+        '.adr/config.yml': 'logs:\n  - path: docs/adr\n  - path: docs/decisions\n',
+        'docs/adr/0001-a.md': adr(
+          'status: superseded\nsuperseded-by: [docs/decisions/0002-broken]',
+          '# A\n'
+        ),
+        'docs/decisions/0002-broken.md': adr('status: [accepted', '# Broken\n'),
+        'docs/adr/0003-x.md': adr('status: accepted\nsupersedes: [docs/decisions/0003-x]', '# X\n'),
+        'docs/decisions/0003-x.md': adr('status: accepted\nsupersedes: [docs/adr/0003-x]', '# X\n')
+      })
+    ]
+    const [across] = problemsAcross([repository!])
+    const groups = across!.logs.flatMap((log) => log.groups)
+    const broken = groups.filter((group) => group.problem.kind === 'invalid-frontmatter')
+    expect(broken.map((group) => group.subjects.map((one) => `${one.log}/${one.adr.id}`))).toEqual([
+      ['docs/decisions/0002-broken']
+    ])
+    // What it voids in the other log is listed under it.
+    expect(broken[0]!.consequences.map((one) => one.problem.kind)).toContain(
+      'unfounded-back-reference'
+    )
+    expect(groups.filter((group) => group.problem.kind === 'supersedes-cycle')).toHaveLength(1)
+    expect(across!.count).toBe(groups.length)
+  })
+
   it('searches every open repository, the one in front first where hits tie', async () => {
     const repositories = await twoRepositories()
+    // Two ADRs that match alike: the one of the repository in front comes first.
+    const tied = [
+      await open('a', 'shop', { 'docs/adr/0001-x.md': adr('status: accepted', '# Queue\n') }),
+      await open('b', 'payments', { 'docs/adr/0001-y.md': adr('status: accepted', '# Queue\n') })
+    ]
+    expect(searchAll(tied, 'queue', { repositoryId: 'b' }).map((hit) => hit.repositoryId)).toEqual([
+      'b',
+      'a'
+    ])
+    expect(searchAll(tied, 'queue', { repositoryId: 'a' }).map((hit) => hit.repositoryId)).toEqual([
+      'a',
+      'b'
+    ])
     const hits = searchAll(repositories, 'ledger', { repositoryId: 'b', log: 'docs/adr' })
     expect(hits.map((hit) => `${hit.repository}:${hit.adr.id}`)).toContain('payments:0001-ledger')
     expect(hits.map((hit) => `${hit.repository}:${hit.adr.id}`)).toContain(

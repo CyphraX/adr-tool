@@ -41,7 +41,7 @@ export function hasBeenAccepted(status: Status | undefined): boolean {
   return status === 'accepted' || status === 'deprecated' || status === 'superseded'
 }
 
-function stateOf(status: Status | undefined): RelationState {
+export function stateOf(status: Status | undefined): RelationState {
   if (hasBeenAccepted(status)) return 'in-effect'
   return status === 'proposed' ? 'pending' : 'void'
 }

@@ -142,6 +142,24 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
     )
   })
 
+  it('shows a Relation to an ADR of another repository as written, without a link', async () => {
+    const repository = await openRepository(
+      memoryFileSystem({
+        'docs/adr/0001-a.md': adr(
+          'status: accepted\ndepends-on: [payments:docs/adr/0001-ledger]',
+          '# A\n'
+        ),
+        'docs/adr/0002-b.md': adr('status: rejected\nrelates-to: [payments:./0002-x]', '# B\n')
+      })
+    )
+    const { files } = exportSite(repository, { title: 'T', date: '2026-11-02' })
+    expect(fileOf(files, 'docs/adr/0001-a.html')).toContain(
+      '<div><dt>Depends on</dt><dd class="elsewhere">payments:docs/adr/0001-ledger</dd></div>'
+    )
+    // A rejected ADR's Relations never took effect, here as elsewhere.
+    expect(fileOf(files, 'docs/adr/0002-b.html')).not.toContain('payments:./0002-x</dd>')
+  })
+
   it('gives headings the ids GitHub gives them, and links footnotes to theirs', async () => {
     const repository = await openRepository(
       memoryFileSystem({

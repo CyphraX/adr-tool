@@ -132,7 +132,7 @@
           {#each repository.logs as { log, groups } (log)}
             {#each groups as { problem, subjects, consequences }, position (position)}
               <li class="group">
-                {#each subjects as one (one.adr.id)}
+                {#each subjects as one (`${one.log}/${one.adr.id}`)}
                   <div class="subject">{@render subject(one)}</div>
                 {:else}
                   {#if severalLogs.has(repository.repositoryId)}
@@ -146,7 +146,7 @@
                     <ul>
                       {#each consequences as consequence, nth (nth)}
                         <li>
-                          {#each consequence.subjects.filter((one) => !subjects.some((own) => own.adr.id === one.adr.id && own.log === one.log)) as one (one.adr.id)}
+                          {#each consequence.subjects.filter((one) => !subjects.some((own) => own.adr.id === one.adr.id && own.log === one.log)) as one (`${one.log}/${one.adr.id}`)}
                             {@render subject(one)}
                           {/each}
                           <span class="what">{describeProblem(consequence.problem)}</span>

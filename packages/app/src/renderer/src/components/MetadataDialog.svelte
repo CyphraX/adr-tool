@@ -77,7 +77,7 @@
   function chosenOf(id: string): Candidate | undefined {
     const inside = app.log && namedIn(app.log, id)
     if (inside) return inside
-    const there = outsideTarget(repositories, id)
+    const there = outsideTarget(repositories, id, app.activeId)
     return there && { id, adr: there.adr, log: there.log, repository: there.repository }
   }
 

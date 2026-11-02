@@ -147,6 +147,7 @@ function fileLines(text: string, adr: Adr | undefined): FileLines {
         case 'superseded-without-successor':
           return status ?? 1
         case 'unknown-target':
+        case 'other-repository':
           return item(problem.key, problem.target) ?? key(problem.key) ?? link(problem.target) ?? 1
         case 'self-reference':
           return item(problem.key, problem.adr) ?? key(problem.key) ?? link(problem.adr) ?? 1

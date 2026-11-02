@@ -1,10 +1,15 @@
 import {
+  REPOSITORY_NAME,
+  absoluteReference,
   groupProblems,
+  isQualified,
   outsideReference,
   outsideTo,
+  relationStateOf,
   type Adr,
   type DecisionLog,
-  type Problem
+  type Problem,
+  type RelationState
 } from '@adr-tool/core'
 import type { OpenRepository } from '../../../shared/ipc'
 import { adrsOf } from './problems'
@@ -37,8 +42,10 @@ export interface OutsideRelation {
   readonly from: Placed
   /** The reference as the file writes it: `<name>:<log>/<ID>`. */
   readonly written: string
-  /** The ADR it names — when a repository of that name is open and has it. */
+  /** The ADR it names — when another repository of that name is open and has it. */
   readonly to: Placed | undefined
+  /** As within a repository: a rejected ADR's Relations never took effect. */
+  readonly state: RelationState
 }
 
 const placed = (repository: OpenRepository, log: DecisionLog, adr: Adr): Placed => ({
@@ -62,14 +69,18 @@ function byName(repositories: readonly OpenRepository[], name: string): OpenRepo
 
 /**
  * The ADR a reference to another repository names, `<name>:<log>/<ID>`, when a repository of
- * that name is open and has it; `undefined` for anything else.
+ * that name is open and has it; `undefined` for anything else. Written in the repository
+ * `from`, a reference by its own name leads nowhere: it names no other repository.
  */
 export function outsideTarget(
   repositories: readonly OpenRepository[],
-  written: string
+  written: string,
+  from?: string
 ): Placed | undefined {
   const reference = outsideReference(written)
   if (!reference) return undefined
+  const own = repositories.find((repository) => repository.id === from)
+  if (own && own.name === reference.repository) return undefined
   const other = byName(repositories, reference.repository)
   const otherLog = other?.repository.logs.find((one) => one.path === reference.log)
   const target = otherLog?.adrs.find((one) => one.id === reference.id)
@@ -85,7 +96,8 @@ export interface OutsideCandidate extends Placed {
 /**
  * The ADRs of the other open repositories that an ADR of `from` can name in `depends-on` or
  * `relates-to`: those a reference by name leads to — not those of a repository that shares the
- * name of one before it, nor of one that shares the name of `from`.
+ * name of one before it, nor of one that shares the name of `from`, nor of one whose name —
+ * of its directory, when its configuration names none — cannot be written in a reference.
  */
 export function outsideCandidates(
   repositories: readonly OpenRepository[],
@@ -97,6 +109,7 @@ export function outsideCandidates(
       (repository) =>
         repository.id !== from &&
         repository.name !== own?.name &&
+        REPOSITORY_NAME.test(repository.name) &&
         byName(repositories, repository.name) === repository
     )
     .flatMap((repository) =>
@@ -122,7 +135,8 @@ export function outsideRelations(repositories: readonly OpenRepository[]): Outsi
               type,
               written,
               from: placed(repository, log, adr),
-              to: outsideTarget(repositories, written)
+              to: outsideTarget(repositories, written, repository.id),
+              state: relationStateOf(adr.metadata.status)
             })
           }
         }
@@ -228,17 +242,49 @@ function subjectsOf(repository: OpenRepository, log: DecisionLog, problem: Probl
 /** The Problems of every open repository, in the order of the tabs. */
 export function problemsAcross(repositories: readonly OpenRepository[]): RepositoryProblems[] {
   return repositories.map((repository) => {
-    const logs = repository.repository.logs
-      .map((log) => ({
-        log: log.path,
-        groups: groupProblems(log).map(({ problem, consequences }) => ({
-          problem,
-          subjects: subjectsOf(repository, log, problem),
-          consequences: consequences.map((consequence) => ({
-            problem: consequence,
-            subjects: subjectsOf(repository, log, consequence)
-          }))
+    type Group = { problem: Problem; subjects: Placed[]; consequences: PlacedProblem[] }
+    const perLog = repository.repository.logs.map((log) => ({
+      log,
+      groups: groupProblems(log).map(({ problem, consequences }): Group => ({
+        problem,
+        subjects: subjectsOf(repository, log, problem),
+        consequences: consequences.map((consequence) => ({
+          problem: consequence,
+          subjects: subjectsOf(repository, log, consequence)
         }))
+      }))
+    }))
+    /** The group of the log `log` that is `kind` reported on its ADR `id`. */
+    const ownGroup = (log: string, kind: Problem['kind'], id: string): Group | undefined =>
+      perLog
+        .find((one) => one.log.path === log)
+        ?.groups.find(
+          ({ problem }) => problem.kind === kind && 'adr' in problem && problem.adr === id
+        )
+    // Each root cause once: one of another log's ADR is listed in that log, with what follows
+    // from it in this one; a cycle through several logs once, not once for each.
+    const cycles = new Set<string>()
+    const logs = perLog
+      .map(({ log, groups }) => ({
+        log: log.path,
+        groups: groups.filter((group) => {
+          const { problem } = group
+          if ('adr' in problem && isQualified(problem.adr)) {
+            const home = absoluteReference(log.path, problem.adr)
+            const there = ownGroup(home.log, problem.kind, home.id)
+            if (there) {
+              there.consequences.push(...group.consequences)
+              return false
+            }
+          }
+          if (problem.kind === 'supersedes-cycle') {
+            const members = group.subjects.map((one) => `${one.log}/${one.adr.id}`).sort()
+            const key = members.join('\n')
+            if (cycles.has(key)) return false
+            cycles.add(key)
+          }
+          return true
+        })
       }))
       .filter((log) => log.groups.length > 0)
     const own = repository.repository.problems

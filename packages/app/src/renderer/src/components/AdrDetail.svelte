@@ -196,7 +196,7 @@
       <ul class="relations outside" aria-label={t.detail.otherRepositories}>
         {#each outside.outgoing as relation, index (`to ${index}`)}
           {@const to = relation.to}
-          <li>
+          <li class:void={relation.state === 'void'}>
             <span class="kind">{relationWord(relation.type, 'from')}</span>
             {#if to}
               <button
@@ -208,6 +208,7 @@
                 <span class="prefix">{prefixOf(to.adr)}</span>
                 {to.adr.title ?? to.adr.id}
               </button>
+              {#if relation.state === 'void'}<span class="note">{t.neverTookEffect}</span>{/if}
             {:else}
               {@const repository = relation.written.slice(0, relation.written.indexOf(':'))}
               <code class="written">{relation.written}</code>
@@ -221,7 +222,7 @@
         {/each}
         {#each outside.incoming as relation, index (`from ${index}`)}
           {@const from = relation.from}
-          <li>
+          <li class:void={relation.state === 'void'}>
             <span class="kind">{relationWord(relation.type, 'to')}</span>
             <button
               title={t.detail.showIn(from.repository)}
@@ -232,7 +233,9 @@
               <span class="prefix">{prefixOf(from.adr)}</span>
               {from.adr.title ?? from.adr.id}
             </button>
-            <span class="note">{IMPLIED_NOTE}</span>
+            <span class="note">
+              {relation.state === 'void' ? t.neverTookEffect : IMPLIED_NOTE}
+            </span>
           </li>
         {/each}
       </ul>

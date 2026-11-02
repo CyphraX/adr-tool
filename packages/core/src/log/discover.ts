@@ -1,4 +1,4 @@
-import { isMap, isSeq, parseDocument } from 'yaml'
+import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import { scalarText } from '../metadata/scalar'
 import type { Problem } from '../problems/problem'
@@ -35,12 +35,22 @@ export interface Discovery {
 export async function discoverLogs(fs: FileSystem): Promise<Discovery> {
   const config = await fs.readText(CONFIG_PATH)
   const found = config === undefined ? undefined : readConfig(config)
+  // A name that cannot be one is a Problem, and ends nothing: it matters to other
+  // repositories only, and the Decision Logs are found as if there were none.
+  const aside = found?.aside ?? []
   if (found && (found.problems.length > 0 || found.locations.length > 0)) {
-    return { by: 'config', ...found }
+    const { locations, problems, name } = found
+    return {
+      by: 'config',
+      locations,
+      problems: [...aside, ...problems],
+      ...(name !== undefined && { name })
+    }
   }
   // A configuration that names the repository and no Decision Log still names it.
   const named = found?.name === undefined ? {} : { name: found.name }
-  return { ...(await discoverElsewhere(fs)), ...named }
+  const elsewhere = await discoverElsewhere(fs)
+  return { ...elsewhere, problems: [...aside, ...elsewhere.problems], ...named }
 }
 
 /** Steps 2 and 3 of section 6: adr-tools' `.adr-dir`, then the well-known directories. */
@@ -66,10 +76,22 @@ async function discoverElsewhere(fs: FileSystem): Promise<Discovery> {
   return { by: existing.length > 0 ? 'default' : 'none', locations: existing, problems: [] }
 }
 
-function readConfig(text: string): Pick<Discovery, 'locations' | 'problems' | 'name'> {
-  const invalid = (said: CoreSaid): Pick<Discovery, 'locations' | 'problems'> => ({
+/** What the configuration says, and the Problems that end nothing (`aside`). */
+type Configured = Pick<Discovery, 'locations' | 'problems' | 'name'> & {
+  readonly aside: readonly Problem[]
+}
+
+function readConfig(text: string): Configured {
+  const problem = (said: CoreSaid): Problem => ({
+    kind: 'invalid-configuration',
+    path: CONFIG_PATH,
+    ...detailed(said)
+  })
+  let aside: Problem[] = []
+  const invalid = (said: CoreSaid): Configured => ({
     locations: [],
-    problems: [{ kind: 'invalid-configuration', path: CONFIG_PATH, ...detailed(said) }]
+    problems: [problem(said)],
+    aside
   })
 
   const doc = parseDocument(text)
@@ -79,22 +101,21 @@ function readConfig(text: string): Pick<Discovery, 'locations' | 'problems' | 'n
       values: { message: doc.errors[0]!.message.split('\n')[0]! }
     })
   }
-  if (doc.contents === null) return { locations: [], problems: [] }
+  if (doc.contents === null) return { locations: [], problems: [], aside }
   if (!isMap(doc.contents)) return invalid({ code: 'expected-mapping', values: {} })
 
+  // An empty `name:` is none: the name of the directory counts.
   const named = doc.contents.get('name', true)
   const name = scalarText(named)
-  if (
-    named !== undefined &&
-    named !== null &&
-    (name === undefined || !REPOSITORY_NAME.test(name))
-  ) {
-    return invalid({ code: 'repository-name', values: {} })
-  }
-  const withName = name === undefined ? {} : { name }
+  const empty = named === undefined || named === null || (isScalar(named) && named.value === null)
+  const fits = name !== undefined && REPOSITORY_NAME.test(name)
+  if (!empty && !fits) aside = [problem({ code: 'repository-name', values: {} })]
+  const withName = fits ? { name } : {}
 
   const logs = doc.contents.get('logs', true)
-  if (logs === undefined || logs === null) return { locations: [], problems: [], ...withName }
+  if (logs === undefined || logs === null) {
+    return { locations: [], problems: [], aside, ...withName }
+  }
   if (!isSeq(logs)) return invalid({ code: 'logs-not-a-list', values: {} })
 
   const locations: LogLocation[] = []
@@ -112,5 +133,5 @@ function readConfig(text: string): Pick<Discovery, 'locations' | 'problems' | 'n
     if (locations.some((location) => location.path === path)) continue
     locations.push({ path, ...(naming !== undefined && { naming }) })
   }
-  return { locations, problems: [], ...withName }
+  return { locations, problems: [], aside, ...withName }
 }

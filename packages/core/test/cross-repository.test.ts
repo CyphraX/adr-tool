@@ -34,10 +34,43 @@ describe('Relations across repositories (docs/file-format.md, section 3)', () =>
       '0003-ledger',
       'docs/adr/0003-ledger',
       ':docs/adr/0001-x',
-      '-x:0001-y'
+      '-x:0001-y',
+      // Only the form the format defines leads out: these are references of this repository,
+      // which name an ADR or are a Problem.
+      '0001-use-http:2',
+      'ADR:0003',
+      'payments:0001-x',
+      'https://github.com/o/payments/blob/main/docs/adr/0001-x.md',
+      'C:/adr/0001-x',
+      'payments:docs/../0001-x',
+      'payments:docs//adr/0001-x',
+      'payments:/0001-x',
+      'payments:docs/adr/0001-x.md',
+      'payments:docs/adr/'
     ]) {
-      expect(outsideReference(reference)).toBeUndefined()
+      expect(outsideReference(reference), reference).toBeUndefined()
     }
+  })
+
+  it('reads an ID with a colon in it as an ID, and a reference out of form as a Problem', async () => {
+    const fs = memoryFileSystem({
+      'docs/adr/0001-use-http:2.md': adr('status: superseded', 'superseded-by: [0002-b]'),
+      'docs/adr/0002-b.md': adr(
+        'status: accepted',
+        'supersedes: [0001-use-http:2]',
+        'relates-to: [payments:0001-x, https://example.com/docs/adr/0001-x.md]'
+      )
+    })
+    const log = (await openRepository(fs)).logs[0]!
+    expect(log.relations).toContainEqual(
+      expect.objectContaining({ type: 'supersedes', from: '0002-b', to: '0001-use-http:2' })
+    )
+    expect(
+      log.problems.map((problem) => [problem.kind, 'target' in problem && problem.target])
+    ).toEqual([
+      ['unknown-target', 'payments:0001-x'],
+      ['unknown-target', 'https://example.com/docs/adr/0001-x.md']
+    ])
   })
 
   it('takes depends-on and relates-to across as written, and nothing else', async () => {
