@@ -154,7 +154,7 @@ describe('Deprecate', () => {
     expect(changes(await planDeprecate(fs, log, '0001-a'))).toEqual({
       '0001-a.md': { removed: ['status: accepted\n'], added: ['status: deprecated\n'] }
     })
-    expect(await planDeprecate(fs, log, '0002-b')).toEqual({
+    expect(await planDeprecate(fs, log, '0002-b')).toMatchObject({
       ok: false,
       reason: 'Only an accepted ADR can be deprecated. 0002-b is proposed.'
     })

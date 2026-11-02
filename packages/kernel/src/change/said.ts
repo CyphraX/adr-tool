@@ -6,17 +6,28 @@
  */
 export interface Said {
   readonly code: string
-  readonly values: Readonly<Record<string, string | number | readonly string[]>>
+  readonly values: Readonly<Record<string, SaidValue>>
 }
+
+/**
+ * A value of a sentence: a name, a number, a list of names — or what was said that the
+ * sentence passes on, such as why one ADR of several cannot be migrated. Such a value is worded
+ * in the language of the sentence around it. A plain text is somebody else's words, a
+ * parser's say, and is passed on as it is.
+ */
+export type SaidValue = string | number | readonly string[] | Said | readonly Said[]
 
 /** The sentences of a module, one per code: each takes the values of its sentence. */
 export type Sentences = Readonly<Record<string, (values: never) => string>>
+
+/** The values of a sentence that takes none. */
+type NoValues = Readonly<Record<string, never>>
 
 /** What a module may say: one of its codes with the values its sentence takes. */
 export type SaidBy<S extends Sentences> = {
   readonly [Code in keyof S & string]: {
     readonly code: Code
-    readonly values: Parameters<S[Code]>[0]
+    readonly values: Parameters<S[Code]> extends [] ? NoValues : Parameters<S[Code]>[0]
   }
 }[keyof S & string]
 
@@ -24,3 +35,14 @@ export type SaidBy<S extends Sentences> = {
 export function sentenceOf<S extends Sentences>(sentences: S, said: SaidBy<S>): string {
   return (sentences[said.code] as (values: unknown) => string)(said.values)
 }
+
+/**
+ * The sentences of the kernel: what `PendingFiles` refuses. Every module that plans with it
+ * says these too, and takes them into its own sentences.
+ */
+export const KERNEL_SENTENCES = {
+  'already-exists': (v: { path: string }): string => `${v.path} already exists.`,
+  'no-longer-exists': (v: { path: string }): string => `${v.path} no longer exists.`
+} satisfies Sentences
+
+export type KernelSaid = SaidBy<typeof KERNEL_SENTENCES>

@@ -291,7 +291,7 @@ describe('asking for a Migration', () => {
   it('is refused where there is nothing to migrate', async () => {
     const [fs, log] = await open(inLog({ '0001-a': '# A\n', '0002-b': '---\nstatus: [x\n---\n' }))
     expect(await planMigration(fs, log)).toMatchObject({ ok: false })
-    expect(await planMigration(fs, log, '0001-a')).toEqual({
+    expect(await planMigration(fs, log, '0001-a')).toMatchObject({
       ok: false,
       reason: "0001-a is in the tool's own format already."
     })

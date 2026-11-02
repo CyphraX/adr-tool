@@ -2,6 +2,7 @@ import { isMap, parseDocument } from 'yaml'
 import type { FileSystem } from '@adr-tool/kernel'
 import { CONFIG_PATH } from '../log/discover'
 import { scalarText } from '../metadata/scalar'
+import { englishOf, type CoreSaid } from '../sentences'
 import { viewSource } from '../text/source'
 import { BUILT_IN_TEMPLATES, DEFAULT_TEMPLATE } from './builtin'
 
@@ -44,23 +45,28 @@ export async function listTemplates(fs: FileSystem): Promise<Templates> {
 export async function loadTemplate(
   fs: FileSystem,
   name: string
-): Promise<{ text: string } | { problem: string }> {
+): Promise<{ text: string } | { problem: string; said: CoreSaid }> {
   // A name is a file name in the directory of Templates, or a built-in one: never a path.
   const named = name !== '' && name !== '.' && name !== '..' && !/[/\\\0]/.test(name)
   const text = named
     ? ((await fs.readText(`${TEMPLATES_PATH}/${name}.md`)) ??
       (Object.hasOwn(BUILT_IN_TEMPLATES, name) ? BUILT_IN_TEMPLATES[name] : undefined))
     : undefined
-  if (text === undefined) return { problem: `There is no Template called "${name}".` }
+  if (text === undefined) return unusable({ code: 'no-template', values: { name } })
 
   const view = viewSource(text)
   if (view.frontmatter || view.unterminatedFrontmatter) {
-    return {
-      problem: `The Template "${name}" starts with frontmatter. A Template shapes the body only; remove the frontmatter from ${TEMPLATES_PATH}/${name}.md.`
-    }
+    const path = `${TEMPLATES_PATH}/${name}.md`
+    return unusable({ code: 'template-has-frontmatter', values: { name, path } })
   }
   return { text: text.slice(view.bodyStart) }
 }
+
+/** Why a Template cannot be used, in English and as a code. */
+const unusable = (said: CoreSaid): { problem: string; said: CoreSaid } => ({
+  problem: englishOf(said),
+  said
+})
 
 async function configuredDefault(fs: FileSystem): Promise<string | undefined> {
   const config = await fs.readText(CONFIG_PATH)

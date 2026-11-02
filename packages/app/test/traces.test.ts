@@ -121,11 +121,12 @@ describe('renaming a Component', () => {
     )
   })
 
-  it("is refused with structure's reason, and with core's", async () => {
+  it("is refused with structure's reason, and with core's, each with its code", async () => {
     const fs = memoryFileSystem(REPOSITORY)
     expect(await planComponentRename(fs, 'core', 'kernel')).toEqual({
       ok: false,
-      reason: 'There is a Component kernel already.'
+      reason: 'There is a Component kernel already.',
+      said: { code: 'component-exists', values: { id: 'kernel' } }
     })
     const broken = memoryFileSystem({
       ...REPOSITORY,
@@ -134,7 +135,8 @@ describe('renaming a Component', () => {
     expect(await planComponentRename(broken, 'core', 'decisions')).toEqual({
       ok: false,
       reason:
-        'The frontmatter of 0003-broken cannot be read, and it has a list "affects". Fix it before core is renamed.'
+        'The frontmatter of 0003-broken cannot be read, and it has a list "affects". Fix it before core is renamed.',
+      said: { code: 'unreadable-has-affects', values: { adr: '0003-broken', component: 'core' } }
     })
   })
 })

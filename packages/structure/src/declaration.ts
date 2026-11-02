@@ -1,5 +1,6 @@
 import { isMap, isScalar, isSeq, parseDocument, type YAMLMap } from 'yaml'
 import type { StructureProblem } from './problems'
+import { detailed, englishOf, type StructureSaid } from './sentences'
 
 /** A Component as `.arch/components.yml` declares it (docs/structure-format.md, section 1). */
 export interface DeclaredComponent {
@@ -17,7 +18,12 @@ export type Declaration =
   /** The file is not there, or it declares no Component. The Draft applies. */
   | { readonly kind: 'absent' }
   /** The file is there and cannot be read. The Draft is shown, and nothing is written. */
-  | { readonly kind: 'unreadable'; readonly detail: string }
+  | {
+      readonly kind: 'unreadable'
+      readonly detail: string
+      /** `detail` as a code, for a window in another language. */
+      readonly said: StructureSaid
+    }
   | {
       readonly kind: 'declared'
       readonly components: readonly DeclaredComponent[]
@@ -36,27 +42,33 @@ export function everyComponent(components: readonly DeclaredComponent[]): Declar
 }
 
 /** The value of a key the suite owns is not of the form the specification gives it. */
-class WrongForm extends Error {}
+class WrongForm extends Error {
+  constructor(readonly said: StructureSaid) {
+    super(englishOf(said))
+  }
+}
+
+const unreadable = (said: StructureSaid): Declaration => ({ kind: 'unreadable', ...detailed(said) })
 
 export function readDeclaration(text: string | undefined): Declaration {
   if (text === undefined) return { kind: 'absent' }
   // Keys that occur twice are a Problem of their own, not a reason to give up on the file.
   const doc = parseDocument(text, { uniqueKeys: false })
   if (doc.errors.length > 0) {
-    return { kind: 'unreadable', detail: `it is not valid YAML: ${doc.errors[0]!.message}` }
+    return unreadable({ code: 'not-yaml', values: { message: doc.errors[0]!.message } })
   }
   if (doc.contents === null) return { kind: 'absent' }
-  if (!isMap(doc.contents)) return { kind: 'unreadable', detail: 'its top level must be a map' }
+  if (!isMap(doc.contents)) return unreadable({ code: 'top-not-map', values: {} })
 
   const problems: StructureProblem[] = []
   try {
     const top = valueOf(doc.contents, 'components')
     if (top === undefined || top === null) return { kind: 'absent' }
-    if (!isMap(top)) throw new WrongForm('"components" must be a map of Components')
+    if (!isMap(top)) throw new WrongForm({ code: 'components-not-map', values: {} })
     const components = readComponents(top, '', problems)
     return components.length === 0 ? { kind: 'absent' } : { kind: 'declared', components, problems }
   } catch (error) {
-    if (error instanceof WrongForm) return { kind: 'unreadable', detail: error.message }
+    if (error instanceof WrongForm) return unreadable(error.said)
     throw error
   }
 }
@@ -79,10 +91,12 @@ function readComponents(
     if (!SEGMENT.test(segment)) problems.push({ kind: 'invalid-segment', component: id, segment })
 
     const value = emptyToNull(pair.value)
-    if (value !== null && !isMap(value)) throw new WrongForm(`${id} must be a map of its keys`)
+    if (value !== null && !isMap(value)) {
+      throw new WrongForm({ code: 'component-not-map', values: { id } })
+    }
     const nested = value === null ? undefined : valueOf(value, 'components')
     if (nested !== undefined && nested !== null && !isMap(nested)) {
-      throw new WrongForm(`"components" of ${id} must be a map of Components`)
+      throw new WrongForm({ code: 'children-not-map', values: { id } })
     }
 
     const paths = value === null ? [] : listOf(value, 'paths', id)
@@ -126,17 +140,18 @@ function textOf(map: YAMLMap, key: string, id: string): string | undefined {
   const node = valueOf(map, key)
   if (node === undefined || node === null) return undefined
   const text = scalarText(node)
-  if (text === undefined) throw new WrongForm(`"${key}" of ${id} must be a text`)
+  if (text === undefined) throw new WrongForm({ code: 'key-not-text', values: { key, id } })
   return text
 }
 
 function listOf(map: YAMLMap, key: string, id: string): string[] {
   const node = valueOf(map, key)
   if (node === undefined || node === null) return []
-  if (!isSeq(node)) throw new WrongForm(`"${key}" of ${id} must be a list of patterns`)
+  const wrong = (): WrongForm => new WrongForm({ code: 'key-not-patterns', values: { key, id } })
+  if (!isSeq(node)) throw wrong()
   return node.items.map((item) => {
     const text = scalarText(item)
-    if (text === undefined) throw new WrongForm(`"${key}" of ${id} must be a list of patterns`)
+    if (text === undefined) throw wrong()
     return text
   })
 }

@@ -9,6 +9,7 @@
  */
 import { Language, Parser, type Node } from 'web-tree-sitter'
 import type { Extraction } from '../extraction'
+import { detailed } from '../sentences'
 
 export interface JavaImport {
   /** As written, without `.*`: `java.util.List`, `java.util`. */
@@ -79,11 +80,12 @@ export async function prepareJava(wasm: {
       const root = tree.rootNode
       const error = root.hasError ? firstError(root) : undefined
       if (error) {
-        return {
-          analysed: false,
-          line: error.startPosition.row + 1,
-          message: error.isMissing ? `Missing ${error.type}.` : 'Syntax that cannot be read.'
-        }
+        const { detail: message, said } = detailed(
+          error.isMissing
+            ? { code: 'java-missing', values: { what: error.type } }
+            : { code: 'java-unreadable', values: {} }
+        )
+        return { analysed: false, line: error.startPosition.row + 1, message, said }
       }
       return { analysed: true, java: outline(root) }
     } finally {

@@ -64,15 +64,17 @@ describe('plan', () => {
     expect(planned.ok && planned.changeSet.files[0]!.after).toBe('ONE\ntwo\n')
   })
 
-  it('turns a Refusal into the reason, and lets every other error through', async () => {
+  it('turns a Refusal into the reason with its code, and lets every other error through', async () => {
     const fs = memoryFileSystem({ 'a.txt': 'a' })
     expect(await plan(fs, text, (pending) => pending.create('a.txt', 'again'))).toEqual({
       ok: false,
-      reason: 'a.txt already exists.'
+      reason: 'a.txt already exists.',
+      said: { code: 'already-exists', values: { path: 'a.txt' } }
     })
     expect(await plan(fs, text, (pending) => pending.write('gone.txt', append('x')))).toEqual({
       ok: false,
-      reason: 'gone.txt no longer exists.'
+      reason: 'gone.txt no longer exists.',
+      said: { code: 'no-longer-exists', values: { path: 'gone.txt' } }
     })
     class OfAModule extends Refusal {}
     expect(
@@ -80,6 +82,12 @@ describe('plan', () => {
         throw new OfAModule('said by a module')
       })
     ).toEqual({ ok: false, reason: 'said by a module' })
+    const said = { code: 'of-a-module', values: { what: 'it' } }
+    expect(
+      await plan(fs, text, async () => {
+        throw new OfAModule('said by a module, of it', said)
+      })
+    ).toEqual({ ok: false, reason: 'said by a module, of it', said })
     await expect(
       plan(fs, text, async () => {
         throw new TypeError('a bug')
@@ -89,7 +97,7 @@ describe('plan', () => {
 
   it('refuses a move onto a file that is there or that another move takes', async () => {
     const fs = memoryFileSystem({ 'a.txt': 'a', 'b.txt': 'b', 'c.txt': 'c' })
-    expect(await plan(fs, text, (pending) => pending.rename('a.txt', 'b.txt'))).toEqual({
+    expect(await plan(fs, text, (pending) => pending.rename('a.txt', 'b.txt'))).toMatchObject({
       ok: false,
       reason: 'b.txt already exists.'
     })
@@ -97,7 +105,7 @@ describe('plan', () => {
       await pending.rename('a.txt', 'd.txt')
       await pending.rename('b.txt', 'd.txt')
     })
-    expect(twice).toEqual({ ok: false, reason: 'd.txt already exists.' })
+    expect(twice).toMatchObject({ ok: false, reason: 'd.txt already exists.' })
   })
 
   it('refuses to create a file where another one is moved to', async () => {
@@ -106,7 +114,7 @@ describe('plan', () => {
       await pending.rename('a.txt', 'b.txt')
       await pending.create('b.txt', 'new')
     })
-    expect(result).toEqual({ ok: false, reason: 'b.txt already exists.' })
+    expect(result).toMatchObject({ ok: false, reason: 'b.txt already exists.' })
   })
 
   it('keeps a file it creates in the change set, an empty one too', async () => {

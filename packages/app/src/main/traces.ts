@@ -42,7 +42,8 @@ export async function openWithTraces(
 
 /**
  * Rename a Component: Structure plans the new segment in the declaration, `core` the Traces in
- * every ADR that name the Component or one below it. One change set, previewed as a whole.
+ * every ADR that name the Component or one below it. One change set, previewed as a whole, with
+ * what either half warns of — and why either half refuses — as its module says it, code and all.
  */
 export async function planComponentRename(
   fs: FileSystem,
@@ -54,5 +55,13 @@ export async function planComponentRename(
   const { logs } = await openRepository(fs)
   const traces = await planRenameTraces(fs, logs, declared.renamed.from, declared.renamed.to)
   if (!traces.ok) return traces
-  return { ok: true, changeSet: joinChangeSets(declared.changeSet, traces.changeSet) }
+  const warnings = [...(declared.warnings ?? []), ...(traces.warnings ?? [])]
+  const warned = [...(declared.warned ?? []), ...(traces.warned ?? [])]
+  return {
+    ok: true,
+    changeSet: joinChangeSets(declared.changeSet, traces.changeSet),
+    ...(warnings.length > 0 && { warnings }),
+    // Codes only where every warning has one: a code stands where its warning stands.
+    ...(warned.length > 0 && warned.length === warnings.length && { warned })
+  }
 }

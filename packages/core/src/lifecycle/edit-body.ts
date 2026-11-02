@@ -5,9 +5,10 @@ import type { DecisionLog } from '../log/load'
 import { appendCorrection } from '../metadata/write'
 import { editsForLines } from '../text/line-diff'
 import { viewSource } from '../text/source'
-import { correctionWarnings } from './correction'
+import { correctionSaid } from './correction'
 import type { Today } from './decide'
-import { Refusal, plan } from './pending'
+import { plan } from './pending'
+import { refuse, Warnings } from '../sentences'
 import { requireOwnFormat } from './rules'
 
 export interface BodyEdit extends Today {
@@ -34,15 +35,15 @@ export function planEditBody(
   id: string,
   edit: BodyEdit
 ): Promise<Plan> {
-  let warnings: string[] = []
+  const warnings = new Warnings()
   const planned = plan(fs, async (pending) => {
     const adr = log.adrs.find((candidate) => candidate.id === id)
-    if (!adr) throw new Refusal(`There is no ADR ${id} in this Decision Log.`)
+    if (!adr) refuse({ code: 'no-adr', values: { id } })
     requireOwnFormat(adr)
 
     const current = viewSource(await pending.read(adr.path))
     if (current.text.slice(current.bodyStart) !== edit.base) {
-      throw new Refusal(`${id} changed on disk after this edit began.`)
+      refuse({ code: 'changed-since-edit', values: { adr: id } })
     }
     await pending.write(adr.path, (view) =>
       editsForLines(view.text, view.bodyStart, edit.body, view.eol)
@@ -57,11 +58,9 @@ export function planEditBody(
         ...(edit.note && { note: edit.note })
       })
     )
-    warnings = correctionWarnings(edit.base, edit.body)
+    warnings.push(...correctionSaid(edit.base, edit.body))
   })
-  return planned.then((result) =>
-    result.ok && warnings.length > 0 ? { ...result, warnings } : result
-  )
+  return planned.then((result) => (result.ok ? { ...result, ...warnings.outcome() } : result))
 }
 
 /**

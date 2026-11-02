@@ -7,7 +7,8 @@ import { formatScalar } from '../metadata/write'
 import { fillTemplate, loadTemplate } from '../templates/templates'
 import type { Eol } from '../text/source'
 import type { Today } from './decide'
-import { Refusal, plan } from './pending'
+import { plan } from './pending'
+import { refuse, Warnings } from '../sentences'
 import { isQualified, normalReference } from '../relations/reference'
 import { named, requireTarget } from './rules'
 
@@ -26,39 +27,41 @@ export interface NewAdr extends Today {
  */
 export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promise<Plan> {
   let created: { id: string; path: string } | undefined
-  const warnings: string[] = []
+  const warnings = new Warnings()
   const planned = plan(fs, async (pending) => {
     const title = adr.title.trim().replace(/\s+/g, ' ')
     const slug = slugify(title)
-    if (slug === '') throw new Refusal('The title needs at least one letter or digit.')
+    if (slug === '') refuse({ code: 'title-needs-letter', values: {} })
 
     const relation = adr.relation
     if (relation) {
       const target = named(log, relation.target)
       if (!target) {
-        throw new Refusal(
-          `There is no ADR ${relation.target} in this ${isQualified(relation.target) ? 'repository' : 'Decision Log'}.`
-        )
+        refuse({
+          code: isQualified(relation.target) ? 'no-adr-in-repository' : 'no-adr',
+          values: { id: relation.target }
+        })
       }
       requireTarget(relation.type, target)
     }
 
     const template = await loadTemplate(fs, adr.template)
-    if ('problem' in template) throw new Refusal(template.problem)
+    if ('problem' in template) refuse(template.said)
 
     const prefix = nextPrefix(log, adr.today)
     const id = `${prefix}-${slug}`
     if (log.adrs.some((existing) => existing.id === id)) {
-      throw new Refusal(`${id} already exists in this Decision Log.`)
+      refuse({ code: 'id-taken', values: { id } })
     }
 
     // MADR 4 names a successor by its number; one that names this number has been waiting for it.
     if (log.naming === 'sequential') {
       for (const other of log.adrs) {
         if (!namesNumber(other, Number(prefix))) continue
-        warnings.push(
-          `${other.id} says it is superseded by the ADR with the number ${Number(prefix)}, which there was none of so far. The new ADR will be read as that successor.`
-        )
+        warnings.push({
+          code: 'successor-by-number',
+          values: { adr: other.id, number: Number(prefix) }
+        })
       }
     }
 
@@ -80,7 +83,7 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
     await pending.create(created.path, lines.join(eol))
   })
   return planned.then((result) =>
-    result.ok && created ? { ...result, created, ...(warnings.length > 0 && { warnings }) } : result
+    result.ok && created ? { ...result, created, ...warnings.outcome() } : result
   )
 }
 

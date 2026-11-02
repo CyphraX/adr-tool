@@ -1,3 +1,5 @@
+import { englishOf, type CoreSaid } from '../sentences'
+
 /**
  * Signs that an edit of an ADR that is no longer `proposed` may be more than a Correction.
  * A Correction never changes what a reader would understand to have been decided; the tool
@@ -5,17 +7,23 @@
  * the author. An empty result means nothing stood out.
  */
 export function correctionWarnings(before: string, after: string): string[] {
+  return correctionSaid(before, after).map(englishOf)
+}
+
+/** The same signs as codes, for a window in another language. */
+export function correctionSaid(before: string, after: string): CoreSaid[] {
   const [removed, added] = difference(words(before), words(after))
-  const warnings: string[] = []
+  const warnings: CoreSaid[] = []
 
   const numbers = [...removed, ...added].filter((word) => /\d/.test(word))
   if (numbers.length > 0) {
-    warnings.push(`A number changed: ${[...new Set(numbers)].join(', ')}.`)
+    warnings.push({ code: 'number-changed', values: { numbers: [...new Set(numbers)] } })
   }
   if (removed.length + added.length > MANY_WORDS) {
-    warnings.push(
-      `More than a few words changed: ${added.length} added, ${removed.length} removed.`
-    )
+    warnings.push({
+      code: 'many-words-changed',
+      values: { added: added.length, removed: removed.length }
+    })
   }
   return warnings
 }
