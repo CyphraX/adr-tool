@@ -184,18 +184,18 @@ function fingerprintOf(exception: WrittenException, rule: Rule): Fingerprint | u
         to !== undefined &&
         cycle === undefined &&
         component === undefined
-        ? { rule: rule.id, from, to }
+        ? { kind: 'dependency', rule: rule.id, from, to }
         : undefined
     case 'no-cycles':
       return cycle !== undefined && cycle.length > 1 && from === undefined && to === undefined
-        ? { rule: rule.id, cycle }
+        ? { kind: 'cycle', rule: rule.id, cycle }
         : undefined
     case 'threshold':
       return component !== undefined &&
         from === undefined &&
         to === undefined &&
         cycle === undefined
-        ? { rule: rule.id, component }
+        ? { kind: 'component', rule: rule.id, component }
         : undefined
   }
 }

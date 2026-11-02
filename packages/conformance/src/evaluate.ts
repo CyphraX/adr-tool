@@ -153,7 +153,7 @@ class Pairs {
       .sort((a, b) => compare(a.from, b.from) || compare(a.to, b.to))
       .map(({ from, to, said, dependencies }) => ({
         rule,
-        fingerprint: { rule: rule.id, from, to },
+        fingerprint: { kind: 'dependency', rule: rule.id, from, to },
         said,
         from,
         to,
@@ -293,7 +293,7 @@ function cycleViolation(
   const { members, roundTrip, typeOnly } = cycle
   return {
     rule,
-    fingerprint: { rule: rule.id, cycle: members },
+    fingerprint: { kind: 'cycle', rule: rule.id, cycle: members },
     said: { code: 'no-cycles', values: { members, roundTrip } },
     cycle: { members, roundTrip, typeOnly },
     dependencies
@@ -334,7 +334,7 @@ function thresholdViolations(rule: ThresholdRule, model: Model): Violation[] {
     const limit = bound === 'max' ? rule.max! : rule.min!
     violations.push({
       rule,
-      fingerprint: { rule: rule.id, component: id },
+      fingerprint: { kind: 'component', rule: rule.id, component: id },
       said: {
         code: 'threshold',
         values: { metric: rule.metric, component: id, value, bound, limit }

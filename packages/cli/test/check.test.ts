@@ -138,7 +138,7 @@ describe('adr check (docs/cli.md)', () => {
       rule: 'billing-not-web',
       message: 'billing must not depend on web.',
       why: 'Billing is the domain; the web is how it is shown, and may change without it.',
-      fingerprint: { rule: 'billing-not-web', from: 'billing', to: 'web' },
+      fingerprint: { kind: 'dependency', rule: 'billing-not-web', from: 'billing', to: 'web' },
       fingerprintText: 'billing-not-web: billing -> web',
       path: 'src/billing/invoice.ts',
       line: 3,

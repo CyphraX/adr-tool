@@ -227,7 +227,11 @@ The **fingerprint** names a Violation without line numbers, so that it stays the
 | `must-not-depend`, `may-only-depend`, `layers` | the Rule, the source Component, the target Component | `rule`, `from`, `to` |
 | `no-cycles` | the Rule, and the members of the Cycle: Component IDs for `among`, the paths of Source Files for `inside`, in any order | `rule`, `cycle` |
 | `threshold` | the Rule, and the Component | `rule`, `component` |
-| `threshold` on a metric per function or per class (part 13) | the Rule, the Source File, and the name of the function or class | `rule`, `file`, `name` |
+| `threshold` on a metric per function or per class (part 13) | the Rule, the Source File, and the qualified name of the function or class | `rule`, `file`, `name` |
+
+The **name** of a function or class in a fingerprint is qualified by what contains it, joined by `.`: `Cart.total` for the method `total` of the class `Cart`, `Cart.Line` for a nested class, `formatDate` for a function at the top of its file. So two methods of one name in one file are told apart, and a method keeps its fingerprint when another one is added beside it.
+
+In the JSON of `adr check` a fingerprint carries its `kind` as well — `dependency`, `cycle` or `component` — so that one is never read as another. An Exception does not write it: the kind of its Rule says which keys it names.
 
 Two Violations never share a fingerprint: a Rule has one Violation per pair, per Cycle, per Component. Where lines move, nothing in a fingerprint changes; where a Component is renamed, Rename rewrites the IDs in the fingerprints of the Exceptions together with the Rules (section 7). A fingerprint that names Source Files — the Cycles found `inside` a Component — changes when one of them is moved: its Exception then matches nothing any more, and says so.
 
