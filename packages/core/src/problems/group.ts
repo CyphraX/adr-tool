@@ -1,5 +1,6 @@
-import type { Adr } from '../adr/adr'
+import type { Adr, GuestAdr } from '../adr/adr'
 import { BACK_REFERENCE_KEYS, type RelationType } from '../relation'
+import { normalReference, referenceTo } from '../relations/reference'
 import type { BackReferenceKey, Problem } from './problem'
 
 /** A Problem to show, and the Problems that are only there because of it. */
@@ -20,13 +21,21 @@ export interface ProblemGroup {
  * what it says, but its Relations are void. Whatever the consistency rules then find between
  * it and other ADRs says nothing about the log — one broken file must not drown the view.
  * What they find that a valid Status would not change stays a Problem of its own.
+ *
+ * The root cause may be an ADR of another log of the repository. Its Problem is that log's;
+ * here it heads what follows from it, named by its reference, and only when something does.
  */
 export function groupProblems(log: {
+  readonly path?: string
   readonly adrs: readonly Adr[]
+  readonly guests?: readonly GuestAdr[]
   readonly problems: readonly Problem[]
 }): ProblemGroup[] {
+  const path = log.path ?? ''
   const groups = log.problems.map((problem) => ({ problem, consequences: [] as Problem[] }))
-  const byId = new Map(log.adrs.map((adr) => [adr.id, adr]))
+  const byId = new Map<string, Pick<Adr, 'metadata' | 'impliedSupersedes'>>(
+    log.adrs.map((adr) => [adr.id, adr])
+  )
   // The ADRs a root cause is reported on: those that cannot be read, and those whose Status
   // cannot. An ADR has at most one of the two.
   const roots = new Map(
@@ -35,6 +44,17 @@ export function groupProblems(log: {
       return root === undefined ? [] : [[root, group] as const]
     })
   )
+  const fromGuests: ProblemGroup[] = []
+  /** How a guest names an ADR of this log. */
+  const seenFrom = new Map<string, string>()
+  for (const guest of log.guests ?? []) {
+    if (!guest.root || !('adr' in guest.root)) continue
+    const group = { problem: { ...guest.root, adr: guest.reference }, consequences: [] }
+    roots.set(guest.reference, group)
+    byId.set(guest.reference, guest)
+    seenFrom.set(guest.reference, guest.log)
+    fromGuests.push(group)
+  }
   const unreadable = (adr: string): boolean => {
     const root = roots.get(adr)?.problem
     return root !== undefined && unreadableFrontmatter(root)
@@ -46,7 +66,9 @@ export function groupProblems(log: {
   const voids = (source: string, type: RelationType, target: string): boolean => {
     if (!roots.has(source)) return false
     const adr = byId.get(source)
-    return unreadable(source) || (adr !== undefined && carries(adr, type, target))
+    const from = seenFrom.get(source)
+    const named = from === undefined ? target : referenceTo(from, path, target)
+    return unreadable(source) || (adr !== undefined && carries(adr, type, named))
   }
 
   const causeOf = (problem: Problem): string | undefined => {
@@ -67,7 +89,9 @@ export function groupProblems(log: {
         // A successor that may supersede it: one that cannot be read and is named as the
         // successor, or one that does supersede it and whose Status voids that.
         const adr = byId.get(problem.adr)
-        const named = adr?.metadata.backReferences['superseded-by'] ?? []
+        const named = (adr?.metadata.backReferences['superseded-by'] ?? []).map((written) =>
+          normalReference(path, written)
+        )
         return (
           named.find((id) => unreadable(id)) ??
           [...roots.keys()].find((id) => voids(id, 'supersedes', problem.adr) && !unreadable(id))
@@ -84,7 +108,7 @@ export function groupProblems(log: {
     if (cause === undefined) shown.push(group)
     else roots.get(cause)!.consequences.push(group.problem)
   }
-  return shown
+  return [...shown, ...fromGuests.filter((group) => group.consequences.length > 0)]
 }
 
 /** Whether `adr` itself names `target` in its Relations of `type`, or another file says so. */

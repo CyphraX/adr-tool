@@ -29,9 +29,11 @@ export { correctionsIn, type Correction, type Metadata } from './metadata/read'
 export { METADATA_KEYS, type MetadataKey } from './metadata/keys'
 export { hasBeenAccepted, type Relation, type RelationState } from './relations/graph'
 export {
+  absoluteReference,
   isQualified,
   normalReference,
   parseReference,
+  qualified,
   referenceTo,
   type Reference
 } from './relations/reference'

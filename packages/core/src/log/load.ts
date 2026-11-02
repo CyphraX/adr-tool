@@ -3,6 +3,8 @@ import { joinPath, type FileSystem } from '@adr-tool/kernel'
 import { checkConsistency, checkTraces } from '../problems/check'
 import type { Problem } from '../problems/problem'
 import { relationsOf, type Relation } from '../relations/graph'
+import { rootOf } from '../problems/group'
+import { qualified } from '../relations/reference'
 import { discoverLogs, type Discovery, type LogLocation } from './discover'
 import { detectNamingScheme, numberOf, parseAdrFileName, type NamingScheme } from './naming'
 
@@ -56,7 +58,7 @@ export async function openRepository(
     else problems.push({ kind: 'missing-log-directory', path: location.path })
   }
   // Relations cross logs: each log is checked with the ADRs of all the others as its guests.
-  const guests = read.map((log) => log.adrs.map((adr) => guestOf(log.path, adr)))
+  const guests = read.map((log) => log.adrs.map((adr) => guestOf(log, adr)))
   const logs = read.map((log, position) =>
     checkLog(
       log,
@@ -85,10 +87,11 @@ interface ReadLog {
   readonly problems: readonly Problem[]
 }
 
-function guestOf(log: string, adr: Adr): GuestAdr {
+function guestOf(log: ReadLog, adr: Adr): GuestAdr {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { body, ...rest } = adr
-  return { ...rest, reference: `${log}/${adr.id}`, log }
+  const root = log.problems.find((problem) => rootOf(log, problem) === adr.id)
+  return { ...rest, reference: qualified(log.path, adr.id), log: log.path, ...(root && { root }) }
 }
 
 function checkLog(log: ReadLog, guests: readonly GuestAdr[], options: OpenOptions): DecisionLog {

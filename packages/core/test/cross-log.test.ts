@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyChangeSet,
+  groupProblems,
   memoryFileSystem,
   openRepository,
   planAccept,
@@ -262,5 +263,147 @@ describe('operations across Decision Logs', () => {
     expect(plan.ok && plan.warnings).toEqual([
       'docs/decisions/0001-new is still proposed. When it is accepted, the Back-reference is written again.'
     ])
+  })
+})
+
+describe('what the review of part 6 found', () => {
+  it('renumbers what the own log writes with its directory, and refuses an ADR that names itself so', async () => {
+    const { fs, log } = await open({
+      'docs/adr/0002-a.md': adr('status: accepted'),
+      'docs/adr/0002-b.md': adr('status: accepted'),
+      'docs/adr/0003-c.md': adr('status: accepted', 'depends-on: [docs/adr/0002-b]')
+    })
+    const plan = await planRenumber(fs, log('docs/adr'), '0002-b')
+    if (!plan.ok) throw new Error(plan.reason)
+    await applyChangeSet(fs, plan.changeSet)
+    expect(await fs.readText('docs/adr/0003-c.md')).toBe(
+      adr('status: accepted', 'depends-on: [docs/adr/0004-b]')
+    )
+
+    const itself = await open({
+      'docs/adr/0002-a.md': adr('status: accepted'),
+      'docs/adr/0002-b.md': adr('status: accepted', 'relates-to: [docs/adr/0002-b]')
+    })
+    expect(await planRenumber(itself.fs, itself.log('docs/adr'), '0002-b')).toEqual({
+      ok: false,
+      reason: '0002-b names itself in relates-to. Remove that before it is renumbered.'
+    })
+  })
+
+  it('renumbers past a file of another log that cannot be read and names only a longer ID', async () => {
+    const { fs, log } = await open({
+      'docs/adr/0002-a.md': adr('status: accepted'),
+      'docs/adr/0002-b.md': adr('status: accepted'),
+      'docs/decisions/0001-x.md': '---\nstatus: [\nrelates-to: [docs/adr/0002-bc]\n---\n\n# X\n'
+    })
+    expect((await planRenumber(fs, log('docs/adr'), '0002-b')).ok).toBe(true)
+  })
+
+  it('repairs a reference to itself however it is written', async () => {
+    const { fs, log } = await open({
+      'docs/adr/0001-a.md': adr('status: accepted', 'relates-to: [docs/adr/0001-a]')
+    })
+    const target = log('docs/adr')
+    const plan = await planRepair(fs, target, repairsOf(target, target.problems[0]!)[0]!)
+    if (!plan.ok) throw new Error(plan.reason)
+    await applyChangeSet(fs, plan.changeSet)
+    expect(kinds(await openRepository(fs))).toEqual([])
+  })
+
+  it('puts what follows from an ADR of another log that cannot be read under that ADR', async () => {
+    const { fs, log } = await open({
+      'docs/adr/0002-old.md': adr('status: superseded', 'superseded-by: [docs/decisions/0001-new]'),
+      'docs/decisions/0001-new.md': adr('status: Acceptd', 'supersedes: [docs/adr/0002-old]')
+    })
+    const groups = groupProblems(log('docs/adr'))
+    expect(groups).toEqual([
+      {
+        problem: expect.objectContaining({
+          kind: 'invalid-metadata',
+          adr: 'docs/decisions/0001-new',
+          key: 'status'
+        }),
+        consequences: [
+          expect.objectContaining({ kind: 'unfounded-back-reference', adr: '0002-old' }),
+          expect.objectContaining({ kind: 'superseded-without-successor', adr: '0002-old' })
+        ]
+      }
+    ])
+    const target = log('docs/adr')
+    const unfounded = target.problems.find(
+      (problem) => problem.kind === 'unfounded-back-reference'
+    )!
+    const plan = await planRepair(fs, target, repairsOf(target, unfounded)[0]!)
+    expect(plan.ok).toBe(false)
+  })
+
+  it('puts what follows from an unreadable ADR of the own log under it, however it is named', async () => {
+    const { log } = await open({
+      'docs/adr/0002-old.md': adr('status: superseded', 'superseded-by: [docs/adr/0003-new]'),
+      'docs/adr/0003-new.md': '---\nstatus: [\n---\n\n# New\n'
+    })
+    const groups = groupProblems(log('docs/adr'))
+    expect(groups.map((group) => [group.problem.kind, group.consequences.length])).toEqual([
+      ['invalid-frontmatter', 2]
+    ])
+  })
+
+  it('finds a cycle of supersedes through three logs, in each of them', async () => {
+    const fs = memoryFileSystem({
+      '.adr/config.yml': 'logs:\n  - path: a\n  - path: b\n  - path: c\n',
+      'a/0001-a.md': adr('status: proposed', 'supersedes: [b/0001-b]'),
+      'b/0001-b.md': adr('status: proposed', 'supersedes: [c/0001-c]'),
+      'c/0001-c.md': adr('status: proposed', 'supersedes: [a/0001-a]')
+    })
+    const repository = await openRepository(fs)
+    expect(
+      repository.logs.map((one) =>
+        one.problems.flatMap((problem) =>
+          problem.kind === 'supersedes-cycle' ? [problem.adrs] : []
+        )
+      )
+    ).toEqual([
+      [['0001-a', 'b/0001-b', 'c/0001-c']],
+      [['0001-b', 'a/0001-a', 'c/0001-c']],
+      [['0001-c', 'a/0001-a', 'b/0001-b']]
+    ])
+  })
+
+  it('writes the bare ID for an ADR of the own log, once', async () => {
+    const { fs, log } = await open({
+      'docs/adr/0001-a.md': adr('status: proposed'),
+      'docs/adr/0002-b.md': adr('status: accepted')
+    })
+    const edited = await planEditMetadata(fs, log('docs/adr'), '0001-a', {
+      relations: { 'relates-to': ['0002-b', 'docs/adr/0002-b'], amends: ['docs/adr/0002-b'] }
+    })
+    expect(edited.ok && edited.changeSet.files[0]!.after).toBe(
+      adr('status: proposed', 'amends: [0002-b]', 'relates-to: [0002-b]')
+    )
+    const created = await planCreate(fs, log('docs/adr'), {
+      title: 'New',
+      template: 'minimal',
+      today: '2026-11-02',
+      relation: { type: 'amends', target: 'docs/adr/0002-b' }
+    })
+    expect(created.ok && created.changeSet.files[0]!.after).toContain('amends: [0002-b]')
+  })
+
+  it('names an ADR of a log at the root of the repository as ./<ID>', async () => {
+    const fs = memoryFileSystem({
+      '.adr/config.yml': 'logs:\n  - path: .\n  - path: docs/decisions\n',
+      '0001-root.md': adr('status: accepted'),
+      'docs/decisions/0001-new.md': adr('status: proposed', 'supersedes: [./0001-root]')
+    })
+    const repository = await openRepository(fs)
+    const decisions = repository.logs.find((one) => one.path === 'docs/decisions')!
+    expect(decisions.guests.map((guest) => guest.reference)).toEqual(['./0001-root'])
+    const plan = await planAccept(fs, decisions, '0001-new', { today: '2026-11-02' })
+    if (!plan.ok) throw new Error(plan.reason)
+    await applyChangeSet(fs, plan.changeSet)
+    expect(await fs.readText('0001-root.md')).toBe(
+      adr('status: superseded', 'superseded-by: [docs/decisions/0001-new]')
+    )
+    expect(kinds(await openRepository(fs))).toEqual([])
   })
 })

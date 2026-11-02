@@ -6,6 +6,7 @@
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import {
+    logName,
     STATUS_LABEL,
     describeCause,
     describeCorrection,
@@ -165,7 +166,7 @@
                   : app.jumpTo(other.log, other.adr.id)}
             >
               <StatusMark status={statusKey(other.adr)} />
-              {#if other.log !== undefined}<span class="log">{other.log}</span>{/if}
+              {#if other.log !== undefined}<span class="log">{logName(other.log)}</span>{/if}
               <span class="prefix">{prefixOf(other.adr)}</span>
               {other.adr.title ?? other.adr.id}
             </button>
@@ -222,8 +223,14 @@
           <li class:follows={cause !== undefined}>
             {describeProblem(problem)}
             {#if cause !== undefined}
-              <button class="cause" onclick={() => app.select(cause.adr)}
-                >{describeCause(cause.problem)}</button
+              <button
+                class="cause"
+                onclick={() => {
+                  // The cause may be an ADR of another log of the repository.
+                  const named = namedIn(log, cause.adr)
+                  if (named?.log !== undefined) app.jumpTo(named.log, named.adr.id)
+                  else app.select(cause.adr)
+                }}>{describeCause(cause.problem)}</button
               >
             {/if}
             {#if cause === undefined && !editing}

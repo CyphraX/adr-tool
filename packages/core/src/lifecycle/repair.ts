@@ -9,7 +9,7 @@ import type { BackReferenceKey, Problem } from '../problems/problem'
 import { BACK_REFERENCE_KEYS } from '../relation'
 import { plan } from './pending'
 import { planRenumber } from './renumber'
-import { referenceTo } from '../relations/reference'
+import { isQualified, normalReference, referenceTo } from '../relations/reference'
 import { logOf, nameOf, named, requireOwnFormat, writable } from './rules'
 
 /**
@@ -50,6 +50,8 @@ export function repairsOf(log: DecisionLog, problem: Problem): Repair[] {
   // Renumber renames a file; every other Repair writes into one, and a file in a foreign
   // format is only written by Migration.
   const foreign = new Set(log.adrs.filter((adr) => adr.foreign).map((adr) => adr.id))
+  // A Problem of another log's ADR is repaired there.
+  if ('adr' in problem && isQualified(problem.adr)) return []
   return candidatesOf(log, problem).filter(
     (repair) => repair.kind === 'renumber' || !foreign.has(repair.adr)
   )
@@ -136,6 +138,21 @@ export async function planRepair(fs: FileSystem, log: DecisionLog, asked: Repair
 
   const planned = await plan(fs, async (pending) => {
     const adr = writable(log, repair.adr)
+    if (repair.kind === 'remove-item' && repair.key !== 'affects') {
+      // However the item is written: `0002-b`, or `docs/adr/0002-b` in the log `docs/adr`.
+      const lists: Record<string, readonly string[]> = {
+        ...adr.metadata.relations,
+        ...adr.metadata.backReferences
+      }
+      const item = normalReference(log.path, repair.item)
+      const written = (lists[repair.key] ?? []).filter(
+        (one) => normalReference(log.path, one) === item
+      )
+      for (const one of written.length > 0 ? written : [repair.item]) {
+        await pending.write(adr.path, (view) => removeFromList(view, repair.key, one))
+      }
+      return
+    }
     await pending.write(adr.path, (view) => {
       switch (repair.kind) {
         case 'lowercase-status':

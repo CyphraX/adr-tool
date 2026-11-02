@@ -5,6 +5,7 @@
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import {
+    logName,
     NO_REPAIR,
     describeConsequences,
     describeProblem,
@@ -33,7 +34,7 @@
     onclick={() => (log === undefined ? app.select(adr.id) : app.jumpTo(log, adr.id))}
   >
     <StatusMark status={statusKey(adr)} />
-    {#if log !== undefined}<span class="log">{log}</span>{/if}
+    {#if log !== undefined}<span class="log">{logName(log)}</span>{/if}
     <span class="prefix">{prefixOf(adr)}</span>
     <span class="title">{adr.title ?? adr.id}</span>
   </button>
@@ -62,7 +63,7 @@
               {@render subject(named)}
               {#if log && repairs.length > 1}
                 <!-- Several repairs: any one of them repairs the Problem, and the person says which. -->
-                {#each repairs.filter((repair) => repair.adr === adr.id) as repair, nth (nth)}
+                {#each repairs.filter((repair) => named.log === undefined && repair.adr === adr.id) as repair, nth (nth)}
                   <button
                     class="repair"
                     disabled={app.editing?.adrId === adr.id}

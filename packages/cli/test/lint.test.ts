@@ -111,6 +111,27 @@ describe('adr lint (docs/cli.md)', () => {
     ])
   })
 
+  it('puts what follows in one log from a root cause in another under it, counted once', async () => {
+    const root = repo({
+      '.adr/config.yml': 'logs:\n  - path: docs/adr\n  - path: docs/decisions\n',
+      'docs/adr/0001-old.md': adrText(
+        'status: superseded',
+        'superseded-by: [docs/decisions/0001-new]'
+      ),
+      'docs/decisions/0001-new.md': adrText('status: approved', 'supersedes: [docs/adr/0001-old]')
+    })
+    const { code, out } = await adr('lint', root)
+    expect(code).toBe(1)
+    expect(out.trimEnd().split('\n')).toEqual([
+      'docs/decisions/0001-new.md:2: invalid-metadata: status: "approved" is not one of proposed, accepted, rejected, deprecated, superseded',
+      '  Reported only because the Status of 0001-new is none of the five values, which voids its Relations.',
+      '  docs/adr/0001-old.md:3: unfounded-back-reference: superseded-by lists docs/decisions/0001-new, which has no such Relation in effect.',
+      '  docs/adr/0001-old.md:2: superseded-without-successor: The Status is superseded, but no accepted ADR supersedes this one.',
+      '',
+      '1 Problem in 2 Decision Logs, and 2 that follow from it.'
+    ])
+  })
+
   it('checks Traces against the Components the repository declares', async () => {
     const root = repo({
       '.arch/components.yml': 'components:\n  billing:\n    paths: [src/billing/**]\n',

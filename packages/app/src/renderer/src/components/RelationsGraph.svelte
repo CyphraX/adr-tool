@@ -5,7 +5,7 @@
   import { everyNamed } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
+  import { logName, RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
 
   // The Relations of the Decision Log in view as a drawing: left to right is "builds on",
@@ -109,7 +109,7 @@
             >
               <StatusMark {status} />
               {#if one.log !== undefined}
-                <span class="log">{one.log.split('/').at(-1)}/</span>
+                <span class="log">{one.log === '' ? logName('') : one.log.split('/').at(-1)}/</span>
               {/if}
               <span class="prefix">{prefixOf(adr)}</span>
               <span class="title">{adr.title ?? adr.id}</span>

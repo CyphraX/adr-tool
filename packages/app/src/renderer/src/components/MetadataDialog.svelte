@@ -4,7 +4,7 @@
   import { everyNamed, namedIn, type Named } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
-  import { RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
+  import { logName, RELATION_TYPE_LABEL, prefixOf } from '../lib/wording'
   import ChipInput from './ChipInput.svelte'
   import Picker from './Picker.svelte'
   import StatusMark from './StatusMark.svelte'
@@ -117,7 +117,7 @@
                   {#if named}
                     {@const other = named.adr}
                     <StatusMark status={statusKey(other)} />
-                    {#if named.log !== undefined}<span class="log">{named.log}</span>{/if}
+                    {#if named.log !== undefined}<span class="log">{logName(named.log)}</span>{/if}
                     <span class="prefix">{prefixOf(other)}</span>
                     <span class="title">{other.title ?? other.id}</span>
                   {:else}
@@ -142,7 +142,7 @@
           >
             {#snippet option({ adr: other, log })}
               <StatusMark status={statusKey(other)} />
-              {#if log !== undefined}<span class="log">{log}</span>{/if}
+              {#if log !== undefined}<span class="log">{logName(log)}</span>{/if}
               <span class="prefix">{prefixOf(other)}</span>
               <span class="title">{other.title ?? other.id}</span>
             {/snippet}

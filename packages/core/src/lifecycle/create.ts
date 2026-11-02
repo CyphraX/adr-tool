@@ -8,7 +8,7 @@ import { fillTemplate, loadTemplate } from '../templates/templates'
 import type { Eol } from '../text/source'
 import type { Today } from './decide'
 import { Refusal, plan } from './pending'
-import { isQualified } from '../relations/reference'
+import { isQualified, normalReference } from '../relations/reference'
 import { named, requireTarget } from './rules'
 
 export interface NewAdr extends Today {
@@ -67,7 +67,9 @@ export function planCreate(fs: FileSystem, log: DecisionLog, adr: NewAdr): Promi
       '---',
       'status: proposed',
       `created: ${adr.today}`,
-      ...(relation ? [`${relation.type}: [${formatScalar(relation.target)}]`] : []),
+      ...(relation
+        ? [`${relation.type}: [${formatScalar(normalReference(log.path, relation.target))}]`]
+        : []),
       '---',
       ''
     ]

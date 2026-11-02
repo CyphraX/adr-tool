@@ -65,6 +65,12 @@ export interface GuestAdr extends Omit<Adr, 'body'> {
   readonly reference: string
   /** The directory of its own Decision Log. */
   readonly log: string
+  /**
+   * The Problem its own log reports when its frontmatter or its Status cannot be read: what
+   * it says about other ADRs is unknown or void then, and what follows from that is no
+   * Problem of its own in the other logs either.
+   */
+  readonly root?: Problem
 }
 
 const NO_MIGRATION = {

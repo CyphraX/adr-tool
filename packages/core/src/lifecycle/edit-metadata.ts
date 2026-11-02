@@ -55,7 +55,20 @@ export function planEditMetadata(
     }
     for (const type of RELATION_TYPES) {
       const wanted = edit.relations?.[type]
-      if (wanted) change(type, adr.metadata.relations[type], [...new Set(wanted)])
+      if (!wanted) continue
+      // An ADR is named once. What is written stays as it is written; what is new is written as
+      // the tool writes it: `0002-b` for `docs/adr/0002-b` in the log `docs/adr`.
+      const normal = (item: string): string => normalReference(log.path, item)
+      const written = new Map<string, string>()
+      for (const item of adr.metadata.relations[type]) {
+        if (!written.has(normal(item))) written.set(normal(item), item)
+      }
+      const items = new Map<string, string>()
+      for (const item of wanted) {
+        if (!items.has(normal(item)))
+          items.set(normal(item), written.get(normal(item)) ?? normal(item))
+      }
+      change(type, adr.metadata.relations[type], [...items.values()])
     }
     if (edit.affects) change('affects', adr.metadata.affects, [...new Set(edit.affects)])
 
