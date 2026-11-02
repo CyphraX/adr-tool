@@ -186,6 +186,27 @@ describe('the drawn Mermaid blocks an export is asked with', () => {
       { source: 'link', svg: '<svg><a href="javascript:alert(1)"/></svg>' },
       { source: 'page', svg: '<p>not a drawing</p>' },
       { source: 'trailing', svg: `${svg}<script>alert(1)</script>` },
+      // Past a list of words to look for, as the review of part 2 found.
+      {
+        source: 'prefixed script',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" xmlns:s="http://www.w3.org/2000/svg"><s:script>alert(1)</s:script></svg>'
+      },
+      {
+        source: 'prefixed html',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><h:img xmlns:h="http://www.w3.org/1999/xhtml" src="x" h:onerror="alert(1)"/></svg>'
+      },
+      {
+        source: 'entity',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><a href="jav&#x61;script:alert(1)"><text>x</text></a></svg>'
+      },
+      {
+        source: 'escape',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><g style="filter:u\\72l(https://attacker.example/t.svg#f)"/></svg>'
+      },
+      {
+        source: 'escaped sheet',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.a{filter:u\\72l(https://attacker.example/t.svg#f)}</style></svg>'
+      },
       { source: 42, svg },
       { source: 'none' },
       'graph TD'
@@ -193,5 +214,11 @@ describe('the drawn Mermaid blocks an export is asked with', () => {
     expect(diagramsRequest(asked)).toEqual(new Map())
     expect(diagramsRequest(undefined)).toEqual(new Map())
     expect(diagramsRequest({ source: 'a', svg })).toEqual(new Map())
+  })
+
+  it('keep a drawing whose labels say anything, since only its markup is looked at', () => {
+    const label =
+      '<svg xmlns="http://www.w3.org/2000/svg"><text>Never javascript:alert(1) or <tspan>onclick="x"</tspan> &lt;script&gt;</text></svg>'
+    expect(diagramsRequest([{ source: 'label', svg: label }])).toEqual(new Map([['label', label]]))
   })
 })

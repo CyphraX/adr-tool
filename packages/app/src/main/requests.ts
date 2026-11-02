@@ -1,5 +1,6 @@
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
+import { drawingRefused } from '../shared/drawing'
 import type {
   CreateRequest,
   DrawnDiagram,
@@ -99,13 +100,6 @@ export function structureRepairRequest(problem: unknown): StructureProblem | und
 const DIAGRAM_LIMIT = 4 * 1024 * 1024
 /** More drawings than this are no export of Decision Logs. */
 const DIAGRAMS_AT_MOST = 2000
-/**
- * What a sanitized drawing never holds (docs/adr/0016-…): a script, an element of HTML, a handler
- * of an event, a `javascript:` address. Sanitized in the window already; looked at again here,
- * before anything of it is written to disk.
- */
-const NEVER_IN_A_DRAWING =
-  /<\s*(?:script|foreignObject|iframe|object|embed)\b|\son[a-z]+\s*=|javascript:/i
 
 /**
  * The Mermaid blocks the window drew for an export, by their source. A drawing that is not an
@@ -118,8 +112,9 @@ export function diagramsRequest(diagrams: unknown): Map<string, string> {
     const { source, svg } = record(given) as Partial<Record<keyof DrawnDiagram, unknown>>
     if (typeof source !== 'string' || typeof svg !== 'string') continue
     const text = svg.trim()
-    const whole = text.startsWith('<svg') && text.endsWith('</svg>')
-    if (!whole || text.length > DIAGRAM_LIMIT || NEVER_IN_A_DRAWING.test(text)) continue
+    // Sanitized in the window already; its markup is looked at again here, against what a
+    // drawing may hold, before anything of it is written to disk (docs/adr/0016-…).
+    if (text.length > DIAGRAM_LIMIT || drawingRefused(text) !== undefined) continue
     drawn.set(source, text)
   }
   return drawn
