@@ -41,6 +41,10 @@ Above the drawing, **Matrix** shows the same level as a dependency structure mat
 
 ![The metrics of this repository's packages, and the page of structure](docs/screenshots/s5-metrics.png)
 
+A line number in the details opens the Source File in a read-only viewer, with the lines of the Dependency marked: from a line in the graph, two clicks lead to the import that causes it.
+
+![The import of core in app's main process, opened from the line between app and core](docs/screenshots/s6-code.png)
+
 `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm build` are what CI runs, on Linux for now; Windows and macOS are switched off until distribution (see [roadmap.md](docs/roadmap.md)).
 
 ## Layout

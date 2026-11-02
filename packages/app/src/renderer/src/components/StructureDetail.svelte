@@ -8,7 +8,8 @@
   } from '../../../shared/ipc'
   import { app } from '../lib/state.svelte'
   import { METRICS, t } from '../lib/strings'
-  import { nodeLabel } from '../lib/structure'
+  import { commonDirectory, nodeLabel } from '../lib/structure'
+  import { codeSpans } from '../lib/wording'
 
   // What the selection in the Structure view stands for: a Component with its page — the
   // declaration, the metrics, the Dependencies at its level, its Cycles — another node with
@@ -17,6 +18,9 @@
   let { view }: { view: StructureView } = $props()
 
   const selection = $derived(app.active?.structure.selection)
+  // What the code viewer shows, so that its link reads as the one that is open.
+  const openPath = $derived(app.active?.structure.code?.path)
+  const openLine = $derived(app.active?.structure.code?.line)
   // The matrix may show other rows than the drawing: what is in front is asked first.
   const inMatrix = $derived(app.active?.structure.show === 'matrix')
   const nodes = $derived<readonly StructureNode[]>(
@@ -49,6 +53,34 @@
     )
 </script>
 
+{#snippet withCode(text: string)}
+  {#each codeSpans(text) as part, position (position)}{#if part.code}<code>{part.text}</code
+      >{:else}{part.text}{/if}{/each}
+{/snippet}
+
+{#snippet fileLink(path: string, marks: readonly number[] = [])}
+  <button
+    class="path file"
+    class:open={openPath === path}
+    title={t.structure.viewer.open(path)}
+    onclick={() => app.openSourceFile(path, marks)}>{path}</button
+  >
+{/snippet}
+
+{#snippet lineLinks(path: string, lines: readonly number[])}
+  <span class="faint lines"
+    >{t.structure.detail.lineWord(lines.length)}
+    {#each lines as line, position (line)}{#if position > 0},
+      {/if}<button
+        class="line"
+        class:open={openPath === path && openLine === line}
+        aria-label={t.structure.viewer.openAt(path, line)}
+        title={t.structure.viewer.openAt(path, line)}
+        onclick={() => app.openSourceFile(path, lines, line)}>{line}</button
+      >{/each}</span
+  >
+{/snippet}
+
 {#snippet edgeButton(edge: StructureEdge, end: 'from' | 'to')}
   <li>
     <button class="link" onclick={() => selectEdge(edge)}>{labelOf(edge[end])}</button>
@@ -70,7 +102,7 @@
 {#snippet nodeDetail(node: StructureNode)}
   <h2>{nodeLabel(node)}</h2>
   {#if node.kind === 'source-file'}
-    <p class="path">{node.id}</p>
+    <p>{@render fileLink(node.id)}</p>
     <p class="faint">{t.structure.page.size(node.files, node.lines)}</p>
   {:else}
     <p class="faint">{t.structure.page.size(node.files, node.lines)}</p>
@@ -143,6 +175,29 @@
         >{/each}
     </dd>
   </dl>
+
+  {#if page.files.length > 0}
+    {@const directory = commonDirectory(page.files)}
+    <h3>{t.structure.page.files}</h3>
+    {#if page.metrics && page.files.length < page.metrics.files}
+      <p class="faint">{t.structure.detail.firstOf(page.files.length, page.metrics.files)}</p>
+    {/if}
+    {#if directory}
+      <p class="faint">{@render withCode(t.structure.page.filesIn(directory))}</p>
+    {/if}
+    <ul class="files">
+      {#each page.files as path (path)}
+        <li>
+          <button
+            class="path file"
+            class:open={openPath === path}
+            title={t.structure.viewer.open(path)}
+            onclick={() => app.openSourceFile(path)}>{path.slice(directory.length)}</button
+          >
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   {#if page.metrics}
     {@const metrics = page.metrics}
@@ -232,11 +287,13 @@
       <ul class="dependencies">
         {#each edge.dependencies as dependency (`${dependency.from}\n${dependency.to}`)}
           <li>
-            <span class="path">{dependency.from}</span>
-            <span class="faint">{t.structure.detail.lines(dependency.lines)}</span>
+            {@render fileLink(dependency.from, dependency.lines)}
+            {@render lineLinks(dependency.from, dependency.lines)}
             {#if dependency.typeOnly}<span class="tag">{t.structure.detail.typeOnly}</span>{/if}
-            <span class="path to"
-              ><span class="arrow" aria-hidden="true">→</span>{dependency.to}</span
+            <span class="to"
+              ><span class="arrow" aria-hidden="true">→</span>{@render fileLink(
+                dependency.to
+              )}</span
             >
           </li>
         {/each}
@@ -276,8 +333,8 @@
       <ul class="dependencies">
         {#each view.notResolved as use, position (position)}
           <li>
-            <span class="path">{use.file}</span>
-            <span class="faint">{t.structure.detail.lines([use.line])}</span>
+            {@render fileLink(use.file, [use.line])}
+            {@render lineLinks(use.file, [use.line])}
             <code>{use.specifier}</code>
           </li>
         {/each}
@@ -292,11 +349,12 @@
       <ul class="dependencies">
         {#each view.notAnalysed as file (file.file)}
           <li>
-            <span class="path">{file.file}</span>
             {#if file.line === undefined}
+              <span class="path">{file.file}</span>
               <span class="faint">{t.structure.detail.unreadable}</span>
             {:else}
-              <span class="faint">{t.structure.detail.lines([file.line])}</span>
+              {@render fileLink(file.file, [file.line])}
+              {@render lineLinks(file.file, [file.line])}
               <span>{file.message}</span>
             {/if}
           </li>
@@ -392,9 +450,39 @@
     overflow-wrap: anywhere;
   }
 
-  .path.to {
+  .to {
     flex-basis: 100%;
     color: var(--ink-soft);
+  }
+
+  .file {
+    color: var(--ink);
+    text-align: left;
+  }
+
+  .to .file {
+    color: var(--ink-soft);
+  }
+
+  .file:hover,
+  .line:hover {
+    color: var(--focus);
+    text-decoration: underline;
+  }
+
+  .file.open,
+  .line.open {
+    color: var(--focus);
+    font-weight: 600;
+  }
+
+  .line {
+    color: var(--focus);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .files {
+    gap: 1px;
   }
 
   .arrow {

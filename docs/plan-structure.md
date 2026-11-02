@@ -145,6 +145,14 @@ A read-only viewer on CodeMirror 6, which the app already carries: syntax highli
 
 *Done when:* from an edge in the graph, two clicks lead to the import line.
 
+*Status (2026-11-02):* built. In the running app, on this repository: a click on the line from `app` to `core` lists the 23 Source File Dependencies behind it, a click on a line number opens the file in the viewer with that line marked and in view — `import { correctionsIn, type FileChange } from '@adr-tool/core'` in `packages/app/src/main/history.ts` (`docs/screenshots/s6-code.png`). The same two clicks were checked on a Svelte component of this repository and on the Maven fixture, where `Page.java` uses `Cart` from line 16 without importing it by name.
+
+- **The viewer takes the middle of the Structure view**, where the level was; the details stay beside it, so one line after another can be opened from the list. "Back" returns to the graph, matrix or metrics it came from, and choosing one of them does the same. Selection and level are untouched by it.
+- **What opens it:** each line number of a Source File Dependency — all lines of the Dependency are marked, the one clicked is brought into view —, both of its paths, a Source File node, the file list of a Component, and the lines of uses that are not resolved and of files that cannot be parsed. The Component page now lists the Source Files it contains (the first 500, as counted by the filter), below the directory they share.
+- **Reading goes through the main process** (`readSourceFile`): the renderer names a Source File by the path the analysis gave it, and the main process reads it only if its analysis lists that path as a Source File, inside the repository, and not larger than 4 MB. The text is what the disk has now; when the repository is analysed again, the open file is read again too.
+- **Highlighting** is CodeMirror's, for every language of section 2: TypeScript and JavaScript with their JSX dialects by extension, Java, and a Svelte component as HTML whose `<script lang="ts">` reads as TypeScript. The colours are tokens of the app, for light and dark. The viewer is read-only and selectable.
+- **Left open:** search in the file (CodeMirror's search is a package away); going from a use in the viewer to the file it uses.
+
 ### Part 7 — The first Trace: an ADR affects Components
 
 - `core`: the Metadata key `affects`, a list of Component IDs, read and written like the other list-valued keys; edited in the Metadata dialog through a picker of Components.

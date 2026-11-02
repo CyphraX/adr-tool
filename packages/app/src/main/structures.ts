@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { readFile, stat } from 'node:fs/promises'
+import { join, resolve, sep } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
 import {
   levelOf,
@@ -12,16 +14,23 @@ import {
   type Structure
 } from '@adr-tool/structure/model'
 import type {
+  SourceFileResult,
   StructureComponent,
   StructureNeighbour,
   StructureNode,
   StructureView
 } from '../shared/ipc'
 import type { Analysis } from './analysis'
+import { t } from './strings'
 
 /** Editors, formatters and git touch many files at once; one analysis covers them all. */
 const REANALYSE_DELAY_MS = 300
-/** How many uses that are not resolved go to the window; the count is always the whole. */
+/** What the code viewer shows at most: a Source File larger than this is generated, not read. */
+export const SOURCE_FILE_LIMIT = 4 * 1024 * 1024
+/**
+ * How many uses that are not resolved, and how many files of a Component, go to the window;
+ * the count is always the whole.
+ */
 const LISTED_AT_MOST = 500
 /**
  * Not watched: what git never lists, and the build output and caches that tools rewrite all
@@ -67,6 +76,13 @@ export class Structures {
     const entry = this.entryOf(repositoryId, root)
     const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
     return viewOf(repositoryId, analysis, parent, tests, expanded)
+  }
+
+  /** A Source File's text for the code viewer, if the analysis lists it as one. */
+  async sourceFile(repositoryId: string, root: string, path: string): Promise<SourceFileResult> {
+    const entry = this.entryOf(repositoryId, root)
+    const analysis = entry.analysis ?? (await this.run(repositoryId, entry))
+    return readSourceFile(entry.root, path, analysis)
   }
 
   /** The Structure the last analysis found, to plan against. */
@@ -204,16 +220,22 @@ export function viewOf(
   ])
   const testsInside = new Map<string, number>()
   const javaInside = new Set<string>()
+  const filesInside = new Map<string, string[]>()
   for (const file of structure.sourceFiles) {
-    const java = file.language === 'java' && (tests || !file.test)
+    const counted = tests || !file.test
     for (let id = file.component; id !== undefined; id = parentOf.get(id)) {
       if (file.test) testsInside.set(id, (testsInside.get(id) ?? 0) + 1)
-      if (java) javaInside.add(id)
+      if (counted && file.language === 'java') javaInside.add(id)
+      if (!counted || !shown.has(id)) continue
+      const list = filesInside.get(id) ?? []
+      if (list.length < LISTED_AT_MOST) list.push(file.path)
+      filesInside.set(id, list)
     }
   }
   const components = [...shown].map((id) =>
     pageOf(byId.get(id)!, parentOf.get(id), levelAt(parentOf.get(id))!, {
       metrics: metrics.get(id),
+      files: filesInside.get(id) ?? [],
       testFiles: testsInside.get(id) ?? 0,
       java: javaInside.has(id),
       nameOf
@@ -263,6 +285,7 @@ function pageOf(
   level: Level,
   found: {
     readonly metrics: Metrics | undefined
+    readonly files: readonly string[]
     readonly testFiles: number
     readonly java: boolean
     readonly nameOf: (node: Pick<LevelNode, 'kind' | 'id'>) => string
@@ -284,6 +307,7 @@ function pageOf(
     paths: component.paths,
     tests: component.tests,
     level: parent,
+    files: found.files,
     testFiles: found.testFiles,
     java: found.java,
     ...(found.metrics ? { metrics: found.metrics } : {}),
@@ -296,6 +320,33 @@ function pageOf(
     cycles: level.cycles
       .filter((cycle) => cycle.members.includes(component.id))
       .map((cycle) => ({ roundTrip: cycle.roundTrip.map(ref), typeOnly: cycle.typeOnly }))
+  }
+}
+
+/**
+ * The text of a Source File, read only when the analysis lists `path` as one: the window names
+ * a file by the path the analysis gave it, and cannot make the main process read anything
+ * else. Read as the disk has it now, which may be newer than the analysis.
+ */
+export async function readSourceFile(
+  root: string,
+  path: string,
+  analysis: Analysis,
+  limit = SOURCE_FILE_LIMIT
+): Promise<SourceFileResult> {
+  const file = analysis.structure.sourceFiles.find((candidate) => candidate.path === path)
+  const full = resolve(root, path)
+  // The analysis never lists a path outside the root; this holds should that ever change.
+  const inside = full.startsWith(resolve(root) + sep)
+  if (file === undefined || !inside) return { ok: false, reason: t.notASourceFile(path) }
+  try {
+    if ((await stat(full)).size > limit) {
+      return { ok: false, reason: t.sourceFileTooLarge(path, Math.round(limit / 1024 / 1024)) }
+    }
+    const text = await readFile(join(root, path), 'utf8')
+    return { ok: true, file: { path, language: file.language, text } }
+  } catch {
+    return { ok: false, reason: t.sourceFileUnreadable(path) }
   }
 }
 

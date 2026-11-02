@@ -208,6 +208,19 @@ function registerIpc(): void {
     }
   )
 
+  ipcMain.handle(CHANNEL.readSourceFile, async (_, repositoryId: unknown, path: unknown) => {
+    if (typeof repositoryId !== 'string' || typeof path !== 'string') {
+      return { ok: false, reason: t.notUnderstood }
+    }
+    const root = repositories.rootOf(repositoryId)
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    try {
+      return await structures.sourceFile(repositoryId, root, path)
+    } catch (error) {
+      return { ok: false, reason: t.analysisFailed(String(error)) }
+    }
+  })
+
   ipcMain.handle(CHANNEL.planAdopt, async (_, repositoryId: unknown) => {
     const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }

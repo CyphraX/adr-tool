@@ -17,6 +17,12 @@ export const t = {
   changeGone: 'This change is no longer available.',
   analysisFailed: (reason: string): string =>
     `The code of this repository could not be analysed: ${reason}`,
+  notASourceFile: (path: string): string =>
+    `${path} is not a Source File of this repository, so it is not shown.`,
+  sourceFileTooLarge: (path: string, megabytes: number): string =>
+    `${path} is too large to show here: more than ${megabytes} MB.`,
+  sourceFileUnreadable: (path: string): string =>
+    `${path} cannot be read. It may have been moved or deleted since the code was analysed.`,
   changedSincePreview: (files: string): string =>
     `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`
 }

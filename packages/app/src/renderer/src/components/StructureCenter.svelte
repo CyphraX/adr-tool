@@ -2,16 +2,19 @@
   import type { StructureView } from '../../../shared/ipc'
   import { app, type StructureShow } from '../lib/state.svelte'
   import { t } from '../lib/strings'
+  import CodeViewer from './CodeViewer.svelte'
   import StructureGraph from './StructureGraph.svelte'
   import StructureMatrix from './StructureMatrix.svelte'
   import StructureMetrics from './StructureMetrics.svelte'
 
   // The middle of the Structure view: where you are in the hierarchy, and the level as a
   // drawing, as a matrix or as a table of its metrics — three views of one model, which
-  // share the filter and the selection.
+  // share the filter and the selection. A Source File opened from the details takes their
+  // place until one of them is chosen again.
   let { view }: { view: StructureView } = $props()
 
   const show = $derived(app.active?.structure.show ?? 'graph')
+  const code = $derived(app.active?.structure.code)
   const views: StructureShow[] = ['graph', 'matrix', 'metrics']
 </script>
 
@@ -38,8 +41,8 @@
     <div class="switch" role="group" aria-label={t.structure.views.label}>
       {#each views as candidate (candidate)}
         <button
-          class:current={show === candidate}
-          aria-pressed={show === candidate}
+          class:current={!code && show === candidate}
+          aria-pressed={!code && show === candidate}
           onclick={() => app.showInStructure(candidate)}
         >
           {t.structure.views[candidate]}
@@ -48,7 +51,9 @@
     </div>
   </div>
 
-  {#if show === 'matrix'}
+  {#if code}
+    <CodeViewer {code} />
+  {:else if show === 'matrix'}
     <StructureMatrix {view} />
   {:else if show === 'metrics'}
     <StructureMetrics {view} />
