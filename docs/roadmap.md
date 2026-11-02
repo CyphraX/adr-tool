@@ -35,7 +35,7 @@ This is the plan of the Decisions module of Softarch Suite — the ADR tool of v
 
 ## Later
 
-- MCP server, so agents get first-class access on top of `core`
+- ~~MCP server, so agents get first-class access on top of `core`~~ Built on 2026-11-02 ([mcp.md](mcp.md); [ADR-0013](adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md); [plan-roadmap.md](plan-roadmap.md), part 9).
 - ~~git write: a "commit this ADR" convenience (stage and commit, possibly push)~~ Built on 2026-11-02, without push ([ADR-0012](adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md); [plan-roadmap.md](plan-roadmap.md), part 7).
 - ~~Branch overview: `proposed` ADRs on branches that are not checked out, and a warning when a number is already taken on another branch~~ Built on 2026-11-02 ([plan-roadmap.md](plan-roadmap.md), part 8).
 - ~~Relations across Decision Logs, written as `<log>/<ID>`; a bare ID keeps meaning "same log"~~ Built on 2026-11-02 ([file-format.md, section 3](file-format.md#3-metadata); [plan-roadmap.md](plan-roadmap.md), part 6).

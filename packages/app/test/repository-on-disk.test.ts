@@ -1,10 +1,19 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { openRepository } from '@adr-tool/core'
 import { nodeFileSystem } from '../src/main/node-file-system'
+import { Repositories } from '../src/main/repositories'
 import { watchPaths } from '../src/main/watch-paths'
 
 const showcase = fileURLToPath(
@@ -86,6 +95,52 @@ describe('a repository on disk', () => {
       expect(await fs.readText('docs/adr/new/0004-b.md')).toBe('# B\n')
     } finally {
       rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('writes nothing through a symbolic link to nothing, and reads a loop of links as absent', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'adr-links-'))
+    try {
+      const outside = join(scratch, 'outside')
+      const root = join(scratch, 'repo')
+      mkdirSync(outside)
+      mkdirSync(join(root, 'docs/adr'), { recursive: true })
+      writeFileSync(join(root, 'docs/adr/0001-a.md'), '# A\n')
+      // A file that is not there yet: writing through the link would create it outside.
+      symlinkSync(join(outside, 'pwned.md'), join(root, 'docs/adr/0002-use-kafka.md'))
+      symlinkSync('loop.md', join(root, 'docs/adr/loop.md'))
+      const fs = nodeFileSystem(root)
+
+      await expect(fs.writeText('docs/adr/0002-use-kafka.md', 'x')).rejects.toThrow(
+        'docs/adr/0002-use-kafka.md is a symbolic link that leads nowhere: it is not written.'
+      )
+      expect(existsSync(join(outside, 'pwned.md'))).toBe(false)
+      expect(await fs.readText('docs/adr/loop.md')).toBeUndefined()
+      expect((await fs.list('docs/adr'))?.map((entry) => entry.name)).toEqual(['0001-a.md'])
+      expect((await openRepository(fs)).logs[0]!.adrs).toHaveLength(1)
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('starts the first Decision Log where the configuration says', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'adr-first-'))
+    const repositories = new Repositories(() => undefined)
+    try {
+      writeFileSync(join(root, '.adr-dir'), 'doc/architecture/decisions\n')
+      const { id } = await repositories.open(root)
+      const planned = await repositories.planCreate({
+        repositoryId: id,
+        logPath: undefined,
+        title: 'Record decisions',
+        template: 'minimal'
+      })
+      expect(planned.ok && planned.change.changeSet.files.map((file) => file.path)).toEqual([
+        'doc/architecture/decisions/0001-record-decisions.md'
+      ])
+    } finally {
+      await repositories.closeAll()
+      rmSync(root, { recursive: true, force: true })
     }
   })
 

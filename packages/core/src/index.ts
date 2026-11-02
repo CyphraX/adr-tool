@@ -7,6 +7,7 @@ export {
   joinChangeSets,
   joinPath,
   memoryFileSystem,
+  normalizePath,
   type Applied,
   type ChangeSet,
   type DirectoryEntry,
@@ -24,6 +25,7 @@ export {
   type MergeBase,
   type TakenNumber
 } from './log/branches'
+export { firstLog } from './log/first'
 export type { NamingScheme } from './log/naming'
 export {
   FOREIGN_FORMAT_NAMES,

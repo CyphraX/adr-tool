@@ -1,0 +1,26 @@
+{
+  "name": "@adr-tool/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "The MCP server of Softarch Suite: the Decision Logs of a repository for agents, every write a change set they see before it is applied",
+  "type": "module",
+  "bin": {
+    "adr-mcp": "./dist/adr-mcp.mjs"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@adr-tool/core": "workspace:*",
+    "@adr-tool/structure": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@types/node": "^24.13.5",
+    "diff": "^9.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.1"
+  }
+}

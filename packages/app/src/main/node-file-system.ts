@@ -1,4 +1,13 @@
-import { mkdir, readFile, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import {
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  stat,
+  writeFile
+} from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { WritableFileSystem } from '@adr-tool/core'
 
@@ -8,9 +17,12 @@ const within = (root: string, path: string): boolean => {
   return rest === '' || (!rest.startsWith('..') && !isAbsolute(rest))
 }
 
+/** Not there, as far as reading goes: gone, not a directory, a loop of links, not readable. */
 const missing = (error: unknown): undefined => {
   const code = (error as NodeJS.ErrnoException).code
-  if (code === 'ENOENT' || code === 'ENOTDIR') return undefined
+  if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'ELOOP' || code === 'EACCES') {
+    return undefined
+  }
   throw error
 }
 
@@ -47,6 +59,11 @@ export function nodeFileSystem(root: string): WritableFileSystem {
       if (target !== undefined) {
         if (!within(await baseReally(), target)) throw outside
         return full
+      }
+      // There and still not found: a symbolic link to nothing, which a write would follow
+      // wherever it points.
+      if ((await lstat(probe).catch(missing)) !== undefined) {
+        throw new Error(`${path} is a symbolic link that leads nowhere: it is not written.`)
       }
       if (dirname(probe) === probe) throw outside
     }
