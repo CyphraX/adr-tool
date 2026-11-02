@@ -50,7 +50,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [12, '0012-committing-an-adr-runs-git-commit-for-its-files-only', 'accepted'],
     [13, '0013-agents-write-adrs-through-the-mcp-server-as-previewed-change', 'accepted'],
     [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted'],
-    [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted']
+    [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted'],
+    [18, '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -113,6 +114,16 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       from: '0015-a-change-set-is-written-beside-its-files-and-renamed-into',
       to: '0004-operations-return-change-sets',
       state: 'in-effect'
-    }
+    },
+    ...[
+      '0002-never-reserialize-markdown',
+      '0003-on-disk-contract',
+      '0004-operations-return-change-sets'
+    ].map((to) => ({
+      type: 'depends-on',
+      from: '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it',
+      to,
+      state: 'in-effect'
+    }))
   ])
 })
