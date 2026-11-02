@@ -166,6 +166,8 @@ export interface StructureView {
   readonly hints: readonly StructureProblem[]
   readonly sourceFiles: number
   readonly testFiles: number
+  /** Java is read without a classpath: where there is Java, its numbers are a lower bound. */
+  readonly javaFiles: number
   readonly dependencies: number
   /** How many different Libraries the code uses. */
   readonly libraries: number

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { extractUses, type Extraction } from '../../src/typescript/extract'
+import type { Extraction } from '../../src/extraction'
+import { extractUses } from '../../src/typescript/extract'
 
 const uses = (extraction: Extraction) => {
-  if (!extraction.analysed) throw new Error('the file was not analysed')
+  if (!extraction.analysed || !('uses' in extraction)) throw new Error('the file was not analysed')
   return extraction.uses.map(
     (use) => `${use.line} ${use.specifier}${use.typeOnly ? ' (type)' : ''}`
   )

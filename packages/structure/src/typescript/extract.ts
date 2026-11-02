@@ -8,13 +8,8 @@
  * checker runs.
  */
 import ts from 'typescript'
+import type { Extraction } from '../extraction'
 import { scriptOfSvelte } from './svelte'
-
-/**
- * Changes whenever the same text would be extracted differently. What was cached under
- * another version is extracted again (docs/structure-format.md, section 7).
- */
-export const EXTRACTION_VERSION = 1
 
 export interface Use {
   /** The module specifier as written: `./cart`, `@acme/shared`, `node:fs`. */
@@ -24,15 +19,6 @@ export interface Use {
   /** The use exists for the compiler only and is gone at run time. */
   readonly typeOnly: boolean
 }
-
-export type Extraction =
-  | { readonly analysed: true; readonly uses: readonly Use[] }
-  /**
-   * The file cannot be parsed. It keeps its Component and has no Dependencies of its own
-   * (section 2, "Files that cannot be read"). `line` and `message` are TypeScript's first
-   * complaint.
-   */
-  | { readonly analysed: false; readonly line: number; readonly message: string }
 
 const SCRIPT_KINDS: readonly (readonly [RegExp, ts.ScriptKind])[] = [
   [/\.[cm]?ts$/, ts.ScriptKind.TS],

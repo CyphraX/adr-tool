@@ -3,8 +3,10 @@
  * makes, resolved against the repository.
  */
 import type { FileSystem } from '@adr-tool/kernel'
+import { extractorOf, type Extract, type Extraction } from './extraction'
+import type { JavaOutline } from './java/outline'
+import { resolveJava } from './java/resolve'
 import type { SourceFile } from './source-files'
-import { extractUses, type Extraction } from './typescript/extract'
 import { prepareResolver } from './typescript/resolution'
 
 /** A directed use of one Source File by another, both inside the repository. */
@@ -49,12 +51,6 @@ export interface Dependencies {
   readonly notAnalysed: readonly NotAnalysed[]
 }
 
-/**
- * What is extracted from one file. The default is `extractUses`; the app hands in the same
- * function behind its cache, keyed by the hash of the file's content (section 7).
- */
-export type Extract = (path: string, text: string) => Extraction
-
 /** How many files are read at a time: enough to keep the disk busy, few enough for any limit. */
 const READ_AT_ONCE = 32
 const DECLARATION_FILE = /\.d\.(?:[^/]+\.)?[cm]?ts$/
@@ -64,24 +60,25 @@ const byPath = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 /**
  * The Dependencies among the Source Files of a repository, and what could not be resolved.
  * `files` are the files the repository consists of, as for `openStructure`; `sourceFiles`
- * are the Source Files among them. Java arrives with part 4; its files have no Dependencies yet.
+ * are the Source Files among them. `extract` reads one file; without a reader for Java
+ * (`extractorOf(prepareJava(…))`), Java files are not read and have no Dependencies.
  */
 export async function analyseDependencies(
   fs: FileSystem,
   files: readonly string[],
   sourceFiles: readonly SourceFile[],
-  extract: Extract = extractUses
+  extract: Extract = extractorOf()
 ): Promise<Dependencies> {
   const resolver = await prepareResolver(fs, files)
   const known = new Set(sourceFiles.map((file) => file.path))
-  const readable = sourceFiles.filter((file) => file.language !== 'java')
 
-  const extractions = new Map<string, Extraction | undefined>()
-  for (let start = 0; start < readable.length; start += READ_AT_ONCE) {
+  /** `null`: the file could not be read. `undefined`: its language is not read. */
+  const extractions = new Map<string, Extraction | null | undefined>()
+  for (let start = 0; start < sourceFiles.length; start += READ_AT_ONCE) {
     await Promise.all(
-      readable.slice(start, start + READ_AT_ONCE).map(async ({ path }) => {
+      sourceFiles.slice(start, start + READ_AT_ONCE).map(async ({ path }) => {
         const text = await fs.readText(path).catch(() => undefined)
-        extractions.set(path, text === undefined ? undefined : extract(path, text))
+        extractions.set(path, text === undefined ? null : extract(path, text))
       })
     )
   }
@@ -90,15 +87,30 @@ export async function analyseDependencies(
   const notResolved: NotResolved[] = []
   const libraries: LibraryUse[] = []
   const notAnalysed: NotAnalysed[] = []
+  const java = new Map<string, JavaOutline>()
+  const depend = (from: string, to: string, typeOnly: boolean, line: number): void => {
+    const key = `${from}\n${to}`
+    const pair = pairs.get(key)
+    if (pair === undefined) pairs.set(key, { from, to, typeOnly, lines: [line] })
+    else {
+      pair.typeOnly &&= typeOnly
+      if (!pair.lines.includes(line)) pair.lines.push(line)
+    }
+  }
 
-  for (const { path } of readable) {
+  for (const { path } of sourceFiles) {
     const extraction = extractions.get(path)
-    if (extraction === undefined) {
+    if (extraction === undefined) continue
+    if (extraction === null) {
       notAnalysed.push({ file: path })
       continue
     }
     if (!extraction.analysed) {
       notAnalysed.push({ file: path, line: extraction.line, message: extraction.message })
+      continue
+    }
+    if ('java' in extraction) {
+      java.set(path, extraction.java)
       continue
     }
     const used = new Set<string>()
@@ -109,14 +121,7 @@ export async function analyseDependencies(
           const to = resolution.path
           // A file never depends on itself.
           if (to === path || !known.has(to)) break
-          const typeOnly = use.typeOnly || DECLARATION_FILE.test(to)
-          const key = `${path}\n${to}`
-          const pair = pairs.get(key)
-          if (pair === undefined) pairs.set(key, { from: path, to, typeOnly, lines: [use.line] })
-          else {
-            pair.typeOnly &&= typeOnly
-            pair.lines.push(use.line)
-          }
+          depend(path, to, use.typeOnly || DECLARATION_FILE.test(to), use.line)
           break
         }
         case 'library':
@@ -132,6 +137,13 @@ export async function analyseDependencies(
       }
     }
   }
+
+  // Java is resolved against the symbol table of the whole repository, once every file is read.
+  // It has no type-only Dependencies.
+  const resolved = resolveJava(java)
+  for (const use of resolved.uses) if (known.has(use.to)) depend(use.from, use.to, false, use.line)
+  notResolved.push(...resolved.notResolved)
+  libraries.push(...resolved.libraries)
 
   const dependencies = [...pairs.values()]
     .map((pair) => ({ ...pair, lines: [...pair.lines].sort((a, b) => a - b) }))

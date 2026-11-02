@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { analyse, readCache, writeCache, type Analysis } from '../src/main/analysis'
 import { Structures, viewOf } from '../src/main/structures'
@@ -65,6 +66,16 @@ describe('the analysis of a repository, as the app runs it', () => {
     expect((await analyse(root, { ...again.cache, version: -1 })).changed).toBe(true)
   })
 
+  it('reads Java with the WebAssembly of tree-sitter, found next to its packages', async () => {
+    const maven = fileURLToPath(
+      new URL('../../structure/test/fixtures/maven-shop/', import.meta.url)
+    )
+    const { analysis, cache } = await analyse(maven, undefined)
+    expect(analysis.dependencies.notAnalysed).toEqual([])
+    expect(analysis.dependencies.dependencies).toHaveLength(11)
+    expect(Object.values(cache.files).every(({ extraction }) => 'java' in extraction)).toBe(true)
+  })
+
   it('keeps its cache in a file that a crash cannot leave half written', async () => {
     const { cache } = await analyse(root, undefined)
     const file = join(root, '..', `${root.split('/').at(-1)}-cache`, 'cache.json')
@@ -100,7 +111,7 @@ describe('a level as the window gets it', () => {
     expect(view.notResolved).toEqual([
       { file: 'src/billing/invoice.ts', specifier: './gone', line: 2 }
     ])
-    expect([view.sourceFiles, view.testFiles]).toEqual([4, 1])
+    expect([view.sourceFiles, view.testFiles, view.javaFiles]).toEqual([4, 1, 0])
   })
 
   it('goes down into a Component, with the way back up', () => {
