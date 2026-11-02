@@ -185,6 +185,8 @@ export const t = {
     refused: {
       foreign:
         'It is written in a foreign format, which the tool reads and never writes. Migrate it first.',
+      unmigratable:
+        'It is written in a foreign format, which the tool reads and never writes, and it cannot be migrated as it stands: its header says why. Change its file by hand.',
       unreadable: 'Its frontmatter cannot be read. Fix it first.',
       unknown: 'Its Status is none of the five values. Fix its Status first.',
       undecided: 'A proposed ADR is accepted or rejected first.',
@@ -208,7 +210,8 @@ export const t = {
     noneWaiting: 'No ADR is proposed.',
     days: (days: number | undefined): string =>
       days === undefined ? 'no date' : `${days} ${many(days, 'day', 'days')}`,
-    median: (days: number): string => `Half of them have waited ${days} days or less.`,
+    median: (days: number): string =>
+      `Half of them have waited ${days} ${many(days, 'day', 'days')} or less.`,
     recent: 'Recent decisions',
     noneDecided: 'No ADR names the date it was decided.',
     components: 'Components affected',

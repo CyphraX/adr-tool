@@ -37,6 +37,9 @@ describe('days and dates', () => {
     expect(dayOf('2026-02-31')).toBeUndefined()
     expect(dayOf('2026-2-3')).toBeUndefined()
     expect(dayOf(undefined)).toBeUndefined()
+    // A year below 100 is that year, not one of the 1900s.
+    expect(dayOf('0099-01-01')).not.toBe(dayOf('1999-01-01'))
+    expect(dateOf(dayOf('0099-01-01')!)).toBe('0099-01-01')
   })
 })
 
@@ -98,6 +101,16 @@ describe('the timeline (part 11)', () => {
     // A short log has a line for every month.
     expect(timeline.ticks.map(dateOf)).toEqual(['2026-03-01'])
   })
+
+  it('keeps to about ten lines over decades', async () => {
+    const adrs = await adrsOf({
+      'docs/adr/0001-a.md': adr('status: accepted\ndecided: 1925-03-04'),
+      'docs/adr/0002-b.md': adr('status: accepted\ndecided: 2026-03-04')
+    })
+    const ticks = timelineOf(adrs, '2026-03-20').ticks.map(dateOf)
+    expect(ticks.length).toBeLessThanOrEqual(11)
+    expect(ticks.every((tick) => tick.endsWith('-01-01'))).toBe(true)
+  })
 })
 
 describe('the board (part 11)', () => {
@@ -147,6 +160,12 @@ describe('the board (part 11)', () => {
     expect(boardOf(adrs).at(-1)?.status).toBe('unknown')
     expect(madr!.foreign).toBeDefined()
     expect(moveOf(madr!, 'accepted')).toEqual({ kind: 'refused', why: 'foreign' })
+    // One that cannot be migrated as it stands is not told to be migrated.
+    const [stuck] = await adrsOf({
+      'docs/adr/0001-old.md': '# 1. Old\n\nDate: 2026-01-01\n\n## Status\n\nSuperseded by 2\n'
+    })
+    expect(stuck!.noMigration).toBeDefined()
+    expect(moveOf(stuck!, 'accepted')).toEqual({ kind: 'refused', why: 'unmigratable' })
   })
 })
 

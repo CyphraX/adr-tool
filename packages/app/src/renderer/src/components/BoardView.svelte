@@ -16,6 +16,9 @@
   const selectedId = $derived(app.selected?.id)
   const changed = $derived(app.active?.repository.git?.changed ?? [])
 
+  /** The type of what a card carries while it is dragged: its ID, for the board alone. */
+  const CARD = 'application/x-softarch-adr'
+
   /** The card being dragged, and the column it is over. */
   let dragging = $state<string | undefined>(undefined)
   let over = $state<StatusKey | undefined>(undefined)
@@ -32,7 +35,8 @@
 
   function ondragstart(event: DragEvent, id: string): void {
     dragging = id
-    event.dataTransfer?.setData('text/plain', id)
+    // Not as text: dropped on the editor beside the board, a card would be typed into the ADR.
+    event.dataTransfer?.setData(CARD, id)
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
   }
 
