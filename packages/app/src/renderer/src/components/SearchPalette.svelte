@@ -194,43 +194,23 @@
                     {/if}
                   {:else if row.kind === 'component'}
                     <span class="line">
-                      <svg
-                        class="glyph"
-                        viewBox="0 0 12 12"
-                        width="12"
-                        height="12"
-                        aria-hidden="true"
-                      >
-                        <rect x="1.5" y="2.5" width="9" height="7" rx="1.5" />
-                      </svg>
+                      <span class="kind">{t.searching.component}</span>
                       <span class="title">{row.hit.name}</span>
                       {#if row.hit.name !== row.hit.id}
                         <code class="id">{row.hit.id}</code>
                       {/if}
-                      <span class="where">
-                        {draft
-                          ? `${t.searching.component} · ${t.searching.draft}`
-                          : t.searching.component}
-                      </span>
+                      {#if draft}
+                        <span class="where">{t.searching.draft}</span>
+                      {/if}
                     </span>
                   {:else}
                     {@const path = split(row.hit.path)}
                     <span class="line">
-                      <svg
-                        class="glyph"
-                        viewBox="0 0 12 12"
-                        width="12"
-                        height="12"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 1.5h4l2.5 2.5v6.5h-6.5z" />
-                      </svg>
+                      <span class="kind">{t.searching.sourceFile}</span>
                       <code class="title path"
                         ><span class="directory">{path.directory}</span>{path.name}</code
                       >
-                      <span class="where">
-                        {`${t.searching.sourceFile} · ${row.hit.component ?? t.searching.unassigned}`}
-                      </span>
+                      <span class="where">{row.hit.component ?? t.searching.unassigned}</span>
                     </span>
                   {/if}
                 </div>
@@ -327,10 +307,12 @@
     font-weight: 400;
   }
 
-  .glyph {
-    fill: none;
-    stroke: var(--ink-soft);
-    stroke-width: 1.2;
+  /* What kind of thing a hit is, in words (docs/design.md: words over icons). */
+  .kind {
+    flex: none;
+    min-width: 6.5em;
+    font-size: 11px;
+    color: var(--ink-faint);
   }
 
   .id,

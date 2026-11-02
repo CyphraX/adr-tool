@@ -173,6 +173,18 @@
     height: auto;
   }
 
+  .document :global(.diagram-source summary) {
+    margin-top: 4px;
+    font-family: var(--ui);
+    font-size: 0.75em;
+    color: var(--ink-faint);
+    cursor: default;
+  }
+
+  .document :global(.diagram-source pre) {
+    margin-top: 6px;
+  }
+
   .document :global(.diagram-error) {
     margin-top: -0.6em;
     font-family: var(--ui);

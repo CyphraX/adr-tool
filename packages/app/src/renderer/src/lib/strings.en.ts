@@ -197,8 +197,11 @@ export const en = {
 
   /** A Mermaid block of an ADR, drawn in the preview and in the live mode. */
   diagram: {
-    cannotDraw: (said: string): string => `This diagram cannot be drawn. Mermaid says: ${said}`,
-    cannotDrawAtAll: 'This diagram cannot be drawn.'
+    cannotDraw: (said: string): string =>
+      `This Mermaid diagram cannot be drawn. Mermaid says: ${said}`,
+    cannotDrawAtAll: 'This Mermaid diagram cannot be drawn.',
+    /** Below a drawn block in the preview, as in the export: its text, for a screen reader too. */
+    source: 'Mermaid source'
   },
 
   export: {

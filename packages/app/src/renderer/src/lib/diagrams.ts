@@ -126,13 +126,26 @@ export function draw(source: string, theme: Theme = windowTheme()): Promise<Draw
   return drawing
 }
 
-/** A drawing as the window shows it: the picture, or the sentence that says why there is none. */
-function figureOf(drawing: Drawing): HTMLElement {
+/**
+ * A drawing as the window shows it: the picture, or the sentence that says why there is none.
+ * With its `source`, the picture has its text a click away below it, as in the export.
+ */
+function figureOf(drawing: Drawing, source?: string): HTMLElement {
   if (drawing.kind === 'drawn') {
     const figure = document.createElement('figure')
     figure.className = 'diagram'
     // Sanitized above, and the same text that the export writes.
     figure.innerHTML = drawing.svg
+    if (source !== undefined) {
+      const details = document.createElement('details')
+      details.className = 'diagram-source'
+      const summary = document.createElement('summary')
+      summary.textContent = t.diagram.source
+      const pre = document.createElement('pre')
+      pre.textContent = source
+      details.append(summary, pre)
+      figure.append(details)
+    }
     return figure
   }
   const said = document.createElement('p')
@@ -155,7 +168,7 @@ export function drawIn(container: HTMLElement, theme: Theme = windowTheme()): vo
     const source = (code.textContent ?? '').replace(/\n$/, '')
     void draw(source, theme).then((drawing) => {
       if (!pre.isConnected) return
-      if (drawing.kind === 'drawn') pre.replaceWith(figureOf(drawing))
+      if (drawing.kind === 'drawn') pre.replaceWith(figureOf(drawing, source))
       else pre.after(figureOf(drawing))
     })
   }

@@ -68,7 +68,12 @@ function drawn(node: HtmlNode, href: string): void {
   node.tagName = 'figure'
   node.properties = { className: ['diagram'] }
   node.children = [
-    { type: 'element', tagName: 'img', properties: { src: href, alt: 'Diagram' }, children: [] },
+    {
+      type: 'element',
+      tagName: 'img',
+      properties: { src: href, alt: 'Mermaid diagram' },
+      children: []
+    },
     {
       type: 'element',
       tagName: 'details',

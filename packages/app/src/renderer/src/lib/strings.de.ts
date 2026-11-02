@@ -148,8 +148,9 @@ export const de: typeof en = {
 
   diagram: {
     cannotDraw: (said: string): string =>
-      `Dieses Diagramm lässt sich nicht zeichnen. Mermaid sagt: ${said}`,
-    cannotDrawAtAll: 'Dieses Diagramm lässt sich nicht zeichnen.'
+      `Dieses Mermaid-Diagramm lässt sich nicht zeichnen. Mermaid sagt: ${said}`,
+    cannotDrawAtAll: 'Dieses Mermaid-Diagramm lässt sich nicht zeichnen.',
+    source: 'Mermaid-Quelltext'
   },
 
   export: {

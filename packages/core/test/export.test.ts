@@ -291,14 +291,14 @@ describe('the export of Decision Logs (docs/plan-roadmap.md, part 10)', () => {
       expect(fileOf(files, 'docs/adr/0001-flow.diagram-1.svg')).toBe(SVG)
       expect(files.filter((file) => file.path.endsWith('.svg'))).toHaveLength(1)
       expect(
-        page.match(/<img src="..\/..\/docs\/adr\/0001-flow.diagram-1.svg" alt="Diagram">/g)
+        page.match(/<img src="..\/..\/docs\/adr\/0001-flow.diagram-1.svg" alt="Mermaid diagram">/g)
       ).toHaveLength(2)
       expect(page).toContain('<figure class="diagram">')
       expect(page).toContain(
         '<details class="diagram-source"><summary>Mermaid source</summary><pre><code class="language-mermaid">'
       )
       expect(page).toContain('a -->\n</code></pre>')
-      expect(print).toContain('<img src="docs/adr/0001-flow.diagram-1.svg" alt="Diagram">')
+      expect(print).toContain('<img src="docs/adr/0001-flow.diagram-1.svg" alt="Mermaid diagram">')
       // Nothing of it runs, and the page keeps its policy.
       expect(page).not.toContain('<svg')
       expect(page).toContain(`content="default-src 'none'; style-src 'self'; img-src 'self'"`)
