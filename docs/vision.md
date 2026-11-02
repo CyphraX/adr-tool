@@ -142,11 +142,12 @@ Architecture evaluation: a qualitative judgement, backed by what the other modul
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | ADRs, Templates, Component declarations, Rules, applied Patterns, Diagrams, Annotations, Assessments, Quality Scenarios, Findings, Risks, Technical Debt Items | code model, Dependencies, metrics, Cycles, Violations, Drift, history figures, Problems |
 
-Derived data enters the repository in exactly three places, each deliberately:
+Derived data enters the repository in exactly four places, each deliberately:
 
 1. an **Exception** — a declaration that names a Violation by its fingerprint;
 2. the **Baseline** — a set of Violation fingerprints;
-3. the **Snapshot** inside an Assessment — frozen metric values kept as evidence.
+3. the **Snapshot** inside an Assessment — frozen metric values kept as evidence;
+4. the **SVG of a Diagram** — its picture, committed beside it so that GitHub shows it and documents can embed it.
 
 ## On disk, in a user's repository
 
@@ -160,6 +161,8 @@ Directory names in other people's repositories are hard to take back, and should
 Each module gets its own format specification, as [file-format.md](file-format.md) is for ADRs. The formats are not decided here.
 
 ## Order after ADR v1
+
+From its third step on, this order is built as [plan-vision.md](plan-vision.md), part by part, for the people of [personas.md](personas.md).
 
 1. **Structure** — Components, Dependency graph, cycles, core metrics, the code viewer, and the first Trace (ADR affects Component). Built ([plan-structure.md](plan-structure.md)).
 2. **The rest of the Decisions roadmap** — decided by the author on 2026-11-02, ahead of Conformance: everything [roadmap.md](roadmap.md) lists apart from distribution, the MCP server and the export of ADRs included ([plan-roadmap.md](plan-roadmap.md)).

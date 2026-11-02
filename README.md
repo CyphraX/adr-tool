@@ -23,7 +23,7 @@ The suite is planned as one workbench of several modules for software architects
 The app runs locally: there is no backend, no account and no telemetry.
 
 > [!NOTE]
-> Early development. v1 of the Decisions module is accepted and the Structure module is built; the rest of the roadmap is being built part by part ([plan-roadmap.md](docs/plan-roadmap.md)). There are no installers yet: the app runs from source.
+> Early development. The Decisions and Structure modules are built, and so is the rest of the roadmap; the other modules of the suite are being built part by part ([plan-vision.md](docs/plan-vision.md)). There are no installers yet: the app runs from source.
 
 ## Table of Contents
 
@@ -310,6 +310,9 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [docs/plan.md](docs/plan.md) | The milestones of the Decisions module, with their status |
 | [docs/plan-structure.md](docs/plan-structure.md) | The parts of the Structure module, with their status |
 | [docs/plan-roadmap.md](docs/plan-roadmap.md) | The parts of the rest of the roadmap, with their status |
+| [docs/plan-vision.md](docs/plan-vision.md) | The parts of the modules still to come — Conformance, Diagrams, Review, Assessment, Documentation —, with their status |
+| [docs/personas.md](docs/personas.md) | The people the suite is built for, and the scenario each part is checked against |
+| [docs/design.md](docs/design.md) | How the window looks and behaves, for every module |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
 | [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` with its output, codes and exit codes, and `adr export` |
@@ -321,7 +324,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 
 - **Decisions:** v1 is built and accepted ([plan.md](docs/plan.md)).
 - **Structure:** parts 1 to 8 are built ([plan-structure.md](docs/plan-structure.md)).
-- **The rest of the roadmap** is being built part by part ([plan-roadmap.md](docs/plan-roadmap.md)):
+- **The rest of the roadmap** is built ([plan-roadmap.md](docs/plan-roadmap.md)):
   - the known gaps before the first release and the live editor (built);
   - an `adr lint` CLI for CI (built);
   - MADR 2.x and log4brains (built);
@@ -333,6 +336,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
   - timeline, board and dashboard, and tables in the live editor (built);
   - the window in German (built);
   - the repositories in the window seen together (built).
+- **The other modules** are being built part by part ([plan-vision.md](docs/plan-vision.md)): Conformance — Rules, Patterns, Violations and `adr check` —, Diagrams bound to the code, Review with Annotations that survive change, Assessment with reports, the Next tiers of Structure — more metrics, history analysis, Libraries —, Documentation as arc42, the System across repositories, and more languages.
 - **Deferred:** distribution — installers, code signing and auto-update.
 
 The details are in [docs/roadmap.md](docs/roadmap.md).
