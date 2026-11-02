@@ -183,3 +183,5 @@ In the running app: on a copy of the showcase log on a file system of 2 MB with 
 ## Status
 
 The status of each part is recorded under it as it is merged.
+
+All fourteen parts were built and merged on 2026-11-02. What this plan leaves open is what [roadmap.md](roadmap.md) still lists before the first public release: distribution — installers, code signing, auto-update —, Windows and macOS back in CI, and the check of the name Softarch Suite for clashes. Nothing of the app has been run on a Mac or on Windows since part 1: the question on quitting with an open dialog (part 2), the rename that is tried again and the copy that stands in for a hard link (part 14) wait for that run. A crash between the first and the last rename of a change set is the window ADR-0015 leaves.

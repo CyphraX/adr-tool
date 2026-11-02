@@ -69,11 +69,16 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 - **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body, in every repository that is open. It ignores case and accents, and reads "ß" as "ss": "strasse" finds "Straße".
 - **Several repositories.** Each repository opens in a tab of its own. With more than one open, **Every ADR** and **Every Problem** list them together, and an ADR may depend on or relate to an ADR of another repository, written `payments:docs/adr/0001-ledger`; where both are open, the Relation reads as such from both ends.
+
+  ![Every ADR of two open repositories, with the detail of a ledger ADR that an ADR of the other repository depends on](docs/screenshots/readme/together.png)
+
 - **git.** The app shows the branch that is checked out and the ADRs with uncommitted changes. For each ADR it shows its history, commit by commit, with the diff; while the history is open, it follows the file and git. **Commit** commits an ADR's file — and, if you like, those of the ADRs it supersedes or amends — with a message you see and can change. Nothing else that is changed or staged is taken along, and nothing is pushed ([ADR-0012](docs/adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md)). **Other branches** lists the ADRs that branches which are not checked out add or decide, read from git without checking anything out, and a new ADR warns when another branch has given its number away already.
 - **Export.** **Export → Web pages…** writes the Decision Logs as HTML pages for people who do not use the tool: an index by Status and a page per ADR, with its Relations as links. The pages open from disk, from a file share or from any web host. They run no script and fetch nothing. **PDF…** prints the same ADRs as a PDF, one ADR per page ([ADR-0014](docs/adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
 - **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 2, 3 and 4, for [log4brains](https://github.com/thomvaill/log4brains) and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
 - **English and German.** The window speaks German when the system does, and English otherwise; the menu at the top right overrides that. What the tool says about ADRs and code — Problems, refusals, the warnings of a change — is said in the same language. `adr lint` and the MCP server stay English.
+
+  ![The window in German: the same Decision Log, with the list, the sidebar and the detail in German](docs/screenshots/readme/decisions-de.png)
 
 <details>
 <summary>More screenshots: timeline, dashboard, Metadata, search, history, Migration</summary>
