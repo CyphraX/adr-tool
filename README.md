@@ -79,7 +79,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 - **Export.** **Export → Web pages…** writes the Decision Logs as HTML pages for people who do not use the tool: an index by Status and a page per ADR, with its Relations as links. The pages open from disk, from a file share or from any web host. They run no script and fetch nothing. **PDF…** prints the same ADRs as a PDF, one ADR per page ([ADR-0014](docs/adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
 - **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 2, 3 and 4, for [log4brains](https://github.com/thomvaill/log4brains) and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
-- **English and German.** The window speaks German when the system does, and English otherwise; the menu at the top right overrides that. What the tool says about ADRs and code — Problems, refusals, the warnings of a change — is said in the same language. `adr lint` and the MCP server stay English.
+- **English and German.** The window speaks German when the system does, and English otherwise; the menu at the top right overrides that. What the tool says about ADRs and code — Problems, refusals, the warnings of a change — is said in the same language. `adr lint`, `adr check` and the MCP server stay English.
 
   ![The window in German: the same Decision Log, with the list, the sidebar and the detail in German](docs/screenshots/readme/decisions-de.png)
 
@@ -190,7 +190,7 @@ docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-wri
 10 Problems in 1 Decision Log.
 ```
 
-The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs it on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
+The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs `adr check`, which does the same and checks its Rules too, on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
 
 ### Checking the code against its Rules
 
@@ -324,7 +324,7 @@ The kinds of Rules, the fingerprint an Exception names and the Problems of the f
 | `pnpm adr check` | Checks them too, and this repository's code against `.arch/rules.yml` |
 | `pnpm adr export --out <dir>` | Exports this repository's ADRs as HTML pages |
 
-CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr lint` on the repository itself.
+CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr check` on the repository itself: its Decision Log, its declaration of Components, and its code against `.arch/rules.yml`.
 
 ### Project layout
 

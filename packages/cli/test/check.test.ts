@@ -282,6 +282,15 @@ describe('adr check (docs/cli.md)', () => {
     ])
   })
 
+  it('names a declaration that is not YAML at the line the parser stopped at, on one line', async () => {
+    const root = shopWith('', { '.arch/components.yml': 'components: [\n' })
+    const { code, out } = await adrIn(root, 'check')
+    expect(code).toBe(1)
+    expect(lines(out)[0]).toBe(
+      '.arch/components.yml:2: unreadable-declaration: .arch/components.yml cannot be read: it is not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 2, column 1'
+    )
+  })
+
   it('evaluates no Rule on a Draft', async () => {
     const root = shopWith('')
     rmSync(join(root, '.arch/components.yml'))

@@ -22,6 +22,8 @@ export interface DeclarationProblem {
   readonly code: StructureProblem['kind']
   readonly message: string
   readonly path: string
+  /** Where the file says one: the line the YAML parser stopped at. */
+  readonly line?: number
   readonly problem: StructureProblem
 }
 
@@ -78,6 +80,7 @@ export async function check(
       code: problem.kind,
       message: wordingOf(problem),
       path: DECLARATION_PATH,
+      ...('line' in problem && problem.line !== undefined && { line: problem.line }),
       problem
     })),
     conformance,

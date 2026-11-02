@@ -132,7 +132,7 @@ Nothing is written. `adr lint` stays as it was: it reads no Rules, and what it p
 
 ### What it prints
 
-First what `adr lint` prints, without its count; then the Problems of `.arch/components.yml`, named by the file alone (`path: code: message`); then the Problems of `.arch/rules.yml` at their line; then each Violation that no Exception accepts, once for each line of each import behind it:
+First what `adr lint` prints, without its count; then the Problems of `.arch/components.yml`, named by the file (`path: code: message`) — and by the line the YAML parser stopped at, for a file that is not YAML; then the Problems of `.arch/rules.yml` at their line; then each Violation that no Exception accepts, once for each line of each import behind it:
 
 ```
 src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
@@ -172,7 +172,7 @@ Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem i
       "rule": "billing-not-web",
       "message": "billing must not depend on web.",
       "why": "Billing is the domain; the web is how it is shown, and may change without it.",
-      "fingerprint": { "rule": "billing-not-web", "from": "billing", "to": "web" },
+      "fingerprint": { "kind": "dependency", "rule": "billing-not-web", "from": "billing", "to": "web" },
       "fingerprintText": "billing-not-web: billing -> web",
       "path": "src/billing/invoice.ts",
       "line": 3,
@@ -255,10 +255,9 @@ A PDF comes from the app (**Export → PDF…**), which prints `print.html` with
 ```yaml
 - run: pnpm install --frozen-lockfile
 - run: pnpm build
-- run: node packages/cli/dist/adr.mjs lint --format github
 - run: node packages/cli/dist/adr.mjs check --format github
 ```
 
-`adr check` checks the Decision Logs too; a pipeline that runs it needs `adr lint` only to see their Problems in a step of their own.
+`adr check` checks the Decision Logs as `adr lint` does, so one step is enough. A step of `adr lint` before it would end the job on a Problem of a Decision Log before the Violations are shown; `adr lint` alone suits a repository without Rules, or a pipeline that wants no analysis of the code.
 
-This repository runs both on itself in its own CI (`.github/workflows/ci.yml`), so a broken Relation in `docs/adr`, or an import that breaks a Rule of `.arch/rules.yml`, fails the build.
+This repository runs `adr check` on itself in its own CI (`.github/workflows/ci.yml`), so a broken Relation in `docs/adr`, or an import that breaks a Rule of `.arch/rules.yml`, fails the build.

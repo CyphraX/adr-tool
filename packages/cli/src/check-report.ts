@@ -67,7 +67,12 @@ export function fails(report: CheckReport): boolean {
 function entries(report: CheckReport): Entry[] {
   const { conformance } = report
   return [
-    ...report.declaration.map(({ path, code, message }) => ({ path, code, message })),
+    ...report.declaration.map(({ path, line, code, message }) => ({
+      path,
+      ...(line !== undefined && { line }),
+      code,
+      message
+    })),
     ...conformance.problems.map((problem) => ({
       path: RULES_PATH,
       line: problem.line,
@@ -162,11 +167,12 @@ function json(report: CheckReport): object {
     logs: decisions.logs,
     problems: [
       ...decisions.problems.map((problem) => ({ module: 'decisions', ...problem })),
-      ...report.declaration.map(({ code, message, path, problem }) => ({
+      ...report.declaration.map(({ code, message, path, line, problem }) => ({
         module: 'structure',
         code,
         message,
         path,
+        ...(line !== undefined && { line }),
         problem
       })),
       ...conformance.problems.map((problem) => ({
