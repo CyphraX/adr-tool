@@ -2,10 +2,12 @@
   import { onMount } from 'svelte'
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
+  import BoardView from './components/BoardView.svelte'
   import BranchAdrDetail from './components/BranchAdrDetail.svelte'
   import BranchList from './components/BranchList.svelte'
   import ChangeDialog from './components/ChangeDialog.svelte'
   import CommitDialog from './components/CommitDialog.svelte'
+  import DashboardView from './components/DashboardView.svelte'
   import HistoryDialog from './components/HistoryDialog.svelte'
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
@@ -18,6 +20,7 @@
   import StructureCenter from './components/StructureCenter.svelte'
   import StructureSidebar from './components/StructureSidebar.svelte'
   import TabBar from './components/TabBar.svelte'
+  import TimelineView from './components/TimelineView.svelte'
   import {
     LIMITS,
     fitMiddle,
@@ -45,7 +48,11 @@
   const STORED_SIZES = 'pane-sizes'
   let sizes = $state<PaneSizes>(readStoredSizes())
   let panesWidth = $state(0)
-  const middlePane = $derived<MiddlePane>(app.active?.view === 'graph' ? 'graph' : 'list')
+  // The graph, the timeline, the board and the dashboard want room: they share one width.
+  const wide = $derived(
+    ['graph', 'timeline', 'board', 'dashboard'].includes(app.active?.view ?? 'adrs')
+  )
+  const middlePane = $derived<MiddlePane>(wide ? 'graph' : 'list')
   // Before the window has been measured there is nothing to fit a width into.
   const sidebarWidth = $derived(
     sizes.sidebar === undefined
@@ -155,7 +162,7 @@
         <div
           class="panes"
           class:wide-editor={app.editing?.mode === 'split'}
-          class:wide-middle={app.active.view === 'graph'}
+          class:wide-middle={wide}
           bind:clientWidth={panesWidth}
           style:--sidebar="{sidebarWidth}px"
           style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
@@ -175,6 +182,12 @@
             <BranchList />
           {:else if app.active.view === 'graph' && app.log}
             <RelationsGraph log={app.log} />
+          {:else if app.active.view === 'timeline' && app.log}
+            <TimelineView log={app.log} />
+          {:else if app.active.view === 'board' && app.log}
+            <BoardView log={app.log} />
+          {:else if app.active.view === 'dashboard' && app.log}
+            <DashboardView log={app.log} />
           {:else}
             <AdrList />
           {/if}
@@ -291,7 +304,10 @@
   }
 
   .panes.wide-editor > :global(.list),
-  .panes.wide-editor > :global(.graph) {
+  .panes.wide-editor > :global(.graph),
+  .panes.wide-editor > :global(.timeline),
+  .panes.wide-editor > :global(.board),
+  .panes.wide-editor > :global(.dashboard) {
     display: none;
   }
 

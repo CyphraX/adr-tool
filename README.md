@@ -53,7 +53,11 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![A new ADR that supersedes another, previewed before it is written](docs/screenshots/readme/new-adr-preview.png)
 
-- **Edit.** The editor has three modes: the Markdown source on its own, the source with a live preview, and **Live**, which renders headings, emphasis, links, lists and code in place and shows the source of the line the cursor is in. Every mode saves the same text. Once an ADR is decided, saving records a **Correction**. A Correction never changes what was decided.
+- **Timeline, board and dashboard.** The **Timeline** shows each ADR from the day it was created to the day it was decided. The **Board** has a column per Status: dragging an ADR to another column accepts, rejects, deprecates or supersedes it, through the same preview as anywhere else. The **Dashboard** counts the ADRs by Status, shows the Problems, how long proposals have waited, the latest decisions and the Components the ADRs affect.
+
+  ![The board: a column per Status, and a drag that accepts an ADR](docs/screenshots/readme/board.png)
+
+- **Edit.** The editor has three modes: the Markdown source on its own, the source with a live preview, and **Live**, which renders headings, emphasis, links, lists, code and tables in place and shows the source of the line the cursor is in. Every mode saves the same text. Once an ADR is decided, saving records a **Correction**. A Correction never changes what was decided.
 
   ![The editor: Markdown source with a live preview](docs/screenshots/readme/editor.png)
 
@@ -70,7 +74,11 @@ The app runs locally: there is no backend, no account and no telemetry.
 - Light and dark themes, following the system.
 
 <details>
-<summary>More screenshots: Metadata, search, history, Migration</summary>
+<summary>More screenshots: timeline, dashboard, Metadata, search, history, Migration</summary>
+
+![The timeline: each ADR from the day it was created to the day it was decided](docs/screenshots/readme/timeline.png)
+
+![The dashboard of a Decision Log](docs/screenshots/readme/dashboard.png)
 
 ![The Metadata dialog: decision-makers, tags, Relations and the Components an ADR affects](docs/screenshots/readme/metadata.png)
 
@@ -315,7 +323,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
   - a branch overview (built);
   - an MCP server for agents (built);
   - an export as web pages and PDF (built);
-  - timeline, board and dashboard;
+  - timeline, board and dashboard, and tables in the live editor (built);
   - a German translation, and the repositories in the window seen together.
 - **Deferred:** distribution — installers, code signing and auto-update.
 

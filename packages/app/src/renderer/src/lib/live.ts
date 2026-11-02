@@ -8,7 +8,8 @@ import type { EditorState } from '@codemirror/state'
  *
  * The line the cursor is in shows its source — every line a selection touches, and all of a
  * construct that one of its lines belongs to: a fenced code block, a quote, emphasis or a link
- * over several lines. Tables, images and task markers stay source.
+ * over several lines. A table is drawn as a table while the cursor is outside it (`liveTables`);
+ * images and task markers stay source.
  *
  * Every hidden range and every bullet lies within one line, and every styled span has text:
  * the editor cannot hide a line break from a plugin, and does not draw an empty mark.
@@ -252,4 +253,33 @@ function onLines(marks: readonly LiveMark[], state: EditorState): LiveMark[] {
         return [mark]
     }
   })
+}
+
+/** A table the live mode draws as a table: whole lines, from the start of its first to the end of its last. */
+export interface LiveTable {
+  readonly from: number
+  readonly to: number
+}
+
+/**
+ * The tables of the text that no selection touches (docs/plan-roadmap.md, part 11). Each is
+ * drawn in place of its lines, rendered as the preview renders it; once the cursor enters one
+ * of its lines, the table shows its source again, all of it.
+ */
+export function liveTables(state: EditorState): LiveTable[] {
+  const doc = state.doc
+  const tables: LiveTable[] = []
+  syntaxTree(state).iterate({
+    enter: (ref) => {
+      if (ref.name !== 'Table') return
+      const from = doc.lineAt(ref.from).from
+      // The parser may end a table after the line break of its last row.
+      const end = doc.sliceString(ref.to - 1, ref.to) === '\n' ? ref.to - 1 : ref.to
+      const to = doc.lineAt(Math.max(ref.from, end)).to
+      const touched = state.selection.ranges.some((range) => range.from <= to && range.to >= from)
+      if (!touched) tables.push({ from, to })
+      return false
+    }
+  })
+  return tables
 }

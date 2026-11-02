@@ -2,10 +2,10 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree } from '@codemirror/language'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import { describe, expect, it } from 'vitest'
-import { liveMarks, type LiveMark } from '../src/renderer/src/lib/live'
+import { liveMarks, liveTables, type LiveMark } from '../src/renderer/src/lib/live'
 
 /** The text with the cursor at `‸`, as the live mode sees it. */
-function marksOf(text: string): { doc: string; marks: LiveMark[] } {
+function stateOf(text: string): EditorState {
   const cursor = text.indexOf('‸')
   const doc = text.replace('‸', '')
   const state = EditorState.create({
@@ -14,7 +14,18 @@ function marksOf(text: string): { doc: string; marks: LiveMark[] } {
     extensions: [markdown({ base: markdownLanguage })]
   })
   ensureSyntaxTree(state, state.doc.length, 5000)
-  return { doc, marks: liveMarks(state) }
+  return state
+}
+
+function marksOf(text: string): { doc: string; marks: LiveMark[] } {
+  const state = stateOf(text)
+  return { doc: state.doc.toString(), marks: liveMarks(state) }
+}
+
+/** The source of each table the live mode draws as a table. */
+function tablesOf(text: string): string[] {
+  const state = stateOf(text)
+  return liveTables(state).map((table) => state.doc.sliceString(table.from, table.to))
 }
 
 /** What a reader sees of each line: the hidden marks taken out, bullets as `•`. */
@@ -93,9 +104,24 @@ describe('the live mode of the editor (docs/plan-roadmap.md, part 3)', () => {
     ])
   })
 
-  it('leaves tables as their source', () => {
+  it('leaves the marks inside a table alone: the table is drawn as a whole', () => {
     const table = '| a | b |\n| - | - |\n| **1** | 2 |'
     expect(rendered(`${table}\n\n‸`)).toBe(`${table}\n\n`)
+  })
+
+  // docs/plan-roadmap.md, part 11
+  it('draws a table as a table while the cursor is outside it, and as source inside', () => {
+    const table = '| Option | Cost |\n| :----- | ---: |\n| **A** | 1 |\n| B | 2 |'
+    expect(tablesOf(`# T\n\n${table}\n\nAfter.‸`)).toEqual([table])
+    expect(tablesOf(`# T\n\n${table}`)).toEqual([])
+    expect(tablesOf(`# T‸\n\n${table}\n`)).toEqual([table])
+    // Any line of it, the delimiter row too, shows the whole table's source.
+    const inside = table.replace(':-----', ':--‸---')
+    expect(tablesOf(`# T\n\n${inside}\n\nAfter.`)).toEqual([])
+    // Two tables: only the one with the cursor shows its source.
+    expect(tablesOf(`${table}\n\n${table}\n\n| x |\n| - |\n| y‸ |`)).toEqual([table, table])
+    // Without a delimiter row, it is no table.
+    expect(tablesOf('| a | b |\n| 1 | 2 |\n\n‸')).toEqual([])
   })
 
   it('hides a closing sequence of a heading with the space before it', () => {

@@ -23,6 +23,7 @@ import type {
 import { recordedIn } from './history'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
+import { moveOf, type StatusKey } from './views'
 
 /** One Status, or the ADRs whose Status could not be read, or no filter at all. */
 export type StatusFilter = Status | 'unknown' | 'all'
@@ -31,7 +32,8 @@ export type StatusFilter = Status | 'unknown' | 'all'
  * What the middle pane shows of the log in view: its ADRs, their Relations as a graph, its
  * Problems — or what other branches do to the ADRs of every log.
  */
-export type MiddleView = 'adrs' | 'graph' | 'problems' | 'branches'
+export type MiddleView =
+  'adrs' | 'graph' | 'timeline' | 'board' | 'dashboard' | 'problems' | 'branches'
 
 /** The modules of the suite the window switches between, per repository. */
 export type Module = 'decisions' | 'structure'
@@ -687,7 +689,10 @@ class AppState {
       // What is in the middle has to show where the jump went: the graph does if it draws
       // the ADR, the list does unless a filter hides it.
       const drawn = this.log?.relations.some(({ from, to }) => from === id || to === id)
-      if (!(tab.view === 'graph' && drawn)) tab.view = 'adrs'
+      // The timeline and the board show every ADR of the log.
+      const shown =
+        tab.view === 'timeline' || tab.view === 'board' || (tab.view === 'graph' && drawn)
+      if (!shown) tab.view = 'adrs'
       const adr = this.log?.adrs.find((candidate) => candidate.id === id)
       if (adr && tab.statusFilter !== 'all' && statusKey(adr) !== tab.statusFilter) {
         tab.statusFilter = 'all'
@@ -704,6 +709,32 @@ class AppState {
     const found = this.log?.adrs.some((adr) => adr.id === id) ?? false
     if (found) this.select(id)
     return found
+  }
+
+  /**
+   * Move an ADR to another Status, as on the board (docs/plan-roadmap.md, part 11): the
+   * operation the move stands for, previewed as from its detail; a move that is none is said so.
+   */
+  move(id: string, to: StatusKey): void {
+    const tab = this.active
+    const adr = this.log?.adrs.find((candidate) => candidate.id === id)
+    if (!tab || !adr) return
+    const move = moveOf(adr, to)
+    if (move.kind === 'stay') return
+    if (move.kind === 'refused') {
+      this.present({
+        kind: 'refused',
+        title: t.board.refusedTitle(prefixOf(adr)),
+        reason: t.board.refused[move.why]
+      })
+      return
+    }
+    // The ADR is selected first: its detail shows what the preview is about.
+    this.leaveEditor(() => {
+      tab.selectedId = id
+      if (move.kind === 'supersede') this.startCreating('supersedes')
+      else void this.decide(move.decision)
+    })
   }
 
   /** Ask for a decision on the selected ADR. The main process plans it; nothing is written yet. */
