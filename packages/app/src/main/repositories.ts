@@ -191,9 +191,16 @@ export class Repositories {
         : logs.find((candidate) => candidate.path === (logPath ?? logs[0]?.path))
     if (!log) return { ok: false, reason: t.noLogAt(logPath) }
 
-    const plan = await build(fs, log)
-    if (!plan.ok) return plan
+    return this.hold(repositoryId, await build(fs, log))
+  }
 
+  /**
+   * Hold a planned change for the renderer to show, and to apply or discard by its id. A plan
+   * of another module than Decisions says nothing of what it creates or renames.
+   */
+  hold(repositoryId: string, plan: Plan): PlanResult {
+    if (!plan.ok) return plan
+    if (!this.entries.has(repositoryId)) return { ok: false, reason: t.repositoryClosed }
     const changeId = randomUUID()
     this.planned.set(changeId, { repositoryId, changeSet: plan.changeSet })
     const warnings = plan.warnings ?? []

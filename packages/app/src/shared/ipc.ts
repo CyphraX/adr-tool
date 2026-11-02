@@ -7,6 +7,13 @@ import type {
   Repository,
   Templates
 } from '@adr-tool/core'
+import type {
+  Cycle,
+  Dependency,
+  NotAnalysed,
+  NotResolved,
+  StructureProblem
+} from '@adr-tool/structure/model'
 
 /**
  * The contract between the main process and the sandboxed renderer.
@@ -125,6 +132,64 @@ export interface MigrationRequest {
   readonly adrId?: string
 }
 
+/** One node of a level in the Structure view (docs/structure-format.md, section 4). */
+export interface StructureNode {
+  readonly kind: 'component' | 'own-files' | 'unassigned' | 'source-file'
+  /** The Component ID; the parent's for its own files; the path of a Source File. */
+  readonly id: string
+  /** The Component's name; the parent's for its own files; the file name of a Source File. */
+  readonly name: string
+  /** How many Source Files it stands for. */
+  readonly files: number
+}
+
+/** The Dependencies from one node of a level to another, and the Source File Dependencies behind them. */
+export interface StructureEdge {
+  readonly from: string
+  readonly to: string
+  readonly weight: number
+  readonly typeOnly: boolean
+  readonly dependencies: readonly Dependency[]
+}
+
+/**
+ * One level of a repository's Components as the Structure view shows it, with what the
+ * analysis found on the way. Computed in the main process from the analysis that ran off it.
+ */
+export interface StructureView {
+  readonly repositoryId: string
+  /** Declared in `.arch/components.yml`, or the Draft. */
+  readonly origin: 'declared' | 'draft'
+  readonly canAdopt: boolean
+  readonly problems: readonly StructureProblem[]
+  /** What the checks find on the Draft: hints, not Problems. */
+  readonly hints: readonly StructureProblem[]
+  readonly sourceFiles: number
+  readonly testFiles: number
+  readonly dependencies: number
+  /** How many different Libraries the code uses. */
+  readonly libraries: number
+  /** The uses that are not resolved: all of them counted, the first few hundred listed. */
+  readonly notResolvedCount: number
+  readonly notResolved: readonly NotResolved[]
+  readonly notAnalysed: readonly NotAnalysed[]
+  /** How long the analysis took. */
+  readonly milliseconds: number
+  /** The Components above the level, from the top down to its parent. Empty at the top. */
+  readonly path: readonly { readonly id: string; readonly name: string }[]
+  /** The Component whose children or Source Files are shown; `undefined` at the top. */
+  readonly parent: string | undefined
+  /** Whether test files are included. */
+  readonly tests: boolean
+  readonly nodes: readonly StructureNode[]
+  readonly edges: readonly StructureEdge[]
+  readonly cycles: readonly Cycle[]
+}
+
+export type StructureResult =
+  | { readonly ok: true; readonly view: StructureView }
+  | { readonly ok: false; readonly reason: string }
+
 export type PlanResult =
   | { readonly ok: true; readonly change: PlannedChange }
   | { readonly ok: false; readonly reason: string }
@@ -177,6 +242,21 @@ export interface Api {
   openExternal(url: string): Promise<void>
   /** Called whenever files of an open repository changed on disk. Returns a function that stops listening. */
   onRepositoryChanged(listener: (repository: OpenRepository) => void): () => void
+  /**
+   * One level of the repository's Components, analysed off the main thread the first time it
+   * is asked for. Below a Component that is no longer there, the top level comes back.
+   */
+  structureView(
+    repositoryId: string,
+    parent: string | undefined,
+    tests: boolean
+  ): Promise<StructureResult>
+  /** Called when the analysis of a repository changed: files changed, or a change was applied. */
+  onStructureChanged(listener: (repositoryId: string) => void): () => void
+  /** Plan writing the Draft into `.arch/components.yml`. Nothing is written until the change is applied. */
+  planAdopt(repositoryId: string): Promise<PlanResult>
+  /** Plan the Repair of a Problem of the declaration. Nothing is written until the change is applied. */
+  planStructureRepair(repositoryId: string, problem: StructureProblem): Promise<PlanResult>
   /** Say whether the window holds text that is not on disk. While it does, closing it asks first. */
   setUnsaved(unsaved: boolean): Promise<void>
   /** Called when the window is to close while it holds unsaved text. Nothing closes until it was answered. */
@@ -197,6 +277,10 @@ export const CHANNEL = {
   planRepair: 'change:plan-repair',
   planMigration: 'change:plan-migration',
   planCreate: 'change:plan-create',
+  planAdopt: 'change:plan-adopt',
+  planStructureRepair: 'change:plan-structure-repair',
+  structureView: 'structure:view',
+  structureChanged: 'structure:changed',
   listTemplates: 'templates:list',
   history: 'git:history',
   historyChange: 'git:history-change',

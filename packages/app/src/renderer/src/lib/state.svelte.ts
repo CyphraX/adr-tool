@@ -9,7 +9,14 @@ import {
   type Status,
   type TemplateInfo
 } from '@adr-tool/core'
-import type { Decision, HistoryEntry, OpenRepository, PlannedChange } from '../../../shared/ipc'
+import type { StructureProblem } from '@adr-tool/structure/model'
+import type {
+  Decision,
+  HistoryEntry,
+  OpenRepository,
+  PlannedChange,
+  StructureView
+} from '../../../shared/ipc'
 import { recordedIn } from './history'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
@@ -20,12 +27,37 @@ export type StatusFilter = Status | 'unknown' | 'all'
 /** What the middle pane shows of the log in view: its ADRs, their Relations as a graph, or its Problems. */
 export type MiddleView = 'adrs' | 'graph' | 'problems'
 
+/** The modules of the suite the window switches between, per repository. */
+export type Module = 'decisions' | 'structure'
+
+/** What is selected in the Structure view: a node, a line, a Cycle, or one of the lists. */
+export type StructureSelection =
+  | { kind: 'node'; id: string }
+  | { kind: 'edge'; from: string; to: string }
+  | { kind: 'cycle'; index: number }
+  | { kind: 'not-resolved' }
+  | { kind: 'not-analysed' }
+
+/** The Structure view of one repository: which level, with or without tests, and what is selected. */
+interface StructureTab {
+  parent: string | undefined
+  tests: boolean
+  /** The level as it was last analysed; kept while it is analysed again. */
+  view: StructureView | undefined
+  loading: boolean
+  /** Why the level could not be shown. */
+  error: string | undefined
+  selection: StructureSelection | undefined
+}
+
 interface Tab {
   repository: OpenRepository
+  module: Module
   logPath: string | undefined
   view: MiddleView
   statusFilter: StatusFilter
   selectedId: string | undefined
+  structure: StructureTab
 }
 
 /** What the dialog shows after an action was asked for. */
@@ -199,6 +231,10 @@ class AppState {
 
   async start(): Promise<void> {
     window.api.onRepositoryChanged((repository) => this.replace(repository))
+    window.api.onStructureChanged((repositoryId) => {
+      const tab = this.tabs.find((candidate) => candidate.repository.id === repositoryId)
+      if (tab?.structure.view) void this.loadStructure(tab)
+    })
     window.api.onCloseRequested(() => this.requestClose())
     const session = await window.api.restoreSession()
     this.tabs = session.repositories.map(newTab)
@@ -248,6 +284,90 @@ class AppState {
     })
   }
 
+  /** Switch the repository in front to another module. The editor is a Decisions thing. */
+  showModule(module: Module): void {
+    const tab = this.active
+    if (!tab || tab.module === module) return
+    this.leaveEditor(() => {
+      tab.module = module
+      if (module === 'structure' && !tab.structure.view) void this.loadStructure(tab)
+    })
+  }
+
+  /** Ask for the level the Structure view of a tab is at. The first time, that analyses the code. */
+  async loadStructure(tab: Tab | undefined = this.active): Promise<void> {
+    if (!tab) return
+    const { parent, tests } = tab.structure
+    tab.structure.loading = true
+    const result = await window.api.structureView(tab.repository.id, parent, tests)
+    // Somebody went elsewhere in the meantime: their request is the one that counts.
+    if (tab.structure.parent !== parent || tab.structure.tests !== tests) return
+    tab.structure.loading = false
+    if (!result.ok) {
+      tab.structure.error = result.reason
+      return
+    }
+    const view = result.view
+    tab.structure.error = undefined
+    tab.structure.view = view
+    tab.structure.parent = view.parent
+    if (!stillThere(tab.structure.selection, view)) tab.structure.selection = undefined
+  }
+
+  /** Go to the level below a Component, or back up to one above; `undefined` is the top. */
+  openComponent(id: string | undefined): void {
+    const tab = this.active
+    if (!tab) return
+    tab.structure.parent = id
+    tab.structure.selection = undefined
+    void this.loadStructure(tab)
+  }
+
+  includeTests(tests: boolean): void {
+    const tab = this.active
+    if (!tab || tab.structure.tests === tests) return
+    tab.structure.tests = tests
+    void this.loadStructure(tab)
+  }
+
+  selectInStructure(selection: StructureSelection | undefined): void {
+    if (this.active) this.active.structure.selection = selection
+  }
+
+  /** Plan writing the Draft into the declaration. Nothing is written yet. */
+  async adopt(): Promise<void> {
+    const tab = this.active
+    if (!tab) return
+    const texts = t.review.adopt
+    const plan = await window.api.planAdopt(tab.repository.id)
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: texts.title,
+          action: texts.action,
+          change: plan.change,
+          applying: false
+        }
+      : { kind: 'refused', title: texts.refused, reason: plan.reason }
+  }
+
+  /** Plan the Repair of a Problem of the declaration. Nothing is written yet. */
+  async repairStructure(problem: StructureProblem): Promise<void> {
+    const tab = this.active
+    if (!tab || problem.kind !== 'dead-pattern') return
+    const texts = t.review.structureRepair
+    const plan = await window.api.planStructureRepair(tab.repository.id, problem)
+    this.review = plan.ok
+      ? {
+          kind: 'change',
+          title: texts.title(problem.component),
+          action: texts.action,
+          change: plan.change,
+          applying: false
+        }
+      : { kind: 'refused', title: texts.refused(problem.component), reason: plan.reason }
+  }
+
   /** Filtering is about ADRs: it leads back to their list. */
   filterBy(filter: StatusFilter): void {
     if (!this.active) return
@@ -280,6 +400,8 @@ class AppState {
     const arrive = (): void => {
       const tab = this.active
       if (!tab) return
+      // An ADR is shown where ADRs are, whichever module was in front.
+      tab.module = 'decisions'
       tab.logPath = logPath
       tab.selectedId = id
       // What is in the middle has to show where the jump went: the graph does if it draws
@@ -711,10 +833,36 @@ function rebase(now: string[], was: string[], onDisk: string[]): string[] {
 function newTab(repository: OpenRepository): Tab {
   return {
     repository,
+    module: 'decisions',
     logPath: undefined,
     view: 'adrs',
     statusFilter: 'all',
-    selectedId: undefined
+    selectedId: undefined,
+    structure: {
+      parent: undefined,
+      tests: false,
+      view: undefined,
+      loading: false,
+      error: undefined,
+      selection: undefined
+    }
+  }
+}
+
+/** Whether what was selected is still on the level as it was analysed again. */
+function stillThere(selection: StructureSelection | undefined, view: StructureView): boolean {
+  switch (selection?.kind) {
+    case undefined:
+      return false
+    case 'node':
+      return view.nodes.some((node) => node.id === selection.id)
+    case 'edge':
+      return view.edges.some((edge) => edge.from === selection.from && edge.to === selection.to)
+    case 'cycle':
+      return selection.index < view.cycles.length
+    case 'not-resolved':
+    case 'not-analysed':
+      return true
   }
 }
 

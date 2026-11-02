@@ -63,6 +63,13 @@ export const t = {
     middle: 'Width of the middle pane'
   },
 
+  /** The modules of the suite, between which the window switches for the repository in front. */
+  modules: {
+    label: 'Modules',
+    decisions: 'Decisions',
+    structure: 'Structure'
+  },
+
   tabs: {
     label: 'Open repositories',
     open: 'Open repository',
@@ -204,6 +211,81 @@ export const t = {
     none: 'No Problems in this Decision Log.'
   },
 
+  structure: {
+    label: 'Components and what the analysis found',
+    components: 'Components',
+    declared: 'Declared in `.arch/components.yml`.',
+    draft:
+      'A Draft, derived from build files and folders because nothing is declared yet. It is a proposal: nothing is written until you adopt it.',
+    adopt: 'Adopt the Draft',
+    adoptHint:
+      'Write these Components into `.arch/components.yml`. You see the file before it is written.',
+    code: 'Code',
+    sourceFiles: (count: number): string => many(count, 'One Source File', `${count} Source Files`),
+    testFiles: (count: number): string =>
+      many(count, 'one of them a test', `${count} of them tests`),
+    dependencies: (count: number): string => many(count, 'One Dependency', `${count} Dependencies`),
+    libraries: (count: number): string => many(count, 'One Library', `${count} Libraries`),
+    analysedIn: (milliseconds: number): string =>
+      `Analysed in ${(milliseconds / 1000).toFixed(1)} s`,
+    includeTests: 'Include test files',
+    notResolved: 'Not resolved',
+    notAnalysed: 'Not analysed',
+    problems: 'Problems',
+    hints: 'Hints on the Draft',
+    repair: 'Repair',
+    analysing: 'Analysing the code of this repository …',
+    failed: 'The code could not be analysed',
+
+    graph: {
+      label: 'Components and the Dependencies between them',
+      top: 'All Components',
+      way: 'Where you are',
+      ownFiles: (name: string): string => `${name} (own files)`,
+      unassigned: 'Unassigned',
+      files: (count: number): string => many(count, 'one file', `${count} files`),
+      draft: 'Draft',
+      howToRead:
+        'Read it from left to right: a Component stands to the right of what it depends on, and its arrow points there. Double-click a Component to see its parts.',
+      empty: 'There is nothing to show here: no Source File lies below this Component.',
+      legend: 'What the lines mean',
+      dependency: 'Dependency',
+      typeOnly: 'type-only',
+      inCycle: 'in a Cycle',
+      weakest: 'weakest Dependency of a Cycle',
+      weight: (count: number): string =>
+        many(count, 'One Source File Dependency', `${count} Source File Dependencies`)
+    },
+
+    detail: {
+      label: 'Details',
+      cycles: 'Cycles',
+      noCycles: 'No Cycle at this level.',
+      cycle: (members: number): string => `A Cycle of ${members}`,
+      typeOnlyCycle: 'Type-only: it does not exist at run time.',
+      roundTrip: 'For example',
+      weakest: 'Weakest Dependency',
+      hint: 'Select a Component to see what it depends on and what uses it, or a line to see the Source File Dependencies behind it.',
+      dependsOn: 'Depends on',
+      usedBy: 'Used by',
+      nothing: 'Nothing at this level.',
+      showParts: 'Show its parts',
+      sourceFile: 'Source File',
+      lines: (lines: readonly number[]): string =>
+        `${many(lines.length, 'line', 'lines')} ${lines.join(', ')}`,
+      typeOnly: 'type-only',
+      notResolved: 'Uses that are not resolved',
+      notResolvedHint:
+        'Their target cannot be determined, so they are neither a Dependency nor the use of a Library. The suite never guesses.',
+      firstOf: (shown: number, total: number): string => `The first ${shown} of ${total}.`,
+      notAnalysed: 'Files that cannot be parsed',
+      notAnalysedHint:
+        'They keep their Component and have no Dependencies of their own until they can be parsed.',
+      unreadable: 'could not be read',
+      none: 'None.'
+    }
+  },
+
   graph: {
     heading: 'Relations',
     empty:
@@ -284,6 +366,16 @@ export const t = {
       action: 'Create',
       title: 'Create the ADR',
       refused: 'The ADR cannot be created'
+    },
+    adopt: {
+      action: 'Adopt',
+      title: 'Adopt the Draft',
+      refused: 'The Draft cannot be adopted'
+    },
+    structureRepair: {
+      action: 'Repair',
+      title: (component: string): string => `Repair the declaration of ${component}`,
+      refused: (component: string): string => `Cannot repair the declaration of ${component}`
     },
     metadata: {
       title: (prefix: string): string => `Change the Metadata of ADR ${prefix}`,

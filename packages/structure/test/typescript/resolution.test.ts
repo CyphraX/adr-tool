@@ -207,6 +207,16 @@ describe('what resolution reads, and what it leaves alone', () => {
     expect(resolver.resolve('lodash', from)).toEqual({ kind: 'library', name: 'lodash' })
   })
 
+  it('resolves a path with a query that only a bundler understands to the file it names', async () => {
+    const resolver = await inMemory({ 'src/a.ts': '', 'src/worker.ts': '', 'src/icon.svg': '' })
+    expect(resolver.resolve('./worker?nodeWorker', 'src/a.ts')).toEqual({
+      kind: 'source-file',
+      path: 'src/worker.ts'
+    })
+    expect(resolver.resolve('./icon.svg?raw', 'src/a.ts')).toEqual({ kind: 'ignored' })
+    expect(resolver.resolve('lodash?x', 'src/a.ts')).toEqual({ kind: 'library', name: 'lodash' })
+  })
+
   it('does not call a Library what is no package name', async () => {
     const resolver = await inMemory({ 'src/a.ts': '' })
     const from = 'src/a.ts'

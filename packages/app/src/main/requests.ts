@@ -1,4 +1,5 @@
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
+import type { StructureProblem } from '@adr-tool/structure/model'
 import type { MetadataEditRequest, MigrationRequest, RepairRequest } from '../shared/ipc'
 
 /**
@@ -45,6 +46,18 @@ export function migrationRequest(request: unknown): MigrationRequest | undefined
   if (typeof repositoryId !== 'string' || typeof logPath !== 'string') return undefined
   if (adrId !== undefined && typeof adrId !== 'string') return undefined
   return { repositoryId, logPath, ...(adrId !== undefined && { adrId }) }
+}
+
+/**
+ * A Problem of the declaration to repair, rebuilt field by field. Only a pattern that matches
+ * nothing has a Repair; whether the declaration still has it is `structure`'s question.
+ */
+export function structureRepairRequest(problem: unknown): StructureProblem | undefined {
+  const { kind, component, key, pattern } = record(problem)
+  if (kind !== 'dead-pattern' || typeof component !== 'string' || typeof pattern !== 'string') {
+    return undefined
+  }
+  return key === 'paths' || key === 'tests' ? { kind, component, key, pattern } : undefined
 }
 
 function repairOf(given: Record<string, unknown>): Repair | undefined {

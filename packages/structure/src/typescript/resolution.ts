@@ -292,7 +292,10 @@ export async function prepareResolver(
       : { kind: 'ignored' }
   }
 
-  function resolve(specifier: string, from: string): Resolution {
+  function resolve(written: string, from: string): Resolution {
+    // A query only a bundler understands (`./worker?nodeWorker`, `./icon.svg?raw`) changes
+    // how the file is used, not which file it is.
+    const specifier = written.replace(/\?[^/]*$/, '')
     if (specifier.startsWith('node:') || BUILT_IN.has(specifier.split('/')[0]!)) {
       return { kind: 'built-in' }
     }

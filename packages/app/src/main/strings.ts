@@ -15,6 +15,8 @@ export const t = {
       ? `There is no Decision Log at ${logPath} any more.`
       : 'This Decision Log is not there any more.',
   changeGone: 'This change is no longer available.',
+  analysisFailed: (reason: string): string =>
+    `The code of this repository could not be analysed: ${reason}`,
   changedSincePreview: (files: string): string =>
     `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`
 }
