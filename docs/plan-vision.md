@@ -146,6 +146,61 @@ For Lena. The module in the window, with its tools for the agent.
 
 *Done when:* Lena's scenario of [personas.md](personas.md) works on a copy of this repository with an import from `core` into `structure` added: the Rule is written in the window, the Violation shows in the list and on the graph, opens the import line, is accepted as an Exception that cites an ADR, and `adr check` passes; a Rename of `structure` rewrites the Rule and the Exception in its preview; the agent's scenario through the MCP server sees the Rule before it writes code.
 
+*Status (2026-11-03):* built.
+
+- **Writing the Rules file** is `packages/conformance/src/write.ts`, as [conformance-format.md](conformance-format.md), section 7, now describes it:
+  - `planAddRule`, `planChangeRule` and `planRemoveRule` (a Rule goes with its Exceptions);
+  - `planAddException`, and `planConformanceRepair` with `repairOf` for the Repairs of section 5: take an unmatched or doubled Exception out, narrow one whose Cycle shrank;
+  - `draftOf` and `renderRule` for the form, and `findException`.
+
+  Each one splices ([ADR-0002](adr/0002-never-reserialize-markdown.md)), and its result is read back and compared to what was meant before it is handed out. What cannot be written that way is refused with `cannot-write-rules` and the reason: the top level or an item in braces, a list in brackets, an anchor or alias, a comment that would be lost, or a text that reads otherwise. `check.ts` gained `checkPlannedImport`, which gives the Violations an import would be part of before it is written, and exports `fingerprintOf` and `FINGERPRINT_KEYS`. The kernel holds the sentences of a YAML file that cannot be read (`YAML_SENTENCES`), which Structure and Conformance both use. 28 new tests are in `packages/conformance/test/write.test.ts` and `planned.test.ts`, which makes 87 in the package.
+- **One composition of the check**, `conformanceOf` in `packages/cli/src/conformance.ts`, serves `adr check`, the app's main process and the MCP server, so the three say the same of the same files. `packages/cli/src/analysis.ts` lists and analyses a repository for the command and the server alike.
+- **MCP** has five new tools: `read_structure`, `list_rules`, `list_violations` (also of a planned import, given `from` and `to`), `plan_rule` and `plan_exception` ([mcp.md](mcp.md); 2 new tests in `packages/mcp/test/server.test.ts`).
+- **The window.** Conformance is the third word of the module switcher. Where its parts sit in the frame, as in the README's first screenshot of it (`docs/screenshots/readme/conformance-violation.png`):
+  - The **sidebar**, from the top: under *Check*, the row **Repository Problems**; under *Rules*, **All Violations**, then each Rule by its ID in the code font with a red count of its Violations, then **Exceptions** with a count that is not red; under *The Rules file*, `.arch/rules.yml`, which opens in the code viewer.
+  - The **centre**: the title (*All Violations*, *Violations of …*, *Exceptions*) on the left; on the right a segmented switch, **List** or **Graph**, and the bordered **New Rule**. The list is a listbox, with the Violations accepted as Exceptions in a group below the others. **Graph** is Structure's drawing of a level, with the Violations in red and a breadcrumb into the levels below.
+  - The **detail** of a Violation: its sentence, its fingerprint, **Accept as Exception**, its Rule with its why, and its Source File Dependencies, where each line number opens the code viewer at the import. The detail of a Rule: what it says, its ID, **Change**, **Remove** and **Show its Violations**, then the why, the kind in words, where it is written, its options, its Violations and its Exceptions. The detail of an Exception: its reason, its ADR, its Rule, where it is written and what it accepts, with **Remove**.
+- **The Rule form** (`RuleForm.svelte`) and the form of **Accept as Exception** stand in the detail, beside the Violations. The Rule form takes the ID, the why and the kind, then the keys of that kind; layers are added and removed as rows. **Preview** opens the change dialog. The Exception form takes a reason and, if you like, an ADR from a picker.
+- **Exceptions and Problems.** The Problems and notes of `.arch/rules.yml` are a section of the repository's Problems, each at its line of the file with its Repair (**Remove** or **Narrow**). A note is not red. **Back to the Violations** returns from that list.
+- **Across the modules**, the page of a Component lists the Rules that name it and its Violations, and an ADR lists under *Justifies* the Exceptions that cite it.
+- **Structure's graph** caught up with [design.md](design.md):
+  - a list beside the drawing reads each line out as a sentence, with its Cycle or its Violations;
+  - the boxes are buttons in reading order, column by column;
+  - the rows of the metrics table are moved through with the arrows, and Enter opens a Component;
+  - the dividers of Structure and Conformance can be dragged as in Decisions.
+
+  On Conformance's drawing a line that breaks a Rule is drawn over the others, at least 2.6 px wide, and scrolled into view; the other lines step back.
+- **In the background**, the Rules are checked on the analysis Structure keeps in the main process (`conformanceView`, `main/conformance.ts`). With the module open, the files are watched; before that, the last analysis serves, and the sidebar says when it was made. A change to `.arch/rules.yml`, or to an ADR, is read at once.
+- **German** has every new string, and every code of Conformance and of the writing (`said.de.ts`, typed by the codes of all five cores).
+- **App tests:** 10 in `packages/app/test/conformance.test.ts` (the form, the levels of the drawing, the names, the ADRs), and 2 more in `repository-problems.test.ts` and 3 in `said.test.ts`.
+
+In the running app, in English and in German, on a copy of this repository with `import { STATUSES } from '@adr-tool/core'` added as line 2 of `packages/structure/src/declaration.ts` and the Rule `core-and-structure-apart` taken out of `.arch/rules.yml`.
+
+What the app showed:
+
+- The sidebar lists the seven Rules with 0, and the centre says "No Violation: the code keeps to every Rule."
+- **New Rule**, `must-not-depend` from `core` and `structure` to `core` and `structure`: the preview, "This changes one file. Nothing else in it is touched.", adds a blank line and the Rule's five lines at the end of `rules`. Afterwards "All Violations" and the Rule show a red 1, and the list says "structure must not depend on core" ("structure darf nicht von core abhängen").
+- The detail of the Violation names `packages/structure/src/declaration.ts` at line 2, and the line opens the code viewer on `from '@adr-tool/core'`. **Graph** shows the one red line from `structure` to `core`, over the grey ones, with "breaks a Rule" in the legend. The spoken list reads "structure depends on core: one Source File Dependency. Violation: structure must not depend on core."
+- **Accept as Exception** with a reason and ADR 0006: the preview adds the Exception with `justified-by: docs/adr/0006-…`. The Violation moves to "Accepted as Exceptions", "Exceptions" counts 1, and `adr check` passes: "8 Rules hold, but for 1 Violation accepted as an Exception."
+- The page of `structure` lists the Rule. ADR 0006 lists the Exception under *Justifies*.
+- **Rename** of `structure` to `model` previews 3 files. In `.arch/rules.yml` it changes the layering, the `to` of the three Rules that stand on `structure`, `from: [core, model]` and `to: [core, model]` of the new Rule, and `from: model` of the Exception.
+- With the import taken out, Repository Problems counts 1: "The Exception core-and-structure-apart: structure -> core matches no Violation any more." Its Repair **Remove** previews taking out its lines, and afterwards `adr check` passes again.
+- Dragging either divider of Structure and Conformance moves it, the arrows move it too, and a double click resets it. No page reported an error.
+
+Through the MCP server, on that copy with the Rule written and no import: `list_rules` lists `core-and-structure-apart`, and `list_violations` with `from: packages/structure/src/declaration.ts` and `to: @adr-tool/core` answers `breaks: 1` with that Rule's sentence, so the agent sees the Rule before it writes code. The same call with `@adr-tool/kernel` breaks nothing.
+
+What changed on the way:
+
+- Merging main, which brought part 3's review, made the code `key-twice` of Conformance `written-twice`, since Structure has a `key-twice` of its own and the German table holds both.
+- The MCP server now depends on `conformance`. The Diagram of the packages has that connection, and its SVG is drawn again.
+- Where design.md did not say, it now does: a form about what the view shows stands in the detail, a table keeps its rows for the arrows, and on Conformance's drawing red is a Violation alone.
+
+What remains:
+
+- An Exception's reason or ADR is changed in an editor. The window adds an Exception, and removes or narrows one.
+- A planned import over MCP stands at line 1 of its file, since it has no line yet.
+- The Rules that an applied Pattern stands for are part 5's.
+
 ### Part 5 — Patterns and the Baseline
 
 For Lena and Jonas, on a repository that was not built to its rules.

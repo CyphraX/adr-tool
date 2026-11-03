@@ -9,7 +9,7 @@ How the window of Softarch Suite looks and behaves, written down so that every m
 - **Three panes** in every module:
   - The **sidebar** on the left: what there is to look at, and filters. Each entry is a row with its label on the left and a count on the right. A count of something wrong is a red badge. Sections have small grey headings.
   - The **centre**: the list, graph, matrix, board or document of the view. Its head row has the view's title on the left and its tools on the right, as bordered buttons or a segmented switch; a legend, where the view needs one, stands at its foot.
-  - The **detail** on the right: the thing that is selected. It starts with a small grey label of its kind ("Component", "Rule", "Annotation"), its title, its ID in the code font, and its actions as bordered buttons in one row; then sections, each under a small grey heading. The divider between the panes can be dragged — in Structure from part 4 of [plan-vision.md](plan-vision.md) on.
+  - The **detail** on the right: the thing that is selected. It starts with a small grey label of its kind ("Component", "Rule", "Annotation"), its title, its ID in the code font, and its actions as bordered buttons in one row; then sections, each under a small grey heading. The dividers between the panes can be dragged, in every module.
 - **Every module answers the same three questions** in the same places: what there is (sidebar), how it hangs together (centre), and what this one is (detail).
 
 ## Writing
@@ -17,6 +17,7 @@ How the window of Softarch Suite looks and behaves, written down so that every m
 - **Nothing is written without a preview** ([ADR-0004](adr/0004-operations-return-change-sets.md)). Every action that changes a file opens the change dialog: a title that says what happens, a line that says how many files change, the diff of each, and the action as the dialog's one primary button.
 - **One primary button per view**, dark and filled: in a dialog, the action that writes, on the right with Cancel left of it; in a view, the one thing the view is there for, such as **Adopt the Draft**. The actions of a detail are bordered buttons, each opening the preview of what it writes.
 - **Forms write the files people also edit by hand.** A form changes the lines it is about and nothing else ([ADR-0002](adr/0002-never-reserialize-markdown.md)); what it cannot write without rewriting more, it refuses with a sentence.
+- **A form about what the view shows stands in the detail**, so that what it is about stays in sight: Conformance's form of a Rule, and its **Accept as Exception**, beside the Violations. Its Preview is its one primary button, with Cancel left of it. A form that starts something of its own, such as a new ADR or the Metadata of one, is a dialog.
 
 ## Words
 
@@ -31,11 +32,11 @@ How the window of Softarch Suite looks and behaves, written down so that every m
 - **Colour has a meaning.** Red (`--problem`) is for what is wrong: a Problem, a Violation, a Cycle, a Drift. The colours of the five Status values say a Status and nothing else — a rejected ADR is red without being wrong. Amber is for what waits for a person, green for what is decided or holds. Selection, hover and the code have tokens of their own; everything else is ink on paper, in three strengths.
 - **Type:** IBM Plex Sans for the window, IBM Plex Serif for what people write as documents — an ADR, an Assessment, a chapter of arc42 —, IBM Plex Mono for code, paths and IDs.
 - **Words over icons.** The marks of a Status and the × that closes a tab are the only icons; a button says what it does.
-- **Graphs** read from left to right: a box stands to the right of what it depends on, and its arrow points there. A solid line is a Dependency, a dashed one type-only; red marks a Cycle or a Violation. A dashed border marks something from elsewhere. Every graph has its legend at its foot.
+- **Graphs** read from left to right: a box stands to the right of what it depends on, and its arrow points there. A solid line is a Dependency, a dashed one type-only; red marks a Cycle or a Violation. Conformance draws Structure's graph with red for a Violation alone — a Cycle is red there where a Rule forbids it —, over the other lines, which step back to a lighter grey. A dashed border marks something from elsewhere. Every graph has its legend at its foot.
 
 ## Behaviour
 
-- **The keyboard reaches everything.** A list is a listbox that the arrows move through; <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd>) searches; <kbd>Escape</kbd> closes a dialog; focus is drawn in `--focus`. Structure's lists catch up in part 4 of [plan-vision.md](plan-vision.md).
-- **A graph is also a text.** Every graph and Diagram has a list beside it that a screen reader reads out as sentences, and its boxes are buttons in reading order — the Relations graph since part 14 of [plan-roadmap.md](plan-roadmap.md), Structure's Dependency graph from part 4 of [plan-vision.md](plan-vision.md) on.
+- **The keyboard reaches everything.** A list is a listbox that the arrows move through; <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd>) searches; <kbd>Escape</kbd> closes a dialog; focus is drawn in `--focus`. A table stays a table — Structure's metrics, a row per Component —, and the arrows move through its rows as through a list.
+- **A graph is also a text.** Every graph and Diagram has a list beside it that a screen reader reads out as sentences, and its boxes are buttons in reading order — the Relations graph since part 14 of [plan-roadmap.md](plan-roadmap.md), Structure's Dependency graph, and Conformance's drawing of it, since part 4 of [plan-vision.md](plan-vision.md). The sentence of a line says what is wrong with it: its Cycle, or the Violations on it.
 - **Analysis happens in the background.** The window stays usable while code is analysed, says what it is doing, and shows the last result until the new one is there.
 - **What is derived is never stored**, and the window says when something is derived: a Draft, a Violation, a Drift, a metric.
