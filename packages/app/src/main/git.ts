@@ -1,7 +1,13 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { isAbsolute, join, resolve as resolvePath } from 'node:path'
-import { GIT_OPTIONS, gitExecutable, within } from '@adr-tool/cli/git'
+import {
+  GIT_OPTIONS,
+  gitExecutable,
+  READ_ENVIRONMENT,
+  READ_OPTIONS,
+  within
+} from '@adr-tool/cli/git'
 import { t } from './strings'
 
 /**
@@ -36,6 +42,12 @@ export type CommitOutcome =
  * signing that are configured, as it does on the command line. A file git does not know yet
  * is announced to it first, and taken out of the index again when the commit fails.
  * The paths are relative to the opened directory; nothing is pushed.
+ *
+ * What only reads — which files git knows, where HEAD is — runs as every read does
+ * (`READ_OPTIONS`). What writes runs on `GIT_OPTIONS` alone: no pager, literal paths, no
+ * fsmonitor, and otherwise what the repository configures for a commit — its hooks, its
+ * signing, the filters that make the content that is committed, and the fetch of what a
+ * partial clone lacks for it — as `git commit` in a terminal would.
  */
 export async function commitFiles(
   root: string,
@@ -45,13 +57,19 @@ export async function commitFiles(
 ): Promise<CommitOutcome> {
   const git = (
     args: string[],
-    timeout = 15_000
+    { timeout = 15_000, reads = false } = {}
   ): Promise<{ ok: boolean; stdout: string; stderr: string }> =>
     new Promise((resolve) => {
       execFile(
         executable,
-        [...GIT_OPTIONS, ...args],
-        { cwd: root, timeout, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+        [...(reads ? READ_OPTIONS : GIT_OPTIONS), ...args],
+        {
+          cwd: root,
+          timeout,
+          maxBuffer: 16 * 1024 * 1024,
+          windowsHide: true,
+          ...(reads && { env: { ...process.env, ...READ_ENVIRONMENT } })
+        },
         (error, stdout, stderr) => resolve({ ok: !error, stdout, stderr })
       )
     })
@@ -70,7 +88,7 @@ export async function commitFiles(
   if (outside !== undefined) return { committed: false, reason: t.commit.notInRepository(outside) }
   if (paths.length === 0) return { committed: false, reason: t.commit.failed }
 
-  const tracked = await git(['ls-files', '-z', '--', ...paths])
+  const tracked = await git(['ls-files', '-z', '--', ...paths], { reads: true })
   if (!tracked.ok) return { committed: false, reason: said(tracked) }
   const known = new Set(tracked.stdout.split('\0').filter(Boolean))
   const announced = paths.filter((path) => !known.has(path) && existsSync(join(base, path)))
@@ -79,10 +97,12 @@ export async function commitFiles(
     if (!added.ok) return { committed: false, reason: said(added) }
   }
   const head = async (): Promise<string> =>
-    (await git(['rev-parse', '--verify', '--quiet', 'HEAD'])).stdout.trim()
+    (await git(['rev-parse', '--verify', '--quiet', 'HEAD'], { reads: true })).stdout.trim()
   const parent = await head()
   // A hook may take its time; a signing may wait for a passphrase.
-  const done = await git(['commit', '--only', '--quiet', '-m', text, '--', ...paths], 120_000)
+  const done = await git(['commit', '--only', '--quiet', '-m', text, '--', ...paths], {
+    timeout: 120_000
+  })
   const sha = await head()
   if (done.ok) return { committed: true, sha }
   // HEAD moved: the commit is made, whatever failed after it. Its files are in it to stay.

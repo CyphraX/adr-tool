@@ -57,6 +57,22 @@ export const GIT_OPTIONS: readonly string[] = [
 ]
 
 /**
+ * What every read adds: no optional locks, and no transport at all, so that a partial clone
+ * fetches nothing it lacks — with `GIT_NO_LAZY_FETCH` (`READ_ENVIRONMENT`), and with
+ * `protocol.allow` for gits older than that, which would run the `core.sshCommand` of the
+ * repository's configuration to fetch.
+ */
+export const READ_OPTIONS: readonly string[] = [
+  '--no-optional-locks',
+  ...GIT_OPTIONS,
+  '-c',
+  'protocol.allow=never'
+]
+
+/** What every read runs with besides the environment it inherits. */
+export const READ_ENVIRONMENT: Readonly<Record<string, string>> = { GIT_NO_LAZY_FETCH: '1' }
+
+/**
  * What a read of a diff or a log adds: no colours a configuration asks for, no external diff,
  * no textconv — programs the configuration names — and no signature checks.
  */
@@ -179,8 +195,9 @@ const STATUS = /^[ACDMRTUXB]\d*$/
  *
  * A repository is untrusted input, its configuration included. Nothing here takes a lock,
  * pages, or runs a program the repository names: no fsmonitor, no signature check, no
- * textconv, filter or external diff (`cat-file blob` prints the blob as it is), and no fetch
- * of an object a partial clone lacks, which would run the transport the configuration names.
+ * textconv or external diff, no filter (`cat-file blob` prints the blob as it is, and status
+ * runs with every filter driver emptied), no submodule, and no fetch of an object a partial
+ * clone lacks, which would run the transport the configuration names.
  */
 export function gitIn(root: string, executable = gitExecutable()): RepositoryGit {
   /** The output of a git command, or how it ended when it failed: its exit code, if it exited. */
@@ -191,10 +208,10 @@ export function gitIn(root: string, executable = gitExecutable()): RepositoryGit
     new Promise((resolve) => {
       const child = execFile(
         executable,
-        ['--no-optional-locks', ...GIT_OPTIONS, ...args],
+        [...READ_OPTIONS, ...args],
         {
           cwd: root,
-          env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+          env: { ...process.env, ...READ_ENVIRONMENT },
           timeout: 15_000,
           maxBuffer: 64 * 1024 * 1024,
           windowsHide: true,
@@ -215,6 +232,32 @@ export function gitIn(root: string, executable = gitExecutable()): RepositoryGit
   /** The output of a git command, read as UTF-8, or `undefined` when it fails. */
   const run = async (args: string[], input?: string): Promise<string | undefined> =>
     (await output(args, input))?.toString('utf8')
+
+  /**
+   * The options that empty every filter driver the configuration names, so that `git status`
+   * does not run its `clean` command or `process` on a file whose stat changed. `undefined`
+   * for a driver whose name cannot be passed with `-c` — it holds a `=` —: then status is
+   * not run at all.
+   */
+  const withoutFilters = async (): Promise<string[] | undefined> => {
+    const done = await call(['config', '--null', '--name-only', '--get-regexp', '^filter\\.'])
+    // It exits with 1 when nothing matches.
+    if (done.stdout === undefined) return done.code === 1 ? [] : undefined
+    const drivers = new Set(
+      done.stdout
+        .toString('utf8')
+        .split('\0')
+        .filter((key) => key.startsWith('filter.') && key.lastIndexOf('.') > 'filter.'.length)
+        .map((key) => key.slice('filter.'.length, key.lastIndexOf('.')))
+    )
+    if ([...drivers].some((driver) => driver.includes('='))) return undefined
+    return [...drivers].flatMap((driver) =>
+      ['clean=', 'smudge=', 'process=', 'required=false'].flatMap((setting) => [
+        '-c',
+        `filter.${driver}.${setting}`
+      ])
+    )
+  }
 
   /** `service/` when the directory is `service` below the top of the repository. */
   const folder = async (): Promise<string | undefined> =>
@@ -360,9 +403,22 @@ export function gitIn(root: string, executable = gitExecutable()): RepositoryGit
     },
 
     async workingTree(): Promise<WorkingTree | undefined> {
+      // Status reads files of the working tree that may have changed: through their filters,
+      // which are emptied, and into submodules, which are left alone.
+      const filters = await withoutFilters()
+      if (filters === undefined) return undefined
       const [top, status] = await Promise.all([
         folder(),
-        run(['status', '--porcelain', '-z', '--untracked-files=all', '--', '.'])
+        run([
+          ...filters,
+          'status',
+          '--porcelain',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=all',
+          '--',
+          '.'
+        ])
       ])
       if (top === undefined || status === undefined) return undefined
       const branch = (await run(['symbolic-ref', '--short', '-q', 'HEAD']))?.trim()
