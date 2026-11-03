@@ -167,7 +167,12 @@ export async function analyseDependencies(
     }
     if (!extraction.analysed) {
       const { line, message, said } = extraction
-      notAnalysed.push({ file: path, line, message, ...(said && { said }) })
+      notAnalysed.push({
+        file: path,
+        ...(line !== undefined && { line }),
+        message,
+        ...(said && { said })
+      })
       continue
     }
     if (extraction.measures) measures.set(path, extraction.measures)

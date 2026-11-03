@@ -147,6 +147,8 @@ Test files are part of the model, so that a Dependency of production code on tes
 
 A Source File that cannot be parsed is **not analysed**: it stays in the model, keeps its Component, and has no outgoing Dependencies. The number of such files is shown. It is not a Problem — the file is not an artefact of the suite.
 
+So is a file its parser, or the reading of its tree, fails on as a whole — nested too deeply for the parser's stack, say: TypeScript's parser runs out of it on a function of 1,200 nested `if`s. It is named without a line, with why, and every other file is analysed all the same.
+
 ## 3. Dependencies (parts 3 and 4)
 
 A **Dependency** is directed, from the Source File that uses to the Source File that is used, both inside the repository. Several uses between the same two files are one Dependency. A file never depends on itself.
