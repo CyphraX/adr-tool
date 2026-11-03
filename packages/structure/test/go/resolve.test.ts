@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { memoryFileSystem } from '@adr-tool/kernel'
 import { analyseDependencies } from '../../src/dependencies'
 import { extractorOf } from '../../src/extraction'
-import { prepareGo } from '../../src/go/outline'
+import { prepareGo, type GoOutline } from '../../src/go/outline'
+import { resolveGo } from '../../src/go/resolve'
 import { sourceFilesAmong } from '../../src/source-files'
 
 const require = createRequire(import.meta.url)
@@ -223,5 +224,36 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
       'main.go': ['package main', 'import "github.com/x/y/z"', 'func main() { z.Do() }']
     })
     expect([edges, unresolved, used]).toEqual([[], [], ['main.go github.com/x/y/z']])
+  })
+
+  it('resolves a package of 200 files with 400 declarations each in time linear in its uses', () => {
+    const FILES = 200
+    const NAMES = 200
+    const outlines = new Map<string, GoOutline>()
+    for (let file = 0; file < FILES; file++) {
+      const declares: string[] = []
+      const names: { name: string; line: number }[] = []
+      for (let name = 0; name < NAMES; name++) {
+        declares.push(`F${file}_${name}`, `G${file}_${name}`)
+        names.push(
+          { name: `F${(file + 1) % FILES}_${name}`, line: name + 3 },
+          { name: `G${(file + 7) % FILES}_${name}`, line: name + 3 }
+        )
+      }
+      outlines.set(`big/f${file}.go`, {
+        package: 'big',
+        imports: [],
+        declares,
+        selections: [],
+        names
+      })
+    }
+    const started = performance.now()
+    const { uses } = resolveGo(outlines, {
+      modules: [{ directory: '', path: 'example.com/big', requires: [], replaces: [] }],
+      replaces: []
+    })
+    expect(performance.now() - started).toBeLessThan(3000)
+    expect(uses).toHaveLength(FILES * NAMES * 2)
   })
 })

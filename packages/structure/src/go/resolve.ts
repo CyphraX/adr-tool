@@ -39,6 +39,8 @@ const isTest = (path: string): boolean => path.endsWith('_test.go')
 interface Package {
   readonly name: string
   readonly files: readonly string[]
+  /** The files of the package that declare each name: looked up, not searched, for every use. */
+  readonly declarers: ReadonlyMap<string, readonly string[]>
 }
 
 export function resolveGo(
@@ -49,7 +51,35 @@ export function resolveGo(
   const inDirectory = new Map<string, string[]>()
   for (const path of [...outlines.keys()].sort()) {
     const directory = directoryOf(path)
-    inDirectory.set(directory, [...(inDirectory.get(directory) ?? []), path])
+    const files = inDirectory.get(directory)
+    if (files) files.push(path)
+    else inDirectory.set(directory, [path])
+  }
+
+  /**
+   * A package as its files are seen: the files of a directory under one package name, the test
+   * files among them where `tests` asks for them — as a test file of the package sees it —,
+   * with what each of them declares. Built once for each, so that a use is a lookup.
+   */
+  const views = new Map<string, Package>()
+  const viewOf = (directory: string, name: string, tests: boolean): Package => {
+    const key = `${directory}\n${name}\n${tests}`
+    const known = views.get(key)
+    if (known) return known
+    const files = (inDirectory.get(directory) ?? []).filter(
+      (path) => outlines.get(path)!.package === name && (tests || !isTest(path))
+    )
+    const declarers = new Map<string, string[]>()
+    for (const file of files) {
+      for (const declared of outlines.get(file)!.declares) {
+        const list = declarers.get(declared)
+        if (list === undefined) declarers.set(declared, [file])
+        else if (list.at(-1) !== file) list.push(file)
+      }
+    }
+    const view = { name, files, declarers }
+    views.set(key, view)
+    return view
   }
 
   /** The module a file or directory belongs to: the deepest go.mod above it. */
@@ -85,10 +115,7 @@ export function resolveGo(
         (name !== 'main' && count > counts.get(chosen)!)
       if (better) chosen = name
     }
-    const found =
-      chosen === undefined
-        ? undefined
-        : { name: chosen, files: files.filter((path) => outlines.get(path)!.package === chosen) }
+    const found = chosen === undefined ? undefined : viewOf(directory, chosen, false)
     packages.set(directory, found)
     return found
   }
@@ -132,8 +159,8 @@ export function resolveGo(
     const use = (files: readonly string[], line: number): void => {
       for (const to of files) if (to !== path) uses.push({ from: path, to, line })
     }
-    const declaring = (pkg: Package, name: string): string[] =>
-      pkg.files.filter((file) => outlines.get(file)!.declares.includes(name))
+    const declaring = (pkg: Package, name: string): readonly string[] =>
+      pkg.declarers.get(name) ?? []
 
     /** The packages of the repository the file imports, by the name it uses them by. */
     const bound = new Map<string, { pkg: Package; path: string; line: number; used: boolean }>()
@@ -180,13 +207,7 @@ export function resolveGo(
     // A name without a qualifier: the file of its own package that declares it, or of a
     // package imported with `.`. A test file sees the other files of its package; others
     // do not see the tests.
-    const own = (inDirectory.get(directoryOf(path)) ?? []).filter(
-      (file) =>
-        file !== path &&
-        outlines.get(file)!.package === outline.package &&
-        (isTest(path) || !isTest(file))
-    )
-    const ownPackage: Package = { name: outline.package, files: own }
+    const ownPackage = viewOf(directoryOf(path), outline.package, isTest(path))
     for (const { name, line } of outline.names) {
       if (bound.has(name)) continue
       const files = declaring(ownPackage, name)
