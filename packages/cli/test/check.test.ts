@@ -16,6 +16,7 @@ const pythonShop = fileURLToPath(
   new URL('../../structure/test/fixtures/python-shop/', import.meta.url)
 )
 const goShop = fileURLToPath(new URL('../../structure/test/fixtures/go-shop/', import.meta.url))
+const fixtureShop = fileURLToPath(new URL('../../structure/test/fixtures/shop/', import.meta.url))
 
 /** Runs the command in `cwd` as a shell would, and keeps what it prints. */
 async function adrIn(
@@ -346,6 +347,98 @@ describe('adr check (docs/cli.md)', () => {
       'No Decision Log.',
       '2 Violations of 2 Rules.'
     ])
+  })
+
+  it('fails at a function whose complexity is above its threshold, on Java', async () => {
+    const root = copyOf(mavenShop, {
+      '.arch/components.yml':
+        'components:\n  cart:\n    paths: [cart/**]\n  catalog:\n    paths: [catalog/**]\n  web:\n    paths: [web/**]\n',
+      '.arch/rules.yml': [
+        'rules:',
+        '  - id: functions-stay-simple',
+        '    why: A function with more ways through it than that cannot be tested path by path.',
+        '    kind: threshold',
+        '    metric: complexity',
+        '    max: 4',
+        "    of: '*'",
+        ''
+      ].join('\n')
+    })
+    const text = await adrIn(root, 'check')
+    expect([text.code, text.err]).toEqual([1, ''])
+    const at = 'cart/src/main/java/com/shop/cart/Cart.java:19'
+    expect(lines(text.out)).toEqual([
+      `${at}: functions-stay-simple: The metric complexity of the function Cart.discount(long) at ${at} is 5, above the maximum of 4. A function with more ways through it than that cannot be tested path by path.`,
+      '',
+      'No Decision Log.',
+      '1 Violation of 1 Rule.'
+    ])
+    const github = await adrIn(root, 'check', '--format', 'github')
+    expect(lines(github.out)[0]).toMatch(
+      /^::error file=cart\/src\/main\/java\/com\/shop\/cart\/Cart\.java,line=19,title=functions-stay-simple::/
+    )
+    const json = JSON.parse((await adrIn(root, 'check', '--format', 'json')).out)
+    expect(json.violations).toEqual([
+      expect.objectContaining({
+        code: 'threshold',
+        fingerprint: {
+          kind: 'function',
+          rule: 'functions-stay-simple',
+          file: 'cart/src/main/java/com/shop/cart/Cart.java',
+          name: 'Cart.discount(long)'
+        },
+        fingerprintText:
+          'functions-stay-simple: Cart.discount(long) in cart/src/main/java/com/shop/cart/Cart.java',
+        path: 'cart/src/main/java/com/shop/cart/Cart.java',
+        line: 19,
+        value: 5,
+        dependencies: []
+      })
+    ])
+    // Accepted by its file and name, it fails nothing.
+    const accepted = copyOf(root, {
+      '.arch/rules.yml': `${readFileSync(join(root, '.arch/rules.yml'), 'utf8')}exceptions:
+  - rule: functions-stay-simple
+    file: cart/src/main/java/com/shop/cart/Cart.java
+    name: Cart.discount(long)
+    reason: The discount tiers are one table, read top to bottom.
+`
+    })
+    expect(lines((await adrIn(accepted, 'check')).out).at(-1)).toBe(
+      '1 Rule holds, but for 1 Violation accepted as an Exception.'
+    )
+  })
+
+  it('notes an Exception that names a function by its position among those of its name', async () => {
+    const root = copyOf(fixtureShop, {
+      'src/cart/both.ts':
+        'export function both(list: number[]): number[] {\n  return list.map((x) => (x > 1 ? x : 0)).concat(list.map((x) => (x > 2 ? x : 0)))\n}\n',
+      '.arch/rules.yml': [
+        'rules:',
+        '  - id: functions-stay-simple',
+        '    why: A function with more ways through it than that cannot be tested path by path.',
+        '    kind: threshold',
+        '    metric: complexity',
+        '    max: 2',
+        '    of: [cart]',
+        'exceptions:',
+        '  - rule: functions-stay-simple',
+        '    file: src/cart/both.ts',
+        "    name: 'both.list.map()#2'",
+        '    reason: The second filter is the first one again.',
+        ''
+      ].join('\n')
+    })
+    const { code, out, err } = await adrIn(root, 'check')
+    // The callbacks are named by their call, the second by its position: both are within the
+    // maximum, and the Exception matches nothing.
+    expect(code).toBe(1)
+    expect(out).toContain(
+      'The Exception functions-stay-simple: both.list.map()#2 in src/cart/both.ts matches no Violation any more.'
+    )
+    expect(err).toBe(
+      'adr check: .arch/rules.yml:9: The Exception of functions-stay-simple names both.list.map()#2 by its position among the functions of that name in src/cart/both.ts: it moves to another one when a function of that name is added or removed before it.\n'
+    )
   })
 
   it('checks Rules of its own on Python and Go, read with the grammars it carries', async () => {

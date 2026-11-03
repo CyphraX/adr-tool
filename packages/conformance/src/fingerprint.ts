@@ -2,8 +2,8 @@
  * The fingerprint of a Violation (docs/conformance-format.md, section 3): its Rule and what it
  * is about, by the kind of the Rule, without line numbers — so that it stays when lines move.
  * An Exception names a Violation by it, and so will a Baseline and a Finding. Each variant says
- * which it is, so that one added later — part 13's Rule, Source File and function — cannot be
- * taken for another.
+ * which it is, so that one cannot be taken for another — a function's Source File and name
+ * for a Component's ID.
  */
 export type Fingerprint =
   /** `must-not-depend`, `may-only-depend`, `layers`: the source and the target Component. */
@@ -15,8 +15,20 @@ export type Fingerprint =
     }
   /** `no-cycles`: the members of the Cycle, Component IDs or paths, in any order. */
   | { readonly kind: 'cycle'; readonly rule: string; readonly cycle: readonly string[] }
-  /** `threshold`: the Component whose metric is outside. */
+  /**
+   * `threshold`: the Component whose metric is outside; for propagation cost, the Component
+   * whose level below it is — `*` for the top level.
+   */
   | { readonly kind: 'component'; readonly rule: string; readonly component: string }
+  /** `threshold` on complexity: a function, by its Source File and its name there. */
+  | {
+      readonly kind: 'function'
+      readonly rule: string
+      readonly file: string
+      readonly name: string
+    }
+  /** `threshold` on LCOM4: a class, by its Source File and its name there. */
+  | { readonly kind: 'class'; readonly rule: string; readonly file: string; readonly name: string }
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -32,6 +44,9 @@ export function fingerprintText(fingerprint: Fingerprint): string {
       return `${fingerprint.rule}: ${membersOf(fingerprint.cycle).join(', ')}`
     case 'component':
       return `${fingerprint.rule}: ${fingerprint.component}`
+    case 'function':
+    case 'class':
+      return `${fingerprint.rule}: ${fingerprint.name} in ${fingerprint.file}`
   }
 }
 
@@ -44,5 +59,8 @@ export function fingerprintKey(fingerprint: Fingerprint): string {
       return [fingerprint.kind, fingerprint.rule, ...membersOf(fingerprint.cycle)].join('\n')
     case 'component':
       return [fingerprint.kind, fingerprint.rule, fingerprint.component].join('\n')
+    case 'function':
+    case 'class':
+      return [fingerprint.kind, fingerprint.rule, fingerprint.file, fingerprint.name].join('\n')
   }
 }

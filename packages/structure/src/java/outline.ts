@@ -10,6 +10,8 @@
 import type { Node } from 'web-tree-sitter'
 import type { Extraction } from '../extraction'
 import { detailed } from '../sentences'
+import { measuring } from '../measures'
+import { measureJava } from './measure'
 import { firstError, parserOf, type Grammar } from '../tree-sitter'
 
 export interface JavaImport {
@@ -78,7 +80,7 @@ export async function prepareJava(wasm: Grammar): Promise<JavaReader> {
         )
         return { analysed: false, line: error.startPosition.row + 1, message, said }
       }
-      return { analysed: true, java: outline(root) }
+      return { analysed: true, java: outline(root), ...measuring(() => measureJava(root)) }
     } finally {
       tree.delete()
     }

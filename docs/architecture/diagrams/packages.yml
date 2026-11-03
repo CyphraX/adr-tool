@@ -58,7 +58,7 @@ connections:
     to: structure
   - from: mcp
     to: cli
-    label: runs git
+    label: runs git, analyses
   - from: cli
     to: core
     label: lints and exports

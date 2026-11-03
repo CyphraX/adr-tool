@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1208" height="672" viewBox="16 20 1208 672" role="img">
   <title>The packages of Softarch Suite</title>
-  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses review: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
+  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git, analyses. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses review: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
   <style>
     svg { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
     .background, .ground { fill: #eef1f5; }
@@ -112,8 +112,8 @@
     <text class="label" x="430" y="277.6" text-anchor="middle">Source Files</text>
     <rect class="ground" x="497.5" y="126" width="85" height="16"/>
     <text class="label" x="540" y="137.6" text-anchor="middle">serves ADRs</text>
-    <rect class="ground" x="733" y="176" width="54" height="16"/>
-    <text class="label" x="760" y="187.6" text-anchor="middle">runs git</text>
+    <rect class="ground" x="702.5" y="176" width="115" height="16"/>
+    <text class="label" x="760" y="187.6" text-anchor="middle">runs git, analyses</text>
     <rect class="ground" x="485.5" y="166" width="109" height="16"/>
     <text class="label" x="540" y="177.6" text-anchor="middle">lints and exports</text>
     <rect class="ground" x="614" y="306" width="112" height="16"/>
