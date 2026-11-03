@@ -122,14 +122,26 @@ export interface Fence {
   readonly close?: Line
 }
 
-const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/
+// A repository is untrusted input: nothing here backtracks over a long line (as core's headingOf).
+const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/
 const OPENING = /^( {0,3})(`{3,}|~{3,})(.*)$/
+
+/**
+ * Where the closing sequence of `#`s at the end of a heading's text starts (CommonMark): a run
+ * after a blank, or the whole text; its length where there is none. Counted by hand.
+ */
+export function closingSequenceAt(text: string): number {
+  let end = text.length
+  while (end > 0 && text[end - 1] === '#') end--
+  const closes = end < text.length && (end === 0 || text[end - 1] === ' ' || text[end - 1] === '\t')
+  return closes ? end : text.length
+}
 
 /** A heading's text without its closing sequence of `#`s. */
 function headingText(raw: string | undefined): string {
   if (raw === undefined) return ''
-  const closed = raw.replace(/(?:^|[ \t]+)#+$/, '')
-  return closed.trim()
+  const text = raw.trimEnd()
+  return text.slice(0, closingSequenceAt(text)).trim()
 }
 
 /**

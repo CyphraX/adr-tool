@@ -391,6 +391,20 @@ describe('the entries of an Assessment', () => {
     ])
   })
 
+  it('take a text and a title of any length in linear time', async () => {
+    const fs = memoryFileSystem({ [PATH]: SHOP })
+    const started = performance.now()
+    const plan = await planScenario(fs, '20261103-the-shop', {
+      ...SCENARIO,
+      title: `${'#'.repeat(80_000)}x ##`,
+      text: `a${'\n'.repeat(80_000)}b`
+    })
+    expect(performance.now() - started).toBeLessThan(2000)
+    const added = inserted(SHOP, await textAfter(plan), 'Why it is rated so.\n')
+    expect(added.startsWith(`\n#### ${'#'.repeat(80_000)}x ## #\n`)).toBe(true)
+    expect(added.endsWith(`a${'\n'.repeat(80_000)}b\n`)).toBe(true)
+  })
+
   it('are refused where they would not read back as given', async () => {
     const fs = memoryFileSystem({ [PATH]: SHOP })
     const scenario = (changes: Partial<NewScenario>) =>

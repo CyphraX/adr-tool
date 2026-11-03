@@ -48,7 +48,15 @@ import { ENTRY_KEYS, readRegisterEntry } from './register'
 import { refuse } from './sentences'
 import { slugOf } from './slug'
 import { snapshotPathOf, snapshotText } from './snapshot'
-import { eolOf, isBlank, linesOf, viewFile, type Eol, type FileView } from './text'
+import {
+  closingSequenceAt,
+  eolOf,
+  isBlank,
+  linesOf,
+  viewFile,
+  type Eol,
+  type FileView
+} from './text'
 import { citedAdr, metricValueOf, type Known } from './traces'
 import {
   appendBlockItem,
@@ -98,7 +106,13 @@ export async function directoryOf(fs: FileSystem, key: DirectoryKey): Promise<st
 
 /** Text with its line breaks in the file's line ending, ending in one; empty stays empty. */
 const inEol = (text: string, eol: Eol): string => {
-  const lines = text.replace(/\r\n?/g, '\n').replace(/^\n+|\n+$/g, '')
+  const lf = text.replace(/\r\n?/g, '\n')
+  // The line breaks around it, counted by hand: a run of them is no reason to backtrack.
+  let start = 0
+  let end = lf.length
+  while (start < end && lf[start] === '\n') start++
+  while (end > start && lf[end - 1] === '\n') end--
+  const lines = lf.slice(start, end)
   return lines.trim() === '' ? '' : `${lines.replaceAll('\n', eol)}${eol}`
 }
 
@@ -151,16 +165,15 @@ function titleOf(title: string): string {
  * none of the title: one more `#` after it is that sequence, and keeps the title as it is.
  */
 function headingLine(level: number, title: string): string {
-  const text = /(?:^|[ \t])#+$/.test(title) ? `${title} #` : title
+  const text = closingSequenceAt(title) < title.length ? `${title} #` : title
   return `${'#'.repeat(level)} ${text}`
 }
 
 /** A fence that none of the lines can close: longer than any run of backticks in them. */
 function fenceFor(lines: readonly string[]): string {
-  const longest = Math.max(
-    0,
-    ...lines.flatMap((line) => line.match(/`+/g) ?? []).map((run) => run.length)
-  )
+  const longest = lines
+    .flatMap((line) => line.match(/`+/g) ?? [])
+    .reduce((most, run) => Math.max(most, run.length), 0)
   return '`'.repeat(Math.max(3, longest + 1))
 }
 

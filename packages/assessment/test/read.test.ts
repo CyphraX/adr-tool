@@ -217,6 +217,25 @@ describe('reading an Assessment', () => {
     ])
   })
 
+  it('reads a heading without its closing #s, and a long line in linear time', () => {
+    const titled = (line: string) => readAssessment('x', `${DIR}/x.md`, `${line}\n`).assessment.title
+    expect(titled('# The shop ##')).toBe('The shop')
+    expect(titled('# C#')).toBe('C#')
+    expect(titled('# C# #')).toBe('C#')
+    expect(titled('#  ###  ')).toBe('')
+    expect(titled('# a\t#b')).toBe('a\t#b')
+    // A repository is untrusted input: these took seconds with a regular expression that backtracks.
+    for (const line of [
+      `## a${' \t'.repeat(40_000)}#x`,
+      `# a${' '.repeat(80_000)}#x`,
+      `# ${'#'.repeat(80_000)}x`
+    ]) {
+      const started = performance.now()
+      readAssessment('x', `${DIR}/x.md`, `---\ndate: 2026-11-03\n---\n\n${line}\n`)
+      expect(performance.now() - started).toBeLessThan(1000)
+    }
+  })
+
   it('says what is wrong with a value, and reads the file without it', () => {
     const { assessment, problems } = readAssessment(
       'x',
