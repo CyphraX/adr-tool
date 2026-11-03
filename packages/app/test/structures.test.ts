@@ -84,6 +84,25 @@ describe('the analysis of a repository, as the app runs it', () => {
     ])
   })
 
+  it('reads Python and Go with the WebAssembly of tree-sitter, found next to its packages', async () => {
+    const fixture = (name: string): string =>
+      fileURLToPath(new URL(`../../structure/test/fixtures/${name}/`, import.meta.url))
+    for (const [name, language, count] of [
+      ['python-shop', 'python', 10],
+      ['go-shop', 'go', 13]
+    ] as const) {
+      const { analysis, cache } = await analyse(fixture(name), undefined)
+      expect(analysis.dependencies.notAnalysed).toEqual([])
+      expect(analysis.dependencies.dependencies).toHaveLength(count)
+      expect(Object.values(cache.files).every(({ extraction }) => language in extraction)).toBe(
+        true
+      )
+      // Their imports name what they use: the note that Java's numbers are a lower bound is not theirs.
+      const pages = viewOf(name, analysis, undefined, false).components
+      expect(pages.every((page) => !page.java)).toBe(true)
+    }
+  })
+
   it('keeps its cache in a file that a crash cannot leave half written', async () => {
     const { cache } = await analyse(root, undefined)
     const file = join(root, '..', `${root.split('/').at(-1)}-cache`, 'cache.json')

@@ -39,7 +39,7 @@ const LISTED_AT_MOST = 500
  * the time. A file git lists in one of them changes nothing until the next analysis.
  */
 const UNWATCHED =
-  /(?:^|[/\\])(?:node_modules|\.git|dist|build|out|target|coverage|\.svelte-kit|\.next|\.turbo|\.cache)(?:[/\\]|$)/
+  /(?:^|[/\\])(?:node_modules|\.git|dist|build|out|target|coverage|\.svelte-kit|\.next|\.turbo|\.cache|__pycache__|\.venv|\.tox|\.mypy_cache|\.pytest_cache|\.ruff_cache)(?:[/\\]|$)/
 
 export type Analyser = (root: string) => Promise<Analysis>
 
