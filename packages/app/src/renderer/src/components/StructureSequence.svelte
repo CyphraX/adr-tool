@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StructureNode, StructureView } from '../../../shared/ipc'
+  import { placeLabels, type Box } from '../lib/labels'
   import { app } from '../lib/state.svelte'
   import { nodeLabel, opens } from '../lib/structure'
   import { t } from '../lib/strings'
@@ -7,7 +8,9 @@
   // The Components of the level on the main sequence (structure-format.md, section 5):
   // instability to the right, abstractness to the top, the diagonal between stable and abstract
   // and unstable and concrete. The drawing is for the eye; the list beside it says the same,
-  // furthest from the line first, and is what the keyboard and a screen reader go through.
+  // furthest from the line first, and is what the keyboard and a screen reader go through. A
+  // point is named where its name finds room, and numbered as in the list where it does not; a
+  // click on it selects it, as in the list, and the selected point is drawn over the others.
   let { view }: { view: StructureView } = $props()
 
   const selection = $derived(app.active?.structure.selection)
@@ -56,6 +59,48 @@
     selection?.kind === 'node' && selection.id === node.id
   const value = (key: 'abstractness' | 'instability' | 'distance', of: number): string =>
     t.structure.value(key, of)
+  /** The fonts' sizes, as the styles below set them, for the room their text takes. */
+  const LABEL = { charWidth: 6.4, lineHeight: 12 }
+  const SMALL = 5.9
+  const textBox = (text: string, left: number, baseline: number): Box => ({
+    x: left,
+    y: baseline - 9,
+    width: text.length * SMALL + 2,
+    height: 12
+  })
+  const painBox = $derived(textBox(t.structure.sequence.pain, LEFT + 6, BOTTOM_EDGE - 6))
+  const uselessBox = $derived.by(() => {
+    const box = textBox(t.structure.sequence.uselessness, 0, TOP + 14)
+    return { ...box, x: RIGHT_EDGE - 6 - box.width }
+  })
+  // The main sequence's name runs down the diagonal, a little above it.
+  const lineBox = $derived.by(() => {
+    const half = (t.structure.sequence.line.length * SMALL * Math.SQRT1_2) / 2 + 5
+    return { x: x(0.5) + 6 - half, y: y(0.5) - 6 - half, width: 2 * half, height: 2 * half }
+  })
+  const labels = $derived(
+    new Map(
+      placeLabels(
+        points.map((point, index) => ({
+          x: x(point.i),
+          y: y(point.a),
+          radius: radiusOf(point.node.lines),
+          name: nodeLabel(point.node),
+          number: index + 1
+        })),
+        {
+          bounds: { x: LEFT, y: TOP, width: SIZE, height: SIZE },
+          taken: [painBox, uselessBox, lineBox],
+          ...LABEL
+        }
+      ).map((label, index) => [points[index]!.node.id, label])
+    )
+  )
+  // Drawn from the furthest down to the nearest, the selected one last, over all others.
+  const drawn = $derived(
+    points.toReversed().toSorted((p, q) => Number(isSelected(p.node)) - Number(isSelected(q.node)))
+  )
+  const select = (node: StructureNode): void => app.selectInStructure({ kind: 'node', id: node.id })
   const said = (point: Point): string =>
     t.structure.sequence.point(
       nodeLabel(point.node),
@@ -70,7 +115,7 @@
     {#if points.length === 0}
       <p class="empty">{t.structure.sequence.none}</p>
     {:else}
-      <div class="body">
+      <div class="body" role="group" aria-label={t.structure.sequence.label}>
         <svg
           class="drawing"
           viewBox="0 0 {WIDTH} {HEIGHT}"
@@ -123,14 +168,24 @@
             text-anchor="middle"
             transform="rotate(-90 14 {y(0.5)})">{t.structure.sequence.abstractness}</text
           >
-          {#each points.toReversed() as point (point.node.id)}
+          {#each drawn as point (point.node.id)}
             {@const selected = isSelected(point.node)}
-            <g class="point" class:selected>
+            {@const label = labels.get(point.node.id)!}
+            <!-- The list beside the drawing is the way there for the keyboard and a screen
+            reader; a click on a point does what a click in the list does. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+            <g
+              class="point"
+              class:selected
+              onclick={() => select(point.node)}
+              ondblclick={() => app.openComponent(point.node.id)}
+            >
               <circle cx={x(point.i)} cy={y(point.a)} r={radiusOf(point.node.lines)} />
               <text
-                x={x(point.i) + (point.i > 0.75 ? -1 : 1) * (radiusOf(point.node.lines) + 4)}
-                y={y(point.a) + 4}
-                text-anchor={point.i > 0.75 ? 'end' : 'start'}>{nodeLabel(point.node)}</text
+                class:numbered={label.numbered}
+                x={label.x}
+                y={label.y}
+                text-anchor={label.anchor}>{label.text}</text
               >
             </g>
           {/each}
@@ -139,17 +194,20 @@
         <div class="list">
           <h3 id="main-sequence-list">{t.structure.sequence.list}</h3>
           <ol aria-labelledby="main-sequence-list">
-            {#each points as point (point.node.id)}
+            {#each points as point, index (point.node.id)}
               {@const selected = isSelected(point.node)}
               <li>
                 <button
                   class:selected
                   aria-pressed={selected}
                   aria-label={said(point)}
-                  onclick={() => app.selectInStructure({ kind: 'node', id: point.node.id })}
+                  onclick={() => select(point.node)}
                   ondblclick={() => app.openComponent(point.node.id)}
                 >
-                  <span class="name">{nodeLabel(point.node)}</span>
+                  <span class="name"
+                    ><span class="number" aria-hidden="true">{index + 1}</span>
+                    {nodeLabel(point.node)}</span
+                  >
                   <span class="values" aria-hidden="true"
                     >A {value('abstractness', point.a)} · I {value('instability', point.i)} · D
                     {value('distance', point.d)}</span
@@ -251,10 +309,25 @@
     font-weight: 600;
   }
 
+  .point {
+    cursor: pointer;
+  }
+
   .point circle {
     fill: color-mix(in srgb, var(--focus) 70%, transparent);
     stroke: var(--paper);
     stroke-width: 1.5;
+  }
+
+  .point:hover circle {
+    fill: var(--focus);
+  }
+
+  .point text.numbered {
+    fill: var(--ink-soft);
+    font-size: 10.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
   .point text {
@@ -316,6 +389,15 @@
   .name {
     font-weight: 500;
     overflow-wrap: anywhere;
+  }
+
+  .number {
+    display: inline-block;
+    min-width: 1.6em;
+    color: var(--ink-faint);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
   .values {
