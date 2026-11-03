@@ -23,6 +23,7 @@
     onfile?: (fileName: string) => void
   } = $props()
   const html = $derived(renderMarkdown(markdown, base))
+  const XLINK = 'http://www.w3.org/1999/xlink'
   /** How long the typing pauses before a Mermaid block is drawn beside it. */
   const DRAW_WHILE_TYPING_MS = 400
 
@@ -50,7 +51,8 @@
   // a web link opens in the system browser; everything else does nothing.
   function followLink(event: MouseEvent): void {
     const anchor = (event.target as Element).closest('a')
-    const href = anchor?.getAttribute('href')
+    // A link of a Mermaid drawing has its address in `xlink:href`.
+    const href = anchor?.getAttribute('href') ?? anchor?.getAttributeNS(XLINK, 'href')
     if (!href) return
     event.preventDefault()
     if (/^https?:\/\//i.test(href)) void window.api.openExternal(href)
