@@ -1,0 +1,21 @@
+title: Inside billing
+level: component
+scope: billing
+elements:
+  - component: persistence
+    at: [40, 40]
+  - component: billing/invoices
+    at: [260, 40]
+  - component: billing/payments
+    at: [480, 40]
+  - external: bank
+    name: The bank
+    at: [480, 160]
+connections:
+  - from: billing/invoices
+    to: persistence
+  - from: billing/payments
+    to: billing/invoices
+    label: settles
+  - from: billing/payments
+    to: bank

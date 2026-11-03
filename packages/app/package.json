@@ -29,6 +29,8 @@
     "@adr-tool/cli": "workspace:*",
     "@adr-tool/conformance": "workspace:*",
     "@adr-tool/core": "workspace:*",
+    "@adr-tool/diagrams": "workspace:*",
+    "@adr-tool/review": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-go": "6.0.1",

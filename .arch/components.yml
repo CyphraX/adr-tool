@@ -37,6 +37,8 @@ components:
         paths: [packages/core/src/templates/**]
       text:
         paths: [packages/core/src/text/**]
+  diagrams:
+    paths: [packages/diagrams/**]
   kernel:
     paths: [packages/kernel/**]
     components:
@@ -44,10 +46,14 @@ components:
         paths: [packages/kernel/src/change/**]
       fs:
         paths: [packages/kernel/src/fs/**]
+      git:
+        paths: [packages/kernel/src/git/**]
       text:
         paths: [packages/kernel/src/text/**]
   mcp:
     paths: [packages/mcp/**]
+  review:
+    paths: [packages/review/**]
   structure:
     paths: [packages/structure/**]
     components:

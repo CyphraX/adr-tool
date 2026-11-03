@@ -1,7 +1,4 @@
-import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { win32 } from 'node:path'
 import { createTwoFilesPatch } from 'diff'
 import {
   DEFAULT_LOG_PATHS,
@@ -37,6 +34,7 @@ import {
   type WritableFileSystem
 } from '@adr-tool/core'
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
+import { gitIn } from '@adr-tool/cli/git'
 import { repositoryFiles } from './files'
 import { Refusal, type Tool } from './protocol'
 import type { Schema } from './schema'
@@ -109,7 +107,8 @@ const PLAN = {
 export function toolsFor(options: ToolOptions): Tool[] {
   const fs: WritableFileSystem = repositoryFiles(options.root)
   const today = options.today ?? localDate
-  const author = options.author ?? (() => gitUserName(options.root))
+  // git's `user.name`, read through the one module that runs git (ADR-0020).
+  const author = options.author ?? (() => gitIn(options.root).userName())
   const planned = new Map<string, Planned>()
 
   const open = async (): Promise<{ repository: Repository; components: string[] | undefined }> => {
@@ -777,39 +776,4 @@ function fileOf(file: FileChange): Record<string, unknown> {
 function localDate(now = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-}
-
-/**
- * The git to run. On Windows a bare `git` is looked for in the directory it runs in before
- * the PATH — a `git.exe` a repository brings along would run — so git is found on the PATH
- * there, by its full path. As the app finds it (packages/app/src/main/git.ts).
- */
-export function gitExecutable(
-  platform: NodeJS.Platform = process.platform,
-  path: string | undefined = process.env.PATH,
-  exists: (path: string) => boolean = existsSync
-): string {
-  if (platform !== 'win32') return 'git'
-  for (const entry of (path ?? '').split(';')) {
-    const directory = entry.replace(/^"(.*)"$/, '$1')
-    if (!win32.isAbsolute(directory)) continue
-    const candidate = win32.join(directory, 'git.exe')
-    if (exists(candidate)) return candidate
-  }
-  return 'git'
-}
-
-/** git's `user.name` for the repository, if git knows one; reading it runs nothing of the repository. */
-function gitUserName(root: string): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    execFile(
-      gitExecutable(),
-      ['config', 'user.name'],
-      { cwd: root, timeout: 5000, windowsHide: true },
-      (error, stdout) => {
-        const name = error ? '' : stdout.trim()
-        resolve(name === '' ? undefined : name)
-      }
-    )
-  })
 }

@@ -8,6 +8,16 @@ export {
 export { memoryFileSystem } from './fs/memory'
 
 export {
+  isDay,
+  isObjectName,
+  type ChangedFile,
+  type Git,
+  type LogEntry,
+  type LogOptions
+} from './git/port'
+export { memoryGit, type ScriptedCommit, type ScriptedHistory } from './git/memory'
+
+export {
   applyChangeSet,
   joinChangeSets,
   type Applied,
@@ -28,3 +38,12 @@ export {
 } from './change/said'
 
 export { applyEdits, type TextEdit } from './text/edit'
+
+export {
+  CONFIG_PATH,
+  openConfig,
+  readConfig,
+  type Config,
+  type Setting,
+  type UnreadableConfig
+} from './config'

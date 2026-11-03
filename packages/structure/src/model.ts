@@ -32,6 +32,7 @@ export { hasRepair, planAdopt, planRename, planRepair, type RenamePlan } from '.
 export type { Dependencies, Dependency, LibraryUse, NotAnalysed, NotResolved } from './dependencies'
 export type { ManifestLibrary } from './manifests'
 export {
+  edgesAmong,
   levelOf,
   UNASSIGNED,
   type Level,
