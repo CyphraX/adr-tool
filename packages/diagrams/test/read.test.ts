@@ -164,13 +164,27 @@ describe('a Diagram', () => {
       `${PATH} cannot be read: the element on line 2 has no position "at".`
     )
     expect(unreadable('elements:\n  - component: a\n    at: [1, "2"]\n')).toBe(
-      `${PATH} cannot be read: "at" on line 3 must be two numbers, [x, y].`
+      `${PATH} cannot be read: "at" on line 3 must be two numbers, [x, y], each between -1000000 and 1000000.`
     )
     expect(unreadable('elements:\n  - component: a\n    at: [1, 2, 3]\n')).toMatch(/"at" on line 3/)
     expect(unreadable('elements:\n  - component: a\n    at: [1, .inf]\n')).toMatch(/"at" on line 3/)
     expect(unreadable('elements:\n  - component: a\n    at: [1, 2]\n    size: [0, 10]\n')).toBe(
-      `${PATH} cannot be read: "size" on line 4 must be two positive numbers, [width, height].`
+      `${PATH} cannot be read: "size" on line 4 must be two positive numbers, [width, height], each up to 1000000.`
     )
+    // What the review of PR #51 found: numbers so large that the picture writes them as 1e+21,
+    // or loses them to Infinity.
+    for (const huge of ['1.7e308', '1e21', '-1000001', '1000000.5']) {
+      expect(unreadable(`elements:\n  - component: a\n    at: [${huge}, 2]\n`)).toBe(
+        `${PATH} cannot be read: "at" on line 3 must be two numbers, [x, y], each between -1000000 and 1000000.`
+      )
+      expect(
+        unreadable(`elements:\n  - component: a\n    at: [1, 2]\n    size: [10, ${huge}]\n`)
+      ).toMatch(/"size" on line 4 must be two positive numbers/)
+    }
+    expect(
+      read('elements:\n  - component: a\n    at: [-1000000, 1000000]\n    size: [1000000, 1]\n')
+        .elements[0]
+    ).toMatchObject({ at: { x: -1000000, y: 1000000 }, size: { width: 1000000, height: 1 } })
     expect(unreadable('elements:\n  - component:\n    at: [1, 2]\n')).toBe(
       `${PATH} cannot be read: "component" on line 2 must be a text.`
     )

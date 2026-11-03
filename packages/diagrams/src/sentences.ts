@@ -101,9 +101,9 @@ export const SENTENCES = {
   'element-without-position': (v: { line: number }): string =>
     `the element on line ${v.line} has no position "at"`,
   'position-not-a-point': (v: { line: number }): string =>
-    `"at" on line ${v.line} must be two numbers, [x, y]`,
+    `"at" on line ${v.line} must be two numbers, [x, y], each between -1000000 and 1000000`,
   'size-not-positive': (v: { line: number }): string =>
-    `"size" on line ${v.line} must be two positive numbers, [width, height]`,
+    `"size" on line ${v.line} must be two positive numbers, [width, height], each up to 1000000`,
   'connection-without-end': (v: { key: string; line: number }): string =>
     `the connection on line ${v.line} has no "${v.key}"`,
 

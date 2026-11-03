@@ -360,11 +360,17 @@ export function connectionsOf(diagram: Pick<Diagram, 'elements' | 'connections'>
   })
 }
 
-/** Two finite numbers in a list, `[x, y]`. */
+/**
+ * How far a position or a size may reach, in either direction: far beyond any picture, and
+ * near enough that every number is written as digits, never as `1e+21`.
+ */
+export const MAX_COORDINATE = 1_000_000
+
+/** Two numbers in a list, `[x, y]`, none of them further from 0 than `MAX_COORDINATE`. */
 function numbers(node: unknown): [number, number] | undefined {
   if (!isSeq(node) || node.items.length !== 2) return undefined
   const values = node.items.map((item) =>
-    isScalar(item) && typeof item.value === 'number' && Number.isFinite(item.value)
+    isScalar(item) && typeof item.value === 'number' && Math.abs(item.value) <= MAX_COORDINATE
       ? item.value
       : undefined
   )

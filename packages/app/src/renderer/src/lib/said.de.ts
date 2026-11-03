@@ -348,9 +348,10 @@ export const DE: Wording<Codes> = {
   'element-of-two-kinds': (v) =>
     `das Element in Zeile ${v.line} sagt mehr als eines von component, external und repository`,
   'element-without-position': (v) => `das Element in Zeile ${v.line} hat keine Position „at“`,
-  'position-not-a-point': (v) => `„at“ in Zeile ${v.line} muss aus zwei Zahlen bestehen, [x, y]`,
+  'position-not-a-point': (v) =>
+    `„at“ in Zeile ${v.line} muss aus zwei Zahlen bestehen, [x, y], jede zwischen -1000000 und 1000000`,
   'size-not-positive': (v) =>
-    `„size“ in Zeile ${v.line} muss aus zwei positiven Zahlen bestehen, [Breite, Höhe]`,
+    `„size“ in Zeile ${v.line} muss aus zwei positiven Zahlen bestehen, [Breite, Höhe], jede bis 1000000`,
   'connection-without-end': (v) => `die Verbindung in Zeile ${v.line} hat kein „${v.key}“`,
 
   // Drift.

@@ -8,6 +8,7 @@ export {
   connectionsOf,
   diagramIdOf,
   elementsOf,
+  MAX_COORDINATE,
   readDiagram,
   VIEW_LEVELS,
   type ComponentElement,

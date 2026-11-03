@@ -84,7 +84,7 @@ An element is a Component, an External System, or — in a system context only �
 
 A Component's `name` and `description` come from `.arch/components.yml`, so that the picture says what the declaration says; written on its element, they are ignored. Keys the suite does not know are preserved and ignored, at the top level and in an item, as in the declaration of Components — also when one is written twice.
 
-Positions and sizes are in the units of the SVG, a pixel each, and grow to the right and downwards. They may be negative and need not be whole; the suite writes whole numbers. They are kept exactly as they are written, and nothing is ever moved to make room.
+Positions and sizes are in the units of the SVG, a pixel each, and grow to the right and downwards. They may be negative and need not be whole; the suite writes whole numbers. None is further from 0 than 1 000 000: far beyond any picture, and near enough that the picture writes every number as digits. They are kept exactly as they are written, and nothing is ever moved to make room.
 
 ### Connections
 
@@ -115,7 +115,7 @@ A person may write any YAML that reads as the same Diagram. Where the suite cann
 
 ### What a valid Diagram is
 
-A file **can be read** when it is YAML whose top level is a map (or nothing at all), no key the suite owns is written twice in one map — at the top, in an element or in a connection: which of the two is meant, nobody can tell —, and the keys the suite owns have values of the form above: the texts are texts, `elements` and `connections` are lists of maps, every element has exactly one of `component`, `external` and `repository` and has an `at` of two numbers, a `size` is two positive numbers, and every connection has a `from` and a `to`. A file that cannot be read is a Problem, and nothing else is said about it.
+A file **can be read** when it is YAML whose top level is a map (or nothing at all), no key the suite owns is written twice in one map — at the top, in an element or in a connection: which of the two is meant, nobody can tell —, and the keys the suite owns have values of the form above: the texts are texts, `elements` and `connections` are lists of maps, every element has exactly one of `component`, `external` and `repository` and has an `at` of two numbers, a `size` is two positive numbers, no number of either is further from 0 than 1 000 000, and every connection has a `from` and a `to`. A file that cannot be read is a Problem, and nothing else is said about it.
 
 A Diagram is **valid** when it can be read and has none of the Problems of section 5.
 
