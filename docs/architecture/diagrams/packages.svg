@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1208" height="672" viewBox="16 20 1208 672" role="img">
+  <title>The packages of Softarch Suite</title>
+  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git, analyses. mcp uses conformance: Rules and Violations. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: Conformance. app uses cli: the export. app uses diagrams: German sentences. app uses review: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
+  <style>
+    svg { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .background, .ground { fill: #eef1f5; }
+    .box { fill: #fcfcfd; stroke: #8891a3; stroke-width: 1.2; }
+    .external .box { stroke-dasharray: 6 4; }
+    .repository .box { stroke-width: 2; }
+    .name { fill: #1c2230; font-size: 14px; font-weight: 600; }
+    .title { fill: #1c2230; font-size: 16px; font-weight: 600; }
+    .description, .label, .legend { fill: #566075; font-size: 12px; }
+    .line { fill: none; stroke: #566075; stroke-width: 1.4; }
+    .arrowhead { fill: #566075; }
+    @media (prefers-color-scheme: dark) {
+      .background, .ground { fill: #1f222a; }
+      .box { fill: #181a20; stroke: #737d91; }
+      .name, .title { fill: #e4e7ee; }
+      .description, .label, .legend { fill: #a5aec0; }
+      .line { stroke: #a5aec0; }
+      .arrowhead { fill: #a5aec0; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="3.5" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+      <path class="arrowhead" d="M0 0.5L7.5 4L0 7.5z"/>
+    </marker>
+  </defs>
+  <rect class="background" x="16" y="20" width="1208" height="672"/>
+  <text class="title" x="40" y="58.8">The packages of Softarch Suite</text>
+  <text class="description" x="40" y="79.6">Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages.</text>
+  <g class="connections">
+    <path class="line" d="M301.14 148L121.33 376.85" marker-end="url(#arrow)"/>
+    <path class="line" d="M260 345.82L163.76 380.81" marker-end="url(#arrow)"/>
+    <path class="line" d="M520 404L164 404" marker-end="url(#arrow)"/>
+    <path class="line" d="M520 385.54L383.82 343.64" marker-end="url(#arrow)"/>
+    <path class="line" d="M487.2 580L156.44 429.66" marker-end="url(#arrow)"/>
+    <path class="line" d="M521.14 580L341.33 351.15" marker-end="url(#arrow)"/>
+    <path class="line" d="M481.33 248L162.37 378.49" marker-end="url(#arrow)"/>
+    <path class="line" d="M487.2 248L376.44 298.34" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 141.27L384 126.91" marker-end="url(#arrow)"/>
+    <path class="line" d="M701.33 168L382.37 298.49" marker-end="url(#arrow)"/>
+    <path class="line" d="M760 168L760 196" marker-end="url(#arrow)"/>
+    <path class="line" d="M743.38 168L598.89 376.71" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 210.36L383.9 138.52" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 237.64L383.9 309.48" marker-end="url(#arrow)"/>
+    <path class="line" d="M736 248L606.83 377.17" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 240.36L163.86 386.58" marker-end="url(#arrow)"/>
+    <path class="line" d="M960 380L383.71 149.49" marker-end="url(#arrow)"/>
+    <path class="line" d="M960 397.14L383.97 331.31" marker-end="url(#arrow)"/>
+    <path class="line" d="M960 404L644 404" marker-end="url(#arrow)"/>
+    <path class="line" d="M985.33 380L797.96 250.28" marker-end="url(#arrow)"/>
+    <path class="line" d="M962.4 428L601.29 578.46" marker-end="url(#arrow)"/>
+    <path class="line" d="M960 381.5L603.75 247.9" marker-end="url(#arrow)"/>
+    <path class="line" d="M998.79 428L884.78 557" marker-end="url(#arrow)"/>
+    <path class="line" d="M960 164.63L823.98 150.6" marker-end="url(#arrow)"/>
+  </g>
+  <g class="elements">
+    <g class="element component">
+      <rect class="box" x="40" y="380" width="120" height="48" rx="5"/>
+      <text class="name" x="100" y="408.2" text-anchor="middle">kernel</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="260" y="100" width="120" height="48" rx="5"/>
+      <text class="name" x="320" y="128.2" text-anchor="middle">core</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="260" y="300" width="120" height="48" rx="5"/>
+      <text class="name" x="320" y="328.2" text-anchor="middle">structure</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="520" y="380" width="120" height="48" rx="5"/>
+      <text class="name" x="580" y="408.2" text-anchor="middle">conformance</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="480" y="580" width="120" height="48" rx="5"/>
+      <text class="name" x="540" y="608.2" text-anchor="middle">diagrams</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="480" y="200" width="120" height="48" rx="5"/>
+      <text class="name" x="540" y="228.2" text-anchor="middle">review</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="700" y="120" width="120" height="48" rx="5"/>
+      <text class="name" x="760" y="148.2" text-anchor="middle">mcp</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="700" y="200" width="120" height="48" rx="5"/>
+      <text class="name" x="760" y="228.2" text-anchor="middle">cli</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="960" y="380" width="120" height="48" rx="5"/>
+      <text class="name" x="1020" y="408.2" text-anchor="middle">app</text>
+    </g>
+    <g class="element external">
+      <rect class="box" x="960" y="140" width="240" height="74" rx="5"/>
+      <text class="name" x="1080" y="163.2" text-anchor="middle">A coding agent</text>
+      <text class="description" x="1080" y="183.6" text-anchor="middle">Brought by the person, connected</text>
+      <text class="description" x="1080" y="199.6" text-anchor="middle">over MCP.</text>
+    </g>
+    <g class="element external">
+      <rect class="box" x="740" y="560" width="233" height="58" rx="5"/>
+      <text class="name" x="856.5" y="583.2" text-anchor="middle">git</text>
+      <text class="description" x="856.5" y="603.6" text-anchor="middle">Holds the history of the repository.</text>
+    </g>
+  </g>
+  <g class="labels">
+    <rect class="ground" x="363" y="356" width="174" height="16"/>
+    <text class="label" x="450" y="367.6" text-anchor="middle">Components, Dependencies</text>
+    <rect class="ground" x="343" y="456" width="174" height="16"/>
+    <text class="label" x="430" y="467.6" text-anchor="middle">Components, Dependencies</text>
+    <rect class="ground" x="388" y="266" width="84" height="16"/>
+    <text class="label" x="430" y="277.6" text-anchor="middle">Source Files</text>
+    <rect class="ground" x="497.5" y="126" width="85" height="16"/>
+    <text class="label" x="540" y="137.6" text-anchor="middle">serves ADRs</text>
+    <rect class="ground" x="702.5" y="176" width="115" height="16"/>
+    <text class="label" x="760" y="187.6" text-anchor="middle">runs git, analyses</text>
+    <rect class="ground" x="604.5" y="266" width="131" height="16"/>
+    <text class="label" x="670" y="277.6" text-anchor="middle">Rules and Violations</text>
+    <rect class="ground" x="485.5" y="166" width="109" height="16"/>
+    <text class="label" x="540" y="177.6" text-anchor="middle">lints and exports</text>
+    <rect class="ground" x="614" y="306" width="112" height="16"/>
+    <text class="label" x="670" y="317.6" text-anchor="middle">checks the Rules</text>
+    <rect class="ground" x="393" y="306" width="74" height="16"/>
+    <text class="label" x="430" y="317.6" text-anchor="middle">the git port</text>
+    <rect class="ground" x="636.5" y="256" width="67" height="16"/>
+    <text class="label" x="670" y="267.6" text-anchor="middle">Decisions</text>
+    <rect class="ground" x="637.5" y="356" width="65" height="16"/>
+    <text class="label" x="670" y="367.6" text-anchor="middle">Structure</text>
+    <rect class="ground" x="756" y="396" width="88" height="16"/>
+    <text class="label" x="800" y="407.6" text-anchor="middle">Conformance</text>
+    <rect class="ground" x="855" y="306" width="70" height="16"/>
+    <text class="label" x="890" y="317.6" text-anchor="middle">the export</text>
+    <rect class="ground" x="720" y="496" width="120" height="16"/>
+    <text class="label" x="780" y="507.6" text-anchor="middle">German sentences</text>
+    <rect class="ground" x="720" y="306" width="120" height="16"/>
+    <text class="label" x="780" y="317.6" text-anchor="middle">German sentences</text>
+    <rect class="ground" x="874.96" y="486" width="131" height="16"/>
+    <text class="label" x="940.46" y="497.6" text-anchor="middle">history and commits</text>
+    <rect class="ground" x="842.5" y="149.41" width="95" height="16"/>
+    <text class="label" x="890" y="161.01" text-anchor="middle">plans changes</text>
+  </g>
+  <g class="legend">
+    <g class="component"><rect class="box" x="40" y="653" width="24" height="14" rx="3"/></g>
+    <text x="70" y="663.6">Component</text>
+    <g class="external"><rect class="box" x="155.2" y="653" width="24" height="14" rx="3"/></g>
+    <text x="185.2" y="663.6">External System</text>
+    <path class="line" d="M302.8 660H326.8" marker-end="url(#arrow)"/>
+    <text x="336.8" y="663.6">uses; the arrow points at what is used</text>
+  </g>
+</svg>

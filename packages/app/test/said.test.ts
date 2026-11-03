@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CONFORMANCE_SENTENCES, type ConformanceSaid } from '@adr-tool/conformance'
 import { SENTENCES, type CoreSaid, type Said } from '@adr-tool/core'
+import { REVIEW_SENTENCES } from '@adr-tool/review'
 import { STRUCTURE_SENTENCES, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
+import { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
 import { DE, inGerman } from '../src/renderer/src/lib/said.de'
 import { wordIn, wordOf, wordStructureProblem, wordWarnings } from '../src/renderer/src/lib/said'
 
-// The window in English: what `core` and `structure` say comes as they say it.
+// The window in English: what the modules say comes as they say it.
 vi.mock('../src/renderer/src/lib/language', () => ({ language: 'en' }))
 
 type Sentence = (values: unknown) => string
@@ -28,6 +30,7 @@ function some(
     numbers: ['417', '4170'],
     keeps: ['‹keep-1›', '‹keep-2›'],
     files: ['src/‹file-1›.ts', 'src/‹file-2›.ts'],
+    candidates: ['docs/adr/‹candidate-1›', 'services/docs/adr/‹candidate-2›'],
     reasons: [
       { code: 'waits-for-successor', values: { adr: '‹reason›', successor: '‹successor›' } }
     ],
@@ -68,18 +71,37 @@ const MODULES = [
     sentences: CONFORMANCE_SENTENCES,
     detail: { code: 'missing-key', values: { key: '‹detail-key›' } },
     why: { code: 'list-in-brackets', values: { key: '‹why-key›' } }
+  },
+  {
+    name: 'diagrams',
+    sentences: DIAGRAMS_SENTENCES,
+    detail: { code: 'diagram-not-map', values: {} }
+  },
+  {
+    name: 'review',
+    sentences: REVIEW_SENTENCES,
+    detail: { code: 'frontmatter-yaml', values: { message: '‹detail-message›' } }
   }
 ] as const
 
 /**
- * The codes the modules take from the kernel: those of every operation (`KERNEL_SENTENCES`), and
- * why a file in YAML cannot be read (`YAML_SENTENCES`), for the two that read one.
+ * The codes the modules take from the kernel: those of every operation and of why
+ * `.arch/config.yml` cannot be read (`KERNEL_SENTENCES`), and why a file in YAML cannot be read
+ * (`YAML_SENTENCES`), for the two that read one.
  */
-const KERNEL_CODES = ['already-exists', 'no-longer-exists', 'not-yaml', 'top-not-map']
+const KERNEL_CODES = [
+  'already-exists',
+  'no-longer-exists',
+  'unreadable-config',
+  'config-not-yaml',
+  'config-not-map',
+  'not-yaml',
+  'top-not-map'
+]
 
 describe('German', () => {
-  it('has a sentence for every code of core, structure and conformance', () => {
-    // The compiler asks for them (`DE` is typed by the three tables); this says so where it runs.
+  it('has a sentence for every code of core, structure, conformance, diagrams and review', () => {
+    // The compiler asks for them (`DE` is typed by the tables); this says so where it runs.
     for (const { sentences } of MODULES) {
       for (const code of Object.keys(sentences)) expect(Object.keys(DE), code).toContain(code)
     }

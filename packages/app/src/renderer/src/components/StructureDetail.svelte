@@ -389,7 +389,9 @@
         </dd>
       {/each}
     </dl>
-    {#if page.java}<p class="faint note">{t.structure.metrics.javaLowerBound}</p>{/if}
+    {#each page.lowerBound as language (language)}
+      <p class="faint note">{t.structure.metrics.lowerBound[language]}</p>
+    {/each}
   {/if}
 
   <p class="faint note">

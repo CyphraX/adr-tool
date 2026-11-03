@@ -41,7 +41,17 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
 
   // The packages of the workspace are the top level.
   const top = structure.components.map((component) => component.id)
-  expect(top).toEqual(['app', 'cli', 'conformance', 'core', 'kernel', 'mcp', 'structure'])
+  expect(top).toEqual([
+    'app',
+    'cli',
+    'conformance',
+    'core',
+    'diagrams',
+    'kernel',
+    'mcp',
+    'review',
+    'structure'
+  ])
   expect(structure.components.find((component) => component.id === 'core')!.paths).toEqual([
     'packages/core/**'
   ])
@@ -63,7 +73,9 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
   )
   // `structure` keeps most of its files directly under src, beside the adapters of its languages.
   expect(ids(structure.components).filter((id) => id.startsWith('structure/'))).toEqual([
+    'structure/go',
     'structure/java',
+    'structure/python',
     'structure/typescript'
   ])
 
@@ -172,7 +184,8 @@ it('computes the metrics of this repository as their definitions say', async () 
   // of the scale.
   expect(metrics.get('kernel')!.instability).toBe(0)
   expect(metrics.get('app')!.instability).toBe(1)
-  // It uses the cores of the three modules and the export of the command line, and reaches
-  // the kernel only through them.
-  expect(metrics.get('app')).toMatchObject({ fanOut: 4, fanIn: 0 })
+  // It uses the cores of Decisions, Structure, Conformance and Review, the git and the export
+  // of the command line, and the sentences of Diagrams for its German, and reaches the kernel
+  // only through them.
+  expect(metrics.get('app')).toMatchObject({ fanOut: 6, fanIn: 0 })
 })

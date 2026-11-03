@@ -85,11 +85,13 @@ The Draft is built from directories, not from parsed code. Its top level is made
 1. workspace packages: `pnpm-workspace.yaml`, `workspaces` in the root `package.json`;
 2. Maven modules: `<modules>` in `pom.xml`, followed recursively;
 3. Gradle projects: `include` lines in `settings.gradle` and `settings.gradle.kts`, read as text, string literals only — `:a:b` names the directories `a` and `a/b`;
-4. without any of these, the repository as a single unit.
+4. uv workspace members (vision, part 20): the directories that the globs of `members` in `[tool.uv.workspace]` of the root `pyproject.toml` name, without those of `exclude`, where they hold a `pyproject.toml`;
+5. Go modules (vision, part 20): where the root holds a `go.mod` or a `go.work`, every directory below it that holds a `go.mod` where the go command looks (section 2) — to Go a nested module is a module of its own, whether anything names it or not;
+6. without any of these, the repository as a single unit.
 
-Units nest by the directories they lie in: a unit inside the directory of another is its child Component, whichever build file named it. Where build files name units, they alone make the top level; a directory beside them that is no unit is not drafted, and its Source Files are Unassigned. The repository as a single unit is not a Component itself: the directories below it are the top level. Where there are none to tell apart, the one directory that holds the code is the one Component (`src`, or `repository` with the pattern `**`).
+Units nest by the directories they lie in: a unit inside the directory of another is its child Component, whichever build file named it. Where build files name units, they alone make the top level; a directory beside them that is no unit is not drafted, and its Source Files are Unassigned. Not so where the root is a unit of code too: where it declares a Python project — `[project]` or `[tool.poetry]` in `pyproject.toml`, a `setup.py`, `[metadata]` in `setup.cfg` —, or where its `go.mod`, `pyproject.toml`, `setup.cfg` or `setup.py` stands beside Source Files of its language that lie in no unit. There its directories are drafted beside the units it holds. A `pyproject.toml` or `setup.cfg` that only configures a tool (`[tool.ruff]`, `[flake8]`) does not make the root code. The repository as a single unit is not a Component itself: the directories below it are the top level. Where there are none to tell apart, the one directory that holds the code is the one Component (`src`, or `repository` with the pattern `**`).
 
-Below each unit, one further level: the directories under the unit's source root. The source root is `src/main/java` where it exists, otherwise `src/` where it exists, otherwise the unit's directory; from there the suite goes down as long as a directory holds exactly one directory and no Source File (this passes over a common base package such as `com/example/shop`), and the directories at that point become the children.
+Below each unit, one further level: the directories under the unit's source root. The source root is the first directory that the packaging configuration of a Python project at the unit names (section 3, "Python") where it holds Source Files, otherwise `src/main/java` where it exists, otherwise `src/` where it exists, otherwise the unit's directory; from there the suite goes down as long as a directory holds exactly one directory and no Source File (this passes over a common base package such as `com/example/shop`), and the directories at that point become the children.
 
 - Only directories that contain at least one Source File become Components. `docs/` does not, and neither does a unit without code.
 - A directory that is a unit, or holds one, is not drafted a second time as a directory.
@@ -114,14 +116,17 @@ A **Source File** is a file with one of these extensions that survives the exclu
 | TypeScript / JavaScript | `.ts` `.tsx` `.mts` `.cts` `.js` `.jsx` `.mjs` `.cjs` | part 3                   |
 | Svelte                  | `.svelte` — its `<script>` blocks only                | part 3                   |
 | Java                    | `.java`                                               | part 4                   |
+| Python                  | `.py`                                                 | vision, part 20          |
+| Go                      | `.go`                                                 | vision, part 20          |
 
 Declaration files (`.d.ts`, `.d.mts`, `.d.cts`) are Source Files. A Dependency on one is type-only.
 
 ### Which files are looked at
 
 - In a git repository: what git tracks, plus untracked files git does not ignore — so that a new file is seen before it is added. git is only ever read. Build output is left out because the repository ignores it, not because of its name.
-- Without git: a walk of the directory that honours `.gitignore` files where they exist. In addition `dist/`, `build/`, `out/` and `target/` are left out where they stand next to a build file (`package.json`, `pom.xml`, `build.gradle`, `build.gradle.kts`).
+- Without git: a walk of the directory that honours `.gitignore` files where they exist. In addition `dist/`, `build/`, `out/` and `target/` are left out where they stand next to a build file (`package.json`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `pyproject.toml`, `setup.py`, `setup.cfg`, `go.mod`).
 - Never, in either case and at any depth: `node_modules/`, `.git/`, `.arch/`.
+- Go files only where the go command looks (vision, part 20): not beneath a directory named `testdata` or `vendor`, and not where a directory or the file's name begins with `_` or `.`. The same holds for `go.mod`.
 
 Finding out what a repository consists of takes git or the disk, so it is not the `structure` package that does it: its caller hands in the list of files — the app from git, read-only, or from its walk (part 3) — and `structure` applies the extensions and the last rule.
 
@@ -132,6 +137,8 @@ A Source File is marked **test** when any of these holds:
 - a segment of its path is `test`, `tests`, `__tests__` or `e2e`;
 - its name ends in `.test.*` or `.spec.*`;
 - it lies under `src/test/` (Maven and Gradle);
+- its name begins with `test_` and ends in `.py`, ends in `_test.py`, or is `conftest.py` (pytest);
+- its name ends in `_test.go` (Go);
 - a `tests` pattern of a Component that contains it matches it.
 
 Test files are part of the model, so that a Dependency of production code on test code is seen. Views, Cycles and metrics leave them out by default and can include them.
@@ -152,6 +159,8 @@ A use of something outside the repository is not a Dependency. Where it names a 
 
 - TypeScript and JavaScript: the package name without a subpath — `lodash/fp` is `lodash`, `@codemirror/state/x` is `@codemirror/state`. Node's built-in modules (`node:fs`, `fs`) are not Libraries.
 - Java: the package of an import that no file of the repository declares — `org.slf4j` for `org.slf4j.Logger`. Packages beginning with `java.`, `javax.` or `jdk.` are not Libraries. Without a classpath the suite cannot tell which build artefact a package comes from.
+- Python: the top-level package of an import that the repository does not have — `requests` for `requests.adapters`, `yaml` for `yaml`, whose distribution is called `PyYAML`: the import does not say so, the manifests do. The standard library is not a Library: the names of `sys.stdlib_module_names` of Python 3.13, together with those removed since 3.8 and those added in 3.14.
+- Go: the module that the `go.mod` of the importing file requires and the import path lies below — `github.com/google/uuid` —, otherwise the import path. The standard library, whose import paths have no dot in their first element (`net/http`), is not a Library, nor is cgo's `C`.
 
 ### TypeScript and JavaScript (part 3)
 
@@ -196,6 +205,52 @@ Files are parsed with `tree-sitter-java` ([ADR-0008](adr/0008-dependencies-come-
 - A package spread over several Components is fine: a use across that boundary is a real Dependency.
 - Java has no type-only Dependencies.
 - **Not seen, by design:** reflection, fully qualified names written inside code, members inherited from a type the file does not name, nested types used without their outer type's import. Metrics for Java are therefore a lower bound.
+
+### Python (vision, part 20)
+
+Files are parsed with `tree-sitter-python` as WebAssembly, as Java is ([ADR-0008](adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)). No interpreter runs, no environment is installed or read, and `setup.py` is read as text.
+
+- A file **cannot be parsed** when tree-sitter finds syntax it cannot read, or has to assume something missing.
+- What counts as a use: `import a.b` and `from a.b import c`, absolute or relative (`from .line import Line`, `from .. import catalog`), wherever they stand in the file — inside a function or a `try` as well. `from __future__ import …` is not one.
+- **Python projects and their source roots.** Every directory that holds a `pyproject.toml`, a `setup.cfg` or a `setup.py` is a Python project, and the root of the repository is one in any case. A file belongs to the deepest project that holds it. A project's **source roots** are, in this order:
+  - the directories its configuration names: in `pyproject.toml`, setuptools' `package-dir` for `""` and `packages.find.where`, Poetry's `packages` with `from`, the directory of each package of a Hatch wheel's `packages`, PDM's `package-dir`, uv's `module-root` and pytest's `pythonpath`; in `setup.cfg`, `package_dir` for `""` (written `=src`), `where` of `[options.packages.find]` and `pythonpath` of `[tool:pytest]`; in `setup.py`, the string literals of `package_dir={'': '…'}` and `where='…'`. Each is taken relative to the project's directory, `..` folded as text (`../../libs` from `services/api` is `libs`); one above the root of the repository is never a root;
+  - its `src`, where Python lies beneath it;
+  - its own directory.
+- An absolute import `a.b` is looked up below a directory as `a/b/__init__.py`, then as `a/b.py`; a directory `a/b` with Python beneath it and no `__init__.py` is a **namespace package**, which has no file and so is no Dependency. The directories are tried in this order: the directory the importing file's top-level package lies in — the first directory above the file that is no package, the file's own directory where that is none; Python puts a script's directory first, and pytest this one for a test, so that `backend/orders/models.py` finds `shop.settings` in `backend/` —, then the source roots of the file's own project, where the first file found is the one meant; then the source roots of every other project, where exactly one file must be found — found in two, the import is not resolved. A module inside a package is reached only through its package: `import logging` in a package is the standard library's, even beside a `logging.py`. And as Python finds a module or a package anywhere before a namespace package, a directory without `__init__.py` named like a module of the standard library (`platform/`) is passed over: what is imported by that name is the standard library's.
+- A relative import is looked up below the importing file's directory, one directory up for every further dot. One that climbs above the file's top-level package — above its own directory, for a file outside of a package —, which Python refuses, or that leads to nothing, is not resolved.
+- **Dependencies are counted as written.** `import a.b.c` is a use of the module `a.b.c`, not of the `__init__.py` of `a` and `a.b` that Python runs on the way. `from a.b import c` is a use of the module `a.b.c` where there is one, otherwise of `a.b`, which then defines `c`; where `a.b` is a namespace package without such a module, `c` is not resolved. `from a.b import *` is a use of `a.b`.
+- An import in the block of `if TYPE_CHECKING:` (or `if typing.TYPE_CHECKING:`), at any depth, is **type-only**: that block runs for the type checker alone. Its `elif` and `else` run.
+- A module the repository does not have: where the top-level package it lies in is found from the importing file (`shop.missing` beside a package `shop`), it is not resolved. Otherwise, where its top-level name is the standard library's, it is skipped; where the repository has a module or package of that name that lies in no package, beneath a directory that is no source root, it is not resolved — the suite cannot tell where the interpreter would find it; otherwise it is a Library.
+- A use is on the line of its import.
+- **Not seen, by design:** imports made by calling something (`importlib.import_module('…')`, `__import__('…')`), and what a `.pth` file or a change of `sys.path` at run time adds. Stubs (`.pyi`) and compiled extensions are no Source Files. Where code imports by calling something, its Dependencies are a lower bound, and the views say so.
+
+### Go (vision, part 20)
+
+Files are parsed with `tree-sitter-go` as WebAssembly. The go command never runs, nothing is downloaded, and neither a module cache nor `GOPATH` is read.
+
+- A file **cannot be parsed** when tree-sitter finds syntax it cannot read, or has to assume something missing.
+- **Modules.** Every `go.mod` where the go command looks (section 2) is a module: its `module` path, what it `require`s, and its `replace` directives that point into the repository — a path beginning with `./` or `../`, as the go command has it, taken relative to the `go.mod` with `..` folded as text; one that climbs above the root of the repository is left out. A `go.work` at the root adds its `replace` directives, which go before those of every module. Both are read as text, blocks included. A file belongs to the module of the deepest `go.mod` above it.
+- **Packages.** A package is a directory. What others import from a directory is its files other than `_test.go`, under the package name most of them declare — not `main` where another one is declared, and on a tie the name of the first file by path. A file of another package in that directory (a generator behind `//go:build ignore`) is not part of it.
+- **An import path** names a directory, looked up in this order: through a `replace` of `go.work`, through a `replace` of the importing file's module, then through the module of the repository with the longest module path the import path lies below; the rest of the path is the directory below it. Among replacements, too, the longest module path wins. A nested module is the repository's whether or not a `replace` or `go.work` names it. A directory that a deeper module holds belongs to that module, and is not reached through the module path of the outer one: such an import is not resolved, and so is one whose directory holds no package.
+- An import path below no module of the repository lies outside: with no dot in its first element it is the standard library and skipped; otherwise it is a Library.
+- Dependencies are between files, so a use of a package is a use of the files that declare the name used. Every file contributes what it declares at the top level to its package — functions, types, variables and constants, but not methods, `init` or `_`. What counts as a use:
+  - `pkg.Name`, where `pkg` is the name an import binds — its alias, otherwise the package name its files declare, which need not be the last element of the path —, as a use of the files of that package that declare `Name`, on the line of the use. Where none does, `<import path>.Name` is not resolved. Only an exported `Name`, one that begins with a capital letter, can be another package's: `cart.items` selects from a value, and is neither a use nor listed.
+  - A name without a qualifier that another file of the file's own package declares, on the line it is first used on. A test file sees every other file of its package; the other files do not see the test files. An external test package (`package cart_test`) is a package of its own that imports the one it tests, and sees what the test files of that package declare, as the go command builds them together (`export_test.go`).
+  - A name that a package imported with `.` declares, in the same way.
+  - A blank import (`import _ "…"`), and an import whose use the syntax does not show, as a use of every file of its package, on the line of the import.
+- Two files that both declare a name — one for each platform, behind build constraints — are each used: build constraints and file names for `GOOS` and `GOARCH` are not evaluated.
+- The syntax has no scopes: a name declared inside a function of the file — a parameter, a variable, a type — is never counted as a use of the package, anywhere in the file. A parameter or a variable that carries the name of an imported package hides it the same way: a selection from that name is neither a use nor listed, anywhere in the file, unless it stands in the position of a type (`func Handle(cart *cart.Cart)`), where only a package can.
+- Go has no type-only Dependencies.
+- **Not seen, by design:** `vendor/` and `testdata/` — an import is resolved into the repository's own modules, never into a copy in `vendor/` —, code generated at build time, and `GOPATH` mode: without a `go.mod` above it, every import of a file with a dot in its first element is a Library, by its import path. A method is reached through its type: calling it is a use of the file that declares the type only where the type is named. Metrics for Go are therefore a lower bound, and the views say so, as they do for Java and Python.
+
+### Manifests (vision, part 20)
+
+What the manifests of a repository declare is read for the Library inventory of part 15 of the vision, read as text and never run. The record is minimal and the same for every language: the manifest's path, the name it declares, the version where it gives one, as written, the group where it puts the Library in one, and the line that declares it — the first of a requirement continued over several; in `pyproject.toml`, whose data says no lines, the line its text shows it on, and none where a string with an escape in it does not show what it reads. Nothing ties it to the Libraries the code uses yet: the name a distribution is installed by (`PyYAML`) is not the one it is imported by (`yaml`), and only part 15 maps the one to the other.
+
+- `pyproject.toml`: the `dependencies` of `[project]`, its `optional-dependencies` with the extra as group, and `[dependency-groups]` with the group's name, an `include-group` left out; Poetry's `dependencies`, `python` left out, its `dev-dependencies` as the group `dev`, and those of `group.<name>` as the group `<name>`. A requirement written as PEP 508 has its name without extras, and as its version what stands between them and the markers, unless that is a URL.
+- `requirements.txt`, `requirements-dev.txt` and the like, and every `.txt` in a directory `requirements/`: a requirement a line, continued lines joined; comments, options (`-r`, `-e`, `--index-url`, `--hash`), paths and URLs are left out.
+- `go.mod`: what it `require`s, with its version; what it marks `// indirect` as the group `indirect`.
+- A manifest that cannot be read names nothing.
 
 ## 4. Dependencies between Components (part 3)
 

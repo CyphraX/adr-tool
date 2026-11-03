@@ -275,8 +275,8 @@ export interface StructureComponent {
   readonly files: readonly string[]
   /** The test files it contains, counted or not. */
   readonly testFiles: number
-  /** It contains Java that is counted: its metrics are a lower bound. */
-  readonly java: boolean
+  /** The languages it contains, counted, whose numbers are a lower bound, in this order. */
+  readonly lowerBound: readonly LowerBound[]
   /** `undefined` when it contains no Source File. */
   readonly metrics?: Metrics
   /** At its own level: what it depends on, and what depends on it. */
@@ -288,6 +288,14 @@ export interface StructureComponent {
     readonly typeOnly: boolean
   }[]
 }
+
+/**
+ * A language whose Dependencies are a lower bound, for what its parser cannot see
+ * (docs/structure-format.md, section 3): Java without a classpath, Python's imports made by
+ * calling something, Go's method calls through values and build constraints.
+ */
+export const LOWER_BOUND = ['java', 'python', 'go'] as const
+export type LowerBound = (typeof LOWER_BOUND)[number]
 
 /**
  * One level of a repository's Components as the Structure view shows it, with what the
@@ -303,8 +311,8 @@ export interface StructureView {
   readonly hints: readonly StructureProblem[]
   readonly sourceFiles: number
   readonly testFiles: number
-  /** Java is read without a classpath: where there is Java, its numbers are a lower bound. */
-  readonly javaFiles: number
+  /** The languages of the repository whose Dependencies are a lower bound, in this order. */
+  readonly lowerBound: readonly LowerBound[]
   readonly dependencies: number
   /** How many different Libraries the code uses. */
   readonly libraries: number

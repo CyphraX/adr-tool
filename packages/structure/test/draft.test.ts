@@ -130,6 +130,155 @@ describe('the Draft (docs/structure-format.md, section 1)', () => {
     ).toEqual(['app ← app/**'])
   })
 
+  it('takes the members of a uv workspace, below the source root a Python project names', async () => {
+    expect(
+      await draft({
+        'pyproject.toml': [
+          '[tool.uv.workspace]',
+          'members = ["packages/*"]',
+          'exclude = ["packages/legacy"]'
+        ].join('\n'),
+        'packages/api/pyproject.toml': '[tool.setuptools]\npackage-dir = { "" = "lib" }\n',
+        'packages/api/lib/api/__init__.py': '',
+        'packages/api/lib/api/routes/users.py': '',
+        'packages/api/lib/api/models/user.py': '',
+        'packages/core/pyproject.toml': '',
+        'packages/core/src/core/__init__.py': '',
+        'packages/core/src/core/money.py': '',
+        'packages/legacy/pyproject.toml': '',
+        'packages/legacy/old.py': '',
+        // Not a member: no pyproject.toml of its own.
+        'packages/notes/todo.py': '',
+        // The root holds Python of its own: its directories are drafted beside the members.
+        'scripts/release.py': ''
+      })
+    ).toEqual([
+      'api ← packages/api/**',
+      'api/models ← packages/api/lib/api/models/**',
+      'api/routes ← packages/api/lib/api/routes/**',
+      'core ← packages/core/**',
+      'scripts ← scripts/**'
+    ])
+  })
+
+  it('does not take the root for code where its Python configuration only configures tools', async () => {
+    const workspace = {
+      'package.json': '{ "name": "root" }',
+      'pnpm-workspace.yaml': 'packages:\n  - packages/*\n',
+      'packages/a/package.json': '{}',
+      'packages/a/src/index.ts': '',
+      'packages/b/package.json': '{}',
+      'packages/b/src/index.ts': '',
+      'scripts/release.ts': '',
+      'e2e/smoke.spec.ts': ''
+    }
+    const members = ['a ← packages/a/**', 'b ← packages/b/**']
+    expect(await draft(workspace)).toEqual(members)
+    expect(
+      await draft({ ...workspace, 'pyproject.toml': '[tool.ruff]\nline-length = 100\n' })
+    ).toEqual(members)
+    expect(await draft({ ...workspace, 'setup.cfg': '[flake8]\nmax-line-length = 100\n' })).toEqual(
+      members
+    )
+    const maven = {
+      'pom.xml': '<project><modules><module>api</module><module>core</module></modules></project>',
+      'api/pom.xml': '<project/>',
+      'api/src/main/java/com/x/api/A.java': '',
+      'core/pom.xml': '<project/>',
+      'core/src/main/java/com/x/core/C.java': '',
+      'docs/snippets/Example.java': '',
+      'pyproject.toml': '[tool.black]\n'
+    }
+    expect(await draft(maven)).toEqual(['api ← api/**', 'core ← core/**'])
+    // A project it declares, or Python beside the units, does.
+    const roots: Record<string, string>[] = [
+      { 'pyproject.toml': '[project]\nname = "tools"\n' },
+      { 'pyproject.toml': '[tool.poetry]\nname = "tools"\n' },
+      { 'setup.cfg': '[metadata]\nname = tools\n' },
+      { 'setup.py': 'from setuptools import setup\nsetup()\n' },
+      { 'pyproject.toml': '[tool.ruff]\n', 'tools/gen.py': '' }
+    ]
+    for (const root of roots) {
+      expect(await draft({ ...maven, ...root })).toEqual([
+        'api ← api/**',
+        'core ← core/**',
+        'docs ← docs/**',
+        ...('tools/gen.py' in root ? ['tools ← tools/**'] : [])
+      ])
+    }
+  })
+
+  it("takes a Python project's source root, but not pytest's, which may name the tests", async () => {
+    expect(
+      await draft({
+        'setup.cfg': '[options]\npackage_dir =\n    =lib\n[tool:pytest]\npythonpath = tests\n',
+        'lib/shop/cart/cart.py': '',
+        'lib/shop/catalog/product.py': '',
+        'tests/test_cart.py': ''
+      })
+    ).toEqual(['cart ← lib/shop/cart/**', 'catalog ← lib/shop/catalog/**'])
+    expect(
+      await draft({
+        'pyproject.toml': '[tool.pytest.ini_options]\npythonpath = ["tests"]\n',
+        'shop/cart.py': '',
+        'tests/helpers.py': ''
+      })
+    ).toEqual(['shop ← shop/**', 'tests ← tests/**'])
+  })
+
+  it('takes the Go modules nested in a Go repository, beside the package directories of its root', async () => {
+    const shop = {
+      'go.mod': 'module example.com/shop\n',
+      'cart/cart.go': '',
+      'internal/db/db.go': '',
+      'tools/go.mod': 'module example.com/shop/tools\n',
+      'tools/lint/lint.go': '',
+      'tools/gen/gen.go': ''
+    }
+    expect(await draft(shop)).toEqual([
+      'cart ← cart/**',
+      'internal ← internal/**',
+      'tools ← tools/**',
+      'tools/gen ← tools/gen/**',
+      'tools/lint ← tools/lint/**'
+    ])
+    // A go.work at the root, with its modules beside it.
+    expect(
+      await draft({
+        'go.work': 'go 1.22\nuse (\n  ./api\n  ./worker\n)\n',
+        'api/go.mod': 'module example.com/api\n',
+        'api/main.go': '',
+        'worker/go.mod': 'module example.com/worker\n',
+        'worker/main.go': ''
+      })
+    ).toEqual(['api ← api/**', 'worker ← worker/**'])
+    // A go.mod below a root that is not Go is a fixture, say, and names no unit.
+    expect(
+      await draft({
+        'package.json': '{}',
+        'src/app.ts': '',
+        'src/lib/x.ts': '',
+        'testdata/go.mod': 'module example.com/x\n',
+        'testdata/x.go': ''
+      })
+    ).toEqual(['lib ← src/lib/**'])
+    // Nor is one where the go command does not look, and Go there is no Source File.
+    expect(
+      await draft({
+        'go.mod': 'module example.com/t\n',
+        'cmd/t/main.go': '',
+        'internal/p/p.go': '',
+        'internal/p/testdata/mod/go.mod': 'module example.com/fake\n',
+        'internal/p/testdata/mod/fake.go': '',
+        'vendor/github.com/x/y/y.go': '',
+        '_examples/go.mod': 'module example.com/examples\n',
+        '_examples/main.go': '',
+        '.tools/go.mod': 'module example.com/tools\n',
+        '.tools/gen.go': ''
+      })
+    ).toEqual(['cmd ← cmd/**', 'internal ← internal/**'])
+  })
+
   it('takes the directories under the source root where nothing names units', async () => {
     expect(
       await draft({

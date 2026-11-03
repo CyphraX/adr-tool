@@ -97,7 +97,12 @@ export const SENTENCES = {
 
   // Why a Java file cannot be read. What the TypeScript compiler says is its own text.
   'java-missing': (v: { what: string }): string => `Missing ${v.what}.`,
-  'java-unreadable': (): string => 'Syntax that cannot be read.'
+  'java-unreadable': (): string => 'Syntax that cannot be read.',
+  // Why a Python or a Go file cannot be read, as for Java.
+  'python-missing': (v: { what: string }): string => `Missing ${v.what}.`,
+  'python-unreadable': (): string => 'Syntax that cannot be read.',
+  'go-missing': (v: { what: string }): string => `Missing ${v.what}.`,
+  'go-unreadable': (): string => 'Syntax that cannot be read.'
 } satisfies Sentences
 
 /** What `structure` may say: one of its codes, with the values of its sentence. */

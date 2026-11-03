@@ -131,7 +131,7 @@ export const SENTENCES = {
   // Why the file, a Rule, an Exception or an applied Pattern cannot be read: the rest of a sentence.
   // `not-yaml` and `top-not-map` are the kernel's (YAML_SENTENCES).
   'key-not-list': (v: { key: string }): string => `"${v.key}" must be a list`,
-  'key-twice': (v: { key: string }): string => `"${v.key}" is written twice`,
+  'written-twice': (v: { key: string }): string => `"${v.key}" is written twice`,
   'key-not-of-kind': (v: { key: string; kind: string }): string =>
     `"${v.key}" is no key of a Rule of the kind ${v.kind}`,
   'item-not-map': (): string => 'it must be a map of its keys',

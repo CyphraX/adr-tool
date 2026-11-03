@@ -57,6 +57,9 @@ describe('the files a repository consists of (docs/structure-format.md, section 
       'packages/web/cache/c.ts': '',
       'packages/web/keep.log': '',
       'packages/web/dist/b.js': '',
+      'services/api/pyproject.toml': '',
+      'services/api/src/api/app.py': '',
+      'services/api/build/lib/api/app.py': '',
       'node_modules/lib/index.js': '',
       'docs/build/kept.md': ''
     })
@@ -68,6 +71,8 @@ describe('the files a repository consists of (docs/structure-format.md, section 
       'packages/web/keep.log',
       'packages/web/package.json',
       'packages/web/src/b.ts',
+      'services/api/pyproject.toml',
+      'services/api/src/api/app.py',
       'src/a.ts'
     ])
   })

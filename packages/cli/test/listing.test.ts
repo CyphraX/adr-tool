@@ -133,11 +133,18 @@ describe('walk, for a folder without git', () => {
       'docs/dist/page.md': '',
       'java/pom.xml': '',
       'java/target/App.class': '',
+      'python/pyproject.toml': '',
+      'python/build/lib/app.py': '',
       'node_modules/x/index.js': '',
       'deep/node_modules/y/index.js': '',
       '.git/config': ''
     })
-    expect(await walk(root)).toEqual(['docs/dist/page.md', 'java/pom.xml', 'package.json'])
+    expect(await walk(root)).toEqual([
+      'docs/dist/page.md',
+      'java/pom.xml',
+      'package.json',
+      'python/pyproject.toml'
+    ])
   })
 
   it('does not follow a symbolic link', async () => {

@@ -1,0 +1,14 @@
+title: The shop in its context
+level: system-context
+elements:
+  - repository: shop
+    name: The shop
+    description: Sells, bills and stores.
+    at: [260, 40]
+  - external: bank
+    name: The bank
+    at: [40, 40]
+connections:
+  - from: shop
+    to: bank
+    label: pays through

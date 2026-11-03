@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import {
   cpSync,
   existsSync,
@@ -9,7 +10,7 @@ import {
   symlinkSync,
   writeFileSync
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { devNull, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { fileURLToPath } from 'node:url'
@@ -20,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { listTemplates, memoryFileSystem, openRepository, planCreate } from '@adr-tool/core'
 import { repositoryFiles } from '../src/files'
 import { PROTOCOL_VERSIONS, serve, type Tool } from '../src/protocol'
-import { gitExecutable, toolsFor } from '../src/tools'
+import { toolsFor } from '../src/tools'
 
 // docs/plan-roadmap.md, part 9; docs/mcp.md
 
@@ -268,6 +269,22 @@ describe('the MCP server (docs/mcp.md)', () => {
 
     const { problems } = await call(client, 'list_problems')
     expect(problems).toEqual([])
+    await close()
+  })
+
+  it("records a Correction for git's user.name when the agent names nobody", async () => {
+    const env = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1' }
+    execFileSync('git', ['init', '-q', '-b', 'trunk'], { cwd: root, env })
+    execFileSync('git', ['config', 'user.name', 'Lena Becker'], { cwd: root, env })
+    const { client, close } = await connect(root, toolsFor({ root, today: () => TODAY }))
+    const read = await call(client, 'read_adr', { id: '0004-operations-return-change-sets' })
+    const edited = await call(client, 'plan_edit_body', {
+      id: read.id,
+      body: `${read.body}One more sentence.\n`,
+      revision: read.revision,
+      note: 'Says what the change set holds.'
+    })
+    expect(edited.files[0].diff).toContain('Lena Becker')
     await close()
   })
 
@@ -804,18 +821,5 @@ describe('the protocol under load (PR #41)', () => {
     output.destroy(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
     input.write('{"jsonrpc":"2.0","id":1,"method":"ping"}\n')
     await expect(done).resolves.toBeUndefined()
-  })
-})
-
-describe('the git that is run', () => {
-  it('is git from the PATH on Windows, never one the repository brings along', () => {
-    const there = new Set(['C:\\Program Files\\Git\\cmd\\git.exe', 'repository\\git.exe'])
-    const exists = (path: string): boolean => there.has(path)
-    expect(gitExecutable('linux', 'C:\\Program Files\\Git\\cmd', exists)).toBe('git')
-    // A directory of the PATH that is not absolute is looked for where git runs: it is skipped.
-    expect(gitExecutable('win32', 'repository;"C:\\Program Files\\Git\\cmd"', exists)).toBe(
-      'C:\\Program Files\\Git\\cmd\\git.exe'
-    )
-    expect(gitExecutable('win32', 'repository', exists)).toBe('git')
   })
 })

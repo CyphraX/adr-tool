@@ -82,7 +82,16 @@ async function gitFiles(root: string): Promise<string[] | undefined> {
 const NEVER = new Set(['node_modules', '.git'])
 /** Build output, left out where it stands next to a build file. */
 const BUILD_OUTPUT = new Set(['dist', 'build', 'out', 'target'])
-const BUILD_FILES = ['package.json', 'pom.xml', 'build.gradle', 'build.gradle.kts']
+const BUILD_FILES = [
+  'package.json',
+  'pom.xml',
+  'build.gradle',
+  'build.gradle.kts',
+  'pyproject.toml',
+  'setup.py',
+  'setup.cfg',
+  'go.mod'
+]
 
 /**
  * The files below `root` for a folder without git, as the app walks it: `.gitignore` files are

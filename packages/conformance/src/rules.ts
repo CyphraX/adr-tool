@@ -173,7 +173,7 @@ export function readRules(text: string | undefined): RulesFile {
   // A key written twice would hide what it says first: a second list of Rules goes unchecked.
   const twice = repeatedKey(top)
   if (twice !== undefined) {
-    return unreadable({ code: 'key-twice', values: { key: twice.key } }, lineOf(twice.node))
+    return unreadable({ code: 'written-twice', values: { key: twice.key } }, lineOf(twice.node))
   }
 
   const lists: Record<'rules' | 'exceptions' | 'patterns', readonly unknown[]> = {
@@ -458,7 +458,7 @@ function repeatedKey(map: YAMLMap): { key: string; node: unknown } | undefined {
 function noKeyTwice(map: YAMLMap, lineOf: LineOf): void {
   const twice = repeatedKey(map)
   if (twice !== undefined) {
-    throw new Wrong({ code: 'key-twice', values: { key: twice.key } }, lineOf(twice.node))
+    throw new Wrong({ code: 'written-twice', values: { key: twice.key } }, lineOf(twice.node))
   }
 }
 
