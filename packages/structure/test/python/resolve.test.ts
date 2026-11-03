@@ -204,6 +204,21 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
     expect(edges).toEqual(['services/api/app/main.py > libs/common/__init__.py 1'])
   })
 
+  it('passes over a directory without __init__.py that is named like a module of the standard library', async () => {
+    const { edges, unresolved, used } = await analyse({
+      'platform/deploy.py': '',
+      'json/schema.py': '',
+      'app/__init__.py': '',
+      'app/x.py': [
+        'import platform',
+        'from platform import system, deploy',
+        'import json.schema',
+        'from json import loads'
+      ]
+    })
+    expect([edges, unresolved, used]).toEqual([[], [], []])
+  })
+
   it('does not resolve a module that two other projects both have', async () => {
     const { edges, unresolved } = await analyse({
       'one/pyproject.toml': '',

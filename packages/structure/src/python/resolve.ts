@@ -184,6 +184,10 @@ export function resolvePython(
           continue
         }
       } else {
+        // A directory without `__init__.py` named like a module of the standard library is
+        // passed over: Python finds a module or a package anywhere before a namespace package.
+        const top = entry.module.split('.')[0]!
+        if (PYTHON_STANDARD_LIBRARY.has(top) && find(path, top)?.kind === 'namespace') continue
         module = find(path, entry.module)
         below = (name) => find(path, `${entry.module}.${name}`)
         if (module === undefined) {
