@@ -29,6 +29,7 @@ import { followHistory, recordedIn } from './history'
 import { chooseLanguage } from './language'
 import type { Module } from './modules'
 import { repositoryProblems } from './repository-problems'
+import { ReviewTab, reviewForms } from './review-tab.svelte'
 import { wordOf } from './said'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
@@ -140,6 +141,8 @@ interface Tab {
   structure: StructureTab
   outline: OutlineTab
   branches: BranchesTab
+  /** The Review module: the Annotations and what is looked at of them (docs/plan-vision.md, part 9). */
+  review: ReviewTab
   /** How the Relations graph is shown: the Relation types it draws, and its scale. */
   graph: { types: RelationType[]; scale: number }
 }
@@ -159,6 +162,8 @@ export type Review =
       caution?: Caution
       /** The change renames a Component: the Structure view follows it. */
       renames?: { from: string; to: string }
+      /** What the module that asked for the change does once it is written. */
+      applied?: () => void
     }
   /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
@@ -342,7 +347,8 @@ class AppState {
 
   /** Every Problem of the repository in front, of every module (docs/plan-vision.md, part 2). */
   readonly repositoryProblems = $derived(
-    this.active && repositoryProblems(this.active.repository, this.active.outline)
+    this.active &&
+      repositoryProblems(this.active.repository, this.active.outline, this.active.review)
   )
 
   /** Whether the editor holds text that is not on disk. */
@@ -360,7 +366,9 @@ class AppState {
 
   /** Whether a dialog holds what was entered and not yet carried out: picks, a typed title. */
   readonly dialogDirty = $derived(
-    this.metadataDirty || (this.creating !== undefined && this.creating.title.trim() !== '')
+    this.metadataDirty ||
+      (this.creating !== undefined && this.creating.title.trim() !== '') ||
+      reviewForms.dirty
   )
 
   /** Whether closing the window now would lose anything that was typed or picked. */
@@ -576,6 +584,9 @@ class AppState {
     if (tab.module === 'structure') {
       tab.structure.problems = true
       tab.structure.code = undefined
+    } else if (tab.module === 'review') {
+      tab.review.problems = true
+      tab.review.code = undefined
     } else {
       this.show('repository-problems')
     }
@@ -1411,6 +1422,7 @@ class AppState {
       this.review = undefined
       // A renamed Component has a new ID: the Structure view stays with it.
       if (review.renames) this.followRename(review.renames.from, review.renames.to)
+      review.applied?.()
       // A renumbered ADR has a new ID: stay with it.
       const renamedId = review.change.renamedId
       if (renamedId !== undefined && this.active) this.active.selectedId = renamedId
@@ -1438,7 +1450,7 @@ class AppState {
   }
 
   /** Show what a plan came back with, unless a question was asked meanwhile. */
-  private present(review: Review): void {
+  present(review: Review): void {
     if (this.review?.kind === 'confirm') {
       if (review.kind === 'change') void window.api.discardChange(review.change.changeId)
       return
@@ -1481,6 +1493,7 @@ class AppState {
     const proceed = (): void => {
       this.creating = undefined
       this.editingMetadata = undefined
+      reviewForms.clear()
       then()
     }
     if (!this.dialogDirty) return proceed()
@@ -1604,6 +1617,7 @@ function newTab(repository: OpenRepository): Tab {
       selection: undefined
     },
     outline: new OutlineTab(),
+    review: new ReviewTab(),
     branches: {
       overview: undefined,
       loading: false,

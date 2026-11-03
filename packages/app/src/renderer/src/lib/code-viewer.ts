@@ -14,6 +14,14 @@ import {
 } from '@codemirror/view'
 import { defaultKeymap } from '@codemirror/commands'
 import { tags } from '@lezer/highlight'
+import {
+  annotationTheme,
+  annotationsIn,
+  selectLineOnNumber,
+  selectedLines,
+  type CodeAnnotation,
+  type Lines
+} from './code-annotations'
 
 // The code viewer: read-only, in the languages of the Structure format's section 2, with
 // the lines a Dependency points at marked. The colours come from the app's tokens.
@@ -104,31 +112,57 @@ export interface CodeViewer {
    * else the first marked one. A new text starts from its top.
    */
   show(file: { path: string; text: string }, marks: readonly number[], line?: number): void
+  /** Show the Annotations of the file beside their lines, `selected` among them (part 9 of the vision). */
+  annotate(annotations: readonly CodeAnnotation[], selected: string | undefined): void
   destroy(): void
 }
 
-export function createCodeViewer(parent: HTMLElement): CodeViewer {
+/** What the viewer tells whoever shows it: lines selected, and an Annotation clicked. */
+export interface CodeViewerEvents {
+  readonly onselect?: (lines: Lines | undefined) => void
+  readonly onannotation?: (id: string) => void
+}
+
+export function createCodeViewer(parent: HTMLElement, events: CodeViewerEvents = {}): CodeViewer {
   const language = new Compartment()
   const marks = new Compartment()
+  const annotations = new Compartment()
+  let shownAnnotations: { list: readonly CodeAnnotation[]; selected: string | undefined } = {
+    list: [],
+    selected: undefined
+  }
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc: '',
       extensions: [
         EditorState.readOnly.of(true),
-        lineNumbers(),
+        annotations.of([]),
+        lineNumbers({
+          domEventHandlers: {
+            mousedown: (view, line, event) => selectLineOnNumber(view, line.from, event)
+          }
+        }),
         highlightSpecialChars(),
         drawSelection(),
         syntaxHighlighting(highlighting),
         language.of([]),
         marks.of([]),
         theme,
+        annotationTheme,
         keymap.of(defaultKeymap),
-        EditorView.contentAttributes.of({ 'aria-readonly': 'true' })
+        EditorView.contentAttributes.of({ 'aria-readonly': 'true' }),
+        EditorView.updateListener.of((update) => {
+          if (update.selectionSet || update.docChanged)
+            events.onselect?.(selectedLines(update.state))
+        })
       ]
     })
   })
   let shown: { path: string; text: string } | undefined
+  function open(id: string): void {
+    events.onannotation?.(id)
+  }
 
   return {
     show(file, lines, line) {
@@ -145,10 +179,20 @@ export function createCodeViewer(parent: HTMLElement): CodeViewer {
       view.dispatch({
         effects: [
           marks.reconfigure(EditorView.decorations.of(markLines(doc, lines))),
+          // The Annotations of the text as it is now: a line it no longer has has none.
+          annotations.reconfigure(
+            annotationsIn(doc, shownAnnotations.list, shownAnnotations.selected, open)
+          ),
           ...(target !== undefined && target >= 1 && target <= doc.lines
             ? [EditorView.scrollIntoView(doc.line(target).from, { y: 'center' })]
             : [EditorView.scrollIntoView(0, { y: 'start' })])
         ]
+      })
+    },
+    annotate(list, selected) {
+      shownAnnotations = { list, selected }
+      view.dispatch({
+        effects: annotations.reconfigure(annotationsIn(view.state.doc, list, selected, open))
       })
     },
     destroy() {

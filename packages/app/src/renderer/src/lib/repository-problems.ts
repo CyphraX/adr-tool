@@ -1,6 +1,7 @@
 import { repairsOf, type DecisionLog, type Problem, type Repair } from '@adr-tool/core'
 import { hasRepair, type StructureProblem } from '@adr-tool/structure/model'
 import type { OpenRepository, StructureOutline } from '../../../shared/ipc'
+import { reviewSection, type ReviewKnown, type ReviewSection } from './review'
 import { problemsAcross, type Placed, type PlacedGroup } from './together'
 
 /**
@@ -23,6 +24,8 @@ export interface RepositoryProblems {
   readonly traces: readonly TraceProblem[]
   /** The Problems of the declaration of Components, as far as Structure knows them. */
   readonly structure: StructureSection
+  /** The Problems of the Annotations: of their files, of their Traces, and the orphaned. */
+  readonly review: ReviewSection
   /** Every Problem known, each root cause once: what every sidebar shows. */
   readonly count: number
 }
@@ -86,7 +89,8 @@ const isTrace = (problem: Problem): problem is TraceProblem['problem'] =>
 
 export function repositoryProblems(
   repository: OpenRepository,
-  outline: OutlineKnown
+  outline: OutlineKnown,
+  review?: ReviewKnown
 ): RepositoryProblems {
   const [across] = problemsAcross([repository])
   const logOf = (path: string): DecisionLog | undefined =>
@@ -112,11 +116,17 @@ export function repositoryProblems(
   const structure = structureSection(outline)
   const decisionsCount = across!.own.length + logs.reduce((sum, log) => sum + log.groups.length, 0)
   const structureCount = structure.state === 'known' ? structure.entries.length : 0
+  const annotations = reviewSection(review)
+  const reviewCount =
+    annotations.state === 'known'
+      ? annotations.entries.length + (annotations.configUnreadable ? 1 : 0)
+      : 0
   return {
     decisions: { own: across!.own, logs },
     traces,
     structure,
-    count: decisionsCount + traces.length + structureCount
+    review: annotations,
+    count: decisionsCount + traces.length + structureCount + reviewCount
   }
 }
 
