@@ -3,6 +3,7 @@ export {
   normalizePath,
   type DirectoryEntry,
   type FileSystem,
+  type ReadOptions,
   type WritableFileSystem
 } from './fs/port'
 export { memoryFileSystem } from './fs/memory'

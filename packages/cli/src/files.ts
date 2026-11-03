@@ -35,15 +35,22 @@ export function repositoryFiles(root: string, warn: (text: string) => void = () 
     const target = await realpath(full).catch(failed(path))
     return target !== undefined && within(await realBase, target) ? target : undefined
   }
-  const kindOf = async (path: string): Promise<'file' | 'directory' | undefined> => {
+  const infoOf = async (path: string) => {
     const target = await real(path)
-    const info = target === undefined ? undefined : await stat(target).catch(failed(path))
+    return target === undefined ? undefined : await stat(target).catch(failed(path))
+  }
+  const kindOf = async (path: string): Promise<'file' | 'directory' | undefined> => {
+    const info = await infoOf(path)
     return info?.isFile() ? 'file' : info?.isDirectory() ? 'directory' : undefined
   }
 
   return {
-    readText: async (path) => {
-      const target = (await kindOf(path)) === 'file' ? await real(path) : undefined
+    readText: async (path, options) => {
+      const info = await infoOf(path)
+      if (!info?.isFile()) return undefined
+      // More than it may have: as good as not there.
+      if (options?.atMost !== undefined && info.size > options.atMost) return undefined
+      const target = await real(path)
       return target === undefined ? undefined : readFile(target, 'utf8').catch(failed(path))
     },
     list: async (path) => {

@@ -63,6 +63,14 @@ describe('a repository on disk', () => {
     expect(await fs.list('docs/adr/0001-modular-monolith.md')).toBeUndefined()
   })
 
+  it('reads a file within a limit of bytes, and one larger as if it were not there', async () => {
+    const fs = nodeFileSystem(showcase)
+    const path = 'docs/adr/0001-modular-monolith.md'
+    const size = statSync(join(showcase, path)).size
+    expect(await fs.readText(path, { atMost: size })).toContain('# ')
+    expect(await fs.readText(path, { atMost: size - 1 })).toBeUndefined()
+  })
+
   it('stays inside its root, whatever path it is handed', async () => {
     const fs = nodeFileSystem(join(showcase, 'docs'))
     for (const path of ['../../own/0001-crlf-and-foreign-keys.md', '/etc/hostname']) {
