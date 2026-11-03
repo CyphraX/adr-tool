@@ -69,8 +69,17 @@ function dayBefore(day: string): string {
   return date.toISOString().slice(0, 10)
 }
 
+/** Whether `lines` have the quoted lines at the Anchor's lines: as they are, trailing whitespace aside. */
 const sameLines = (lines: readonly string[], anchor: Anchor): boolean =>
-  anchor.quote.every((line, offset) => lines[anchor.start - 1 + offset] === line)
+  anchor.quote.every(
+    (line, offset) => lines[anchor.start - 1 + offset]?.trimEnd() === line.trimEnd()
+  )
+
+/**
+ * A line that tells nothing about where it stands: blank, or without a letter or a digit — a
+ * closing brace, a lone `});`. The diff may pair it with any of its copies.
+ */
+const weak = (line: string): boolean => !/[\p{L}\p{N}]/u.test(line)
 
 /**
  * Find an Anchor again in the code as it is on disk now (docs/review-format.md, section 4).
@@ -195,7 +204,8 @@ async function historyOf(
  * Where the quoted lines are in `lines`: the quoted lines themselves, the nearest to where the
  * Anchor was; otherwise, with history, the block that holds the quoted lines the diff kept, if
  * it is similar enough; otherwise the most similar block that is similar enough. With history,
- * only lines that are new since, quoted lines kept, or lines the diff cannot place are looked at.
+ * only lines that are new since, quoted lines kept, or weak lines the diff cannot place are
+ * looked at.
  */
 function locate(
   anchor: Anchor,
@@ -205,20 +215,24 @@ function locate(
   const quote = anchor.quote.map(normalized)
   const plain = lines.map(normalized)
   const [start, end] = [anchor.start - 1, anchor.end]
-  const matches = history && matchLines(history, lines)
+  // Compared whitespace aside: a file that is re-indented keeps its lines.
+  const before = history?.map(normalized)
+  const matches = before && matchLines(before, plain)
 
   // Which lines may belong to the Anchor's block, and where the Anchor would be now.
   let allowed: (index: number) => boolean = () => true
   let near = start
-  if (history && matches) {
+  if (before && matches) {
     const { ofOld, ofNew } = matches
-    // A line the old text has more than once — a closing brace, a blank line — the diff may
-    // pair with any of them: that it kept one elsewhere says nothing about where it belongs.
+    // A weak line the old text has more than once — a closing brace, a blank line — the diff
+    // may pair with any of them: that it kept one elsewhere says nothing about where it
+    // belongs. Any other line it kept elsewhere is other code, a copy of the quoted lines too.
     const times = new Map<string, number>()
-    for (const line of history) times.set(line, (times.get(line) ?? 0) + 1)
+    for (const line of before) times.set(line, (times.get(line) ?? 0) + 1)
     allowed = (index) => {
       const old = ofNew[index]!
-      return old === -1 || (old >= start && old < end) || times.get(history[old]!)! > 1
+      if (old === -1 || (old >= start && old < end)) return true
+      return weak(before[old]!) && times.get(before[old]!)! > 1
     }
     near = expectedStart(ofOld, start)
   }

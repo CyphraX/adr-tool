@@ -248,6 +248,74 @@ describe('what counts as the Anchor’s lines', () => {
     expect(await findAnchor(ANCHOR, repository)).toEqual({ kind: 'orphaned', file: 'there' })
   })
 
+  it('does not take the look-alike either when the whole file is re-indented in the same commit', async () => {
+    const deleted = [...LOOK_ALIKE.slice(0, 7), ...LOOK_ALIKE.slice(11)]
+    for (const indent of [
+      (line: string) => (line === '' ? line : `\t${line}`),
+      (line: string) => line.replace(/^ +/, (spaces) => '\t'.repeat(spaces.length / 2))
+    ]) {
+      const repository = after({ 'src/cart.ts': text(deleted.map(indent)) }, [withLookAlike])
+      expect(await findAnchor(ANCHOR, repository)).toEqual({ kind: 'orphaned', file: 'there' })
+    }
+  })
+
+  it('does not take a copy of the quoted lines elsewhere for them when they are deleted', async () => {
+    const twice = [
+      'class A {',
+      '  toString(): string {',
+      '    return this.name',
+      '  }',
+      '  a = 1',
+      '}',
+      'class B {',
+      '  toString(): string {',
+      '    return this.name',
+      '  }',
+      '  b = 2',
+      '}'
+    ]
+    const anchor: Anchor = {
+      path: 'src/a.ts',
+      start: 2,
+      end: 4,
+      quote: twice.slice(1, 4),
+      commit: sha(1)
+    }
+    const start = { ...first, files: { 'src/a.ts': text(twice) } }
+    const deleted = [...twice.slice(0, 1), ...twice.slice(4)]
+    expect(await findAnchor(anchor, after({ 'src/a.ts': text(deleted) }, [start]))).toEqual({
+      kind: 'orphaned',
+      file: 'there'
+    })
+
+    // One line of boilerplate, quoted where it was deleted, and kept in the other function.
+    const checks = [
+      'function a() {',
+      '  validate(input)',
+      '  return 1',
+      '}',
+      'function b() {',
+      '  validate(input)',
+      '  return 2',
+      '}'
+    ]
+    const line: Anchor = { path: 'src/a.ts', start: 2, end: 2, quote: [checks[1]!], commit: sha(1) }
+    const withChecks = { ...first, files: { 'src/a.ts': text(checks) } }
+    const without = [...checks.slice(0, 1), ...checks.slice(2)]
+    expect(await findAnchor(line, after({ 'src/a.ts': text(without) }, [withChecks]))).toEqual({
+      kind: 'orphaned',
+      file: 'there'
+    })
+  })
+
+  it('leaves lines that differ only in whitespace at their end unchanged', async () => {
+    const trailing = CART.map((line, index) => (index >= 7 && index < 10 ? `${line}  ` : line))
+    const repository = after({ 'src/cart.ts': text(trailing) })
+    expect(await findAnchor(ANCHOR, repository)).toEqual({ kind: 'unchanged', anchor: ANCHOR })
+    const fewer = { ...ANCHOR, quote: ANCHOR.quote.map((line) => `${line}\t`) }
+    expect(await findAnchor(fewer, repository)).toEqual({ kind: 'unchanged', anchor: fewer })
+  })
+
   it('takes the look-alike without history, which is why the new place is previewed', async () => {
     const deleted = [...LOOK_ALIKE.slice(0, 7), ...LOOK_ALIKE.slice(11)]
     const fs = memoryFileSystem({ 'src/cart.ts': text(deleted) })
