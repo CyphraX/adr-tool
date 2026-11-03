@@ -1,5 +1,5 @@
 import type { RelationState, RelationType } from '@adr-tool/core'
-import type { Decision } from '../../../shared/ipc'
+import type { Decision, LowerBound } from '../../../shared/ipc'
 import type { Refusal } from './views'
 
 /**
@@ -496,8 +496,12 @@ export const en = {
     libraries: (count: number): string => many(count, 'One Library', `${count} Libraries`),
     analysedIn: (milliseconds: number): string =>
       `Analysed in ${(milliseconds / 1000).toFixed(1)} s`,
-    javaLowerBound:
-      'Java is read without a classpath, so its Dependencies are a lower bound: reflection, fully qualified names in code and members inherited from a type a file does not name are not seen.',
+    lowerBound: {
+      java: 'Java is read without a classpath, so its Dependencies are a lower bound: reflection, fully qualified names in code and members inherited from a type a file does not name are not seen.',
+      python:
+        'Python is read without running it, so its Dependencies are a lower bound: imports made by calling importlib or __import__ are not seen, and .pyi stubs are not read.',
+      go: 'Go is read without the go command, so its Dependencies are a lower bound: method calls through values and build constraints are not followed.'
+    } satisfies Record<LowerBound, string>,
     includeTests: 'Include test files',
     notResolved: 'Not resolved',
     notAnalysed: 'Not analysed',
@@ -604,8 +608,12 @@ export const en = {
       node: 'Node',
       howToRead:
         'Each Component is measured on the Source Files it contains; outside is everything else, Unassigned files included. Test files count only when they are included, type-only Dependencies always. Point at a heading for its definition. Own files and Unassigned have a size and no other metric.',
-      javaLowerBound:
-        'Java is read without a classpath: where there is Java, these numbers are a lower bound.'
+      lowerBound: {
+        java: 'Java is read without a classpath: where there is Java, these numbers are a lower bound.',
+        python:
+          "Python's imports made by calling something are not seen: where there is Python, these numbers are a lower bound.",
+        go: "Go's method calls through values and build constraints are not followed: where there is Go, these numbers are a lower bound."
+      } satisfies Record<LowerBound, string>
     },
 
     matrix: {

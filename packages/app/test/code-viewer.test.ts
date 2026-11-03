@@ -19,6 +19,8 @@ describe('the code viewer', () => {
     // A Svelte component is HTML whose script blocks are TypeScript where they say so.
     expect(name('Row.svelte')).toBe('html')
     expect(name('Cart.java')).toBe('java')
+    expect(name('cart.py')).toBe('python')
+    expect(name('cart.go')).toBe('go')
     expect(name('README.md')).toBeUndefined()
   })
 

@@ -105,11 +105,11 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 ### Structure
 
-- **Components.** Components are declared in `.arch/components.yml`. Until something is declared, the app derives a **Draft** from the build files and the folders: pnpm and npm workspaces, Maven modules, Gradle projects. The Draft is marked as a proposal everywhere it is shown, and **Adopt** writes it as a previewed change.
+- **Components.** Components are declared in `.arch/components.yml`. Until something is declared, the app derives a **Draft** from the build files and the folders: pnpm and npm workspaces, Maven modules, Gradle projects, uv workspaces, Go modules. The Draft is marked as a proposal everywhere it is shown, and **Adopt** writes it as a previewed change.
 
   ![The Draft of this repository, with the page of one Component](docs/screenshots/readme/structure-draft.png)
 
-- **Dependencies and Cycles.** The app reads TypeScript, JavaScript, Svelte and Java with parsers alone. It never runs anything from the repository it analyses ([ADR-0007](docs/adr/0007-the-analysis-never-executes-anything-from-the-analysed.md), [ADR-0008](docs/adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)). Each level is drawn as a graph. A Cycle is shown with an example round trip and its weakest Dependency.
+- **Dependencies and Cycles.** The app reads TypeScript, JavaScript, Svelte, Java, Python and Go with parsers alone. It never runs anything from the repository it analyses ([ADR-0007](docs/adr/0007-the-analysis-never-executes-anything-from-the-analysed.md), [ADR-0008](docs/adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)). Each level is drawn as a graph. A Cycle is shown with an example round trip and its weakest Dependency.
 
   ![A Cycle between two Components, with its weakest Dependency](docs/screenshots/readme/structure-cycle.png)
 
@@ -208,7 +208,7 @@ No Problems in 1 Decision Log.
 2 Violations of 2 Rules.
 ```
 
-It reads TypeScript, JavaScript and Java, and runs nothing from the repository. This repository checks its own packages with it in CI ([.arch/rules.yml](.arch/rules.yml)). The command is in [docs/cli.md](docs/cli.md#adr-check-path---format-textjsongithub), the file of Rules in [docs/conformance-format.md](docs/conformance-format.md).
+It reads TypeScript, JavaScript, Java, Python and Go, and runs nothing from the repository. This repository checks its own packages with it in CI ([.arch/rules.yml](.arch/rules.yml)). The command is in [docs/cli.md](docs/cli.md#adr-check-path---format-textjsongithub), the file of Rules in [docs/conformance-format.md](docs/conformance-format.md).
 
 ### Exporting for readers
 
@@ -243,6 +243,8 @@ The test fixtures are useful for exploring the app. They are test data, so copy 
 | `packages/core/test/fixtures/madr`, `…/madr-2`, `…/log4brains`, `…/adr-tools` | Foreign formats, offered for Migration |
 | `packages/structure/test/fixtures/shop` | A Cycle between two Components with its weakest Dependency, and one between two files |
 | `packages/structure/test/fixtures/maven-shop` | Java: a Maven project of three modules, with one package spread over two of them |
+| `packages/structure/test/fixtures/python-shop` | Python: a src layout of three packages, a Cycle between two of them, one import under `if TYPE_CHECKING:`, and its manifests |
+| `packages/structure/test/fixtures/go-shop` | Go: a module with a nested module reached through `replace`, a Cycle between two files, a test file, and one import that is not resolved |
 | `packages/conformance/test/fixtures/layered-shop` | Three layers and two Rules, broken on purpose by one import, and the ADR an Exception for it would name |
 | this repository | Its own ADRs, and its packages as declared Components |
 
@@ -338,7 +340,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | --- | --- |
 | [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, the git port with a scripted history for tests ([ADR-0020](docs/adr/0020-git-is-a-port-of-the-kernel-implemented-once-for-node.md)), splice edits, change sets, and the reading of `.arch/config.yml` |
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
-| [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
+| [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java, Python and Go are read with the grammars of tree-sitter as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
 | [`packages/conformance`](packages/conformance) | The core of the Conformance module, on `kernel` and `structure` alone and under the same guard: the Rules and Exceptions of `.arch/rules.yml`, their evaluation against the Dependencies, the Problems of the file, and Rename in it |
 | [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the Repair of an element whose Component is gone, and the SVG, drawn without a browser |
 | [`packages/review`](packages/review) | The core of the Review module, under the same guard: Annotations with their Anchors, Replies and Traces to ADRs, and how an Anchor is found again across commits, renames and rebases ([ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)). It reads git through the kernel's port; the window follows |

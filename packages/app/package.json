@@ -19,7 +19,9 @@
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
     "chokidar": "^5.0.0",
+    "tree-sitter-go": "0.25.0",
     "tree-sitter-java": "^0.23.5",
+    "tree-sitter-python": "0.25.0",
     "typescript": "^5.9.3",
     "web-tree-sitter": "^0.27.0"
   },
@@ -31,10 +33,12 @@
     "@adr-tool/review": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-go": "6.0.1",
     "@codemirror/lang-html": "^6.4.12",
     "@codemirror/lang-java": "^6.0.2",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/lang-python": "6.2.1",
     "@codemirror/language": "^6.12.4",
     "@codemirror/state": "^6.7.5",
     "@codemirror/view": "^6.43.12",

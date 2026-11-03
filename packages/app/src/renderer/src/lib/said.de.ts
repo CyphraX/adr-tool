@@ -311,6 +311,11 @@ export const DE: Wording<Codes> = {
   // Why a Java file cannot be read.
   'java-missing': (v) => `Es fehlt: ${v.what}.`,
   'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
+  // Why a Python or a Go file cannot be read, as for Java.
+  'python-missing': (v) => `Es fehlt: ${v.what}.`,
+  'python-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
+  'go-missing': (v) => `Es fehlt: ${v.what}.`,
+  'go-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
 
   // The Problems of Diagrams.
   'invalid-diagrams-directory': (v) =>

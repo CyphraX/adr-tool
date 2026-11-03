@@ -5,6 +5,8 @@ packages:
 allowBuilds:
   electron: true
   esbuild: true
-  # Only the grammar's prebuilt .wasm is used. Its install script would build the
-  # native Node binding with node-gyp, which nothing here loads.
+  # Only the grammars' prebuilt .wasm is used. Their install scripts would build the
+  # native Node bindings with node-gyp, which nothing here loads.
+  tree-sitter-go: false
   tree-sitter-java: false
+  tree-sitter-python: false

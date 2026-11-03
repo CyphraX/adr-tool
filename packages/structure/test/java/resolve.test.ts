@@ -26,7 +26,7 @@ async function analyse(repository: Record<string, string | string[]>) {
     memoryFileSystem(texts),
     files,
     sourceFilesAmong(files),
-    extractorOf(await reader)
+    extractorOf({ java: await reader })
   )
   const short = (path: string) => path.slice(path.lastIndexOf('/') + 1, -'.java'.length)
   return {
