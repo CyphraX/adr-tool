@@ -15,7 +15,7 @@
 import type { Node } from 'web-tree-sitter'
 import {
   ANONYMOUS,
-  lcom4Of,
+  cohesionOf,
   Names,
   type ClassMeasure,
   type DeclarationMeasure,
@@ -216,13 +216,11 @@ export function measureJava(root: Node): FileMeasures {
       (modifiers?.children.some((child) => child?.type === 'abstract') ?? false)
     declarations.push({ name, line: lineOf(own ?? node), abstract: isAbstract })
     if (CLASSES.has(node.type)) {
-      const methods = methodsOf(node)
       classes.push({
         name,
         line: lineOf(own ?? node),
         endLine: endLineOf(node),
-        methods: methods.length,
-        lcom4: lcom4Of(methods)
+        ...cohesionOf(methodsOf(node))
       })
     }
     // What a type's header computes — an annotation's value — belongs to no method.
@@ -250,27 +248,29 @@ function membersOf(type: Node): Node[] {
   )
 }
 
-/** The names a method declares for itself: parameters, variables, those of lambdas and patterns. */
-function localNames(method: Node): Set<string> {
-  const local = new Set<string>()
-  const visit = (node: Node): void => {
-    if (TYPES.has(node.type)) return
-    if (DECLARING.has(node.type)) {
-      const name = node.childForFieldName('name')
-      if (name) local.add(name.text)
-    }
-    if (node.type === 'inferred_parameters' || node.type === 'type_pattern') {
-      for (const child of children(node)) if (child.type === 'identifier') local.add(child.text)
-    }
-    if (node.type === 'lambda_expression') {
-      const parameters = node.childForFieldName('parameters')
-      if (parameters?.type === 'identifier') local.add(parameters.text)
-    }
-    for (const child of children(node)) visit(child)
-  }
-  visit(method)
-  return local
+/** Where the names a method declares are seen: innermost first. */
+interface Locals {
+  readonly names: Set<string>
+  readonly outer: Locals | undefined
 }
+
+const declares = (locals: Locals | undefined, name: string): boolean => {
+  for (let at = locals; at !== undefined; at = at.outer) if (at.names.has(name)) return true
+  return false
+}
+
+/** What opens a scope for the names declared inside it, Java's blocks and their kin. */
+const SCOPES = new Set([
+  'block',
+  'constructor_body',
+  'switch_block',
+  'switch_rule',
+  'lambda_expression',
+  'catch_clause',
+  'for_statement',
+  'enhanced_for_statement',
+  'try_with_resources_statement'
+])
 
 /** What declares a name in its field `name`. */
 const DECLARING = new Set([
@@ -278,8 +278,12 @@ const DECLARING = new Set([
   'formal_parameter',
   'catch_formal_parameter',
   'enhanced_for_statement',
-  'instanceof_expression'
+  'instanceof_expression',
+  'resource'
 ])
+
+/** What declares each identifier among its children: lambda parameters, patterns. */
+const LISTING = new Set(['inferred_parameters', 'type_pattern', 'record_pattern_component'])
 
 /** Where a plain name is no member used: a label, an annotation, a package. */
 const NOT_A_USE = new Set([
@@ -292,7 +296,13 @@ const NOT_A_USE = new Set([
   'scoped_identifier'
 ])
 
-/** The methods of a class with the members of the class each uses, for LCOM4. */
+/**
+ * The methods of a class with the members of the class each uses, for LCOM4: a field read or
+ * written by its plain name where no local of that name is seen, through `this.`, or through
+ * the class's own name — `Line.TOTAL` —; a method called or referenced, `this::m`. A field a
+ * method reference is taken on, `allowed::contains`, is used. In a class inside the method,
+ * `this` is that class's own.
+ */
 function methodsOf(type: Node): MethodUses[] {
   const fields = new Set<string>()
   const methods: { name: string; node: Node }[] = []
@@ -317,54 +327,112 @@ function methodsOf(type: Node): MethodUses[] {
     }
   }
   const methodNames = new Set(methods.map((method) => method.name))
+  const own = type.childForFieldName('name')?.text
 
   return methods.map(({ name, node }) => {
-    const local = localNames(node)
     const usedFields = new Set<string>()
     const calls = new Set<string>()
-    const body = node.childForFieldName('body')!
-    const visit = (current: Node): void => {
-      // A class inside the method is a class of its own.
-      if (TYPES.has(current.type)) return
+    // The walk keeps a stack of its own, in the order of the method, so that a local is seen
+    // only after it is declared and only inside its scope: `count++; { int count = 1; }` uses
+    // the field. Each node with the locals seen there, and whether its `this` is the instance.
+    type Task = { readonly node: Node; readonly locals: Locals; readonly ownThis: boolean }
+    const stack: Task[] = []
+    const next = (nodes: readonly Node[], locals: Locals, ownThis: boolean): void => {
+      for (let index = nodes.length - 1; index >= 0; index--) {
+        stack.push({ node: nodes[index]!, locals, ownThis })
+      }
+    }
+    /** Whether an expression is the instance or the class, through which a member is used. */
+    const isSelf = (object: Node | null, task: Task): boolean =>
+      object === null ||
+      (object.type === 'this' && task.ownThis) ||
+      (object.type === 'identifier' && object.text === own && !declares(task.locals, own))
+    const parameters = node.childForFieldName('parameters')
+    next(
+      [...(parameters ? [parameters] : []), node.childForFieldName('body')!],
+      { names: new Set(), outer: undefined },
+      true
+    )
+    for (let task = stack.pop(); task !== undefined; task = stack.pop()) {
+      const current = task.node
+      // A class declared inside the method is a class of its own.
+      if (TYPES.has(current.type)) continue
+      const locals = SCOPES.has(current.type)
+        ? { names: new Set<string>(), outer: task.locals }
+        : task.locals
+      if (DECLARING.has(current.type)) {
+        const declared = current.childForFieldName('name')
+        if (declared) locals.names.add(declared.text)
+      }
+      if (LISTING.has(current.type)) {
+        for (const child of children(current)) {
+          if (child.type === 'identifier') locals.names.add(child.text)
+        }
+      }
+      if (current.type === 'lambda_expression') {
+        const declared = current.childForFieldName('parameters')
+        if (declared?.type === 'identifier') locals.names.add(declared.text)
+      }
       if (current.type === 'method_invocation') {
-        const object = current.childForFieldName('object')
         const called = current.childForFieldName('name')?.text
-        if (called !== undefined && (object === null || object.type === 'this')) {
+        if (called !== undefined && isSelf(current.childForFieldName('object'), task)) {
           if (methodNames.has(called)) calls.add(called)
           // A record's component is read through the accessor of its name.
           else if (fields.has(called)) usedFields.add(called)
         }
       } else if (current.type === 'field_access') {
-        const object = current.childForFieldName('object')
         const field = current.childForFieldName('field')?.text
-        if (object?.type === 'this' && field !== undefined && fields.has(field))
-          usedFields.add(field)
-      } else if (current.type === 'method_reference') {
-        const [first, ...rest] = current.namedChildren
-        const referenced = rest.at(-1)
         if (
-          first?.type === 'this' &&
-          referenced?.type === 'identifier' &&
-          methodNames.has(referenced.text)
+          field !== undefined &&
+          fields.has(field) &&
+          isSelf(current.childForFieldName('object'), task)
         ) {
-          calls.add(referenced.text)
+          usedFields.add(field)
         }
-        return
+      } else if (current.type === 'method_reference') {
+        const [first, ...rest] = children(current)
+        const referenced = rest.at(-1)
+        if (first?.type === 'this' && task.ownThis && referenced?.type === 'identifier') {
+          if (methodNames.has(referenced.text)) calls.add(referenced.text)
+        } else if (first) {
+          // What the method is taken on is read: `allowed::contains` uses the field `allowed`.
+          stack.push({ node: first, locals, ownThis: task.ownThis })
+        }
+        continue
       } else if (
         current.type === 'identifier' &&
         fields.has(current.text) &&
-        !local.has(current.text)
+        !declares(locals, current.text)
       ) {
         const parent = current.parent
         const isMember =
           (parent?.type === 'field_access' && parent.childForFieldName('field')?.equals(current)) ||
           (parent?.type === 'method_invocation' &&
             parent.childForFieldName('name')?.equals(current))
-        if (!isMember && !NOT_A_USE.has(parent?.type ?? '')) usedFields.add(current.text)
+        if (
+          !isMember &&
+          !NOT_A_USE.has(parent?.type ?? '') &&
+          !LISTING.has(parent?.type ?? '') &&
+          !declaresHere(current)
+        ) {
+          usedFields.add(current.text)
+        }
       }
-      for (const child of children(current)) visit(child)
+      if (current.type === 'class_body') {
+        // The body of an anonymous class: its `this` is its own.
+        next(children(current), locals, false)
+      } else next(children(current), locals, task.ownThis)
     }
-    visit(body)
     return { name, fields: usedFields, calls }
   })
+}
+
+/** Whether an identifier is the name a declaration gives, not a use. */
+function declaresHere(identifier: Node): boolean {
+  const parent = identifier.parent
+  return (
+    parent !== null &&
+    DECLARING.has(parent.type) &&
+    parent.childForFieldName('name')?.equals(identifier) === true
+  )
 }

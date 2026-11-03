@@ -196,7 +196,7 @@ A Rule has `max`, `min` or both. Each Component that `of` matches and that has t
 What the metric is of decides what breaks the Rule (part 13):
 
 - **Of a Component** — the metrics of part 3, abstractness and distance: each matched Component, as above. Abstractness is undefined where a Component declares nothing — no type, no function — and distance with it.
-- **Of a function** — complexity: each function in the Source Files that the matched Components contain, their children's included. `of: '*'` checks every function of the declared Components. Its Violation is reported at the function's line, where its name is.
+- **Of a function** — complexity: each function in the Source Files that the matched Components contain, their children's included. `of: '*'` checks every function of the declared Components. Its Violation is reported at the line the function begins on: in Java the line of its name, in TypeScript and JavaScript the line where its text begins, past its decorators (structure-format.md, section 5, "Names").
 - **Of a class** — LCOM4: each class there, as for a function; a class without methods has no LCOM4 and breaks nothing.
 - **Of a level** — propagation cost: the level below each matched Component, as Structure draws it (structure-format.md, section 4) — its children, its own Source Files, and below a Component without children its directories. `'*'` in `of` names the top level, which lies below no Component; with propagation cost it matches no Component. A level of fewer than two nodes has no propagation cost.
 

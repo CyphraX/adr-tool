@@ -29,9 +29,16 @@ export function javaComplexityByWords(text: string): number {
 /**
  * LCOM4 by its definition: which methods are connected — sharing a field, or one using the
  * other — closed over every path (Warshall), and the groups counted as the distinct sets
- * each method reaches.
+ * each method reaches. A method that uses no member and is used by no other one is left out
+ * first.
  */
-export function lcom4ByDefinition(methods: readonly MethodUses[]): number | undefined {
+export function lcom4ByDefinition(all: readonly MethodUses[]): number | undefined {
+  const methods = all.filter(
+    (method) =>
+      method.fields.size > 0 ||
+      method.calls.size > 0 ||
+      all.some((other) => other.calls.has(method.name))
+  )
   if (methods.length === 0) return undefined
   const linked = methods.map((a) =>
     methods.map(

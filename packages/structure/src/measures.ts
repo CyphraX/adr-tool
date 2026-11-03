@@ -33,9 +33,12 @@ export interface ClassMeasure {
   readonly name: string
   readonly line: number
   readonly endLine: number
-  /** The methods counted, constructors left out. */
+  /**
+   * The methods LCOM4 counts: constructors are left out, and so is a method that uses no
+   * member of its class and is used by none (`cohesionOf`).
+   */
   readonly methods: number
-  /** The connected groups among its methods; `undefined` for a class without methods. */
+  /** The connected groups among those methods; `undefined` where there is none. */
   readonly lcom4: number | undefined
 }
 
@@ -139,4 +142,22 @@ export function lcom4Of(methods: readonly MethodUses[]): number | undefined {
       for (const other of byName.get(called) ?? []) join(index, other)
   })
   return new Set(methods.map((_, index) => root(index))).size
+}
+
+/**
+ * The cohesion of a class: LCOM4 over the methods that take part in it, those that use a
+ * member of the class or are used by another method. A method that uses no field, calls no
+ * method and is called by none — an override that answers a constant, a hook left empty —
+ * says nothing about how the class holds together, and would count as a group of its own:
+ * it is left out, as a constructor is.
+ */
+export function cohesionOf(methods: readonly MethodUses[]): {
+  readonly methods: number
+  readonly lcom4: number | undefined
+} {
+  const called = new Set(methods.flatMap((method) => [...method.calls]))
+  const taking = methods.filter(
+    (method) => method.fields.size > 0 || method.calls.size > 0 || called.has(method.name)
+  )
+  return { methods: taking.length, lcom4: lcom4Of(taking) }
 }

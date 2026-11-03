@@ -13,7 +13,7 @@
 import ts from 'typescript'
 import {
   ANONYMOUS,
-  lcom4Of,
+  cohesionOf,
   Names,
   type ClassMeasure,
   type DeclarationMeasure,
@@ -406,13 +406,11 @@ export function measureTypeScript(source: ts.SourceFile, component?: string): Fi
     const heritage = (node.heritageClauses ?? []).map((clause) => ({ node: clause, scope }))
     next(...decoratorsOf(node, scope), ...heritage, () => {
       const name = names.take([...scope.names, className(node, source)].join('.'))
-      const methods = methodsOf(node, source)
       classes.push({
         name,
         line: lineOf(source, startOf(node, source)),
         endLine: lineOf(source, node.end),
-        methods: methods.length,
-        lcom4: lcom4Of(methods)
+        ...cohesionOf(methodsOf(node, source))
       })
       const inner: Scope = { names: [name], counting: scope.counting }
       next(...node.members.map((member) => ({ node: member, scope: inner })))
@@ -437,27 +435,64 @@ export function measureTypeScript(source: ts.SourceFile, component?: string): Fi
   }
 }
 
-/** The members a method uses: `this.x`, `Class.x` for a static one, `const { x } = this`. */
-function usesOf(body: ts.Node, own: string | undefined): Set<string> {
+/** The assignments: `=`, `+=`, `??=` and the others. */
+const ASSIGNING = new Set(
+  Object.values(ts.SyntaxKind)
+    .filter((kind): kind is ts.SyntaxKind => typeof kind === 'number')
+    .filter(
+      (kind) =>
+        kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastCompoundAssignment
+    )
+)
+
+/** Whether a node is written to: the left side of an assignment, or what `++` and `--` change. */
+function isWritten(node: ts.Node): boolean {
+  const { holder, value } = holderOf(node)
+  if (ts.isBinaryExpression(holder)) {
+    return holder.left === value && ASSIGNING.has(holder.operatorToken.kind)
+  }
+  return (
+    (ts.isPrefixUnaryExpression(holder) || ts.isPostfixUnaryExpression(holder)) &&
+    (holder.operator === ts.SyntaxKind.PlusPlusToken ||
+      holder.operator === ts.SyntaxKind.MinusMinusToken)
+  )
+}
+
+/**
+ * What a member of a class uses of its class: `this.x`, `Class.x` for a static one,
+ * `const { x } = this`; and of them, what it writes to, `this.x = …`.
+ */
+function selfUses(
+  member: ts.Node,
+  own: string | undefined
+): { readonly used: Set<string>; readonly written: Set<string> } {
   const used = new Set<string>()
+  const written = new Set<string>()
   // The walk keeps a stack of its own, as `measureTypeScript` does; each node with whether its
-  // `this` is the instance.
-  const stack: [ts.Node, boolean][] = [[body, true]]
+  // `this` is the instance. Every function inside but an arrow function has a `this` of its
+  // own — written with `function`, a method or accessor of an object —, and so does a class.
+  const stack: [ts.Node, boolean][] = []
+  ts.forEachChild(member, (child) => {
+    stack.push([child, true])
+  })
   for (let top = stack.pop(); top !== undefined; top = stack.pop()) {
     const [node, ownThis] = top
-    // A class inside has a `this` of its own; a function written with `function` too.
     if (ts.isClassLike(node)) continue
-    const keepsThis = !(ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node))
+    const keepsThis = !(hasBody(node) && !ts.isArrowFunction(node))
     const isSelf = (expression: ts.Expression): boolean =>
       (ownThis && expression.kind === ts.SyntaxKind.ThisKeyword) ||
       (own !== undefined && ts.isIdentifier(expression) && expression.text === own)
-    if (ts.isPropertyAccessExpression(node) && isSelf(node.expression)) used.add(node.name.text)
+    const use = (name: string): void => {
+      used.add(name)
+      if (isWritten(node)) written.add(name)
+    }
+    if (ts.isPropertyAccessExpression(node) && isSelf(node.expression)) use(node.name.text)
     if (
       ts.isElementAccessExpression(node) &&
       isSelf(node.expression) &&
       ts.isStringLiteralLike(node.argumentExpression)
     ) {
-      used.add(node.argumentExpression.text)
+      use(node.argumentExpression.text)
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -476,13 +511,19 @@ function usesOf(body: ts.Node, own: string | undefined): Set<string> {
       stack.push([child, ownThis && keepsThis])
     })
   }
-  return used
+  return { used, written }
 }
 
-/** The methods of a class with what each uses, for LCOM4; constructors are left out. */
+/**
+ * The methods of a class with what each uses, for LCOM4; constructors are left out. The
+ * fields are what the class declares as properties — in its body, or as parameter properties —
+ * and what it writes to as `this.x` anywhere in its members, as JavaScript declares them.
+ */
 function methodsOf(node: ts.ClassLikeDeclaration, source: ts.SourceFile): MethodUses[] {
   const fields = new Set<string>()
   const methods: { name: string; body: ts.Node }[] = []
+  /** The members that only write fields: constructors, static blocks, field values. */
+  const others: ts.Node[] = []
   for (const member of node.members) {
     if (ts.isConstructorDeclaration(member)) {
       // Parameter properties are fields: `constructor(private readonly lines: Line[])`.
@@ -494,6 +535,11 @@ function methodsOf(node: ts.ClassLikeDeclaration, source: ts.SourceFile): Method
           fields.add(parameter.name.text)
         }
       }
+      others.push(member)
+      continue
+    }
+    if (ts.isClassStaticBlockDeclaration(member)) {
+      others.push(member)
       continue
     }
     const name = ts.isClassElement(member) ? propertyName(member.name, source) : undefined
@@ -509,20 +555,24 @@ function methodsOf(node: ts.ClassLikeDeclaration, source: ts.SourceFile): Method
       const value = member.initializer && unwrapped(member.initializer)
       if (value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value))) {
         // Called as a method, a function written with `function` has the instance as `this`.
-        methods.push({ name, body: ts.isFunctionExpression(value) ? value.body : value })
-      } else fields.add(name)
+        methods.push({ name, body: value })
+      } else {
+        fields.add(name)
+        if (member.initializer) others.push(member)
+      }
     }
   }
   const methodNames = new Set(methods.map((method) => method.name))
   const own = node.name?.text
-  return methods.map(({ name, body }) => {
-    const used = usesOf(body, own)
-    return {
-      name,
-      fields: new Set([...used].filter((member) => fields.has(member))),
-      calls: new Set([...used].filter((member) => methodNames.has(member)))
-    }
-  })
+  const uses = methods.map(({ name, body }) => ({ name, ...selfUses(body, own) }))
+  for (const { written } of [...uses, ...others.map((member) => selfUses(member, own))]) {
+    for (const field of written) if (!methodNames.has(field)) fields.add(field)
+  }
+  return uses.map(({ name, used }) => ({
+    name,
+    fields: new Set([...used].filter((member) => fields.has(member))),
+    calls: new Set([...used].filter((member) => methodNames.has(member)))
+  }))
 }
 
 /**

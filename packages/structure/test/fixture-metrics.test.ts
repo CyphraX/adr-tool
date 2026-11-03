@@ -14,7 +14,7 @@ import {
   propagationCostOf,
   type Structure
 } from '../src'
-import { lcom4Of, type MethodUses } from '../src/measures'
+import { cohesionOf, type MethodUses } from '../src/measures'
 import { metricsByDefinition } from './metrics-by-definition'
 import {
   javaComplexityByWords,
@@ -231,7 +231,7 @@ describe('LCOM4', () => {
       )
       const combine = (at: number, chosen: MethodUses[]): void => {
         if (at === methods.length) {
-          expect(lcom4Of(chosen)).toBe(lcom4ByDefinition(chosen))
+          expect(cohesionOf(chosen).lcom4).toBe(lcom4ByDefinition(chosen))
           checked++
           return
         }

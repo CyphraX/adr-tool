@@ -178,10 +178,67 @@ enum Kind {
   boolean second() { return equals(B); }
 }`)
     expect(classes.map(({ name, methods, lcom4 }) => [name, methods, lcom4])).toEqual([
-      // {add, total, net, tax}, {note}, {shadowed}, {alone, reference}.
-      ['Cart', 8, 4],
+      // {add, total, net, tax}, {note}, {alone, reference}; shadowed uses no member, and is
+      // left out.
+      ['Cart', 7, 3],
       ['Line', 2, 2],
       ['Kind', 2, 2]
+    ])
+  })
+})
+
+describe('what a Java method uses of its class, for LCOM4 (docs/structure-format.md, section 5)', () => {
+  const groups = (text: string) =>
+    measured(text).classes.map(({ name, methods, lcom4 }) => [name, methods, lcom4])
+
+  it('takes a field a method reference is taken on, and a field named by its class', () => {
+    expect(
+      groups(`package a;
+final class Filter {
+  private final java.util.Set<String> allowed = new java.util.HashSet<>();
+  static final int TOTAL = 3;
+  boolean any(java.util.List<String> names) { return names.stream().anyMatch(allowed::contains); }
+  void allow(String name) { allowed.add(name); }
+  int total() { return Filter.TOTAL; }
+  int twice() { return 2 * TOTAL; }
+  int counted() { return Filter.twice() + this.allowed.size(); }
+}`)
+    ).toEqual([['Filter', 5, 1]])
+  })
+
+  it('sees a local only inside its scope, after it is declared', () => {
+    expect(
+      groups(`package a;
+final class Counter {
+  private int count;
+  private int other;
+  void before() { count++; { int count = 1; System.out.println(count); } }
+  void after() { int other = 2; System.out.println(other); }
+  void loop(java.util.List<Integer> list) { for (int count : list) { System.out.println(count); } other++; }
+  void caught() { try { run(); } catch (RuntimeException count) { System.out.println(count); } }
+  void lambda() { java.util.function.IntUnaryOperator f = count -> count + 1; f.applyAsInt(other); }
+  void run() { }
+}`)
+    ).toEqual([
+      // before uses count; loop and lambda use other; caught calls run, which uses nothing but
+      // is used; after uses nothing of the class and is left out.
+      ['Counter', 5, 3]
+    ])
+  })
+
+  it('takes no \`this\` of an anonymous class for the instance', () => {
+    expect(
+      groups(`package a;
+final class Outer {
+  private int seen;
+  private int shown;
+  Runnable one() { return new Runnable() { int seen; public void run() { this.seen++; } }; }
+  Runnable two() { return new Runnable() { public void run() { shown++; } }; }
+  void three() { shown--; }
+}`)
+    ).toEqual([
+      ['Outer', 2, 1]
+      // The anonymous classes are no classes of the file: their methods are functions.
     ])
   })
 })

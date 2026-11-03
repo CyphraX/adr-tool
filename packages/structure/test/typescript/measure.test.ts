@@ -225,11 +225,49 @@ describe('the LCOM4 of a class (docs/structure-format.md, section 5)', () => {
           '  priced = (x: number): number => x * this.tax', // tax
           '  static empty(): Cart { return Cart.make() }', // uses make
           '  static make(): Cart { return new Cart(0) }',
-          '  alone(): number { return 1 }',
+          '  alone(): number { return 1 }', // uses nothing, used by none: left out
           '}'
         ].join('\n')
       )
-    ).toEqual([['Cart', 8, 5]])
+    ).toEqual([['Cart', 7, 4]])
+  })
+
+  it('takes what JavaScript assigns to `this.x` for a field, in the constructor or elsewhere', () => {
+    expect(
+      measured(
+        'cart.js',
+        'class Cart { constructor(){ this.items = [] } add(x){ this.items.push(x) } total(){ return this.items.length } count(){ return this.items.length } }\n'
+      ).classes.map(({ name, methods, lcom4 }) => [name, methods, lcom4])
+    ).toEqual([['Cart', 3, 1]])
+    expect(
+      lcom4(
+        [
+          'export class Counter {',
+          '  start() { this.count = 0 }', // writes count: a field
+          '  step() { this.count++ }',
+          '  log() { this.logger.info(this.count) }', // reads logger, which none writes: inherited
+          '  bind() { this.step = this.step.bind(this) }', // step is a method all the same
+          '}'
+        ].join('\n')
+      )
+    ).toEqual([['Counter', 4, 1]])
+  })
+
+  it('counts a function-valued field as a method, and leaves out a method that uses nothing', () => {
+    expect(
+      lcom4(
+        [
+          'export class Bullet extends WidgetType {',
+          '  constructor(private readonly mark: string) { super() }',
+          '  toDOM(): HTMLElement { return document.createElement("span") }', // uses nothing
+          '  eq(other: Bullet): boolean { return other.mark === this.mark }', // mark
+          '  ignoreEvent(): boolean { return false }', // uses nothing
+          '  label = (): string => this.mark.toUpperCase()', // mark: an arrow keeps `this`
+          '  size = function (this: Bullet): number { return this.mark.length }', // mark
+          '}'
+        ].join('\n')
+      )
+    ).toEqual([['Bullet', 3, 1]])
   })
 
   it('reads `const { x } = this`, and no `this` of a nested class or `function`', () => {
@@ -243,12 +281,14 @@ describe('the LCOM4 of a class (docs/structure-format.md, section 5)', () => {
           '  two(): number { return [1].map(() => this.x)[0]! }', // an arrow keeps `this`
           '  three(): number { return [1].map(function (this: { y: number }) { return this.y })[0]! }',
           '  four(): object { return class { y = 3; get() { return this.y } } }',
+          '  five(): object { return { y: 4, get() { return this.y }, get z() { return this.y } } }',
           '}',
           'export class Empty { field = 1 }'
         ].join('\n')
       )
     ).toEqual([
-      ['A', 4, 3],
+      // three, four and five use none of A: the `this` they read is another's.
+      ['A', 2, 1],
       // Nested and anonymous: a class of its own, measured on its own.
       ['A.four.<anonymous>', 1, 1],
       // No methods: no LCOM4.
