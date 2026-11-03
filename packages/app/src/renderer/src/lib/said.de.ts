@@ -345,6 +345,8 @@ export const DE: Wording<Codes> = {
     `${v.lines} sind keine Zeilen: Anzugeben sind die erste und die letzte, gezählt ab 1.`,
   'lines-outside': (v) =>
     `${v.path} hat ${v.count} ${v.count === 1 ? 'Zeile' : 'Zeilen'}; die Zeilen ${v.lines} liegen nicht darin.`,
+  'carriage-return-in-lines': (v) =>
+    `Die Zeilen ${v.lines} von ${v.path} enthalten einen Wagenrücklauf, der keine Zeile beendet; zitierte Zeilen können ihn nicht behalten.`,
   'resolved-already': (v) => `${v.id} hat bereits den Zustand resolved.`,
   'open-already': (v) => `${v.id} hat bereits den Zustand open.`,
   'cited-already': (v) => `${v.id} verweist bereits auf ${v.adr}.`,

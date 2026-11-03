@@ -102,6 +102,8 @@ export const SENTENCES = {
     `${v.lines} are no lines: give the first and the last, counted from 1.`,
   'lines-outside': (v: { path: string; lines: string; count: number }): string =>
     `${v.path} has ${v.count} ${v.count === 1 ? 'line' : 'lines'}; lines ${v.lines} are not in it.`,
+  'carriage-return-in-lines': (v: { path: string; lines: string }): string =>
+    `Lines ${v.lines} of ${v.path} hold a carriage return that ends no line, which quoted lines cannot keep.`,
   'resolved-already': (v: { id: string }): string => `${v.id} is resolved already.`,
   'open-already': (v: { id: string }): string => `${v.id} is open already.`,
   'cited-already': (v: { id: string; adr: string }): string => `${v.id} cites ${v.adr} already.`,

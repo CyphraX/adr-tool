@@ -60,7 +60,8 @@ export {
   planUncite,
   planUpdateAnchor,
   type NewAnnotation,
-  type NewReply
+  type NewReply,
+  type SelectedLines
 } from './write'
 export { hasRepair, REVIEW_PROBLEM_CODES, saidOf, wordingOf, type ReviewProblem } from './problems'
 export {

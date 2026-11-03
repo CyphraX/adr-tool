@@ -102,6 +102,23 @@ const inEol = (text: string, eol: Eol): string => {
 const mostOf = (texts: readonly string[]): Eol =>
   texts.filter((text) => eolOf(text) === '\r\n').length * 2 > texts.length ? '\r\n' : '\n'
 
+/** Lines of a Source File as a person selects them: the first and the last, counted from 1. */
+export interface SelectedLines {
+  readonly path: string
+  readonly start: number
+  readonly end: number
+}
+
+/** Quoted lines must be lines: a carriage return that ends no line would end one in the file. */
+function checkQuote(anchor: Anchor): void {
+  if (anchor.quote.some((line) => /[\r\n]/.test(line))) {
+    refuse({
+      code: 'carriage-return-in-lines',
+      values: { path: anchor.path, lines: linesText(anchor) }
+    })
+  }
+}
+
 /**
  * The Anchor of lines of a Source File as they are on disk now, with the commit HEAD points at:
  * what an Annotation is created with, or attached again to.
@@ -126,7 +143,9 @@ export async function anchorAt(
   if (end > all.length)
     refuse({ code: 'lines-outside', values: { path, lines, count: all.length } })
   const commit = await git.headCommit()
-  return { path: source, start, end, quote: all.slice(start - 1, end), ...(commit && { commit }) }
+  const anchor = { path: source, start, end, quote: all.slice(start - 1, end) }
+  checkQuote(anchor)
+  return { ...anchor, ...(commit && { commit }) }
 }
 
 /** The ADRs an Annotation is to cite, each one that names exactly one ADR. */
@@ -144,8 +163,8 @@ export interface NewAnnotation {
   readonly author: string
   /** `YYYY-MM-DD`. */
   readonly date: string
-  /** Where it is: `anchorAt` reads it from the disk. */
-  readonly anchor: Anchor
+  /** The lines it is about: read from the disk when it is planned, with HEAD's commit. */
+  readonly lines: SelectedLines
   /** Markdown. */
   readonly text: string
   /** ADRs, as `cites` names them. */
@@ -153,11 +172,13 @@ export interface NewAnnotation {
 }
 
 /**
- * Plan a new Annotation, a file of its own (docs/review-format.md, section 5). Its ID is the day
- * and a slug of its text; `adrs` are the ADRs of the repository, which `cites` is checked against.
+ * Plan a new Annotation, a file of its own (docs/review-format.md, section 5). Its Anchor is
+ * read from the disk as it is now; its ID is the day and a slug of its text; `adrs` are the
+ * ADRs of the repository, which `cites` is checked against.
  */
 export function planAnnotation(
   fs: FileSystem,
+  git: Pick<Git, 'headCommit'>,
   annotation: NewAnnotation,
   adrs: readonly AdrReference[] = []
 ): Promise<Plan<{ readonly id: string }>> {
@@ -168,6 +189,8 @@ export function planAnnotation(
     const cites = [...new Set(annotation.cites ?? [])]
     checkCites(cites, adrs)
     const directory = await directoryOf(fs)
+    const { lines } = annotation
+    const anchor = await anchorAt(fs, git, lines.path, lines.start, lines.end)
 
     const listed = (await fs.list(directory)) ?? []
     const taken = new Set(listed.map((entry) => entry.name.replace(/\.md$/, '').toLowerCase()))
@@ -178,13 +201,12 @@ export function planAnnotation(
     )
     const eol = mostOf(texts)
 
-    const name = annotation.anchor.path.slice(annotation.anchor.path.lastIndexOf('/') + 1)
+    const name = anchor.path.slice(anchor.path.lastIndexOf('/') + 1)
     const slug = slugOf(annotation.text) || slugOf(name) || 'annotation'
     const stem = `${annotation.date.replaceAll('-', '')}-${slug}`
     let id = stem
     for (let count = 2; taken.has(id.toLowerCase()); count++) id = `${stem}-${count}`
 
-    const { anchor } = annotation
     const frontmatter = [
       '---',
       `type: ${annotation.type}`,
@@ -327,6 +349,7 @@ async function writeAnchor(
   if (!viewFile(text).frontmatter || !readAnnotation('', path, text, []).annotation.writable) {
     refuse({ code: 'annotation-unreadable', values: { path } })
   }
+  checkQuote(anchor)
   await pending.write(path, (view) => anchorEdits(view, path, anchor))
 }
 
@@ -338,7 +361,7 @@ export function planAttach(
   fs: FileSystem,
   git: Pick<Git, 'headCommit'>,
   id: string,
-  lines: { readonly path: string; readonly start: number; readonly end: number }
+  lines: SelectedLines
 ): Promise<Plan> {
   return planning(fs, async (pending) => {
     const { path } = await annotationFile(fs, id)
@@ -347,12 +370,21 @@ export function planAttach(
   })
 }
 
-/** Plan Update the Anchor: write the place a moved Annotation is found at into its Anchor. */
+/**
+ * Plan Update the Anchor: write the place a moved Annotation is found at into its Anchor, with
+ * the lines as the disk has them there now and the commit it was found at.
+ */
 export function planUpdateAnchor(fs: FileSystem, id: string, found: Found): Promise<Plan> {
   return planning(fs, async (pending) => {
     const { path } = await annotationFile(fs, id)
     if (found.kind !== 'moved') refuse({ code: 'not-moved', values: { id } })
-    await writeAnchor(pending, path, found.anchor)
+    const { anchor } = found
+    const commit = { headCommit: async () => anchor.commit }
+    await writeAnchor(
+      pending,
+      path,
+      await anchorAt(fs, commit, anchor.path, anchor.start, anchor.end)
+    )
     return {}
   })
 }

@@ -90,14 +90,21 @@ const NEW: NewAnnotation = {
   type: 'question',
   author: 'Aylin Demir',
   date: '2026-11-02',
-  anchor: { path: 'src/cart.ts', start: 4, end: 6, quote: CART.slice(3, 6), commit: sha(7) },
+  lines: { path: 'src/cart.ts', start: 4, end: 6 },
   text: 'Why is the total computed on every call?\n\nIt is read on every render.'
 }
+/** The Anchor of `NEW`, as the disk and HEAD have it. */
+const ANCHOR = { path: 'src/cart.ts', start: 4, end: 6, quote: CART.slice(3, 6), commit: sha(7) }
 
 describe('creating an Annotation', () => {
   it('writes a file of its own, its ID the day and a slug of its text', async () => {
     const fs = memoryFileSystem(SOURCE)
-    const plan = await planAnnotation(fs, { ...NEW, cites: ['0003-postgres-write-model'] }, ADRS)
+    const plan = await planAnnotation(
+      fs,
+      HEAD,
+      { ...NEW, cites: ['0003-postgres-write-model'] },
+      ADRS
+    )
     expect(plan).toMatchObject({
       ok: true,
       id: '20261102-why-is-the-total-computed-on-every-call-it-is-read-on-every'
@@ -138,7 +145,7 @@ describe('creating an Annotation', () => {
       type: 'question',
       state: 'open',
       author: 'Aylin Demir',
-      anchor: NEW.anchor,
+      anchor: ANCHOR,
       cites: ['0003-postgres-write-model']
     })
     expect(await findAnchor(annotations[0]!.anchor!, { fs, git: HEAD })).toMatchObject({
@@ -148,7 +155,7 @@ describe('creating an Annotation', () => {
 
   it('reads the Anchor from the disk, with the commit HEAD points at', async () => {
     const fs = memoryFileSystem(SOURCE)
-    expect(await anchorAt(fs, HEAD, './src/cart.ts', 4, 6)).toEqual(NEW.anchor)
+    expect(await anchorAt(fs, HEAD, './src/cart.ts', 4, 6)).toEqual(ANCHOR)
     expect(await anchorAt(fs, memoryGit({ commits: [] }), 'src/cart.ts', 7, 7)).toEqual({
       path: 'src/cart.ts',
       start: 7,
@@ -169,7 +176,7 @@ describe('creating an Annotation', () => {
       [`${DIR}/20261102-why-2.md`]: crlf,
       [`${DIR}/other.md`]: BY_HAND
     })
-    const plan = await planAnnotation(fs, { ...NEW, text: 'Why?' })
+    const plan = await planAnnotation(fs, HEAD, { ...NEW, text: 'Why?' })
     expect(plan).toMatchObject({ ok: true, id: '20261102-why-3' })
     await applied(fs, plan)
     const text = (await fs.readText(`${DIR}/20261102-why-3.md`))!
@@ -179,8 +186,8 @@ describe('creating an Annotation', () => {
 
   it('takes the slug of the Source File for a text without one, and a fence the quote cannot close', async () => {
     const fs = memoryFileSystem({ 'README.md': 'Run:\n```sh\npnpm i\n```\n' })
-    const anchor = await anchorAt(fs, HEAD, 'README.md', 2, 4)
-    const plan = await planAnnotation(fs, { ...NEW, anchor, text: '…' })
+    const lines = { path: 'README.md', start: 2, end: 4 }
+    const plan = await planAnnotation(fs, HEAD, { ...NEW, lines, text: '…' })
     expect(plan).toMatchObject({ ok: true, id: '20261102-readme-md' })
     await applied(fs, plan)
     const { annotations } = await readAnnotations(fs)
@@ -191,7 +198,7 @@ describe('creating an Annotation', () => {
   it('refuses what it cannot write, and writes nothing', async () => {
     const fs = memoryFileSystem(SOURCE)
     const refused = async (annotation: NewAnnotation, adrs = ADRS) => {
-      const plan = await planAnnotation(fs, annotation, adrs)
+      const plan = await planAnnotation(fs, HEAD, annotation, adrs)
       if (plan.ok) throw new Error('planned')
       return plan.said?.code
     }
@@ -199,18 +206,53 @@ describe('creating an Annotation', () => {
     expect(await refused({ ...NEW, date: '2. November' })).toBe('not-a-day')
     expect(await refused({ ...NEW, cites: ['0009-gone'] })).toBe('no-such-adr')
     expect(await refused({ ...NEW, cites: ['0004-events'] })).toBe('adr-in-several-logs')
+    // The Anchor is read from the disk: a file that is not there, lines it does not have.
+    const lines = (path: string, start: number, end: number) => ({
+      ...NEW,
+      lines: { path, start, end }
+    })
+    expect(await refused(lines('no/such/file.ts', 3, 3))).toBe('no-source-file')
+    expect(await refused(lines('src/cart.ts', 7, 9))).toBe('lines-outside')
+    expect(await refused(lines('src/cart.ts', 0, 1))).toBe('no-lines')
     expect(
-      await planAnnotation(fs, { ...NEW, cites: ['docs/adr/0004-events'] }, ADRS)
+      await planAnnotation(fs, HEAD, { ...NEW, cites: ['docs/adr/0004-events'] }, ADRS)
     ).toMatchObject({ ok: true })
     const broken = memoryFileSystem({
       ...SOURCE,
       '.arch/config.yml': 'annotations: ../elsewhere\n'
     })
-    expect(await planAnnotation(broken, NEW)).toMatchObject({
+    expect(await planAnnotation(broken, HEAD, NEW)).toMatchObject({
       ok: false,
       said: { code: 'annotations-unavailable' }
     })
     expect(await fs.list(DIR)).toBeUndefined()
+  })
+
+  it('refuses lines with a carriage return that ends no line, which quoted lines cannot keep', async () => {
+    const fs = memoryFileSystem({ 'src/old.ts': 'one\rtwo\nthree\n', 'src/a.md': 'x\n' })
+    const plan = await planAnnotation(fs, HEAD, {
+      ...NEW,
+      lines: { path: 'src/old.ts', start: 1, end: 2 }
+    })
+    expect(plan).toMatchObject({
+      ok: false,
+      reason:
+        'Lines 1-2 of src/old.ts hold a carriage return that ends no line, which quoted lines cannot keep.',
+      said: { code: 'carriage-return-in-lines' }
+    })
+    expect(
+      await planAnnotation(fs, HEAD, { ...NEW, lines: { path: 'src/old.ts', start: 2, end: 2 } })
+    ).toMatchObject({ ok: true })
+    // Nor is such a line written into an Anchor that was found elsewhere.
+    const by = memoryFileSystem({ 'src/old.ts': 'one\rtwo\nthree\n', [`${DIR}/why.md`]: BY_HAND })
+    const found = {
+      kind: 'moved',
+      anchor: { path: 'src/old.ts', start: 1, end: 1, quote: ['one\rtwo'] },
+      similarity: 0.6
+    } as const
+    expect(await planUpdateAnchor(by, 'why', found)).toMatchObject({
+      said: { code: 'carriage-return-in-lines' }
+    })
   })
 
   it('writes into the directory the configuration names', async () => {
@@ -218,7 +260,7 @@ describe('creating an Annotation', () => {
       ...SOURCE,
       '.arch/config.yml': 'diagrams: docs/diagrams\nannotations: docs/reviews\n'
     })
-    const plan = await planAnnotation(fs, NEW)
+    const plan = await planAnnotation(fs, HEAD, NEW)
     if (!plan.ok) throw new Error(plan.reason)
     expect(plan.changeSet.files.map((file) => file.path)).toEqual([`docs/reviews/${plan.id}.md`])
   })
