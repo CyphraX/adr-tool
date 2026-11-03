@@ -76,14 +76,22 @@
           { column, descending: column === 'files' || column === 'usedBy' }
   }
 
-  const COLUMNS: { column: LibraryColumn; numeric: boolean }[] = [
-    { column: 'library', numeric: false },
-    { column: 'version', numeric: false },
-    { column: 'usedBy', numeric: false },
-    { column: 'files', numeric: true },
-    { column: 'licence', numeric: false }
+  /** The columns, and the share of the width each has: a long name ends in an ellipsis. */
+  const COLUMNS: { column: LibraryColumn; numeric: boolean; width: string }[] = [
+    { column: 'library', numeric: false, width: '28%' },
+    { column: 'version', numeric: false, width: '11%' },
+    { column: 'usedBy', numeric: false, width: '31%' },
+    { column: 'files', numeric: true, width: '8%' },
+    { column: 'licence', numeric: false, width: '22%' }
   ]
 </script>
+
+{#snippet unbroken(text: string)}
+  <!-- Broken between its words only: an SPDX name such as BSD-3-Clause stays whole. -->
+  {#each text.split(' ') as word, position (position)}{position > 0 ? ' ' : ''}<span class="word"
+      >{word}</span
+    >{/each}
+{/snippet}
 
 <div class="libraries-view">
   <div class="tools">
@@ -107,6 +115,9 @@
       <p class="empty">{words.noneShown}</p>
     {:else}
       <table aria-label={words.label}>
+        <colgroup>
+          {#each COLUMNS as { column, width } (column)}<col style:width />{/each}
+        </colgroup>
         <thead>
           <tr>
             {#each COLUMNS as { column, numeric } (column)}
@@ -167,7 +178,7 @@
                 class:unknown={library.licence.kind === 'unknown'}
                 title={licenceLabel(library.licence)}
               >
-                {licenceLabel(library.licence, 'short')}
+                {@render unbroken(licenceLabel(library.licence, 'short'))}
               </td>
             </tr>
           {/each}
@@ -194,7 +205,7 @@
   .tools {
     display: flex;
     flex: none;
-    padding: 10px 14px 0;
+    padding: 10px 14px;
   }
 
   .filter {
@@ -227,11 +238,12 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* No room above the table: the rows go under its sticky heading, not past it. */
   .scroll {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 10px 14px 14px;
+    padding: 0 14px 14px;
   }
 
   .empty {
@@ -240,6 +252,7 @@
 
   table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     background: var(--paper);
     font-variant-numeric: tabular-nums;
@@ -296,15 +309,32 @@
     flex-direction: row-reverse;
   }
 
+  .version {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* A long name ends in an ellipsis; what is said of it goes below rather than being cut. */
   .name {
     font-weight: 400;
+    white-space: normal;
   }
 
   .name button {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
     font-family: var(--code);
     font-size: 12px;
     font-weight: 500;
     text-align: left;
+  }
+
+  .ecosystem,
+  .tag {
+    white-space: nowrap;
   }
 
   .name button:hover {
@@ -351,6 +381,10 @@
 
   .users .tag {
     font-family: var(--ui);
+  }
+
+  .word {
+    white-space: nowrap;
   }
 
   .licence.unknown {

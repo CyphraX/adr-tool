@@ -13,6 +13,13 @@
   const rows = $derived(librariesIn(inventory, component))
 </script>
 
+{#snippet unbroken(text: string)}
+  <!-- Broken between its words only: an SPDX name such as BSD-3-Clause stays whole. -->
+  {#each text.split(' ') as word, position (position)}{position > 0 ? ' ' : ''}<span class="word"
+      >{word}</span
+    >{/each}
+{/snippet}
+
 <h3>{words.page}</h3>
 {#if rows.length === 0}
   <p class="faint">{words.pageNone}</p>
@@ -49,7 +56,10 @@
           <td class="numeric"
             >{row.usedBy.reduce((sum, user) => sum + user.files.length, 0) || ''}</td
           >
-          <td class:unknown={library.licence.kind === 'unknown'}>{licenceLabel(library.licence)}</td
+          <td
+            class:unknown={library.licence.kind === 'unknown'}
+            title={licenceLabel(library.licence)}
+            >{@render unbroken(licenceLabel(library.licence, 'short'))}</td
           >
         </tr>
       {/each}
@@ -114,6 +124,10 @@
   .version {
     font-family: var(--code);
     color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .word {
     white-space: nowrap;
   }
 
