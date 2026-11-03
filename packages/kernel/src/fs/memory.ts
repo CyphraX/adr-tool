@@ -1,6 +1,14 @@
 import type { DirectoryEntry, WritableFileSystem } from './port'
 
-const encoder = new TextEncoder()
+/** How many bytes a text has in UTF-8. */
+function bytesOf(text: string): number {
+  let bytes = 0
+  for (const character of text) {
+    const code = character.codePointAt(0)!
+    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4
+  }
+  return bytes
+}
 
 /** A file system held in memory: a map from path to text. Directories exist by having files in them. */
 export function memoryFileSystem(initial: Readonly<Record<string, string>>): WritableFileSystem {
@@ -9,7 +17,7 @@ export function memoryFileSystem(initial: Readonly<Record<string, string>>): Wri
     async readText(path, options) {
       const text = files.get(path)
       const atMost = options?.atMost
-      return atMost !== undefined && text !== undefined && encoder.encode(text).length > atMost
+      return atMost !== undefined && text !== undefined && bytesOf(text) > atMost
         ? undefined
         : text
     },
