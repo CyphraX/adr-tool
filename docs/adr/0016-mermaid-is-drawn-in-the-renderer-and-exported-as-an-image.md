@@ -25,11 +25,13 @@ What Mermaid returns goes through DOMPurify 3.4.17 with its SVG and SVG-filter p
 
 Only then is the drawing shown.
 
-A block that does not parse stays a code block, with what Mermaid says beside it in one sentence. In the live mode a block is drawn as a widget while the cursor is outside it; inside it, the source shows.
+A block that does not parse stays a code block, with what Mermaid says beside it in one sentence. In the live mode a block is drawn as a widget while the cursor is outside it; inside it, the source shows. Below a drawing, its source is a click away.
+
+Blocks are drawn one at a time, because Mermaid's settings are global. A block is drawn only if it is still shown when its turn comes. The preview beside the editor draws a block once the typing pauses. What Mermaid says of a block is kept only while the block is shown. A block that Mermaid takes more than 15 seconds over stays code, and the next one is drawn.
 
 **This amends [ADR-0014](0014-the-export-is-static-html-from-core-printed-to-pdf-by.md).** The export still writes through the one code of `adr export` and the app (`packages/cli/src/export.ts`). It now takes the drawn blocks as an optional input: a map from a block's source to its sanitized SVG (`ExportOptions.diagrams` in `core`).
 
-- **The app**: before it exports, the app draws every block of every Decision Log in the light theme and passes the drawings in. The main process does not trust the renderer's sanitizing alone. Before it writes a drawing, it holds the markup against the same allowlist (`diagramsRequest`):
+- **The app**: the person picks where the export goes first. Main keeps that place and gives the window a ticket for it. The window then draws every block of every Decision Log in the light theme, in the export's fonts and at the size of its view box, and exports to the ticket. The main process does not trust the renderer's sanitizing alone. Before it writes a drawing, it holds the markup against the same allowlist (`diagramsRequest`):
   - one well-formed `<svg>` element;
   - only the elements Mermaid draws with, and none with a prefix;
   - no handler, prefixed or not;
@@ -38,7 +40,7 @@ A block that does not parse stays a code block, with what Mermaid says beside it
   - no CSS that fetches.
 
   The text of a label is never looked at, so a label may say anything.
-- **How the export writes a drawing**: each drawing is a file beside its page, `<page>.diagram-<n>.svg`. The page shows it with `<img>` and puts the source below it in a `<details>`.
+- **How the export writes a drawing**: each drawing is a file beside its page, `<page>.diagram-<n>.svg`. The page shows it with `<img>` and puts the source below it in a `<details>`. The image is named by the block's `accTitle` and `accDescr` when it has them. The style rules for drawings are added to `style.css` only when there are drawings, so an export without any is byte for byte what it was.
 - **`adr export`** has no browser to draw with. It passes no drawings, and its blocks stay code blocks, as before.
 
 The content security policy of ADR-0014 stays exactly as it is.
@@ -59,5 +61,6 @@ The content security policy of ADR-0014 stays exactly as it is.
 - A drawing in the export is light, whatever theme the window shows. Printed to PDF, it is the same image.
 - A drawing opened on its own from a web host runs nothing and fetches nothing, because it holds nothing that would. The SVGs that ADR-0014 copies as images are not sanitized like this.
 - A drawing whose CSS cannot be read with certainty is not drawn. That is what the backslash check costs, and Mermaid writes no backslash of its own.
+- Mermaid measures its text in the window's document, so while it draws, the drawing is there as Mermaid made it, before it is sanitized. The window's content security policy (`default-src 'self'`, `img-src 'self' data: adr-asset:`) is what keeps that drawing from fetching anything. The review's cases do try, and the policy blocks them.
 - The renderer ships Mermaid's chunks but loads them only for a document that has a block. Moving to a new version of Mermaid is a change to review, not an update that just happens.
 - A `mermaid` block is found as the export finds it (`mermaidSources` in `core`): a fenced block whose info string starts with the word `mermaid`, in lower case, as GitHub has it.

@@ -67,17 +67,18 @@ For Lena and Aylin. What a window with six modules needs before the third one ar
   The last come from a new request, `structureOutline` (`main/structures.ts`), which answers from the analysis that Structure keeps for the repository with every Component, Source File, Problem and hint. `RepositoryProblems.svelte` stands in the middle of Decisions and of Structure, and both sidebars hold the row **Repository Problems** with its red count. While Structure analyses, the count carries a "…" and the list says the section follows. On a Draft, what the checks find are hints, with no Repair. A Repair goes through the preview that already exists for it, and the Problems view of a log stays (`packages/app/test/repository-problems.test.ts`).
 - **The search** gained `searchComponents` and `searchSourceFiles` (`lib/search.ts`). Every word has to match: the ID or name of a Component, or the path of a Source File, where the file name counts most. Case and accents are ignored, as for ADRs (`packages/app/test/search-artefacts.test.ts`). The palette lists ADRs as before, with the same ranking and at most 12. Below them come at most 6 Components and 8 Source Files, each section under its heading and each hit named by its kind in words, all in one list for the keyboard. While Structure analyses, the palette says whether it searches the last analysis or nothing yet.
 - **Mermaid** is [ADR-0016](adr/0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image.md), which amends ADR-0014.
-  - The code: `lib/mermaid.ts` is pure (configuration, the scrubbing of CSS and addresses, Mermaid's sentence, a cache of drawings). `lib/diagrams.ts` loads Mermaid and DOMPurify lazily and draws one block at a time.
+  - The code: `lib/mermaid.ts` is pure (configuration, addresses, Mermaid's sentence, a cache of drawings). `lib/sanitize.ts` runs DOMPurify and then reads the drawing's CSS with the browser's own parser. `shared/drawing.ts` is the allowlist of a drawing's markup, which the window and main both hold it against. `lib/diagrams.ts` loads Mermaid and DOMPurify lazily and draws one block at a time, only while it is shown.
   - Where blocks are drawn: `MarkdownDocument.svelte` replaces a block with its drawing and puts its source below it, in the reading view and the preview. In the live mode a block is a widget while the cursor is outside it (`liveDiagrams`, `lib/editor.ts`).
   - The export: `ExportOptions.diagrams` in `core` and `ExportRequest.diagrams` in `packages/cli/src/export.ts` carry the drawings, and `mermaidSources` finds the blocks. The app draws every block light and passes the drawings in, and main checks each one again (`diagramsRequest`).
-  - Tests: `packages/core/test/export.test.ts`, `packages/app/test/mermaid.test.ts`, `live.test.ts` and `requests.test.ts`. DOMPurify needs a DOM, which the tests in Node do not have, so it is checked in the running app.
+  - Tests: `packages/core/test/export.test.ts`, and in `packages/app/test/` `mermaid.test.ts`, `drawing.test.ts`, `requests.test.ts`, `live.test.ts`, and `sanitize.test.ts` and `diagrams.test.ts` in jsdom 30.1.3, a dev dependency of the app only. jsdom's CSS parser is not Chrome's: it drops `u\72l(…)` where Chrome decodes it to a `url()`. So the backslash is refused either way, and the escapes are also tried in the running app.
 
 In the running app, in English and in German, on a copy of this repository set up as follows:
 
 - `plugins` added to `affects` of ADR 0006;
 - `depends-on: [0099-a-decision-that-is-gone]` added to ADR 0012;
 - a pattern `packages/gone/**` added to `cli`;
-- an ADR 0016 with a flowchart, and an ADR 0017 whose block does not parse.
+- an ADR 0016 with a flowchart, and an ADR 0017 whose block does not parse;
+- after the review, an ADR 0018 with the review's hostile blocks: `style`, `classDef`, `%%{init}%%` and frontmatter `config:` that hide `url()` behind the escape `u\72l(`, in flowcharts and class, state, ER and block diagrams, each with a beacon on `127.0.0.1`.
 
 What the app showed:
 
@@ -85,9 +86,10 @@ What the app showed:
 - 0012 opens in Decisions with the list beside it, and `cli` opens its page in Structure.
 - The Repair of the Trace previews "Remove plugins from affects" on one file, and Cancel writes nothing.
 - "kernel" finds ADRs 0006, 0009 and 0015, then the Components `kernel`, `kernel/change`, `kernel/fs` and `kernel/text`, then the best 8 of 10 Source Files under `packages/kernel/`. A Component opens on its page, and "kernel change-set" opens `packages/kernel/src/change/change-set.ts` in the code viewer.
-- ADR 0016 shows the flowchart drawn in the reading view and the live mode, with no script, `foreignObject` or handler in it. With the cursor in the block, its source shows.
+- ADR 0016 shows the flowchart drawn in the reading view and the live mode, with no script, `foreignObject` or handler in it. "Mermaid source" below it opens its source in both, and the live block stays drawn. With the cursor in the block, its source shows.
 - ADR 0017 keeps its code, with "This Mermaid diagram cannot be drawn. Mermaid says: Parse error on line 2: Expecting 'SQE', 'DOUBLECIRCLEEND', 'PE', '-)', …, got 'PS'" beside it.
-- **Export → Web pages…** wrote 19 pages and one drawing, `docs/adr/0016-….diagram-1.svg`. No page holds a script, and the content security policy is ADR-0014's. The page of 0016, opened from disk, shows the drawing, and 0017's block stays code.
+- **Export → Web pages…** wrote 19 pages and one drawing, `docs/adr/0016-….diagram-1.svg`. No page holds a script, and the content security policy is ADR-0014's. The page of 0016, opened from disk, shows the drawing, and 0017's block stays code. After the review, the drawing is 657 × 191, the size of its view box, in the export's fonts.
+- ADR 0018 draws 9 of its 10 blocks with nothing of the beacon in them. The ER diagram is refused by Mermaid itself ("Lexical error on line 3"). The export writes 9 drawings, none naming the beacon or holding a backslash. Opened on their own, they fetch nothing, and nothing reached the beacon. While Mermaid measured the blocks, the window's content security policy blocked their loads.
 - The copy changed only as it was set up.
 
 What changed on the way:
@@ -96,10 +98,22 @@ What changed on the way:
 - The sidebar row is "Repository Problems", since "Problems of the repository" did not fit.
 - A drawing is a "Mermaid diagram": Diagram is the Diagrams module's term.
 
+What the review of PR #49 changed:
+
+- CSS escapes got past the scrubbing of the CSS as text. The CSS is now read by the browser's parser (`CSSStyleSheet.replaceSync` for a style sheet, `element.style` for a style attribute), and what is left with a backslash is refused. The `secure` keys gained `theme`, `themeCSS`, `themeVariables`, `fontFamily`, `altFontFamily` and `layout`, among others.
+- Main's check of a drawing was a list of words; it is the allowlist of `shared/drawing.ts`, on the markup and never on a label.
+- Analysis on demand, as the PO decided: a repository coming to the front is analysed once in the background, with no watcher. The watcher starts once Structure is opened. A repository analysed only for the count is analysed again when its Problems view or the search opens. The repository in front goes first, and an analysis nobody waits for any more is dropped. The count says it is "as of" the last analysis.
+- A block no longer shown when its turn comes is not drawn. The preview beside the editor draws once the typing pauses. What failed for a block no longer shown is not kept, nor what failed for reasons other than the block. An open source stays open as the document is set again.
+- The export asks where it goes first, then draws. Main keeps the place and gives the window a ticket. A block that Mermaid takes more than 15 seconds over stays code.
+- An exported drawing has the size of its view box, so `<img>` does not stretch it, and it uses the export's fonts. It is named by its `accTitle` and `accDescr`. `style.css` gets the rules for drawings only when there are drawings, so an export without any is unchanged byte for byte.
+- A link in a drawing opens from the reading view (`xlink:href`). The live block follows the window's theme, and the roles of a drawing are kept for screen readers.
+- **Repository Problems** stands in Structure's sidebar always, also before a view exists and in a repository without a Decision Log.
+- The outlines are kept out of Svelte's deep proxy, so searching 50,000 Source Files is not slowed down by it.
+
 What remains:
 
 - The search finds the Components and Source Files of the repository in front only. It finds ADRs, as before, in every repository that is open.
-- To count the Problems of the declaration, the window asks for Structure's analysis as soon as a repository is in front. Before, that happened when Structure was opened; the analysis now runs in its worker in the background.
+- To count the Problems of the declaration, a repository is analysed once when it comes to the front, in the worker, without following changes on disk. Until Structure is opened, the count can be older than the files; it says when it was counted.
 - What Mermaid says is in English, in a German window too.
 - A drawing in the export is always light. `adr export` does not draw.
 - Structure's catch-up with [design.md](design.md) is part 4's.

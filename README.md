@@ -137,7 +137,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![Renaming a Component: one line in the declaration, one in the ADR that affects it](docs/screenshots/readme/structure-rename.png)
 
-The analysis runs in a worker thread and caches its results per file. It follows changes on disk while the view is open.
+The analysis runs in a worker thread and caches its results per file. It follows changes on disk once Structure is opened. Before that, a repository coming to the front is analysed once, for the count of Repository Problems, which then says when it was counted.
 
 ## Install
 
