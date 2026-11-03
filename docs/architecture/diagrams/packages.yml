@@ -59,6 +59,11 @@ connections:
   - from: mcp
     to: cli
     label: runs git
+  - from: mcp
+    to: review
+    label: serves Annotations
+  - from: mcp
+    to: kernel
   - from: cli
     to: core
     label: lints and exports
@@ -70,6 +75,9 @@ connections:
   - from: cli
     to: kernel
     label: the git port
+  - from: cli
+    to: review
+    label: checks the Annotations
   - from: app
     to: core
     label: Decisions
@@ -87,7 +95,7 @@ connections:
     label: German sentences
   - from: app
     to: review
-    label: German sentences
+    label: Review
   - from: app
     to: git
     label: history and commits

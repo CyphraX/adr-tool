@@ -11,11 +11,13 @@ How the window of Softarch Suite looks and behaves, written down so that every m
   - The **centre**: the list, graph, matrix, board or document of the view. Its head row has the view's title on the left and its tools on the right, as bordered buttons or a segmented switch; a legend, where the view needs one, stands at its foot.
   - The **detail** on the right: the thing that is selected. It starts with a small grey label of its kind ("Component", "Rule", "Annotation"), its title, its ID in the code font, and its actions as bordered buttons in one row; then sections, each under a small grey heading. The divider between the panes can be dragged — in Structure from part 4 of [plan-vision.md](plan-vision.md) on.
 - **Every module answers the same three questions** in the same places: what there is (sidebar), how it hangs together (centre), and what this one is (detail).
+- **Code is read in the centre.** Where a module shows the code of a Source File — Review, from part 9 of [plan-vision.md](plan-vision.md) on — the code viewer takes the centre in place of its list, with a way back to the list in its head row, and the detail stays what is selected. A mode that waits for the person to select lines, such as **Attach again**, says so in a band at the top of the code viewer, with its action and Cancel; the action names the lines it will write.
 
 ## Writing
 
 - **Nothing is written without a preview** ([ADR-0004](adr/0004-operations-return-change-sets.md)). Every action that changes a file opens the change dialog: a title that says what happens, a line that says how many files change, the diff of each, and the action as the dialog's one primary button.
-- **One primary button per view**, dark and filled: in a dialog, the action that writes, on the right with Cancel left of it; in a view, the one thing the view is there for, such as **Adopt the Draft**. The actions of a detail are bordered buttons, each opening the preview of what it writes.
+- **One primary button per view**, dark and filled: in a dialog, the action that writes, on the right with Cancel left of it; in a view, the one thing the view is there for, such as **Adopt the Draft**. The actions of a detail are bordered buttons, each opening the preview of what it writes — but for the one action the thing waits for, which is the detail's primary button while nothing else in the window is: **Attach again** for an orphaned Annotation, **Update the Anchor** for a moved one (part 9).
+- **A form that writes a new thing** — a new Annotation — is a small dialog of its own whose primary button is **Preview**: it opens the change dialog with what the form will write in its place, and Cancel there brings the form back as it was left; the form closes once the change is applied.
 - **Forms write the files people also edit by hand.** A form changes the lines it is about and nothing else ([ADR-0002](adr/0002-never-reserialize-markdown.md)); what it cannot write without rewriting more, it refuses with a sentence.
 
 ## Words
@@ -28,9 +30,9 @@ How the window of Softarch Suite looks and behaves, written down so that every m
 ## Look
 
 - **Colours come from the tokens** of `packages/app/src/renderer/src/main.css`, never as literal values, so that light and dark follow the system.
-- **Colour has a meaning.** Red (`--problem`) is for what is wrong: a Problem, a Violation, a Cycle, a Drift. The colours of the five Status values say a Status and nothing else — a rejected ADR is red without being wrong. Amber is for what waits for a person, green for what is decided or holds. Selection, hover and the code have tokens of their own; everything else is ink on paper, in three strengths.
+- **Colour has a meaning.** Red (`--problem`) is for what is wrong: a Problem, a Violation, a Cycle, a Drift. The colours of the five Status values say a Status and nothing else — a rejected ADR is red without being wrong. Amber (`--waiting`) is for what waits for a person — an open Annotation, a moved one whose Anchor can be updated —, green for what is decided or holds. An orphaned Annotation is a Problem, and red. Selection, hover and the code have tokens of their own; everything else is ink on paper, in three strengths.
 - **Type:** IBM Plex Sans for the window, IBM Plex Serif for what people write as documents — an ADR, an Assessment, a chapter of arc42 —, IBM Plex Mono for code, paths and IDs.
-- **Words over icons.** The marks of a Status and the × that closes a tab are the only icons; a button says what it does.
+- **Words over icons.** The marks of a Status, the bars of Annotations in the gutter of the code — amber for an open one, ink for a resolved one, one column each where they overlap — and the × that closes a tab are the only icons; a button says what it does.
 - **Graphs** read from left to right: a box stands to the right of what it depends on, and its arrow points there. A solid line is a Dependency, a dashed one type-only; red marks a Cycle or a Violation. A dashed border marks something from elsewhere. Every graph has its legend at its foot.
 
 ## Behaviour

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1208" height="672" viewBox="16 20 1208 672" role="img">
   <title>The packages of Softarch Suite</title>
-  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses review: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
+  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git. mcp uses review: serves Annotations. mcp uses kernel. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. cli uses review: checks the Annotations. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses review: Review. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
   <style>
     svg { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
     .background, .ground { fill: #eef1f5; }
@@ -41,10 +41,13 @@
     <path class="line" d="M700 141.27L384 126.91" marker-end="url(#arrow)"/>
     <path class="line" d="M701.33 168L382.37 298.49" marker-end="url(#arrow)"/>
     <path class="line" d="M760 168L760 196" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 165.82L603.76 200.81" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 167.64L163.72 378.9" marker-end="url(#arrow)"/>
     <path class="line" d="M700 210.36L383.9 138.52" marker-end="url(#arrow)"/>
     <path class="line" d="M700 237.64L383.9 309.48" marker-end="url(#arrow)"/>
     <path class="line" d="M736 248L606.83 377.17" marker-end="url(#arrow)"/>
     <path class="line" d="M700 240.36L163.86 386.58" marker-end="url(#arrow)"/>
+    <path class="line" d="M700 224L604 224" marker-end="url(#arrow)"/>
     <path class="line" d="M960 380L383.71 149.49" marker-end="url(#arrow)"/>
     <path class="line" d="M960 397.14L383.97 331.31" marker-end="url(#arrow)"/>
     <path class="line" d="M960 404L644 404" marker-end="url(#arrow)"/>
@@ -114,12 +117,16 @@
     <text class="label" x="540" y="137.6" text-anchor="middle">serves ADRs</text>
     <rect class="ground" x="733" y="176" width="54" height="16"/>
     <text class="label" x="760" y="187.6" text-anchor="middle">runs git</text>
+    <rect class="ground" x="587.5" y="176" width="125" height="16"/>
+    <text class="label" x="650" y="187.6" text-anchor="middle">serves Annotations</text>
     <rect class="ground" x="485.5" y="166" width="109" height="16"/>
     <text class="label" x="540" y="177.6" text-anchor="middle">lints and exports</text>
     <rect class="ground" x="614" y="306" width="112" height="16"/>
     <text class="label" x="670" y="317.6" text-anchor="middle">checks the Rules</text>
     <rect class="ground" x="393" y="306" width="74" height="16"/>
     <text class="label" x="430" y="317.6" text-anchor="middle">the git port</text>
+    <rect class="ground" x="575" y="216" width="150" height="16"/>
+    <text class="label" x="650" y="227.6" text-anchor="middle">checks the Annotations</text>
     <rect class="ground" x="636.5" y="256" width="67" height="16"/>
     <text class="label" x="670" y="267.6" text-anchor="middle">Decisions</text>
     <rect class="ground" x="637.5" y="356" width="65" height="16"/>
@@ -130,8 +137,8 @@
     <text class="label" x="890" y="317.6" text-anchor="middle">the export</text>
     <rect class="ground" x="720" y="496" width="120" height="16"/>
     <text class="label" x="780" y="507.6" text-anchor="middle">German sentences</text>
-    <rect class="ground" x="720" y="306" width="120" height="16"/>
-    <text class="label" x="780" y="317.6" text-anchor="middle">German sentences</text>
+    <rect class="ground" x="753.5" y="306" width="53" height="16"/>
+    <text class="label" x="780" y="317.6" text-anchor="middle">Review</text>
     <rect class="ground" x="874.96" y="486" width="131" height="16"/>
     <text class="label" x="940.46" y="497.6" text-anchor="middle">history and commits</text>
     <rect class="ground" x="842.5" y="149.41" width="95" height="16"/>
