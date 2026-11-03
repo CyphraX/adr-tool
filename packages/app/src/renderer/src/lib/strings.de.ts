@@ -446,8 +446,12 @@ export const de: typeof en = {
     libraries: (count: number): string => many(count, 'Eine Bibliothek', `${count} Bibliotheken`),
     analysedIn: (milliseconds: number): string =>
       `Analysiert in ${(milliseconds / 1000).toLocaleString('de', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`,
-    javaLowerBound:
-      'Java wird ohne Classpath gelesen, daher sind seine Abhängigkeiten eine Untergrenze: Reflection, voll qualifizierte Namen im Code und Member, die von einem Typ geerbt werden, den eine Datei nicht nennt, werden nicht gesehen.',
+    lowerBound: {
+      java: 'Java wird ohne Classpath gelesen, daher sind seine Abhängigkeiten eine Untergrenze: Reflection, voll qualifizierte Namen im Code und Member, die von einem Typ geerbt werden, den eine Datei nicht nennt, werden nicht gesehen.',
+      python:
+        'Python wird gelesen, ohne es auszuführen, daher sind seine Abhängigkeiten eine Untergrenze: Importe durch einen Aufruf von importlib oder __import__ werden nicht gesehen, und .pyi-Stubs werden nicht gelesen.',
+      go: 'Go wird ohne den go-Befehl gelesen, daher sind seine Abhängigkeiten eine Untergrenze: Methodenaufrufe über Werte und Build-Constraints werden nicht verfolgt.'
+    },
     includeTests: 'Testdateien einbeziehen',
     notResolved: 'Nicht aufgelöst',
     notAnalysed: 'Nicht analysiert',
@@ -557,8 +561,12 @@ export const de: typeof en = {
       node: 'Knoten',
       howToRead:
         'Jede Komponente wird an den Quelldateien gemessen, die sie enthält; außen ist alles andere, nicht zugeordnete Dateien eingeschlossen. Testdateien zählen nur, wenn sie einbezogen sind, Abhängigkeiten nur über Typen immer. Zeigen Sie auf eine Überschrift für ihre Definition. Eigene Dateien und Nicht zugeordnet haben eine Größe und keine weitere Metrik.',
-      javaLowerBound:
-        'Java wird ohne Classpath gelesen: Wo es Java gibt, sind diese Zahlen eine Untergrenze.'
+      lowerBound: {
+        java: 'Java wird ohne Classpath gelesen: Wo es Java gibt, sind diese Zahlen eine Untergrenze.',
+        python:
+          'Importe durch einen Aufruf werden in Python nicht gesehen: Wo es Python gibt, sind diese Zahlen eine Untergrenze.',
+        go: 'Methodenaufrufe über Werte und Build-Constraints werden in Go nicht verfolgt: Wo es Go gibt, sind diese Zahlen eine Untergrenze.'
+      }
     },
 
     matrix: {

@@ -30,6 +30,7 @@ export {
 } from './sentences'
 export { hasRepair, planAdopt, planRename, planRepair, type RenamePlan } from './operations'
 export type { Dependencies, Dependency, LibraryUse, NotAnalysed, NotResolved } from './dependencies'
+export type { ManifestLibrary } from './manifests'
 export {
   edgesAmong,
   levelOf,

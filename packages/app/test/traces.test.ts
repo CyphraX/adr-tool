@@ -275,7 +275,14 @@ describe('this repository', () => {
     const [log] = repository.logs
     expect(log!.problems).toEqual([])
     const adr = log!.adrs.find((one) => one.id.startsWith('0006-'))!
-    expect(adr.metadata.affects).toEqual(['kernel', 'core', 'structure', 'conformance', 'diagrams'])
+    expect(adr.metadata.affects).toEqual([
+      'kernel',
+      'core',
+      'structure',
+      'conformance',
+      'diagrams',
+      'review'
+    ])
   })
 
   it('renames structure in the declaration, in ADR-0006, in the Rules and in its Diagram', async () => {
@@ -291,7 +298,7 @@ describe('this repository', () => {
       { path: '.arch/components.yml', changed: ['  structure:'] },
       {
         path: 'docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md',
-        changed: ['affects: [kernel, core, structure, conformance, diagrams]']
+        changed: ['affects: [kernel, core, structure, conformance, diagrams, review]']
       },
       {
         path: '.arch/rules.yml',
@@ -300,7 +307,8 @@ describe('this repository', () => {
           '    to: [core, structure]',
           '    to: [kernel, structure]',
           '    to: [kernel, structure]',
-          '    layers: [app, [cli, mcp], [conformance, diagrams], [core, structure], kernel]'
+          '    to: [kernel, structure]',
+          '    layers: [app, [cli, mcp], [conformance, diagrams, review], [core, structure], kernel]'
         ]
       },
       {
@@ -308,6 +316,7 @@ describe('this repository', () => {
         changed: [
           '  - component: structure',
           '  - from: structure',
+          '    to: structure',
           '    to: structure',
           '    to: structure',
           '    to: structure',

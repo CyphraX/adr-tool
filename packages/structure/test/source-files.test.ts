@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { sourceFilesAmong } from '../src/source-files'
 
 describe('Source Files (docs/structure-format.md, section 2)', () => {
-  it('are the files with the extensions of the three languages, in the order of their paths', () => {
+  it('are the files with the extensions of the languages, in the order of their paths', () => {
     const files = [
       'src/main.ts',
       'src/App.svelte',
@@ -11,6 +11,10 @@ describe('Source Files (docs/structure-format.md, section 2)', () => {
       'src/module.mts',
       'src/types.d.ts',
       'src/main/java/com/example/Cart.java',
+      'shop/cart.py',
+      'shop/cart.pyc',
+      'cart/cart.go',
+      'go.mod',
       'README.md',
       'package.json',
       'src/style.css',
@@ -18,6 +22,8 @@ describe('Source Files (docs/structure-format.md, section 2)', () => {
       'Makefile'
     ]
     expect(sourceFilesAmong(files).map((file) => [file.path, file.language])).toEqual([
+      ['cart/cart.go', 'go'],
+      ['shop/cart.py', 'python'],
       ['src/App.svelte', 'svelte'],
       ['src/legacy.cjs', 'typescript'],
       ['src/main.ts', 'typescript'],
@@ -39,6 +45,27 @@ describe('Source Files (docs/structure-format.md, section 2)', () => {
     expect(sourceFilesAmong(files).map((file) => file.path)).toEqual(['src/node_modules_like/a.ts'])
   })
 
+  it('are no Go where the go command does not look: testdata, vendor, and names with _ or .', () => {
+    const files = [
+      'cart/cart.go',
+      'cart/testdata/broken.go',
+      'vendor/github.com/google/uuid/uuid.go',
+      '_examples/main.go',
+      'cart/.cache/x.go',
+      'cart/_generated.go',
+      'cart/cart_test.go',
+      // Only Go: the go command's rules are no other language's.
+      'testdata/fixture.ts',
+      'vendor/lib.py'
+    ]
+    expect(sourceFilesAmong(files).map((file) => file.path)).toEqual([
+      'cart/cart.go',
+      'cart/cart_test.go',
+      'testdata/fixture.ts',
+      'vendor/lib.py'
+    ])
+  })
+
   it('are not left out for being called dist or build: that is for git to say', () => {
     expect(sourceFilesAmong(['src/build/plan.ts', 'dist/index.js'])).toHaveLength(2)
   })
@@ -53,6 +80,13 @@ describe('Source Files (docs/structure-format.md, section 2)', () => {
     ['src/cart.test.svelte', true],
     ['shop/src/test/java/com/example/CartTest.java', true],
     ['src/main/java/com/example/CartTest.java', false],
+    ['shop/test_cart.py', true],
+    ['shop/cart_test.py', true],
+    ['conftest.py', true],
+    ['shop/testing.py', false],
+    ['shop/latest_cart.py', false],
+    ['cart/cart_test.go', true],
+    ['cart/contest.go', false],
     ['src/testing.ts', false],
     ['src/latest/a.ts', false],
     ['src/contest.ts', false]

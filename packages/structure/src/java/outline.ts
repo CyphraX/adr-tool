@@ -7,9 +7,10 @@
  * `.wasm` files and hands their bytes in. That keeps the question of where the files lie in
  * a packaged app out of the analysis.
  */
-import { Language, Parser, type Node } from 'web-tree-sitter'
+import type { Node } from 'web-tree-sitter'
 import type { Extraction } from '../extraction'
 import { detailed } from '../sentences'
+import { firstError, parserOf, type Grammar } from '../tree-sitter'
 
 export interface JavaImport {
   /** As written, without `.*`: `java.util.List`, `java.util`. */
@@ -59,19 +60,9 @@ const TYPE_DECLARATIONS = [
   'annotation_type_declaration'
 ]
 
-let runtime: Promise<void> | undefined
-
-export async function prepareJava(wasm: {
-  /** `web-tree-sitter.wasm` */
-  readonly runtime: Uint8Array
-  /** `tree-sitter-java.wasm` */
-  readonly grammar: Uint8Array
-}): Promise<JavaReader> {
-  // The runtime can be initialised once per thread.
-  runtime ??= Parser.init({ wasmBinary: wasm.runtime })
-  await runtime
-  const parser = new Parser()
-  parser.setLanguage(await Language.load(wasm.grammar))
+/** `wasm` holds `web-tree-sitter.wasm` and `tree-sitter-java.wasm`. */
+export async function prepareJava(wasm: Grammar): Promise<JavaReader> {
+  const parser = await parserOf(wasm)
 
   return (text) => {
     const tree = parser.parse(text)
@@ -92,17 +83,6 @@ export async function prepareJava(wasm: {
       tree.delete()
     }
   }
-}
-
-/** The first node the parser could not read, or put in where something was missing. */
-function firstError(root: Node): Node | undefined {
-  let node: Node | null = root
-  while (node) {
-    if (node.isError || node.isMissing) return node
-    node =
-      node.children.find((child) => child !== null && (child.hasError || child.isMissing)) ?? null
-  }
-  return undefined
 }
 
 function outline(root: Node): JavaOutline {

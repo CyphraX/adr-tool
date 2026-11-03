@@ -59,7 +59,9 @@ function withConnection(diagram: Diagram, text: string, from: string, to: string
   return added
 }
 
-describe('the Diagram of this repository’s packages', () => {
+// Each test analyses the whole repository, a few seconds apiece, while the other packages'
+// tests run beside it: they get the time the analysis of the whole repository gets in Structure.
+describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () => {
   it('is valid, and shows every package of the repository', async () => {
     const { structure, packages } = await own()
     expect(structure.origin).toBe('declared')
@@ -80,23 +82,32 @@ describe('the Diagram of this repository’s packages', () => {
       'app > conformance',
       'app > core',
       'app > diagrams',
+      'app > kernel',
+      'app > review',
       'app > structure',
       'cli > conformance',
       'cli > core',
+      'cli > kernel',
       'cli > structure',
       'conformance > kernel',
       'conformance > structure',
       'core > kernel',
       'diagrams > kernel',
       'diagrams > structure',
+      'mcp > cli',
       'mcp > core',
       'mcp > structure',
+      'review > kernel',
+      'review > structure',
       'structure > kernel'
     ])
     expect(suggested.every((connection) => connection.drawn)).toBe(true)
-    // The window's German takes the sentences of Diagrams as types only.
-    expect(suggested.find((one) => one.from === 'app' && one.to === 'diagrams')).toMatchObject({
+    // The window's German takes the sentences of Review as types only; Diagrams it runs.
+    expect(suggested.find((one) => one.from === 'app' && one.to === 'review')).toMatchObject({
       typeOnly: true
+    })
+    expect(suggested.find((one) => one.from === 'app' && one.to === 'diagrams')).toMatchObject({
+      typeOnly: false
     })
     expect(driftOf(packages, structure, analysis)).toEqual([])
   })
@@ -172,7 +183,7 @@ describe('the Diagram of this repository’s packages', () => {
     expect(
       problems.map((problem) => `${problem.path}:${problem.line}: ${wordingOf(problem)}`)
     ).toEqual([
-      'docs/architecture/diagrams/packages.yml:18: The Diagram shows mcp, which is not a declared Component.'
+      'docs/architecture/diagrams/packages.yml:20: The Diagram shows mcp, which is not a declared Component.'
     ])
 
     // Planned against the repository as it is: this test never writes into it.

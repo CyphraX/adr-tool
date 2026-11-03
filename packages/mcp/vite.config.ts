@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 
-// The server is one file that Node.js runs as it is: `core`, `structure`, `yaml` and `diff` are bundled
-// into it, Node's own modules are not. The workspace packages are source-only, as for the app.
+// The server is one file that Node.js runs as it is: `core`, `structure`, the command line's git,
+// `yaml` and `diff` are bundled into it, Node's own modules are not. The workspace packages are source-only, as for the app.
 export default defineConfig({
   build: {
     ssr: 'src/main.ts',

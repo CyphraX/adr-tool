@@ -7,7 +7,16 @@ import { gitIn } from './git'
 const NEVER = new Set(['node_modules', '.git'])
 /** Build output, left out where it stands next to a build file. */
 const BUILD_OUTPUT = new Set(['dist', 'build', 'out', 'target'])
-const BUILD_FILES = ['package.json', 'pom.xml', 'build.gradle', 'build.gradle.kts']
+const BUILD_FILES = [
+  'package.json',
+  'pom.xml',
+  'build.gradle',
+  'build.gradle.kts',
+  'pyproject.toml',
+  'setup.py',
+  'setup.cfg',
+  'go.mod'
+]
 
 /**
  * What a repository consists of (docs/structure-format.md, section 2): in a git repository,

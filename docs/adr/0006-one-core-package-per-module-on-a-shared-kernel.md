@@ -4,7 +4,7 @@ created: 2026-09-20
 decision-makers: [Philipp Saal]
 tags: [architecture, packages]
 depends-on: [0001-electron-svelte-typescript-throughout, 0004-operations-return-change-sets]
-affects: [kernel, core, structure, conformance, diagrams]
+affects: [kernel, core, structure, conformance, diagrams, review]
 ---
 
 # One core package per module, on a shared kernel

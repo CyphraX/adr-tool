@@ -15,7 +15,10 @@
   },
   "dependencies": {
     "@adr-tool/kernel": "workspace:*",
+    "smol-toml": "1.9.1",
+    "tree-sitter-go": "0.25.0",
     "tree-sitter-java": "^0.23.5",
+    "tree-sitter-python": "0.25.0",
     "typescript": "^5.9.3",
     "web-tree-sitter": "^0.27.0",
     "yaml": "^2.9.1"
