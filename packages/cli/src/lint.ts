@@ -9,7 +9,8 @@ import {
   type DecisionLog,
   type FileSystem,
   type Problem,
-  type ProblemCode
+  type ProblemCode,
+  type Repository
 } from '@adr-tool/core'
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
 
@@ -45,6 +46,13 @@ export interface LintReport {
  * `undefined` when the repository has no Decision Log to check.
  */
 export async function lint(fs: FileSystem): Promise<LintReport | undefined> {
+  return (await lintRepository(fs)).report
+}
+
+/** `lint`, and the Decision Logs it read: what `adr check` tells Conformance about the ADRs. */
+export async function lintRepository(
+  fs: FileSystem
+): Promise<{ readonly report: LintReport | undefined; readonly repository: Repository }> {
   const declaration = readDeclaration(await fs.readText(DECLARATION_PATH))
   const components =
     declaration.kind === 'declared'
@@ -57,7 +65,7 @@ export async function lint(fs: FileSystem): Promise<LintReport | undefined> {
         ]
       : []
   const repository = await openRepository(fs, components ? { components } : {})
-  if (repository.discoveredBy === 'none') return undefined
+  if (repository.discoveredBy === 'none') return { report: undefined, repository }
 
   const locate = problemLocator(fs)
   const report = async (problem: Problem, log?: DecisionLog): Promise<LintedProblem> => {
@@ -107,5 +115,5 @@ export async function lint(fs: FileSystem): Promise<LintReport | undefined> {
       })
     }
   }
-  return { logs: repository.logs.map((log) => log.path), problems, notes }
+  return { report: { logs: repository.logs.map((log) => log.path), problems, notes }, repository }
 }

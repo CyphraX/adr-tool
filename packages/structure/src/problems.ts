@@ -14,6 +14,8 @@ export type StructureProblem =
       readonly detail: string
       /** `detail` as a code, for a window in another language. */
       readonly said?: StructureSaid
+      /** The line the YAML parser stopped at, where it says one. */
+      readonly line?: number
     }
   /** A key of a `components` map is not a valid segment of a Component ID. */
   | { readonly kind: 'invalid-segment'; readonly component: string; readonly segment: string }

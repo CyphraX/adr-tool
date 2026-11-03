@@ -23,6 +23,8 @@ export type Declaration =
       readonly detail: string
       /** `detail` as a code, for a window in another language. */
       readonly said: StructureSaid
+      /** The line the YAML parser stopped at, from 1, where it says one. */
+      readonly line?: number
     }
   | {
       readonly kind: 'declared'
@@ -48,14 +50,21 @@ class WrongForm extends Error {
   }
 }
 
-const unreadable = (said: StructureSaid): Declaration => ({ kind: 'unreadable', ...detailed(said) })
+const unreadable = (said: StructureSaid, line?: number): Declaration => ({
+  kind: 'unreadable',
+  ...detailed(said),
+  ...(line !== undefined && { line })
+})
 
 export function readDeclaration(text: string | undefined): Declaration {
   if (text === undefined) return { kind: 'absent' }
   // Keys that occur twice are a Problem of their own, not a reason to give up on the file.
   const doc = parseDocument(text, { uniqueKeys: false })
   if (doc.errors.length > 0) {
-    return unreadable({ code: 'not-yaml', values: { message: doc.errors[0]!.message } })
+    // The parser's first line says what is wrong and where; the rest draws the line it means.
+    const error = doc.errors[0]!
+    const message = error.message.split('\n')[0]!.replace(/:$/, '')
+    return unreadable({ code: 'not-yaml', values: { message } }, error.linePos?.[0].line)
   }
   if (doc.contents === null) return { kind: 'absent' }
   if (!isMap(doc.contents)) return unreadable({ code: 'top-not-map', values: {} })

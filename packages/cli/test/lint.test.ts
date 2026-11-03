@@ -204,7 +204,7 @@ describe('adr lint (docs/cli.md)', () => {
       [['lint', join(empty, 'README.md')], /is not a directory/],
       [['lint', '--format', 'xml'], /--format/],
       [['lint', 'a', 'b'], /one path/],
-      [['check'], /Unknown command/],
+      [['frobnicate'], /Unknown command/],
       [[], /Usage/]
     ] as const) {
       const { code, out, err } = await adr(...args)

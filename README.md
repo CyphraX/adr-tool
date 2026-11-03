@@ -15,10 +15,11 @@ A desktop app for the architecture that lives in a git repository: its Architect
 
 Softarch Suite reads ADRs where they already are: Markdown files in a repository, written by people, by agents or by other tools. It lists them, shows how they relate, finds what is inconsistent, and writes new ones and changes to existing ones. Every change is shown as a diff before it is written, and nothing is changed beyond the lines it was asked to change. Markdown is never re-serialized ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)).
 
-The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built, and the core of a third:
+The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built, and the cores of two more:
 
 - **Decisions** covers the ADRs. It was called ADR Tool until the suite got its name.
 - **Structure** shows the Components of the code and the Dependencies between them, and links them to the ADRs that affect them.
+- **Conformance** checks the code against Rules the architect writes down. Its core and `adr check` are built; its window is next.
 - **Diagrams** draws pictures of the architecture whose boxes are Components, and says where a picture and the code drift apart. Its core is built; its window is next.
 
 The app runs locally: there is no backend, no account and no telemetry.
@@ -31,9 +32,11 @@ The app runs locally: there is no backend, no account and no telemetry.
 - [Features](#features)
   - [Decisions](#decisions)
   - [Structure](#structure)
+  - [Conformance](#conformance)
 - [Install](#install)
 - [Usage](#usage)
   - [Checking ADRs in CI](#checking-adrs-in-ci)
+  - [Checking the code against its Rules](#checking-the-code-against-its-rules)
   - [Agents over MCP](#agents-over-mcp)
 - [Development](#development)
 - [Documentation](#documentation)
@@ -77,7 +80,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 - **Export.** **Export → Web pages…** writes the Decision Logs as HTML pages for people who do not use the tool: an index by Status and a page per ADR, with its Relations as links. The pages open from disk, from a file share or from any web host. They run no script and fetch nothing. **PDF…** prints the same ADRs as a PDF, one ADR per page ([ADR-0014](docs/adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
 - **Foreign formats.** ADRs written for [MADR](https://adr.github.io/madr/) 2, 3 and 4, for [log4brains](https://github.com/thomvaill/log4brains) and for [adr-tools](https://github.com/npryce/adr-tools) are read as they are. **Migration** converts them into the suite's own format, as a previewed change ([ADR-0005](docs/adr/0005-foreign-formats-are-read-never-written.md)).
 - Light and dark themes, following the system.
-- **English and German.** The window speaks German when the system does, and English otherwise; the menu at the top right overrides that. What the tool says about ADRs and code — Problems, refusals, the warnings of a change — is said in the same language. `adr lint` and the MCP server stay English.
+- **English and German.** The window speaks German when the system does, and English otherwise; the menu at the top right overrides that. What the tool says about ADRs and code — Problems, refusals, the warnings of a change — is said in the same language. `adr lint`, `adr check` and the MCP server stay English.
 
   ![The window in German: the same Decision Log, with the list, the sidebar and the detail in German](docs/screenshots/readme/decisions-de.png)
 
@@ -138,6 +141,10 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 The analysis runs in a worker thread and caches its results per file. It follows changes on disk while the view is open.
 
+### Conformance
+
+- **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, and how far a metric may go. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request; the window follows ([plan-vision.md](docs/plan-vision.md), part 4).
+
 ## Install
 
 Requirements:
@@ -184,7 +191,22 @@ docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-wri
 10 Problems in 1 Decision Log.
 ```
 
-The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs it on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
+The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs `adr check`, which does the same and checks its Rules too, on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
+
+### Checking the code against its Rules
+
+`adr check` does what `adr lint` does, and checks `.arch/components.yml` and the Rules of `.arch/rules.yml` against the code. Each Violation is printed at the line of the import that causes it, with the reason its Rule gives; the command exits with 1 on a Problem or on a Violation without an Exception:
+
+```console
+$ node packages/cli/dist/adr.mjs check packages/conformance/test/fixtures/layered-shop
+src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
+src/billing/invoice.ts:3: layered: billing must not depend on web, which lies in a layer above it: src/billing/invoice.ts:3 imports src/web/format.ts. The web uses billing, which uses persistence.
+
+No Problems in 1 Decision Log.
+2 Violations of 2 Rules.
+```
+
+It reads TypeScript, JavaScript and Java, and runs nothing from the repository. This repository checks its own packages with it in CI ([.arch/rules.yml](.arch/rules.yml)). The command is in [docs/cli.md](docs/cli.md#adr-check-path---format-textjsongithub), the file of Rules in [docs/conformance-format.md](docs/conformance-format.md).
 
 ### Exporting for readers
 
@@ -219,6 +241,7 @@ The test fixtures are useful for exploring the app. They are test data, so copy 
 | `packages/core/test/fixtures/madr`, `…/madr-2`, `…/log4brains`, `…/adr-tools` | Foreign formats, offered for Migration |
 | `packages/structure/test/fixtures/shop` | A Cycle between two Components with its weakest Dependency, and one between two files |
 | `packages/structure/test/fixtures/maven-shop` | Java: a Maven project of three modules, with one package spread over two of them |
+| `packages/conformance/test/fixtures/layered-shop` | Three layers and two Rules, broken on purpose by one import, and the ADR an Exception for it would name |
 | this repository | Its own ADRs, and its packages as declared Components |
 
 ### Where ADRs are found
@@ -267,6 +290,27 @@ components:
 
 The patterns, test files, the Draft, the Dependencies of each language and the definitions of the metrics are in [docs/structure-format.md](docs/structure-format.md).
 
+### Writing Rules
+
+```yaml
+# .arch/rules.yml
+rules:
+  - id: billing-not-web
+    why: Billing is the domain; the web is how it is shown, and may change without it.
+    kind: must-not-depend
+    from: billing
+    to: [web]
+
+exceptions:
+  - rule: billing-not-web
+    from: billing
+    to: web
+    reason: The invoice formats its date like the web until it has a format of its own.
+    justified-by: docs/adr/0012-invoices-format-dates-like-the-web
+```
+
+The kinds of Rules, the fingerprint an Exception names and the Problems of the file are in [docs/conformance-format.md](docs/conformance-format.md).
+
 ## Development
 
 | Command | What it does |
@@ -278,22 +322,24 @@ The patterns, test files, the Draft, the Dependencies of each language and the d
 | `pnpm lint` | Runs ESLint |
 | `pnpm format` / `pnpm format:check` | Runs Prettier, writing or checking |
 | `pnpm adr lint` | Checks this repository's ADRs with the built command line |
+| `pnpm adr check` | Checks them too, and this repository's code against `.arch/rules.yml` |
 | `pnpm adr export --out <dir>` | Exports this repository's ADRs as HTML pages |
 | `pnpm --filter @adr-tool/diagrams export-own` | Draws this repository's Diagram again, into `docs/architecture/diagrams/packages.svg`; a test fails while the picture is stale |
 
-CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr lint` on the repository itself.
+CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr check` on the repository itself: its Decision Log, its declaration of Components, and its code against `.arch/rules.yml`.
 
 ### Project layout
 
-A pnpm monorepo. Each module of the suite has one UI-free core package, and the module cores never depend on each other ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)), except that `diagrams` reads Structure's model ([ADR-0018](docs/adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md)).
+A pnpm monorepo. Each module of the suite has one UI-free core package. The module cores depend on the kernel and may depend on Structure's model, whose Components every module refers to; otherwise they never depend on each other ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)).
 
 | Package | Contents |
 | --- | --- |
 | [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets, and the reading of `.arch/config.yml` |
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
+| [`packages/conformance`](packages/conformance) | The core of the Conformance module, on `kernel` and `structure` alone and under the same guard: the Rules and Exceptions of `.arch/rules.yml`, their evaluation against the Dependencies, the Problems of the file, and Rename in it |
 | [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the Repair of an element whose Component is gone, and the SVG, drawn without a browser |
-| [`packages/cli`](packages/cli) | The command line, `adr lint` and `adr export`, built on both cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
+| [`packages/cli`](packages/cli) | The command line, `adr lint`, `adr check` and `adr export`, built on the cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
 | [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
@@ -318,9 +364,10 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [docs/design.md](docs/design.md) | How the window looks and behaves, for every module |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
-| [docs/configuration.md](docs/configuration.md) | The contract of `.arch/config.yml`, the suite's settings: one key per module, and what happens when the file cannot be read |
+| [docs/conformance-format.md](docs/conformance-format.md) | The contract of the Conformance module: Rules, Violations and their fingerprint, Exceptions, the Problems of `.arch/rules.yml` |
 | [docs/diagrams-format.md](docs/diagrams-format.md) | The contract of the Diagrams module: the file of a Diagram, its view levels, suggested connections and Drift, its Problems, and the SVG |
-| [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` with its output, codes and exit codes, and `adr export` |
+| [docs/configuration.md](docs/configuration.md) | The contract of `.arch/config.yml`, the suite's settings: one key per module, and what happens when the file cannot be read |
+| [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` and `adr check` with their output, codes and exit codes, and `adr export` |
 | [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
 | [CONTEXT.md](CONTEXT.md), [CONTEXT-MAP.md](CONTEXT-MAP.md) | The domain language and how its contexts relate |
@@ -353,7 +400,7 @@ Changes go through pull requests against `main`, and CI must pass. Before you op
 1. Run the five CI checks locally: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test` and `pnpm build`.
 2. Use the terms of the glossaries.
 3. Write down a decision of consequence as an ADR.
-4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md), [docs/structure-format.md](docs/structure-format.md) or [docs/diagrams-format.md](docs/diagrams-format.md).
+4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md), [docs/structure-format.md](docs/structure-format.md), [docs/conformance-format.md](docs/conformance-format.md), [docs/diagrams-format.md](docs/diagrams-format.md) or [docs/configuration.md](docs/configuration.md).
 
 ## License
 

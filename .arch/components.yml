@@ -12,6 +12,8 @@ components:
         paths: [packages/app/src/shared/**]
   cli:
     paths: [packages/cli/**]
+  conformance:
+    paths: [packages/conformance/**]
   core:
     paths: [packages/core/**]
     components:
