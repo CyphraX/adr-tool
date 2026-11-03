@@ -1,20 +1,9 @@
 import type { FileSystem } from '@adr-tool/core'
-import {
-  checkConformance,
-  needsModel,
-  readRules,
-  RULES_PATH,
-  type ConformanceReport,
-  type Decisions
-} from '@adr-tool/conformance'
-import {
-  analyseDependencies,
-  extractorOf,
-  openStructure,
-  type NotAnalysed
-} from '@adr-tool/structure'
+import { needsModel, readRules, RULES_PATH, type ConformanceReport } from '@adr-tool/conformance'
+import { analyseDependencies, openStructure, type NotAnalysed } from '@adr-tool/structure'
 import { DECLARATION_PATH, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
-import { javaReader } from './java'
+import { extractorFor } from './analysis'
+import { conformanceOf } from './conformance'
 import { lintRepository, type LintReport } from './lint'
 
 /** A Problem of `.arch/components.yml`, as the command reports it. */
@@ -60,17 +49,13 @@ export async function check(
   // The code is analysed only for Rules that are checked: it takes a moment on a large repository.
   let model: Awaited<ReturnType<typeof analyseDependencies>> | undefined
   if (needsModel(rules, structure)) {
-    const hasJava = structure.sourceFiles.some((file) => file.language === 'java')
-    const extract = extractorOf(hasJava ? await javaReader() : undefined)
+    const extract = await extractorFor(structure)
     model = await analyseDependencies(fs, files, structure.sourceFiles, extract)
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
   }
 
-  const decisions: Decisions = {
-    logs: repository.logs.map((log) => log.path),
-    adrs: repository.logs.flatMap((log) => log.adrs.map((adr) => ({ log: log.path, id: adr.id })))
-  }
-  const conformance = checkConformance(rules, structure, model, decisions)
+  // The same composition as the app's and the MCP server's (src/conformance.ts).
+  const conformance = conformanceOf(rules, structure, model, repository)
 
   return {
     lint,
