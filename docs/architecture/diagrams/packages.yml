@@ -15,6 +15,8 @@ elements:
     at: [520, 380]
   - component: diagrams
     at: [480, 580]
+  - component: review
+    at: [480, 200]
   - component: mcp
     at: [700, 120]
   - component: cli
@@ -44,6 +46,11 @@ connections:
   - from: diagrams
     to: structure
     label: Components, Dependencies
+  - from: review
+    to: kernel
+  - from: review
+    to: structure
+    label: Source Files
   - from: mcp
     to: core
     label: serves ADRs
@@ -51,7 +58,7 @@ connections:
     to: structure
   - from: mcp
     to: cli
-    label: analyses the code
+    label: runs git, analyses
   - from: cli
     to: core
     label: lints and exports
@@ -60,6 +67,9 @@ connections:
   - from: cli
     to: conformance
     label: checks the Rules
+  - from: cli
+    to: kernel
+    label: the git port
   - from: app
     to: core
     label: Decisions
@@ -74,6 +84,9 @@ connections:
     label: the export
   - from: app
     to: diagrams
+    label: German sentences
+  - from: app
+    to: review
     label: German sentences
   - from: app
     to: git

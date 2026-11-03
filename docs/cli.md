@@ -6,7 +6,7 @@ The contract of the suite's command line (`packages/cli`): what it reads, what i
 
 ## Running it
 
-The command is one file with nothing to install beside it: `pnpm build` writes it to `packages/cli/dist/adr.mjs`, and Node.js 22.12 or later runs it, wherever it is copied to — the `.mjs` makes it a module whatever `package.json` stands beside it. It is about 12 MB: the TypeScript compiler, which `adr check` reads TypeScript and JavaScript with, is most of it, and the WebAssembly of tree-sitter and its Java grammar are in it as text ([ADR-0017](adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)), so that nothing has to stand beside it.
+The command is one file with nothing to install beside it: `pnpm build` writes it to `packages/cli/dist/adr.mjs`, and Node.js 22.12 or later runs it, wherever it is copied to — the `.mjs` makes it a module whatever `package.json` stands beside it. It is about 13 MB: the TypeScript compiler, which `adr check` reads TypeScript and JavaScript with, is most of it, and the WebAssembly of tree-sitter and its grammars of Java, Python and Go are in it as text ([ADR-0017](adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)), so that nothing has to stand beside it.
 
 ```sh
 node packages/cli/dist/adr.mjs lint            # the repository in the current directory
@@ -125,7 +125,7 @@ node packages/cli/dist/adr.mjs check --format github  # in a pipeline
 
 - **The Decision Logs** are found and checked as `adr lint` checks them, with the same lines and codes. A repository without one is checked all the same, when it has `.arch/components.yml` or `.arch/rules.yml`.
 - **The files of the repository** are what the app lists ([structure-format.md, section 2](structure-format.md#2-source-files-part-2)): in a git repository, what git tracks and what it neither tracks nor ignores; elsewhere, a walk of the directory that honours `.gitignore`. git is run without a pager, without locks, without the file system monitor and without fetching what a partial clone lacks; nothing the repository brings along is run ([ADR-0007](adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)).
-- **The code** is read only when a Rule needs it: TypeScript and JavaScript with the TypeScript compiler, Java with the tree-sitter grammar that the command carries. A Source File that cannot be parsed is named on standard error; it has no Dependencies of its own, and the check goes on.
+- **The code** is read only when a Rule needs it: TypeScript and JavaScript with the TypeScript compiler, Java, Python and Go with the tree-sitter grammars that the command carries. A Source File that cannot be parsed is named on standard error; it has no Dependencies of its own, and the check goes on.
 - **The Rules** are evaluated only against a declaration that can be read. On a Draft — no `.arch/components.yml`, or one that cannot be read — the file of Rules has the Problem `rules-without-declaration`, and no Rule is checked ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)).
 
 Nothing is written. `adr lint` stays as it was: it reads no Rules, and what it prints and how it ends do not change.

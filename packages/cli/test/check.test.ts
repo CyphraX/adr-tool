@@ -12,6 +12,10 @@ const shop = fileURLToPath(
 const mavenShop = fileURLToPath(
   new URL('../../structure/test/fixtures/maven-shop/', import.meta.url)
 )
+const pythonShop = fileURLToPath(
+  new URL('../../structure/test/fixtures/python-shop/', import.meta.url)
+)
+const goShop = fileURLToPath(new URL('../../structure/test/fixtures/go-shop/', import.meta.url))
 
 /** Runs the command in `cwd` as a shell would, and keeps what it prints. */
 async function adrIn(
@@ -402,6 +406,54 @@ describe('adr check (docs/cli.md)', () => {
     expect(lines((await adrIn(accepted, 'check')).out).at(-1)).toBe(
       '1 Rule holds, but for 1 Violation accepted as an Exception.'
     )
+  })
+
+  it('checks Rules of its own on Python and Go, read with the grammars it carries', async () => {
+    const python = copyOf(pythonShop, {
+      '.arch/components.yml':
+        'components:\n  cart:\n    paths: [src/shop/cart/**]\n  catalog:\n    paths: [src/shop/catalog/**]\n  pricing:\n    paths: [src/shop/pricing/**]\n',
+      '.arch/rules.yml': [
+        'rules:',
+        '  - id: pricing-not-cart',
+        '    why: Pricing is asked by the cart, and knows nothing of it.',
+        '    kind: must-not-depend',
+        '    from: pricing',
+        '    to: [cart]',
+        ''
+      ].join('\n')
+    })
+    const fromPython = await adrIn(python, 'check')
+    expect([fromPython.code, fromPython.err]).toEqual([1, ''])
+    expect(lines(fromPython.out)).toEqual([
+      'src/shop/pricing/rules.py:6: pricing-not-cart: pricing must not depend on cart: src/shop/pricing/rules.py:6 imports src/shop/cart/line.py. Pricing is asked by the cart, and knows nothing of it.',
+      '',
+      'No Decision Log.',
+      '1 Violation of 1 Rule.'
+    ])
+
+    const go = copyOf(goShop, {
+      '.arch/components.yml':
+        'components:\n  billing:\n    paths: [billing/**]\n  cart:\n    paths: [cart/**]\n  catalog:\n    paths: [catalog/**]\n  cmd:\n    paths: [cmd/**]\n  web:\n    paths: [web/**]\n',
+      '.arch/rules.yml': [
+        'rules:',
+        '  - id: cart-in-order',
+        '    why: Cart and Line should be readable one after the other.',
+        '    kind: no-cycles',
+        '    inside: [cart]',
+        ''
+      ].join('\n')
+    })
+    const fromGo = await adrIn(go, 'check')
+    expect([fromGo.code, fromGo.err]).toEqual([1, ''])
+    // A name of its own package is a use without an import, as in Java.
+    expect(lines(fromGo.out)).toEqual([
+      'cart/cart.go:8: cart-in-order: cart/cart.go and cart/line.go depend on each other in a Cycle: cart/cart.go:8 imports cart/line.go. Cart and Line should be readable one after the other.',
+      'cart/cart.go:18: cart-in-order: cart/cart.go and cart/line.go depend on each other in a Cycle: cart/cart.go:18 imports cart/line.go. Cart and Line should be readable one after the other.',
+      'cart/line.go:21: cart-in-order: cart/cart.go and cart/line.go depend on each other in a Cycle: cart/line.go:21 imports cart/cart.go. Cart and Line should be readable one after the other.',
+      '',
+      'No Decision Log.',
+      '1 Violation of 1 Rule.'
+    ])
   })
 
   it('leaves adr lint as it was: it reads no Rules', async () => {

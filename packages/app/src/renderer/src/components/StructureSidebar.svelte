@@ -72,9 +72,9 @@
         {t.structure.libraries(view.libraries)}<br />
         <span class="faint">{t.structure.analysedIn(view.milliseconds)}</span>
       </p>
-      {#if view.javaFiles > 0}
-        <p class="about faint">{t.structure.javaLowerBound}</p>
-      {/if}
+      {#each view.lowerBound as language (language)}
+        <p class="about faint">{t.structure.lowerBound[language]}</p>
+      {/each}
       <label class="toggle">
         <input
           type="checkbox"

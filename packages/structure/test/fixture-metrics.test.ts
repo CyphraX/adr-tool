@@ -38,7 +38,7 @@ async function analysed(root: string) {
   const structure = await openStructure(fs, files)
   return {
     structure,
-    ...(await analyseDependencies(fs, files, structure.sourceFiles, extractorOf(java)))
+    ...(await analyseDependencies(fs, files, structure.sourceFiles, extractorOf({ java })))
   }
 }
 

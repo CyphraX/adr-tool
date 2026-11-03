@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { SENTENCES, type CoreSaid, type Said } from '@adr-tool/core'
+import { REVIEW_SENTENCES } from '@adr-tool/review'
 import { STRUCTURE_SENTENCES, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
 import { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
 import { DE, inGerman } from '../src/renderer/src/lib/said.de'
@@ -25,6 +26,7 @@ function some(detail: Said): Record<string, unknown> {
     numbers: ['417', '4170'],
     keeps: ['‹keep-1›', '‹keep-2›'],
     files: ['src/‹file-1›.ts', 'src/‹file-2›.ts'],
+    candidates: ['docs/adr/‹candidate-1›', 'services/docs/adr/‹candidate-2›'],
     reasons: [
       { code: 'waits-for-successor', values: { adr: '‹reason›', successor: '‹successor›' } }
     ],
@@ -49,12 +51,17 @@ const MODULES = [
     name: 'diagrams',
     sentences: DIAGRAMS_SENTENCES,
     detail: { code: 'diagram-not-map', values: {} }
+  },
+  {
+    name: 'review',
+    sentences: REVIEW_SENTENCES,
+    detail: { code: 'frontmatter-yaml', values: { message: '‹detail-message›' } }
   }
 ] as const
 
 describe('German', () => {
-  it('has a sentence for every code of core, structure and diagrams', () => {
-    // The compiler asks for them (`DE` is typed by the three tables); this says so where it runs.
+  it('has a sentence for every code of core, structure, diagrams and review', () => {
+    // The compiler asks for them (`DE` is typed by the tables); this says so where it runs.
     for (const { sentences } of MODULES) {
       for (const code of Object.keys(sentences)) expect(Object.keys(DE), code).toContain(code)
     }
@@ -63,20 +70,19 @@ describe('German', () => {
   })
 
   it('gives each module codes of its own: only the kernel’s are shared', () => {
-    for (const [first, second] of [
-      [SENTENCES, STRUCTURE_SENTENCES],
-      [SENTENCES, DIAGRAMS_SENTENCES],
-      [STRUCTURE_SENTENCES, DIAGRAMS_SENTENCES]
-    ] as const) {
-      const shared = Object.keys(first).filter((code) => code in second)
-      // What any operation may refuse, and why .arch/config.yml cannot be read.
-      expect(shared.sort()).toEqual([
-        'already-exists',
-        'config-not-map',
-        'config-not-yaml',
-        'no-longer-exists',
-        'unreadable-config'
-      ])
+    for (const one of MODULES) {
+      for (const other of MODULES) {
+        if (one === other) continue
+        const shared = Object.keys(one.sentences).filter((code) => code in other.sentences)
+        // What any operation may refuse, and why .arch/config.yml cannot be read.
+        expect(shared.sort(), `${one.name} and ${other.name}`).toEqual([
+          'already-exists',
+          'config-not-map',
+          'config-not-yaml',
+          'no-longer-exists',
+          'unreadable-config'
+        ])
+      }
     }
   })
 

@@ -78,10 +78,10 @@ describe('the analysis of a repository, as the app runs it', () => {
     // Its numbers are a lower bound, and its pages say so.
     const view = viewOf('maven', analysis, undefined, false)
     const pages = view.components
-    expect(pages.map((page) => [page.id, page.java])).toEqual([
-      ['cart', true],
-      ['catalog', true],
-      ['web', true]
+    expect(pages.map((page) => [page.id, page.lowerBound])).toEqual([
+      ['cart', ['java']],
+      ['catalog', ['java']],
+      ['web', ['java']]
     ])
     // The main sequence of its modules, and the functions of the cart, the most complex first.
     expect(
@@ -102,6 +102,27 @@ describe('the analysis of a repository, as the app runs it', () => {
     ])
     expect(cart.functions[0]!.file).toBe('cart/src/main/java/com/shop/cart/Cart.java')
     expect(cart.classes).toEqual([])
+  })
+
+  it('reads Python and Go with the WebAssembly of tree-sitter, found next to its packages', async () => {
+    const fixture = (name: string): string =>
+      fileURLToPath(new URL(`../../structure/test/fixtures/${name}/`, import.meta.url))
+    for (const [name, language, count] of [
+      ['python-shop', 'python', 10],
+      ['go-shop', 'go', 13]
+    ] as const) {
+      const { analysis, cache } = await analyse(fixture(name), undefined)
+      expect(analysis.dependencies.notAnalysed).toEqual([])
+      expect(analysis.dependencies.dependencies).toHaveLength(count)
+      expect(Object.values(cache.files).every(({ extraction }) => language in extraction)).toBe(
+        true
+      )
+      // Their numbers are a lower bound too, each for what its parser cannot see, and the
+      // pages and the sidebar say so for their language alone.
+      const view = viewOf(name, analysis, undefined, false)
+      expect(view.lowerBound).toEqual([language])
+      expect(view.components.every((page) => page.lowerBound.join() === language)).toBe(true)
+    }
   })
 
   it('keeps its cache in a file that a crash cannot leave half written', async () => {
@@ -142,7 +163,7 @@ describe('a level as the window gets it', () => {
     expect(view.notResolved).toEqual([
       { file: 'src/billing/invoice.ts', specifier: './gone', line: 2 }
     ])
-    expect([view.sourceFiles, view.testFiles, view.javaFiles]).toEqual([4, 1, 0])
+    expect([view.sourceFiles, view.testFiles, view.lowerBound]).toEqual([4, 1, []])
   })
 
   it('goes down into a Component, with the way back up', () => {
@@ -226,7 +247,7 @@ describe('a level as the window gets it', () => {
       level: undefined,
       files: ['src/shop/cart/cart.ts', 'src/shop/index.ts'],
       testFiles: 0,
-      java: false,
+      lowerBound: [],
       dependsOn: [
         { kind: 'component', id: 'billing', name: 'billing', weight: 1, typeOnly: false }
       ],
@@ -289,6 +310,7 @@ describe('this repository, as the window gets it', () => {
       'diagrams',
       'kernel',
       'mcp',
+      'review',
       'structure',
       '(unassigned)'
     ])

@@ -4,9 +4,16 @@
  */
 import type { FileSystem } from '@adr-tool/kernel'
 import { extractorOf, type Extract, type Extraction } from './extraction'
+import { goModules } from './go/modules'
+import type { GoOutline } from './go/outline'
+import { resolveGo } from './go/resolve'
 import type { JavaOutline } from './java/outline'
 import { resolveJava } from './java/resolve'
 import type { FileMeasures } from './measures'
+import { manifestLibraries, type ManifestLibrary } from './manifests'
+import type { PythonOutline } from './python/outline'
+import { pythonProjects } from './python/projects'
+import { resolvePython } from './python/resolve'
 import type { StructureSaid } from './sentences'
 import type { SourceFile } from './source-files'
 import { prepareResolver } from './typescript/resolution'
@@ -37,7 +44,10 @@ export interface NotResolved {
 /** A file that uses a Library, once per file and Library. */
 export interface LibraryUse {
   readonly file: string
-  /** The package name the code uses: `lodash` for `lodash/fp`. */
+  /**
+   * The package name the code uses: `lodash` for `lodash/fp`, the package `org.slf4j` in Java,
+   * the top-level package `requests` in Python, the module `github.com/google/uuid` in Go.
+   */
   readonly library: string
 }
 
@@ -58,6 +68,11 @@ export interface Dependencies {
   readonly dependencies: readonly Dependency[]
   readonly notResolved: readonly NotResolved[]
   readonly libraries: readonly LibraryUse[]
+  /**
+   * What the manifests of Python and Go declare — `pyproject.toml`, `requirements.txt`,
+   * `go.mod` —, for the Library inventory. Read as text, in the order of their paths.
+   */
+  readonly manifests: readonly ManifestLibrary[]
   readonly notAnalysed: readonly NotAnalysed[]
   /** How many lines each Source File has that could be read (section 5, Size). */
   readonly lineCounts: ReadonlyMap<string, number>
@@ -84,8 +99,9 @@ export function linesOf(text: string): number {
 /**
  * The Dependencies among the Source Files of a repository, and what could not be resolved.
  * `files` are the files the repository consists of, as for `openStructure`; `sourceFiles`
- * are the Source Files among them. `extract` reads one file; without a reader for Java
- * (`extractorOf(prepareJava(…))`), Java files are not read and have no Dependencies.
+ * are the Source Files among them. `extract` reads one file; without a reader for Java,
+ * Python or Go (`extractorOf({ java: await prepareJava(…) })`), the files of that language are
+ * not read and have no Dependencies.
  */
 export async function analyseDependencies(
   fs: FileSystem,
@@ -125,6 +141,8 @@ export async function analyseDependencies(
   const notAnalysed: NotAnalysed[] = []
   const java = new Map<string, JavaOutline>()
   const measures = new Map<string, FileMeasures>()
+  const python = new Map<string, PythonOutline>()
+  const go = new Map<string, GoOutline>()
   const depend = (from: string, to: string, typeOnly: boolean, line: number): void => {
     const key = `${from}\n${to}`
     const pair = pairs.get(key)
@@ -152,6 +170,14 @@ export async function analyseDependencies(
     if (extraction.measures) measures.set(path, extraction.measures)
     if ('java' in extraction) {
       java.set(path, extraction.java)
+      continue
+    }
+    if ('python' in extraction) {
+      python.set(path, extraction.python)
+      continue
+    }
+    if ('go' in extraction) {
+      go.set(path, extraction.go)
       continue
     }
     const used = new Set<string>()
@@ -186,6 +212,26 @@ export async function analyseDependencies(
   notResolved.push(...resolved.notResolved)
   libraries.push(...resolved.libraries)
 
+  // Python and Go as well, against the source roots of the Python projects and the modules of
+  // Go. What they read to know those is read only where there is code of theirs to resolve.
+  if (python.size > 0) {
+    const sources = sourceFiles
+      .filter((file) => file.language === 'python')
+      .map((file) => file.path)
+    const fromPython = resolvePython(python, sources, await pythonProjects(fs, files, sources))
+    for (const use of fromPython.uses) {
+      if (known.has(use.to)) depend(use.from, use.to, use.typeOnly, use.line)
+    }
+    notResolved.push(...fromPython.notResolved)
+    libraries.push(...fromPython.libraries)
+  }
+  if (go.size > 0) {
+    const fromGo = resolveGo(go, await goModules(fs, files))
+    for (const use of fromGo.uses) if (known.has(use.to)) depend(use.from, use.to, false, use.line)
+    notResolved.push(...fromGo.notResolved)
+    libraries.push(...fromGo.libraries)
+  }
+
   const dependencies: Dependency[] = [...pairs.values()]
     .map(({ typed, ...pair }) => {
       const lines = [...pair.lines].sort((a, b) => a - b)
@@ -193,5 +239,6 @@ export async function analyseDependencies(
       return { ...pair, lines, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
     })
     .sort((a, b) => byPath(a.from, b.from) || byPath(a.to, b.to))
-  return { dependencies, notResolved, libraries, notAnalysed, lineCounts, measures }
+  const manifests = await manifestLibraries(fs, files)
+  return { dependencies, notResolved, libraries, manifests, notAnalysed, lineCounts, measures }
 }

@@ -18,15 +18,17 @@ import {
   type Metrics,
   type Structure
 } from '@adr-tool/structure/model'
-import type {
-  SourceFileResult,
-  StructureClass,
-  StructureComponent,
-  StructureFunction,
-  StructureNeighbour,
-  StructureNode,
-  StructureOutline,
-  StructureView
+import {
+  LOWER_BOUND,
+  type LowerBound,
+  type SourceFileResult,
+  type StructureClass,
+  type StructureComponent,
+  type StructureFunction,
+  type StructureNeighbour,
+  type StructureNode,
+  type StructureOutline,
+  type StructureView
 } from '../shared/ipc'
 import type { Analysis } from './analysis'
 import { t } from './strings'
@@ -48,7 +50,7 @@ const CLASSES_LISTED = 5
  * the time. A file git lists in one of them changes nothing until the next analysis.
  */
 const UNWATCHED =
-  /(?:^|[/\\])(?:node_modules|\.git|dist|build|out|target|coverage|\.svelte-kit|\.next|\.turbo|\.cache)(?:[/\\]|$)/
+  /(?:^|[/\\])(?:node_modules|\.git|dist|build|out|target|coverage|\.svelte-kit|\.next|\.turbo|\.cache|__pycache__|\.venv|\.tox|\.mypy_cache|\.pytest_cache|\.ruff_cache)(?:[/\\]|$)/
 
 export type Analyser = (root: string) => Promise<Analysis>
 
@@ -354,7 +356,7 @@ export function viewOf(
     ...matrix.groups.map((group) => group.id)
   ])
   const testsInside = new Map<string, number>()
-  const javaInside = new Set<string>()
+  const lowerBoundInside = new Map<string, Set<string>>()
   const filesInside = new Map<string, string[]>()
   const measuredInside = new Map<string, FileMeasures[]>()
   const measuredFiles = new Map<FileMeasures, string>()
@@ -364,7 +366,9 @@ export function viewOf(
     if (measured) measuredFiles.set(measured, file.path)
     for (let id = file.component; id !== undefined; id = parentOf.get(id)) {
       if (file.test) testsInside.set(id, (testsInside.get(id) ?? 0) + 1)
-      if (counted && file.language === 'java') javaInside.add(id)
+      if (counted && isLowerBound(file.language)) {
+        lowerBoundInside.set(id, (lowerBoundInside.get(id) ?? new Set()).add(file.language))
+      }
       if (!counted || !shown.has(id)) continue
       const list = filesInside.get(id) ?? []
       if (list.length < LISTED_AT_MOST) list.push(file.path)
@@ -382,7 +386,7 @@ export function viewOf(
       metrics: metrics.get(id),
       files: filesInside.get(id) ?? [],
       testFiles: testsInside.get(id) ?? 0,
-      java: javaInside.has(id),
+      lowerBound: LOWER_BOUND.filter((language) => lowerBoundInside.get(id)?.has(language)),
       ...inside(id),
       nameOf
     })
@@ -396,7 +400,9 @@ export function viewOf(
     hints: structure.hints,
     sourceFiles: structure.sourceFiles.length,
     testFiles: structure.sourceFiles.filter((file) => file.test).length,
-    javaFiles: structure.sourceFiles.filter((file) => file.language === 'java').length,
+    lowerBound: LOWER_BOUND.filter((language) =>
+      structure.sourceFiles.some((file) => file.language === language)
+    ),
     dependencies: dependencies.dependencies.length,
     libraries: new Set(dependencies.libraries.map((use) => use.library)).size,
     notResolvedCount: dependencies.notResolved.length,
@@ -447,6 +453,10 @@ export function outlineOf(
   }
 }
 
+/** A language whose Dependencies are a lower bound. */
+const isLowerBound = (language: string): language is LowerBound =>
+  (LOWER_BOUND as readonly string[]).includes(language)
+
 /** The page of one Component: its declaration, its metrics, and its Dependencies at its level. */
 function pageOf(
   component: DeclaredComponent,
@@ -456,7 +466,7 @@ function pageOf(
     readonly metrics: Metrics | undefined
     readonly files: readonly string[]
     readonly testFiles: number
-    readonly java: boolean
+    readonly lowerBound: readonly LowerBound[]
     readonly functions: readonly StructureFunction[]
     readonly functionCount: number
     readonly classes: readonly StructureClass[]
@@ -482,7 +492,7 @@ function pageOf(
     level: parent,
     files: found.files,
     testFiles: found.testFiles,
-    java: found.java,
+    lowerBound: found.lowerBound,
     ...(found.metrics ? { metrics: found.metrics } : {}),
     functions: found.functions,
     functionCount: found.functionCount,
