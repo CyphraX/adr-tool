@@ -4,7 +4,9 @@ import {
   citingComponent,
   findingsCiting,
   hasRepair,
+  metricValueIn,
   openAssessments,
+  planEvidence,
   traceProblems,
   wordingOf,
   type AdrReference,
@@ -157,6 +159,43 @@ describe('the Traces of an Assessment', () => {
       wordingOf(traceProblems(read, KNOWN).find((p) => p.kind === 'final-without-snapshot')!)
     ).toBe(
       `${DIR}/a.md is final and cites metric values, but has no Snapshot that keeps them: they read differently with every commit.`
+    )
+  })
+
+  it('take no key of Object.prototype for a value, and keep every key of a Snapshot', async () => {
+    const snapshot = `${DIR}/a.snapshot.yml`
+    const read = await reading(
+      'date: 2026-11-03',
+      'evidence:\n  - metric: name\n    component: constructor\n  - metric: toString\n    component: cart',
+      { [snapshot]: 'components:\n  __proto__:\n    files: 1\n  cart:\n    files: 2\n' }
+    )
+    expect(read.problems).toEqual([])
+    const frozen = read.assessments[0]!.snapshot!
+    expect(Object.keys(frozen.components)).toEqual(['__proto__', 'cart'])
+    expect(metricValueIn(frozen, 'files', { component: '__proto__' })).toBe(1)
+    expect(metricValueIn(frozen, 'name', { component: 'constructor' })).toBeUndefined()
+    expect(metricValueIn(frozen, 'toString', { component: 'cart' })).toBeUndefined()
+    expect(
+      traceProblems(read, {})
+        .filter((problem) => problem.kind.startsWith('metric'))
+        .map((problem) => problem.kind)
+    ).toEqual(['metric-not-in-snapshot', 'metric-not-in-snapshot'])
+    // Nor do the values now, which the caller hands in as plain objects.
+    const now = { components: { cart: { files: 2 } } }
+    expect(metricValueIn(now, 'constructor', { component: 'cart' })).toBeUndefined()
+    expect(metricValueIn(now, 'files', { component: 'toString' })).toBeUndefined()
+    const fs = memoryFileSystem({
+      [`${DIR}/a.md`]: assessment('date: 2026-11-03', 'scenarios: [S1]')
+    })
+    const plan = await planEvidence(
+      fs,
+      'a',
+      'F1',
+      { kind: 'metric', metric: 'valueOf', subject: { component: 'cart' } },
+      { metrics: now }
+    )
+    expect(plan.ok ? 'planned' : plan.reason).toBe(
+      'the metric valueOf of cart is not there, so a Finding cannot cite it.'
     )
   })
 

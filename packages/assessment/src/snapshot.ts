@@ -14,6 +14,18 @@ import type { AssessmentSaid } from './sentences'
 import type { Eol } from './text'
 import { formatScalar, scalarText } from './yaml'
 
+/**
+ * A record keyed by names from a file or from the code: without a prototype, so that
+ * `__proto__` is a key like any other, and `constructor` is none until it is set.
+ */
+const table = <T>(): Record<string, T> => Object.create(null) as Record<string, T>
+
+/** The value of a record's own key: none that `Object.prototype` has. */
+export const ownValue = <T>(
+  record: Readonly<Record<string, T>> | undefined,
+  key: string
+): T | undefined => (record !== undefined && Object.hasOwn(record, key) ? record[key] : undefined)
+
 /** What a Snapshot's file name adds to its Assessment's ID. */
 export const SNAPSHOT_SUFFIX = '.snapshot.yml'
 
@@ -41,7 +53,7 @@ const FIELD_OF: Readonly<Record<string, string>> = {
 
 /** The metric values of one Component, by name: those it has. */
 export function componentValuesOf(metrics: Metrics): Record<string, number> {
-  const values: Record<string, number> = {}
+  const values = table<number>()
   for (const [name, field] of Object.entries(FIELD_OF)) {
     const value = (metrics as unknown as Record<string, unknown>)[field]
     if (typeof value === 'number' && Number.isFinite(value)) values[name] = value
@@ -69,22 +81,23 @@ export function snapshotValuesOf(
   inside?: ReadonlyMap<string, MeasuredInside>
 ): SnapshotValues | undefined {
   if (structure.origin !== 'declared') return undefined
-  const components: Record<string, Record<string, number>> = {}
+  const components = table<Record<string, number>>()
   for (const { id } of everyComponent(structure.components)) {
     const known = metrics.get(id)
     const values = known && componentValuesOf(known)
     if (values && Object.keys(values).length > 0) components[id] = values
   }
-  const sourceFiles: Record<string, Record<string, Record<string, number>>> = {}
+  const sourceFiles = table<Record<string, Record<string, number>>>()
   for (const file of structure.sourceFiles) {
     const measured = file.test ? undefined : inside?.get(file.path)
     if (!measured) continue
-    const names: Record<string, Record<string, number>> = {}
+    const names = table<Record<string, number>>()
     for (const { name, complexity } of measured.functions ?? []) {
-      names[name] = { ...names[name], complexity }
+      names[name] = Object.assign(names[name] ?? table<number>(), { complexity })
     }
     for (const { name, lcom4 } of measured.classes ?? []) {
-      if (lcom4 !== undefined) names[name] = { ...names[name], lcom4 }
+      if (lcom4 !== undefined)
+        names[name] = Object.assign(names[name] ?? table<number>(), { lcom4 })
     }
     if (Object.keys(names).length > 0) sourceFiles[file.path] = names
   }
@@ -97,8 +110,10 @@ export function metricValueIn(
   metric: string,
   subject: MetricSubject
 ): number | undefined {
-  if ('component' in subject) return values.components[subject.component]?.[metric]
-  return values.sourceFiles?.[subject.file]?.[subject.name]?.[metric]
+  if ('component' in subject)
+    return ownValue(ownValue(values.components, subject.component), metric)
+  const inFile = ownValue(values.sourceFiles, subject.file)
+  return ownValue(ownValue(inFile, subject.name), metric)
 }
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
@@ -160,7 +175,7 @@ export function snapshotText(assessment: string, snapshot: NewSnapshot, eol: Eol
 /** A mapping of names to numbers; `undefined` where it is not one. */
 function numbersOf(node: unknown): Record<string, number> | undefined {
   if (!isMap(node)) return undefined
-  const values: Record<string, number> = {}
+  const values = table<number>()
   for (const pair of node.items) {
     const name = scalarText(pair.key)
     const value = pair.value
@@ -199,7 +214,7 @@ export function readSnapshot(
   if (date !== undefined && date !== null && (!dateText || !isDay(dateText))) {
     return unreadable({ code: 'snapshot-day', values: {} })
   }
-  const components: Record<string, Record<string, number>> = {}
+  const components = table<Record<string, number>>()
   const listed = get('components')
   if (listed !== undefined && listed !== null) {
     if (!isMap(listed))
@@ -213,7 +228,7 @@ export function readSnapshot(
       components[id] = values
     }
   }
-  const sourceFiles: Record<string, Record<string, Record<string, number>>> = {}
+  const sourceFiles = table<Record<string, Record<string, number>>>()
   const inside = get('source-files')
   if (inside !== undefined && inside !== null) {
     const wrong = unreadable({ code: 'snapshot-numbers', values: { key: 'source-files' } })
@@ -221,7 +236,7 @@ export function readSnapshot(
     for (const file of inside.items) {
       const name = scalarText(file.key)
       if (name === undefined || !isMap(file.value)) return wrong
-      const names: Record<string, Record<string, number>> = {}
+      const names = table<Record<string, number>>()
       for (const pair of file.value.items) {
         const subject = scalarText(pair.key)
         const values = numbersOf(pair.value)

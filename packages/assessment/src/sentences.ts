@@ -32,7 +32,7 @@ const KEPT: Record<string, string> = {
   risks: 'Risk',
   debt: 'Technical Debt Item'
 }
-const kept = (key: string): string => KEPT[key] ?? key
+const kept = (key: string): string => (Object.hasOwn(KEPT, key) ? KEPT[key]! : key)
 
 /** What a piece of evidence is, as a sentence names it before its name. */
 const EVIDENCE: Record<string, string> = {
@@ -43,7 +43,9 @@ const EVIDENCE: Record<string, string> = {
   risk: 'the Risk',
   debt: 'the Technical Debt Item'
 }
-const evidence = (kind: string, name: string): string => `${EVIDENCE[kind] ?? kind} ${name}`
+const evidenceTerm = (kind: string): string =>
+  Object.hasOwn(EVIDENCE, kind) ? EVIDENCE[kind]! : kind
+const evidence = (kind: string, name: string): string => `${evidenceTerm(kind)} ${name}`
 
 // The values are types, not interfaces: a Said's values are a record of names, and only a type
 // is one without saying so.
@@ -215,7 +217,7 @@ export const SENTENCES = {
   'evidence-ambiguous-adr': (v: { adr: string; candidates: readonly string[] }): string =>
     `${v.adr} is in several Decision Logs: ${listed(v.candidates)}. Name it with its log.`,
   'evidence-incomplete': (v: { kind: string }): string =>
-    `The evidence is not complete: ${EVIDENCE[v.kind] ?? v.kind} needs every key its kind names.`,
+    `The evidence is not complete: ${evidenceTerm(v.kind)} needs every key its kind names.`,
   'snapshot-without-values': (): string =>
     'There are no metric values to freeze: the Components have to be declared, and to hold Source Files.',
   'state-unchanged': (v: { id: string; state: string }): string => `${v.id} is ${v.state} already.`,
