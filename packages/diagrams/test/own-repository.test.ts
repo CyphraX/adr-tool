@@ -59,7 +59,9 @@ function withConnection(diagram: Diagram, text: string, from: string, to: string
   return added
 }
 
-describe('the Diagram of this repository’s packages', () => {
+// Each test analyses the whole repository, a few seconds apiece, while the other packages'
+// tests run beside it: they get the time the analysis of the whole repository gets in Structure.
+describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () => {
   it('is valid, and shows every package of the repository', async () => {
     const { structure, packages } = await own()
     expect(structure.origin).toBe('declared')
