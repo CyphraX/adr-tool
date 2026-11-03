@@ -124,8 +124,10 @@ function outline(root: Node): GoOutline {
       case 'const_declaration':
       case 'type_declaration':
         for (const spec of node.descendantsOfType(SPECS)) {
-          // Only the specs of the declaration itself: a type's methods have none.
-          for (const name of fields(spec, 'name')) declare(name.text)
+          // Only the specs of the declaration itself, not those of a function literal in its
+          // value: `var handler = func() { var cfg int }` declares `handler` alone.
+          if (spec && isTopLevelSpec(spec))
+            for (const name of fields(spec, 'name')) declare(name.text)
         }
         break
     }

@@ -123,6 +123,16 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     ])
   })
 
+  it('does not take a variable of a function literal for a name of its package', async () => {
+    const { edges } = await analyse({
+      'go.mod': MODULE,
+      'p/a.go': ['package p', 'var handler = func() {', '  var cfg int', '  _ = cfg', '}'],
+      'p/b.go': ['package p', 'var cfg = 1'],
+      'p/c.go': ['package p', 'func F() int { return cfg }']
+    })
+    expect(edges).toEqual(['p/c.go > p/b.go 2'])
+  })
+
   it('counts a name that files for different platforms both declare as a use of each', async () => {
     const { edges } = await analyse({
       'go.mod': MODULE,

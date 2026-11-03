@@ -92,6 +92,22 @@ describe('a Go file, read with tree-sitter-go as WebAssembly', () => {
     ])
   })
 
+  it('declares at the top level only what the declaration names, not what a function literal in it does', () => {
+    const outline = outlineOf([
+      'package p',
+      'var handler = func() {',
+      '  var cfg int',
+      '  type local struct{}',
+      '  const limit = 3',
+      '  _ = cfg',
+      '}',
+      'func use() int { return cfg + limit }'
+    ])
+    expect([...outline.declares].sort()).toEqual(['handler', 'use'])
+    // Declared inside, they hide the package's names of the file: never a use of the package.
+    expect(outline.names.map((name) => name.name)).toEqual(['int'])
+  })
+
   it('does not analyse a file with syntax errors, and says on which line the first one is', () => {
     const broken = read('package cart\n\nfunc broken( {\n}\n')
     expect(broken.analysed).toBe(false)
