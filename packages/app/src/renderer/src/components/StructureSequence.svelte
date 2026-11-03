@@ -59,14 +59,33 @@
     selection?.kind === 'node' && selection.id === node.id
   const value = (key: 'abstractness' | 'instability' | 'distance', of: number): string =>
     t.structure.value(key, of)
-  /** The fonts' sizes, as the styles below set them, for the room their text takes. */
-  const LABEL = { charWidth: 6.4, lineHeight: 12 }
-  const SMALL = 5.9
+  /**
+   * How wide a text is drawn in the font of the drawing, at a size the styles below set: as the
+   * window measures it, in the semibold weight a selected name takes; where there is no window
+   * to measure in, by an average character of that font.
+   */
+  const context =
+    typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+  const family =
+    typeof document === 'undefined'
+      ? 'sans-serif'
+      : getComputedStyle(document.documentElement).getPropertyValue('--ui') || 'sans-serif'
+  const widthOf = (text: string, size: number): number => {
+    if (!context) return text.length * size * 0.56
+    context.font = `600 ${size}px ${family}`
+    return context.measureText(text).width
+  }
+  /** The sizes of the points' names and numbers, and of what the chart says itself. */
+  const NAME = 11.5
+  const NUMBER = 10.5
+  const SAID = 10.5
+  /** A line of text at the names' size, as high as the window draws its box. */
+  const LINE = 15
   const textBox = (text: string, left: number, baseline: number): Box => ({
     x: left,
-    y: baseline - 9,
-    width: text.length * SMALL + 2,
-    height: 12
+    y: baseline - SAID,
+    width: widthOf(text, SAID) + 2,
+    height: SAID * 1.35
   })
   const painBox = $derived(textBox(t.structure.sequence.pain, LEFT + 6, BOTTOM_EDGE - 6))
   const uselessBox = $derived.by(() => {
@@ -75,7 +94,7 @@
   })
   // The main sequence's name runs down the diagonal, a little above it.
   const lineBox = $derived.by(() => {
-    const half = (t.structure.sequence.line.length * SMALL * Math.SQRT1_2) / 2 + 5
+    const half = (widthOf(t.structure.sequence.line, SAID) * Math.SQRT1_2) / 2 + 5
     return { x: x(0.5) + 6 - half, y: y(0.5) - 6 - half, width: 2 * half, height: 2 * half }
   })
   const labels = $derived(
@@ -91,7 +110,8 @@
         {
           bounds: { x: LEFT, y: TOP, width: SIZE, height: SIZE },
           taken: [painBox, uselessBox, lineBox],
-          ...LABEL
+          widthOf: (text, numbered) => widthOf(text, numbered ? NUMBER : NAME),
+          lineHeight: LINE
         }
       ).map((label, index) => [points[index]!.node.id, label])
     )

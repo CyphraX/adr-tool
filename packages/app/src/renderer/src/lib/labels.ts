@@ -35,12 +35,14 @@ export interface Room {
   readonly bounds: Box
   /** What is written there already. */
   readonly taken: readonly Box[]
-  /** The width of one character, and the height of a line, of the labels' font. */
-  readonly charWidth: number
+  /** How wide a label is drawn, a name or a number, and how high a line of it is. */
+  readonly widthOf: (text: string, numbered: boolean) => number
   readonly lineHeight: number
 }
 
 const GAP = 3
+/** The outline drawn around a point and a label, which takes room as well. */
+const STROKE = 1.5
 
 export const overlaps = (a: Box, b: Box): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
@@ -79,7 +81,12 @@ function placesAround(
     at(x + diagonal, y - diagonal - height, 'start'),
     at(x + diagonal, y + diagonal, 'start'),
     at(x - diagonal - width, y - diagonal - height, 'end'),
-    at(x - diagonal - width, y + diagonal, 'end')
+    at(x - diagonal - width, y + diagonal, 'end'),
+    // Above and below again, from the point's edge on to one side.
+    at(x - radius, y - near - height, 'start'),
+    at(x + radius - width, y - near - height, 'end'),
+    at(x - radius, y + near, 'start'),
+    at(x + radius - width, y + near, 'end')
   ]
 }
 
@@ -92,10 +99,10 @@ export function placeLabels(marks: readonly Mark[], room: Room): Label[] {
   const taken: Box[] = [
     ...room.taken,
     ...marks.map(({ x, y, radius }) => ({
-      x: x - radius,
-      y: y - radius,
-      width: 2 * radius,
-      height: 2 * radius
+      x: x - radius - STROKE,
+      y: y - radius - STROKE,
+      width: 2 * (radius + STROKE),
+      height: 2 * (radius + STROKE)
     }))
   ]
   return marks.map((mark) => {
@@ -103,7 +110,7 @@ export function placeLabels(marks: readonly Mark[], room: Room): Label[] {
       [mark.name, false],
       [String(mark.number), true]
     ] as const) {
-      const width = text.length * room.charWidth + 2
+      const width = room.widthOf(text, numbered) + 2 * STROKE
       const free = placesAround(mark, width, room.lineHeight).find(
         ({ box }) => within(room.bounds, box) && !taken.some((other) => overlaps(other, box))
       )
@@ -113,7 +120,7 @@ export function placeLabels(marks: readonly Mark[], room: Room): Label[] {
       }
     }
     const text = String(mark.number)
-    const [right] = placesAround(mark, text.length * room.charWidth + 2, room.lineHeight)
+    const [right] = placesAround(mark, room.widthOf(text, true) + 2 * STROKE, room.lineHeight)
     taken.push(right!.box)
     return { ...right!, text, numbered: true }
   })

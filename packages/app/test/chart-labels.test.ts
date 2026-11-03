@@ -9,7 +9,13 @@ const at = (i: number, a: number): { x: number; y: number } => ({
   x: frame.x + 14 + i * (frame.width - 28),
   y: frame.y + 14 + (1 - a) * (frame.height - 28)
 })
-const room = { bounds: frame, taken: [], charWidth: 6.4, lineHeight: 12 }
+/** IBM Plex Sans at 11.5 px is about 0.56 of that wide a character, in its semibold weight. */
+const room = {
+  bounds: frame,
+  taken: [],
+  widthOf: (text: string): number => text.length * 6.5,
+  lineHeight: 15
+}
 
 /** Every label clear of every other label and of every point. */
 function expectClear(marks: readonly Mark[], labels: ReturnType<typeof placeLabels>): void {
@@ -29,17 +35,19 @@ function expectClear(marks: readonly Mark[], labels: ReturnType<typeof placeLabe
 
 describe('the labels of the main sequence', () => {
   it('names every package of this repository where it lies, none over another', () => {
-    // A, I and the size of the top level of this repository, as the chart drew them on top of
-    // each other: diagrams, conformance and app; structure and core; cli and mcp.
+    // A, I and the size of the top level of this repository, furthest from the main sequence
+    // first, as the chart drew them on top of each other: app, diagrams, mcp and review;
+    // structure and core; cli and conformance.
     const packages: [string, number, number, number][] = [
-      ['structure', 0.29, 0.21, 7],
       ['kernel', 0.54, 0, 4],
+      ['structure', 0.29, 0.26, 7],
       ['core', 0.28, 0.3, 6],
       ['app', 0.34, 1, 10],
       ['diagrams', 0.35, 0.89, 5],
-      ['mcp', 0.2, 1, 4],
-      ['conformance', 0.32, 0.67, 5],
-      ['cli', 0.21, 0.8, 4]
+      ['mcp', 0.21, 1, 4],
+      ['review', 0.25, 0.88, 5],
+      ['cli', 0.24, 0.64, 4],
+      ['conformance', 0.32, 0.67, 5]
     ]
     const marks = packages.map(([name, a, i, radius], index) => ({
       ...at(i, a),
