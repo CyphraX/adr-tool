@@ -85,7 +85,7 @@ The frontmatter is found as in an ADR ([file-format.md](file-format.md), section
 - **Absent means default:** no `type` is a `note`, no `state` is `open`. The suite writes both, always.
 - `author` and `date` may be absent in a file written by hand; nothing is wrong then, and the Anchor is found again without the day it was written (section 4).
 - **Keys of others** — any key not in the table, and any key under `anchor` other than its three — are kept byte for byte and never moved, as in an ADR.
-- The suite writes keys in the order of the table, `anchor` in block style with its keys in the order `path`, `lines`, `commit`, and `cites` in flow style. A value it writes is written plain where it reads back as the same text, and in double quotes otherwise; `anchor.lines` and `anchor.commit` are always written plain, since they are read by their text: `lines: 12` is line 12, and a commit name of digits only stays that name.
+- The suite writes keys in the order of the table, `anchor` in block style with its keys in the order `path`, `lines`, `commit`, and `cites` in flow style. A value it writes is written plain where it reads back as the same text, and in double quotes otherwise; `anchor.lines` and `anchor.commit` are written plain, since they are read by their text: `lines: 12` is line 12, and a commit name of digits only stays that name. A value that replaces one in single or double quotes keeps those quotes, for these two as well: the quotes are the person's, and the text inside them reads the same.
 
 ### The Anchor
 

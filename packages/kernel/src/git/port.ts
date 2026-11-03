@@ -42,9 +42,11 @@ export interface LogOptions {
    */
   readonly path?: string
   /**
-   * Only commits made on or after this day, `YYYY-MM-DD`, from its start in UTC: when they were
-   * committed, so that a rebased commit counts as new. git stops at the first commits older
-   * than that, as `git log --since` does.
+   * Only commits committed on or after this day, `YYYY-MM-DD`, from its start in UTC. It goes
+   * by the committer date, not the author date `LogEntry.date` gives: a rebased commit keeps
+   * the day it was authored and is committed anew, and counts as new. Following a line of
+   * commits back, git stops at the first one committed before the day, as `git log --since`
+   * does, though older ones beyond it may have been committed later.
    */
   readonly since?: string
   /** At most this many commits, the newest. */
@@ -58,7 +60,10 @@ export interface LogEntry {
   readonly parent: string | undefined
   /** The author's name, as the commit records it. */
   readonly author: string
-  /** When the author made it, ISO 8601. */
+  /**
+   * The author date, ISO 8601: when the change was first made. A rebase keeps it, so it can be
+   * older than the day `since` was given, which goes by the committer date.
+   */
   readonly date: string
   /** The first line of its message. */
   readonly subject: string
