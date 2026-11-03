@@ -1,4 +1,5 @@
 import { app, dialog, ipcMain, protocol, session, shell, BrowserWindow } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,6 +9,7 @@ import {
   CHANNEL,
   type BodyEditRequest,
   type Decision,
+  type ExportKind,
   type OpenRepository,
   type Session
 } from '../shared/ipc'
@@ -19,6 +21,7 @@ import { nodeFileSystem } from './node-file-system'
 import { Repositories, localDate } from './repositories'
 import {
   createRequest,
+  diagramsRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
@@ -27,7 +30,7 @@ import {
 } from './requests'
 import { readSession, writeSession } from './session-store'
 import { setLanguage, t } from './strings'
-import { Structures, cacheName } from './structures'
+import { AnalysisDropped, Structures, cacheName } from './structures'
 
 const isWebLink = (url: string): boolean => /^https?:\/\//i.test(url)
 
@@ -117,6 +120,7 @@ function registerIpc(): void {
 
   ipcMain.handle(CHANNEL.setActiveRepository, async (_, id: unknown) => {
     activeRoot = typeof id === 'string' ? repositories.rootOf(id) : undefined
+    structures.bringToFront(typeof id === 'string' ? id : undefined)
     await saveSession()
   })
 
@@ -221,6 +225,18 @@ function registerIpc(): void {
     }
   })
 
+  ipcMain.handle(CHANNEL.structureOutline, async (_, repositoryId: unknown, fresh: unknown) => {
+    if (typeof repositoryId !== 'string') return { ok: false, reason: t.notUnderstood }
+    const root = repositories.rootOf(repositoryId)
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    try {
+      return { ok: true, outline: await structures.outline(repositoryId, root, fresh === true) }
+    } catch (error) {
+      if (error instanceof AnalysisDropped) return { ok: false, dropped: true }
+      return { ok: false, reason: t.analysisFailed(String(error)) }
+    }
+  })
+
   ipcMain.handle(CHANNEL.planAdopt, async (_, repositoryId: unknown) => {
     const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
@@ -301,41 +317,53 @@ function registerIpc(): void {
   })
 
   // An export goes where the person points in a dialog of the system, never where the
-  // renderer says; what it wrote is all the renderer may have opened.
+  // renderer says: the place stays here, and the renderer holds a ticket for it while it draws
+  // the Mermaid blocks. What an export wrote is all the renderer may have opened.
+  const destinations = new Map<string, { kind: ExportKind; repositoryId: string; to: string }>()
   const exported = new Set<string>()
-  ipcMain.handle(CHANNEL.exportSite, async (event, repositoryId: unknown) => {
+  ipcMain.handle(CHANNEL.pickExport, async (event, repositoryId: unknown, kind: unknown) => {
     const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    if (kind !== 'site' && kind !== 'pdf') return { ok: false, reason: t.notUnderstood }
     const window = BrowserWindow.fromWebContents(event.sender)
-    const options = {
-      title: t.export.siteTitle,
-      buttonLabel: t.export.siteButton,
-      properties: ['openDirectory' as const, 'createDirectory' as const]
+    let to: string | undefined
+    if (kind === 'site') {
+      const options = {
+        title: t.export.siteTitle,
+        buttonLabel: t.export.siteButton,
+        properties: ['openDirectory' as const, 'createDirectory' as const]
+      }
+      const picked = await (window
+        ? dialog.showOpenDialog(window, options)
+        : dialog.showOpenDialog(options))
+      if (!picked.canceled) to = picked.filePaths[0]
+    } else {
+      const options = {
+        title: t.export.pdfTitle,
+        defaultPath: `${basename(root)} decisions.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      }
+      const picked = await (window
+        ? dialog.showSaveDialog(window, options)
+        : dialog.showSaveDialog(options))
+      if (!picked.canceled && picked.filePath) to = picked.filePath
     }
-    const picked = await (window
-      ? dialog.showOpenDialog(window, options)
-      : dialog.showOpenDialog(options))
-    const out = picked.filePaths[0]
-    if (picked.canceled || out === undefined) return undefined
-    const result = await writeExport(root, out, localDate())
-    if (!result.ok) return result
-    exported.add(result.index)
-    return { ok: true, path: result.index, adrs: result.adrs }
+    if (to === undefined) return undefined
+    const ticket = randomUUID()
+    destinations.set(ticket, { kind, repositoryId: repositoryId as string, to })
+    return { ok: true, ticket }
   })
-  ipcMain.handle(CHANNEL.exportPdf, async (event, repositoryId: unknown) => {
-    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+  ipcMain.handle(CHANNEL.exportTo, async (_, ticket: unknown, diagrams: unknown) => {
+    const destination = typeof ticket === 'string' ? destinations.get(ticket) : undefined
+    if (destination === undefined) return { ok: false, reason: t.notUnderstood }
+    destinations.delete(ticket as string)
+    const root = repositories.rootOf(destination.repositoryId)
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
-    const window = BrowserWindow.fromWebContents(event.sender)
-    const options = {
-      title: t.export.pdfTitle,
-      defaultPath: `${basename(root)} decisions.pdf`,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }]
-    }
-    const picked = await (window
-      ? dialog.showSaveDialog(window, options)
-      : dialog.showSaveDialog(options))
-    if (picked.canceled || !picked.filePath) return undefined
-    const result = await exportPdf(root, picked.filePath, localDate(), printToPdf)
+    const drawn = diagramsRequest(diagrams)
+    const result =
+      destination.kind === 'site'
+        ? await writeExport(root, destination.to, localDate(), drawn)
+        : await exportPdf(root, destination.to, localDate(), printToPdf, drawn)
     if (!result.ok) return result
     exported.add(result.index)
     return { ok: true, path: result.index, adrs: result.adrs }

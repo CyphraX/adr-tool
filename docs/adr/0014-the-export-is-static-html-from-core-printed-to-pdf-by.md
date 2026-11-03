@@ -4,6 +4,7 @@ created: 2026-11-02
 decided: 2026-11-02
 decision-makers: [Philipp Saal]
 tags: [export]
+amended-by: [0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image]
 ---
 
 # The export is static HTML from core, printed to PDF by the app

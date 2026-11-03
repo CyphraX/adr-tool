@@ -154,7 +154,9 @@ it('finds the Dependency from app to core, and the Source File Dependencies behi
   ).toBe(true)
   // The export is written as `adr export` writes it, by the same code (part 10).
   expect(edges).toContain('app > cli')
-})
+  // The whole repository is analysed; beside the tests of the other packages, that can take
+  // longer than vitest's 5 seconds.
+}, 30_000)
 
 // The done-when of part 5, as far as `structure` goes: the app shows these numbers.
 it('computes the metrics of this repository as their definitions say', async () => {

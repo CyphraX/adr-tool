@@ -66,11 +66,13 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![The live mode: the text reads as rendered, the line with the cursor shows its source](docs/screenshots/readme/live.png)
 
-- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Where it can know what was meant, a Problem comes with a Repair, which is previewed like any other change. What only follows from a file that cannot be read, or from a Status that is none of the five values, is listed under that root cause.
+- **Mermaid.** A `mermaid` code block is drawn as a diagram in the reading view, the preview, the live mode and the app's export. A block that does not parse stays code, with what Mermaid says beside it. An ADR is untrusted input, so Mermaid draws at its strictest and what it draws is sanitized. The export shows each drawing as an image beside its page, and still runs no script. `adr export` has no browser to draw with and keeps the block as code ([ADR-0016](docs/adr/0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image.md)).
+
+- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Where it can know what was meant, a Problem comes with a Repair, which is previewed like any other change. What only follows from a file that cannot be read, or from a Status that is none of the five values, is listed under that root cause. **Repository Problems**, in the sidebar of Decisions and of Structure, puts every Problem of the repository in one list. That covers each Decision Log, the declaration of Components, and every Trace of an ADR to a Component that is not declared. Each Problem opens what it is about in its module, with its Repair.
 
   ![The Problems of a Decision Log, each with its Repair](docs/screenshots/readme/problems.png)
 
-- **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body, in every repository that is open. It ignores case and accents, and reads "ß" as "ss": "strasse" finds "Straße".
+- **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body, in every repository that is open. It ignores case and accents, and reads "ß" as "ss": "strasse" finds "Straße". Below the ADRs it finds the Components of the repository in front, by ID and name, and its Source Files, by path. A Component opens on its page, a Source File in the code viewer.
 - **Several repositories.** Each repository opens in a tab of its own. With more than one open, **Every ADR** and **Every Problem** list them together, and an ADR may depend on or relate to an ADR of another repository, written `payments:docs/adr/0001-ledger`; where both are open, the Relation reads as such from both ends.
 
   ![Every ADR of two open repositories, with the detail of a ledger ADR that an ADR of the other repository depends on](docs/screenshots/readme/together.png)
@@ -138,7 +140,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![Renaming a Component: one line in the declaration, one in the ADR that affects it](docs/screenshots/readme/structure-rename.png)
 
-The analysis runs in a worker thread and caches its results per file. It follows changes on disk while the view is open.
+The analysis runs in a worker thread and caches its results per file. It follows changes on disk once Structure is opened. Before that, a repository coming to the front is analysed once, for the count of Repository Problems, which then says when it was counted.
 
 ### Conformance
 

@@ -51,6 +51,7 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [13, '0013-agents-write-adrs-through-the-mcp-server-as-previewed-change', 'accepted'],
     [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted'],
     [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted'],
+    [16, '0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image', 'accepted'],
     [17, '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
@@ -113,6 +114,12 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       type: 'depends-on',
       from: '0015-a-change-set-is-written-beside-its-files-and-renamed-into',
       to: '0004-operations-return-change-sets',
+      state: 'in-effect'
+    },
+    {
+      type: 'amends',
+      from: '0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image',
+      to: '0014-the-export-is-static-html-from-core-printed-to-pdf-by',
       state: 'in-effect'
     },
     ...[

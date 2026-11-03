@@ -2,7 +2,13 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree } from '@codemirror/language'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import { describe, expect, it } from 'vitest'
-import { liveMarks, liveTables, stepIntoTable, type LiveMark } from '../src/renderer/src/lib/live'
+import {
+  liveDiagrams,
+  liveMarks,
+  liveTables,
+  stepIntoTable,
+  type LiveMark
+} from '../src/renderer/src/lib/live'
 
 /** The text with the cursor at `‸`, as the live mode sees it. */
 function stateOf(text: string): EditorState {
@@ -232,5 +238,46 @@ describe('the live mode of the editor (docs/plan-roadmap.md, part 3)', () => {
       }
       start += line.length + 1
     }
+  })
+})
+
+describe('a Mermaid block in the live mode (docs/plan-vision.md, part 2)', () => {
+  const diagramsOf = (text: string): { lines: string; source: string }[] => {
+    const state = stateOf(text)
+    return liveDiagrams(state).map((diagram) => ({
+      lines: state.doc.sliceString(diagram.from, diagram.to),
+      source: diagram.source
+    }))
+  }
+  const BLOCK = '```mermaid\nflowchart LR\n  a --> b\n```'
+
+  it('is drawn in place of its lines while the cursor is elsewhere', () => {
+    expect(diagramsOf(`‸# A\n\n${BLOCK}\n\nText.\n`)).toEqual([
+      { lines: BLOCK, source: 'flowchart LR\n  a --> b' }
+    ])
+  })
+
+  it('shows its source, all of it, while the cursor is in one of its lines', () => {
+    expect(diagramsOf('# A\n\n```mermaid\nflowchart LR\n  a -‸-> b\n```\n')).toEqual([])
+    expect(diagramsOf('# A\n\n```mermaid\nflowchart LR\n  a --> b\n```‸\n')).toEqual([])
+  })
+
+  it('is only a block whose info string starts with mermaid, and not one in a quote', () => {
+    expect(diagramsOf('‸\n```ts\nconst a = 1\n```\n')).toEqual([])
+    expect(diagramsOf('‸\n```mermaid title="x"\ngraph TD\n```\n')).toEqual([
+      { lines: '```mermaid title="x"\ngraph TD\n```', source: 'graph TD' }
+    ])
+    expect(diagramsOf('‸\n> ```mermaid\n> graph TD\n> ```\n')).toEqual([])
+  })
+
+  it('runs to the end of the text when it is never closed', () => {
+    expect(diagramsOf('‸\n```mermaid\ngraph TD\n  a\n')).toEqual([
+      { lines: '```mermaid\ngraph TD\n  a', source: 'graph TD\n  a' }
+    ])
+  })
+
+  it('is stepped into from the line above and below, as a table is', () => {
+    const state = stateOf(`Above‸\n${BLOCK}\nBelow\n`)
+    expect(stepIntoTable(state, liveDiagrams(state), 1)).toBe('Above\n'.length)
   })
 })
