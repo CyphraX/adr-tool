@@ -51,7 +51,11 @@ export async function readPyproject(
   path: string
 ): Promise<Record<string, unknown> | undefined> {
   const text = await fs.readText(path).catch(() => undefined)
-  if (text === undefined) return undefined
+  return text === undefined ? undefined : parsePyproject(text)
+}
+
+/** The text of a `pyproject.toml` as data; `undefined` where it is not TOML. */
+export function parsePyproject(text: string): Record<string, unknown> | undefined {
   try {
     return parseToml(text) as Record<string, unknown>
   } catch {

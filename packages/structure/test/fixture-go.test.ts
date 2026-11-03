@@ -92,9 +92,15 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
 
   // What its go.mod files require, for the Library inventory.
   expect(analysis.manifests).toEqual([
-    { manifest: 'billing/go.mod', name: 'example.com/shop', version: 'v0.0.0' },
-    { manifest: 'go.mod', name: 'example.com/shop/billing', version: 'v0.0.0' },
-    { manifest: 'go.mod', name: 'github.com/google/uuid', version: 'v1.6.0' },
-    { manifest: 'go.mod', name: 'golang.org/x/text', version: 'v0.21.0', group: 'indirect' }
+    { manifest: 'billing/go.mod', name: 'example.com/shop', version: 'v0.0.0', line: 5 },
+    { manifest: 'go.mod', name: 'example.com/shop/billing', version: 'v0.0.0', line: 6 },
+    { manifest: 'go.mod', name: 'github.com/google/uuid', version: 'v1.6.0', line: 7 },
+    {
+      manifest: 'go.mod',
+      name: 'golang.org/x/text',
+      version: 'v0.21.0',
+      group: 'indirect',
+      line: 8
+    }
   ])
 })

@@ -104,10 +104,10 @@ it('drafts a src layout of Python packages, with their Dependencies and their Cy
 
   // What its manifests declare, for the Library inventory: the distribution, not the import.
   expect(analysis.manifests).toEqual([
-    { manifest: 'pyproject.toml', name: 'requests', version: '>=2.31' },
-    { manifest: 'pyproject.toml', name: 'PyYAML', version: '>=6.0' },
-    { manifest: 'pyproject.toml', name: 'pytest', version: '>=8', group: 'dev' },
-    { manifest: 'requirements.txt', name: 'requests', version: '==2.32.3' },
-    { manifest: 'requirements.txt', name: 'PyYAML', version: '==6.0.2' }
+    { manifest: 'pyproject.toml', name: 'requests', version: '>=2.31', line: 6 },
+    { manifest: 'pyproject.toml', name: 'PyYAML', version: '>=6.0', line: 7 },
+    { manifest: 'pyproject.toml', name: 'pytest', version: '>=8', group: 'dev', line: 11 },
+    { manifest: 'requirements.txt', name: 'requests', version: '==2.32.3', line: 2 },
+    { manifest: 'requirements.txt', name: 'PyYAML', version: '==6.0.2', line: 3 }
   ])
 })
