@@ -396,6 +396,37 @@ describe('adr check (docs/cli.md)', () => {
     ])
   })
 
+  it('leaves adr lint as it was: it reads no Rules', async () => {
+    expect(await adrIn(shop, 'lint')).toEqual({
+      code: 0,
+      out: 'No Problems in 1 Decision Log.\n',
+      err: ''
+    })
+  })
+
+  it('ends with 2 when nothing can be checked, and says why on standard error', async () => {
+    const empty = copyOf(undefined, { 'README.md': '# Nothing here\n' })
+    for (const [args, said] of [
+      [['check', empty], /Nothing to check in .*: no Decision Log is found there/],
+      [['check', join(empty, 'missing')], /is not a directory/],
+      [['check', '--format', 'xml'], /--format/],
+      [['check', '--out', empty], /--out and --log are options of adr export/],
+      [['check', 'a', 'b'], /one path/]
+    ] as const) {
+      const { code, out, err } = await adr(...args)
+      expect([args, code, out]).toEqual([args, 2, ''])
+      expect(err).toMatch(said)
+    }
+  })
+
+  it('says how it is used with --help', async () => {
+    const { code, out } = await adr('check', '--help')
+    expect(code).toBe(0)
+    expect(out).toContain('adr check [path] [--format text|json|github]')
+  })
+})
+
+describe('adr check on Rules about Libraries (docs/cli.md)', () => {
   it('prints a Violation of a Rule about a Library at each line that imports it', async () => {
     const page = readFileSync(join(shop, 'src/web/page.ts'), 'utf8')
     const root = shopWith(
@@ -477,33 +508,4 @@ describe('adr check (docs/cli.md)', () => {
     )
     expect(lines(out).at(-1)).toMatch(/^1 Violation of \d+ Rules\.$/)
   }, 30_000)
-
-  it('leaves adr lint as it was: it reads no Rules', async () => {
-    expect(await adrIn(shop, 'lint')).toEqual({
-      code: 0,
-      out: 'No Problems in 1 Decision Log.\n',
-      err: ''
-    })
-  })
-
-  it('ends with 2 when nothing can be checked, and says why on standard error', async () => {
-    const empty = copyOf(undefined, { 'README.md': '# Nothing here\n' })
-    for (const [args, said] of [
-      [['check', empty], /Nothing to check in .*: no Decision Log is found there/],
-      [['check', join(empty, 'missing')], /is not a directory/],
-      [['check', '--format', 'xml'], /--format/],
-      [['check', '--out', empty], /--out and --log are options of adr export/],
-      [['check', 'a', 'b'], /one path/]
-    ] as const) {
-      const { code, out, err } = await adr(...args)
-      expect([args, code, out]).toEqual([args, 2, ''])
-      expect(err).toMatch(said)
-    }
-  })
-
-  it('says how it is used with --help', async () => {
-    const { code, out } = await adr('check', '--help')
-    expect(code).toBe(0)
-    expect(out).toContain('adr check [path] [--format text|json|github]')
-  })
 })

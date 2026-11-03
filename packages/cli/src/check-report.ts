@@ -222,10 +222,11 @@ function json(report: CheckReport): object {
         why: violation.rule.why,
         fingerprint: violation.fingerprint,
         fingerprintText: fingerprintText(violation.fingerprint),
-        path: first?.from ?? use?.file ?? RULES_PATH,
-        line: first ? first.lines[0] : use ? use.lines[0] : violation.rule.line,
+        path: first?.from ?? RULES_PATH,
+        line: first ? first.lines[0] : violation.rule.line,
         dependencies: violation.dependencies,
-        ...(violation.uses && { uses: violation.uses }),
+        // A Rule about Libraries: at its first import, with every use behind it.
+        ...(use && { path: use.file, line: use.lines[0], uses: violation.uses }),
         ...(exception && {
           exception: {
             reason: exception.reason,
