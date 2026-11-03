@@ -1,23 +1,6 @@
 import { defineConfig } from 'vite'
+import { commandConfig } from '../cli/command.config'
 
-// The server is one file that Node.js runs as it is: `core`, `structure`, the command line's git,
-// `yaml` and `diff` are bundled into it, Node's own modules are not. The workspace packages are source-only, as for the app.
-export default defineConfig({
-  build: {
-    ssr: 'src/main.ts',
-    outDir: 'dist',
-    target: 'node22',
-    emptyOutDir: true,
-    minify: false,
-    rollupOptions: {
-      output: {
-        entryFileNames: 'adr-mcp.mjs',
-        banner: '#!/usr/bin/env node'
-      }
-    }
-  },
-  ssr: {
-    noExternal: true,
-    target: 'node'
-  }
-})
+// `adr-mcp` is built as `adr` is: one file, with what reads the code of the repository —
+// TypeScript, tree-sitter —, `core`, `structure`, `conformance`, `yaml` and `diff` in it.
+export default defineConfig(commandConfig('adr-mcp.mjs'))

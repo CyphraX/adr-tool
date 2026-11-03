@@ -9,7 +9,14 @@ import { hasWildcard, matcherOf } from './component-patterns'
 import { evaluate, type Model, type Violation } from './evaluate'
 import { fingerprintKey, membersOf, type Fingerprint } from './fingerprint'
 import { RULES_PATH, type ConformanceNote, type ConformanceProblem } from './problems'
-import { readRules, type Naming, type Rule, type RulesFile, type WrittenException } from './rules'
+import {
+  readRules,
+  SUBJECT_OF,
+  type Naming,
+  type Rule,
+  type RulesFile,
+  type WrittenException
+} from './rules'
 
 /**
  * What the checker is told about Decisions, which `conformance` does not know (ADR-0006): the
@@ -136,7 +143,7 @@ export function checkConformance(
         rule: rule.id,
         detail: {
           code: 'fingerprint-of-kind',
-          values: { kind: rule.kind, keys: FINGERPRINT_KEYS[rule.kind] }
+          values: { kind: rule.kind, keys: keysOf(rule) }
         },
         line: exception.line
       })
@@ -226,32 +233,52 @@ const FINGERPRINT_KEYS: Record<Rule['kind'], string> = {
   threshold: '"component"'
 }
 
-/** The fingerprint an Exception names, when its keys fit the kind of its Rule. */
+/** What names a Violation of a Rule in an Exception: a threshold's by the subject of its metric. */
+function keysOf(rule: Rule): string {
+  if (rule.kind !== 'threshold') return FINGERPRINT_KEYS[rule.kind]
+  switch (SUBJECT_OF[rule.metric]) {
+    case 'function':
+    case 'class':
+      return '"file" and "name"'
+    case 'level':
+      return '"component", or "*" for the top level'
+    case 'component':
+      return FINGERPRINT_KEYS.threshold
+  }
+}
+
+/** The fingerprint an Exception names, when its keys — and no others — fit its Rule. */
 function fingerprintOf(exception: WrittenException, rule: Rule): Fingerprint | undefined {
-  const { from, to, cycle, component } = exception
+  const { from, to, cycle, component, file, name } = exception
+  const only = (...keys: readonly (keyof WrittenException)[]): boolean =>
+    FINGERPRINT_KEYS_WRITTEN.every((key) => (exception[key] !== undefined) === keys.includes(key))
   switch (rule.kind) {
     case 'must-not-depend':
     case 'may-only-depend':
     case 'layers':
-      return from !== undefined &&
-        to !== undefined &&
-        cycle === undefined &&
-        component === undefined
-        ? { kind: 'dependency', rule: rule.id, from, to }
+      return only('from', 'to')
+        ? { kind: 'dependency', rule: rule.id, from: from!, to: to! }
         : undefined
     case 'no-cycles':
-      return cycle !== undefined && cycle.length > 1 && from === undefined && to === undefined
-        ? { kind: 'cycle', rule: rule.id, cycle }
+      return only('cycle') && cycle!.length > 1
+        ? { kind: 'cycle', rule: rule.id, cycle: cycle! }
         : undefined
-    case 'threshold':
-      return component !== undefined &&
-        from === undefined &&
-        to === undefined &&
-        cycle === undefined
-        ? { kind: 'component', rule: rule.id, component }
+    case 'threshold': {
+      const subject = SUBJECT_OF[rule.metric]
+      if (subject === 'function' || subject === 'class') {
+        return only('file', 'name')
+          ? { kind: subject, rule: rule.id, file: file!, name: name! }
+          : undefined
+      }
+      return only('component')
+        ? { kind: 'component', rule: rule.id, component: component! }
         : undefined
+    }
   }
 }
+
+/** The keys of an Exception that may name its Violation. */
+const FINGERPRINT_KEYS_WRITTEN = ['from', 'to', 'cycle', 'component', 'file', 'name'] as const
 
 /** A web address, or anything else with a scheme and `//`: no name of an ADR. */
 const URL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//

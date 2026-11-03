@@ -9,6 +9,7 @@
     "adr": "./dist/adr.mjs"
   },
   "exports": {
+    "./analysis": "./src/analysis.ts",
     "./export": "./src/export.ts",
     "./git": "./src/git.ts"
   },

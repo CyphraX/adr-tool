@@ -9,6 +9,8 @@
  */
 import ts from 'typescript'
 import type { Extraction } from '../extraction'
+import { measuring } from '../measures'
+import { measureTypeScript } from './measure'
 import { scriptOfSvelte } from './svelte'
 
 export interface Use {
@@ -43,7 +45,8 @@ export function extractUses(path: string, text: string): Extraction {
     // name. An empty export after the last line makes it a module and moves nothing.
     ALWAYS_A_MODULE.test(path) ? `${code}\nexport {}` : code,
     ts.ScriptTarget.Latest,
-    false,
+    // The measures ask what a function is assigned to (./measure.ts).
+    true,
     kind
   )
 
@@ -58,37 +61,50 @@ export function extractUses(path: string, text: string): Extraction {
   }
 
   const uses: Use[] = []
-  // A declaration file, and a module declared with `declare`, do not exist at run time.
-  let ambient = source.isDeclarationFile
   const add = (node: ts.Node, literal: ts.Node | undefined, typeOnly: boolean): void => {
     if (literal === undefined || !ts.isStringLiteralLike(literal)) return
     uses.push({
       specifier: literal.text,
       line: lineOf(source, node.getStart(source)),
-      typeOnly: typeOnly || ambient
+      typeOnly
     })
   }
 
-  const visit = (node: ts.Node): void => {
+  // The walk keeps a stack of its own, in the order of the file, as the measures do: a chain of
+  // 4,000 `+` is as deep a tree. Each node with whether it lies in what does not exist at run
+  // time — a declaration file, a module declared with `declare`.
+  const stack: [ts.Node, boolean][] = []
+  const nextChildren = (node: ts.Node, ambient: boolean): void => {
+    const from = stack.length
+    ts.forEachChild(node, (child) => {
+      stack.push([child, ambient])
+    })
+    for (let a = from, b = stack.length - 1; a < b; a++, b--) {
+      const task = stack[a]!
+      stack[a] = stack[b]!
+      stack[b] = task
+    }
+  }
+  nextChildren(source, source.isDeclarationFile)
+  for (let top = stack.pop(); top !== undefined; top = stack.pop()) {
+    const [node, ambient] = top
     if (ts.isModuleDeclaration(node) && !ambient && isDeclared(node)) {
-      ambient = true
-      ts.forEachChild(node, visit)
-      ambient = false
-      return
+      nextChildren(node, true)
+      continue
     }
     if (ts.isImportDeclaration(node)) {
-      add(node, node.moduleSpecifier, isTypeOnlyImport(node.importClause))
-      return
+      add(node, node.moduleSpecifier, ambient || isTypeOnlyImport(node.importClause))
+      continue
     }
     if (ts.isExportDeclaration(node)) {
-      if (node.moduleSpecifier) add(node, node.moduleSpecifier, isTypeOnlyExport(node))
-      return
+      if (node.moduleSpecifier) add(node, node.moduleSpecifier, ambient || isTypeOnlyExport(node))
+      continue
     }
     if (ts.isImportEqualsDeclaration(node)) {
       if (ts.isExternalModuleReference(node.moduleReference)) {
-        add(node, node.moduleReference.expression, node.isTypeOnly)
+        add(node, node.moduleReference.expression, ambient || node.isTypeOnly)
       }
-      return
+      continue
     }
     if (ts.isImportTypeNode(node)) {
       // `import('./x').T` and `typeof import('./x')`, in the position of a type.
@@ -98,12 +114,13 @@ export function extractUses(path: string, text: string): Extraction {
       const callee = node.expression
       const isImport = callee.kind === ts.SyntaxKind.ImportKeyword
       const isRequire = ts.isIdentifier(callee) && callee.text === 'require'
-      if (isImport || isRequire) add(node, node.arguments[0], false)
+      if (isImport || isRequire) add(node, node.arguments[0], ambient)
     }
-    ts.forEachChild(node, visit)
+    nextChildren(node, ambient)
   }
-  ts.forEachChild(source, visit)
-  return { analysed: true, uses }
+  // A component is named by its file: `Row` for `Row.svelte`.
+  const component = isSvelte ? path.slice(path.lastIndexOf('/') + 1, -'.svelte'.length) : undefined
+  return { analysed: true, uses, ...measuring(() => measureTypeScript(source, component)) }
 }
 
 const isDeclared = (node: ts.ModuleDeclaration): boolean =>

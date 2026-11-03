@@ -13,6 +13,7 @@ import {
   type ParsedNode,
   type YAMLMap
 } from 'yaml'
+import { TOP_LEVEL } from './component-patterns'
 import { RULE_KIND_NAMES, type ConformanceProblem } from './problems'
 import type { ConformanceSaid } from './sentences'
 
@@ -28,9 +29,39 @@ export const METRICS = [
   'fan-out',
   'fan-in',
   'relational-cohesion',
-  'internal-share'
+  'internal-share',
+  // Part 13: of a Component, of each function, of each class, of a level.
+  'abstractness',
+  'distance',
+  'complexity',
+  'lcom4',
+  'propagation-cost'
 ] as const
 export type MetricName = (typeof METRICS)[number]
+
+/**
+ * What a metric is of, and so what its Violations are named by (docs/conformance-format.md,
+ * section 3): a Component, a function or a class in a Source File, or the level below a
+ * Component.
+ */
+export type MetricSubject = 'component' | 'function' | 'class' | 'level'
+
+export const SUBJECT_OF: Record<MetricName, MetricSubject> = {
+  files: 'component',
+  lines: 'component',
+  'efferent-coupling': 'component',
+  'afferent-coupling': 'component',
+  instability: 'component',
+  'fan-out': 'component',
+  'fan-in': 'component',
+  'relational-cohesion': 'component',
+  'internal-share': 'component',
+  abstractness: 'component',
+  distance: 'component',
+  complexity: 'function',
+  lcom4: 'class',
+  'propagation-cost': 'level'
+}
 
 /** Where a Rule or an applied Pattern names Components: the pattern as written, its key, its line. */
 export interface Naming {
@@ -86,6 +117,9 @@ export interface WrittenException {
   readonly to?: string
   readonly cycle?: readonly string[]
   readonly component?: string
+  /** Of a function or a class: its Source File, and its name there. */
+  readonly file?: string
+  readonly name?: string
   readonly reason: string
   readonly justifiedBy?: { readonly adr: string; readonly line: number }
 }
@@ -356,6 +390,12 @@ function readRule(
         throw new Wrong({ code: 'max-or-min', values: {} }, line)
       }
       const of = patternsAt('of', true)!
+      // `/` names the top level, of propagation cost alone; it names no Component.
+      if (metric === 'propagation-cost') {
+        for (let at = names.length - 1; at >= 0; at--) {
+          if (names[at]!.key === 'of' && names[at]!.pattern === TOP_LEVEL) names.splice(at, 1)
+        }
+      }
       return {
         rule: {
           ...common,
@@ -377,6 +417,8 @@ function readException(map: YAMLMap, line: number, lineOf: LineOf): WrittenExcep
   const from = text(map, 'from', lineOf)
   const to = text(map, 'to', lineOf)
   const component = text(map, 'component', lineOf)
+  const file = text(map, 'file', lineOf)
+  const name = text(map, 'name', lineOf)
   const cycleNode = valueOf(map, 'cycle')
   let cycle: string[] | undefined
   if (cycleNode !== undefined && cycleNode !== null) {
@@ -397,6 +439,8 @@ function readException(map: YAMLMap, line: number, lineOf: LineOf): WrittenExcep
     ...(to !== undefined && { to }),
     ...(cycle !== undefined && { cycle }),
     ...(component !== undefined && { component }),
+    ...(file !== undefined && { file }),
+    ...(name !== undefined && { name }),
     reason,
     ...(adr !== undefined && {
       justifiedBy: { adr, line: lineOf(keyNodeOf(map, 'justified-by'), line) }

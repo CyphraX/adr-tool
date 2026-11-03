@@ -4,6 +4,7 @@
  */
 import type { DeclaredComponent } from '../src/declaration'
 import type { Dependency } from '../src/dependencies'
+import type { FileMeasures } from '../src/measures'
 import type { Metrics } from '../src/metrics'
 import type { Structure } from '../src/structure'
 
@@ -11,7 +12,8 @@ export function metricsByDefinition(
   structure: Pick<Structure, 'components' | 'sourceFiles'>,
   dependencies: readonly Dependency[],
   lineCounts: ReadonlyMap<string, number>,
-  tests: boolean
+  tests: boolean,
+  measures: ReadonlyMap<string, FileMeasures> = new Map()
 ): Map<string, Metrics> {
   const counted = structure.sourceFiles.filter((file) => tests || !file.test)
   const among = new Set(counted.map((file) => file.path))
@@ -45,16 +47,28 @@ export function metricsByDefinition(
       }).length
       const internal = shown.filter(({ from, to }) => inside.has(from) && inside.has(to)).length
       const touching = shown.filter(({ from, to }) => inside.has(from) || inside.has(to)).length
+      const instability = efferent + afferent === 0 ? undefined : efferent / (efferent + afferent)
+      // Every declaration of every file inside, one at a time.
+      const declared = files.flatMap((file) => measures.get(file)?.declarations ?? [])
+      const abstractness =
+        declared.length === 0
+          ? undefined
+          : declared.filter((declaration) => declaration.abstract).length / declared.length
       metrics.set(component.id, {
         files: inside.size,
         lines: files.reduce((sum, file) => sum + (lineCounts.get(file) ?? 0), 0),
         efferent,
         afferent,
-        instability: efferent + afferent === 0 ? undefined : efferent / (efferent + afferent),
+        instability,
         fanOut,
         fanIn,
         cohesion: (internal + 1) / inside.size,
-        internalShare: touching === 0 ? undefined : internal / touching
+        internalShare: touching === 0 ? undefined : internal / touching,
+        abstractness,
+        distance:
+          abstractness === undefined || instability === undefined
+            ? undefined
+            : Math.round(Math.abs(abstractness + instability - 1) * 1e12) / 1e12
       })
     }
     for (const child of component.children) visit(child, component.children)
