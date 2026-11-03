@@ -95,15 +95,25 @@ export function resolvePython(
       )
 
   /**
-   * A module by its absolute name, as seen from a file: first the file's own directory where it
-   * is no package — as Python puts a script's directory first, and pytest a test's — and the
-   * roots of the file's own project, in order; then those of every other project, where the
-   * name must be found in exactly one file.
+   * The directory a file's top-level package lies in: the first above it that is no package —
+   * the file's own directory where that is none. Python puts a script's directory first, and
+   * pytest this one, for a test: `backend/` of `backend/orders/models.py`, run by
+   * `backend/manage.py`.
+   */
+  const baseOf = (path: string): string => {
+    let directory = directoryOf(path)
+    while (directory !== '' && isPackage(directory)) directory = directoryOf(directory)
+    return directory
+  }
+
+  /**
+   * A module by its absolute name, as seen from a file: first the directory its top-level
+   * package lies in, and the roots of the file's own project, in order; then those of every
+   * other project, where the name must be found in exactly one file.
    */
   const find = (from: string, dotted: string): Found | undefined => {
     const own = projectOf(from)
-    const directory = directoryOf(from)
-    const first = [...(isPackage(directory) ? [] : [directory]), ...own.roots]
+    const first = [...new Set([baseOf(from), ...own.roots])]
     let namespace = false
     for (const root of first) {
       const found = lookup(root, dotted)

@@ -82,6 +82,26 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
     ])
   })
 
+  it('looks first where the top-level package of the file lies, as a script and pytest do: Django in backend/', async () => {
+    const { edges, unresolved, used } = await analyse({
+      'requirements.txt': 'django==5.0\n',
+      'frontend/src/main.ts': 'export const x = 1\n',
+      'backend/manage.py': 'import os\nfrom shop import settings\n',
+      'backend/shop/__init__.py': '',
+      'backend/shop/settings.py': '',
+      'backend/orders/__init__.py': '',
+      'backend/orders/models.py': 'from django.db import models\nfrom shop.settings import DEBUG\n',
+      'backend/orders/views.py': 'from orders.models import Order\nfrom .models import Order\n'
+    })
+    expect(unresolved).toEqual([])
+    expect(used).toEqual(['backend/orders/models.py django'])
+    expect(edges).toEqual([
+      'backend/manage.py > backend/shop/settings.py 2',
+      'backend/orders/models.py > backend/shop/settings.py 2',
+      'backend/orders/views.py > backend/orders/models.py 1,2'
+    ])
+  })
+
   it('resolves a relative import from the directory of the file, one level up for every further dot', async () => {
     const { edges, unresolved } = await analyse({
       'shop/__init__.py': 'from . import cart\n',
