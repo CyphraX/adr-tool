@@ -53,7 +53,12 @@
 <div class="list">
   <div class="tools">
     <button class="search" onclick={() => app.startSearching()}>{t.search}</button>
-    <button title={t.annotations.list.annotateFileHint} onclick={() => reviewing.startPicking()}>
+    <!-- Where there is nothing yet, this is what there is to do. -->
+    <button
+      class:primary={known !== undefined && all === 0 && !known.configUnreadable}
+      title={t.annotations.list.annotateFileHint}
+      onclick={() => reviewing.startPicking()}
+    >
       {t.annotations.list.annotateFile}
     </button>
   </div>
@@ -169,6 +174,18 @@
 
   .tools button:hover {
     background: var(--hover);
+  }
+
+  .tools .primary {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    font-weight: 500;
+  }
+
+  .tools .primary:hover {
+    border-color: var(--focus);
+    background: var(--focus);
   }
 
   .head {
