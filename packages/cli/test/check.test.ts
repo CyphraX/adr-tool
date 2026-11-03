@@ -344,6 +344,66 @@ describe('adr check (docs/cli.md)', () => {
     ])
   })
 
+  it('fails at a function whose complexity is above its threshold, on Java', async () => {
+    const root = copyOf(mavenShop, {
+      '.arch/components.yml':
+        'components:\n  cart:\n    paths: [cart/**]\n  catalog:\n    paths: [catalog/**]\n  web:\n    paths: [web/**]\n',
+      '.arch/rules.yml': [
+        'rules:',
+        '  - id: functions-stay-simple',
+        '    why: A function with more ways through it than that cannot be tested path by path.',
+        '    kind: threshold',
+        '    metric: complexity',
+        '    max: 4',
+        "    of: '*'",
+        ''
+      ].join('\n')
+    })
+    const text = await adrIn(root, 'check')
+    expect([text.code, text.err]).toEqual([1, ''])
+    const at = 'cart/src/main/java/com/shop/cart/Cart.java:19'
+    expect(lines(text.out)).toEqual([
+      `${at}: functions-stay-simple: The metric complexity of the function Cart.discount(long) at ${at} is 5, above the maximum of 4. A function with more ways through it than that cannot be tested path by path.`,
+      '',
+      'No Decision Log.',
+      '1 Violation of 1 Rule.'
+    ])
+    const github = await adrIn(root, 'check', '--format', 'github')
+    expect(lines(github.out)[0]).toMatch(
+      /^::error file=cart\/src\/main\/java\/com\/shop\/cart\/Cart\.java,line=19,title=functions-stay-simple::/
+    )
+    const json = JSON.parse((await adrIn(root, 'check', '--format', 'json')).out)
+    expect(json.violations).toEqual([
+      expect.objectContaining({
+        code: 'threshold',
+        fingerprint: {
+          kind: 'function',
+          rule: 'functions-stay-simple',
+          file: 'cart/src/main/java/com/shop/cart/Cart.java',
+          name: 'Cart.discount(long)'
+        },
+        fingerprintText:
+          'functions-stay-simple: Cart.discount(long) in cart/src/main/java/com/shop/cart/Cart.java',
+        path: 'cart/src/main/java/com/shop/cart/Cart.java',
+        line: 19,
+        value: 5,
+        dependencies: []
+      })
+    ])
+    // Accepted by its file and name, it fails nothing.
+    const accepted = copyOf(root, {
+      '.arch/rules.yml': `${readFileSync(join(root, '.arch/rules.yml'), 'utf8')}exceptions:
+  - rule: functions-stay-simple
+    file: cart/src/main/java/com/shop/cart/Cart.java
+    name: Cart.discount(long)
+    reason: The discount tiers are one table, read top to bottom.
+`
+    })
+    expect(lines((await adrIn(accepted, 'check')).out).at(-1)).toBe(
+      '1 Rule holds, but for 1 Violation accepted as an Exception.'
+    )
+  })
+
   it('leaves adr lint as it was: it reads no Rules', async () => {
     expect(await adrIn(shop, 'lint')).toEqual({
       code: 0,

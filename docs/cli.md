@@ -138,7 +138,11 @@ First what `adr lint` prints, without its count; then the Problems of `.arch/com
 src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
 ```
 
-- **The file and the line** are those of the import — where the person who wrote it reads the message. A Violation with no import behind it, a `threshold`, is printed at the line of its Rule in `.arch/rules.yml`.
+- **The file and the line** are those of the import — where the person who wrote it reads the message. A Violation with no import behind it, a `threshold`, is printed at the line of its Rule in `.arch/rules.yml` — a threshold on the complexity of a function or the LCOM4 of a class at the line of its name, where it is changed:
+
+```
+cart/src/main/java/com/shop/cart/Cart.java:19: functions-stay-simple: The metric complexity of the function Cart.discount(long) at cart/src/main/java/com/shop/cart/Cart.java:19 is 5, above the maximum of 4. A function with more ways through it than that cannot be tested path by path.
+```
 - **The code** is the ID of the Rule, which the architect chose and which stays as long as the Rule does. A Problem has its code, as in `adr lint`.
 - **The message** is the sentence of the Violation ([conformance-format.md, section 3](conformance-format.md#3-violations-and-their-fingerprint-part-3)), the import that causes it, and the reason the Rule gives, in the architect's words.
 
@@ -185,7 +189,7 @@ Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem i
 
 - **`notes`** holds the notes of `.arch/rules.yml`, each with `module`, `code`, `message`, `path`, `line` and `note` as Conformance reports it; they fail nothing.
 - **`problems`** holds the Problems of every module, each with `module`: `decisions` (as `adr lint` writes them), `structure` (of `.arch/components.yml`) or `conformance` (of `.arch/rules.yml`), with `code`, `message`, `path`, `line` where there is one, and `problem` as the module reports it.
-- **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, or of the Rule when there is none; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
+- **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, of the function or class of a threshold, or of the Rule; `value` is the value of a threshold's metric; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
 
 `--format github` prints one `::error` [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message) for each line of the text format, so that a pull request shows each Violation on the line of its import, titled with the ID of the Rule, and each Problem titled with its code — a note as a `::notice`; the Problems of the Decision Logs are written as `adr lint` writes them. The counts come last, as lines of their own. The files are named from the directory the command runs in, as with `adr lint`:
 
