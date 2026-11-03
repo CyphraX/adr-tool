@@ -36,10 +36,13 @@
           <span class="value" title={t.structure.page.complexity(one.complexity)}
             >{one.complexity}</span
           >
-          <span class="where">{fileName(one.file)}:{one.line}</span>
+          <span class="where"><code>{fileName(one.file)}:{one.line}</code></span>
         </li>
       {/each}
     </ol>
+  {/if}
+  {#if page.notMeasured.length > 0}
+    <p class="faint">{t.structure.page.notMeasured(page.notMeasured.join(', '))}</p>
   {/if}
 
   {#if page.classes.length > 0}
@@ -57,7 +60,12 @@
           <span class="value" title={t.structure.page.groups(one.lcom4, one.methods)}
             >{one.lcom4}</span
           >
-          <span class="where">{t.structure.page.groups(one.lcom4, one.methods)}</span>
+          <span class="where"
+            ><code>{fileName(one.file)}:{one.line}</code> · {t.structure.page.groups(
+              one.lcom4,
+              one.methods
+            )}</span
+          >
         </li>
       {/each}
     </ol>
@@ -127,8 +135,12 @@
 
   .where {
     color: var(--ink-faint);
+    font-size: 11.5px;
+    overflow-wrap: anywhere;
+  }
+
+  .where code {
     font-family: var(--code);
     font-size: 11px;
-    overflow-wrap: anywhere;
   }
 </style>

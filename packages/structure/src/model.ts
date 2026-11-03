@@ -47,7 +47,8 @@ export {
   type ClassMeasure,
   type DeclarationMeasure,
   type FileMeasures,
-  type FunctionMeasure
+  type FunctionMeasure,
+  type NotMeasured
 } from './measures'
 export { measuredInside, type MeasuredClass, type MeasuredFunction } from './inside'
 export { propagationCostOf } from './propagation'

@@ -11,7 +11,8 @@ import {
   analyseDependencies,
   extractorOf,
   openStructure,
-  type NotAnalysed
+  type NotAnalysed,
+  type NotMeasured
 } from '@adr-tool/structure'
 import { DECLARATION_PATH, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
 import { goReader, javaReader, pythonReader } from './readers'
@@ -69,6 +70,7 @@ export async function check(
     })
     model = await analyseDependencies(fs, files, structure.sourceFiles, extract)
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
+    if (model.notMeasured.length > 0) notes.push(notMeasured(model.notMeasured))
   }
 
   const decisions: Decisions = {
@@ -101,4 +103,12 @@ function notAnalysed(files: readonly NotAnalysed[]): string {
   const more = files.length > shown.length ? `, and ${files.length - shown.length} more` : ''
   const count = files.length === 1 ? '1 Source File' : `${files.length} Source Files`
   return `${count} cannot be parsed and ${files.length === 1 ? 'has' : 'have'} no Dependencies of ${files.length === 1 ? 'its' : 'their'} own: ${shown.join(', ')}${more}.`
+}
+
+/** The note about Source Files that could not be measured: no metric of their inside counts them. */
+function notMeasured(files: readonly NotMeasured[]): string {
+  const shown = files.slice(0, 3).map((file) => `${file.file} (${file.message})`)
+  const more = files.length > shown.length ? `, and ${files.length - shown.length} more` : ''
+  const count = files.length === 1 ? '1 Source File' : `${files.length} Source Files`
+  return `${count} could not be measured inside: ${files.length === 1 ? 'its' : 'their'} functions and classes count towards no Rule on complexity, LCOM4, abstractness or distance: ${shown.join(', ')}${more}.`
 }

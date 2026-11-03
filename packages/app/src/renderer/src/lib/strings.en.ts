@@ -711,7 +711,7 @@ export const en = {
       metrics: 'Metrics',
       functions: 'Most complex functions',
       functionsHint:
-        'By cyclomatic complexity: 1 and one more for each decision — if, loop, case, catch, &&, ||, ?:. Open one to read it.',
+        'By cyclomatic complexity: 1 and one more for each decision, each language counted as its usual tool counts it — ESLint for TypeScript and JavaScript (if, loop, case, catch, ?:, &&, ||, ??, ?., &&=, ||=, ??=, a default value), Checkstyle for Java, radon for Python, gocyclo for Go. Open one to read it.',
       firstFunctions: (shown: number, total: number): string =>
         `The ${shown} most complex of ${count(total)}.`,
       complexity: (value: number): string => `complexity ${value}`,
@@ -720,6 +720,8 @@ export const en = {
       classesHint:
         'LCOM4: the groups of methods that share no field and call no one of another group. More than one, and the class could be split.',
       groups: (lcom4: number, methods: number): string => `${lcom4} groups of ${methods} methods`,
+      notMeasured: (files: string): string =>
+        `Not measured inside, and so missing here: ${files}. Measuring failed there; its Dependencies are counted all the same.`,
       cycles: 'Cycles it is part of',
       noCycle: 'None at its level.',
       atItsLevel: 'At its own level, among the Components beside it.',

@@ -44,7 +44,7 @@ describe('component_metrics (docs/mcp.md)', () => {
       origin: 'declared',
       tests: false,
       level: {
-        below: '*',
+        below: null,
         propagationCost: 0.5,
         nodes: [
           {
@@ -60,10 +60,14 @@ describe('component_metrics (docs/mcp.md)', () => {
         ]
       },
       functionCount: 10,
-      classes: [],
+      splitClasses: [],
+      splitClassCount: 0,
       // Cart, Line, Search, Product, CartView, Page, and a Util in cart and in web.
       classCount: 8,
-      note: expect.stringContaining('lower bound')
+      // What Java's reader does not see touches the Dependencies, not what a file alone says.
+      notes: [
+        'Java is read without a classpath. Dependencies may be missing there: afferent and efferent coupling, fan-in, fan-out and propagation cost are lower bounds, and instability and distance can be off either way. Complexity, LCOM4 and abstractness are read from each file alone and are not affected.'
+      ]
     })
     expect((result.functions as unknown[])[0]).toEqual({
       file: 'cart/src/main/java/com/shop/cart/Cart.java',
@@ -94,7 +98,8 @@ describe('component_metrics (docs/mcp.md)', () => {
 
   it('names the classes whose methods fall apart', async () => {
     const result = await measure(copyOf(fixture('shop')), { component: 'billing' })
-    expect(result.classes).toEqual([
+    expect(result).toMatchObject({ splitClassCount: 1, notes: [] })
+    expect(result.splitClasses).toEqual([
       {
         file: 'src/billing/ledger.ts',
         name: 'Ledger',

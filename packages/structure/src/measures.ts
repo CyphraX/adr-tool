@@ -56,6 +56,27 @@ export interface FileMeasures {
   readonly declarations: readonly DeclarationMeasure[]
 }
 
+/** A Source File whose inside could not be measured. It keeps its uses all the same. */
+export interface NotMeasured {
+  readonly file: string
+  /** What went wrong, as the runtime says it. */
+  readonly message: string
+}
+
+/**
+ * Measure one file, or say why it could not be: what fails measuring a file fails nothing
+ * else. The file keeps its Dependencies and counts towards no metric of its inside.
+ */
+export function measuring(
+  measure: () => FileMeasures
+): { readonly measures: FileMeasures } | { readonly notMeasured: string } {
+  try {
+    return { measures: measure() }
+  } catch (error) {
+    return { notMeasured: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 /** The name of a function or class that has none. */
 export const ANONYMOUS = '<anonymous>'
 

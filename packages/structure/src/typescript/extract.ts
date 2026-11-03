@@ -9,6 +9,7 @@
  */
 import ts from 'typescript'
 import type { Extraction } from '../extraction'
+import { measuring } from '../measures'
 import { measureTypeScript } from './measure'
 import { scriptOfSvelte } from './svelte'
 
@@ -119,7 +120,7 @@ export function extractUses(path: string, text: string): Extraction {
   }
   // A component is named by its file: `Row` for `Row.svelte`.
   const component = isSvelte ? path.slice(path.lastIndexOf('/') + 1, -'.svelte'.length) : undefined
-  return { analysed: true, uses, measures: measureTypeScript(source, component) }
+  return { analysed: true, uses, ...measuring(() => measureTypeScript(source, component)) }
 }
 
 const isDeclared = (node: ts.ModuleDeclaration): boolean =>

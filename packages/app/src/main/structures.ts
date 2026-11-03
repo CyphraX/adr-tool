@@ -360,6 +360,8 @@ export function viewOf(
   const filesInside = new Map<string, string[]>()
   const measuredInside = new Map<string, FileMeasures[]>()
   const measuredFiles = new Map<FileMeasures, string>()
+  const failed = new Set(dependencies.notMeasured.map(({ file }) => file))
+  const notMeasuredInside = new Map<string, string[]>()
   for (const file of explored.sourceFiles) {
     const counted = tests || !file.test
     const measured = counted ? measures.get(file.path) : undefined
@@ -373,6 +375,9 @@ export function viewOf(
       const list = filesInside.get(id) ?? []
       if (list.length < LISTED_AT_MOST) list.push(file.path)
       filesInside.set(id, list)
+      if (failed.has(file.path)) {
+        notMeasuredInside.set(id, [...(notMeasuredInside.get(id) ?? []), file.path])
+      }
       if (measured === undefined) continue
       const measuredList = measuredInside.get(id) ?? []
       measuredList.push(measured)
@@ -388,6 +393,7 @@ export function viewOf(
       testFiles: testsInside.get(id) ?? 0,
       lowerBound: LOWER_BOUND.filter((language) => lowerBoundInside.get(id)?.has(language)),
       ...inside(id),
+      notMeasured: notMeasuredInside.get(id) ?? [],
       nameOf
     })
   )
@@ -470,6 +476,7 @@ function pageOf(
     readonly functions: readonly StructureFunction[]
     readonly functionCount: number
     readonly classes: readonly StructureClass[]
+    readonly notMeasured: readonly string[]
     readonly nameOf: (node: Pick<LevelNode, 'kind' | 'id'>) => string
   }
 ): StructureComponent {
@@ -497,6 +504,7 @@ function pageOf(
     functions: found.functions,
     functionCount: found.functionCount,
     classes: found.classes,
+    notMeasured: found.notMeasured,
     dependsOn: level.edges
       .filter((edge) => edge.from === component.id)
       .map((edge) => neighbour(edge.to, edge)),

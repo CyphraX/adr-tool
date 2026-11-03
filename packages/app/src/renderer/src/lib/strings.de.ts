@@ -664,7 +664,7 @@ export const de: typeof en = {
       metrics: 'Metriken',
       functions: 'Komplexeste Funktionen',
       functionsHint:
-        'Nach zyklomatischer Komplexität: 1 und eins mehr für jede Entscheidung — if, Schleife, case, catch, &&, ||, ?:. Öffnen Sie eine, um sie zu lesen.',
+        'Nach zyklomatischer Komplexität: 1 und eins mehr für jede Entscheidung, jede Sprache gezählt, wie ihr übliches Werkzeug sie zählt — ESLint für TypeScript und JavaScript (if, Schleife, case, catch, ?:, &&, ||, ??, ?., &&=, ||=, ??=, ein Vorgabewert), Checkstyle für Java, radon für Python, gocyclo für Go. Öffnen Sie eine, um sie zu lesen.',
       firstFunctions: (shown: number, total: number): string =>
         `Die ${shown} komplexesten von ${count(total)}.`,
       complexity: (value: number): string => `Komplexität ${value}`,
@@ -674,6 +674,8 @@ export const de: typeof en = {
         'LCOM4: die Gruppen von Methoden, die kein Feld teilen und keine Methode einer anderen Gruppe aufrufen. Mehr als eine, und die Klasse ließe sich teilen.',
       groups: (lcom4: number, methods: number): string =>
         `${lcom4} Gruppen aus ${methods} Methoden`,
+      notMeasured: (files: string): string =>
+        `Nicht von innen vermessen und darum hier nicht aufgeführt: ${files}. Das Vermessen schlug dort fehl; ihre Abhängigkeiten zählen trotzdem.`,
       cycles: 'Zyklen, zu denen sie gehört',
       noCycle: 'Keiner auf ihrer Ebene.',
       atItsLevel: 'Auf ihrer eigenen Ebene, unter den Komponenten neben ihr.',

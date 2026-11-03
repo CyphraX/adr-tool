@@ -17,20 +17,23 @@ import { extractUses, type Use } from './typescript/extract'
  */
 export const EXTRACTION_VERSION = 5
 
+/** What is measured inside a file that was read (section 5, "Inside a Source File"). */
+export interface Measured {
+  /** Its functions, classes and declarations. */
+  readonly measures?: FileMeasures
+  /** Why it could not be measured, where it could not: the file keeps its uses. */
+  readonly notMeasured?: string
+}
+
 export type Extraction =
   /** TypeScript, JavaScript, Svelte: the module specifiers the code uses, as written. */
-  | {
-      readonly analysed: true
-      readonly uses: readonly Use[]
-      /** Its functions, classes and declarations (section 5, "Inside a Source File"). */
-      readonly measures?: FileMeasures
-    }
+  | ({ readonly analysed: true; readonly uses: readonly Use[] } & Measured)
   /** Java: what the file declares and uses, for the symbol table of its packages. */
-  | { readonly analysed: true; readonly java: JavaOutline; readonly measures?: FileMeasures }
+  | ({ readonly analysed: true; readonly java: JavaOutline } & Measured)
   /** Python: its imports, as written, for the source roots of the repository. */
-  | { readonly analysed: true; readonly python: PythonOutline; readonly measures?: FileMeasures }
+  | ({ readonly analysed: true; readonly python: PythonOutline } & Measured)
   /** Go: its package, its imports, what it declares and uses, for the packages of its modules. */
-  | { readonly analysed: true; readonly go: GoOutline; readonly measures?: FileMeasures }
+  | ({ readonly analysed: true; readonly go: GoOutline } & Measured)
   /**
    * The file cannot be parsed. It keeps its Component and has no Dependencies of its own
    * (section 2, "Files that cannot be read"). `line` and `message` are the parser's first

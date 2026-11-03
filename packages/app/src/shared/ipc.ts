@@ -292,6 +292,8 @@ export interface StructureComponent {
   readonly functionCount: number
   /** Its classes whose methods fall into more than one group, the most groups first: the first few. */
   readonly classes: readonly StructureClass[]
+  /** The Source Files inside that could not be measured: their functions and classes are missing. */
+  readonly notMeasured: readonly string[]
   /** At its own level: what it depends on, and what depends on it. */
   readonly dependsOn: readonly StructureNeighbour[]
   readonly usedBy: readonly StructureNeighbour[]
