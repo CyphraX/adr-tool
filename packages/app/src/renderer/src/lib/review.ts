@@ -7,10 +7,10 @@
  */
 import type { Repository } from '@adr-tool/core'
 import {
+  adrReferencesOf,
   citedAdr,
   hasRepair,
   qualified,
-  type AdrReference,
   type AnnotationState,
   type AnnotationType,
   type ReviewProblem
@@ -187,12 +187,6 @@ export function facetCounts(
   return { all, states, anchors, types, components, authors }
 }
 
-/** The ADRs of a repository as a `cites` item names them: by the directory of their log, `.` at the top. */
-export const adrReferencesOf = (repository: Repository): AdrReference[] =>
-  repository.logs.flatMap((log) =>
-    log.adrs.map((adr) => ({ log: log.path === '' ? '.' : log.path, id: adr.id }))
-  )
-
 /** An ADR as a Trace of an Annotation names it, and where it is in the window. */
 export interface CitedLine {
   /** As the Annotation writes it. */
@@ -207,7 +201,7 @@ export const citedBy = (annotation: AnnotationView, repository: Repository): Cit
 
 /** Items of `cites`, each with the ADR it names, if there is one. */
 export function citedLines(cites: readonly string[], repository: Repository): CitedLine[] {
-  const adrs = adrReferencesOf(repository)
+  const adrs = adrReferencesOf(repository.logs)
   return cites.map((item) => {
     const found = citedAdr(item, adrs).found
     return found
@@ -221,7 +215,7 @@ export function citedLines(cites: readonly string[], repository: Repository): Ci
  * with its log otherwise, as `cites` names it (docs/review-format.md, section 2).
  */
 export function citationOf(repository: Repository, logPath: string, id: string): string {
-  const adrs = adrReferencesOf(repository)
+  const adrs = adrReferencesOf(repository.logs)
   const log = logPath === '' ? '.' : logPath
   return adrs.filter((adr) => adr.id === id).length === 1 ? id : qualified({ log, id })
 }
@@ -233,7 +227,7 @@ export function citing(
   logPath: string,
   id: string
 ): AnnotationView[] {
-  const adrs = adrReferencesOf(repository)
+  const adrs = adrReferencesOf(repository.logs)
   const log = logPath === '' ? '.' : logPath
   return annotations.filter((annotation) =>
     annotation.cites.some((item) => {

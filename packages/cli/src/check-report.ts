@@ -8,6 +8,7 @@ import {
   type CheckedViolation
 } from '@adr-tool/conformance'
 import { DECLARATION_PATH } from '@adr-tool/structure/model'
+import { CONFIG_PATH, KERNEL_SENTENCES, sentenceOf, type UnreadableConfig } from '@adr-tool/kernel'
 import type { CheckReport } from './check'
 import {
   data,
@@ -53,20 +54,42 @@ export function renderCheck(report: CheckReport, format: Format, checkout = ''):
   }
 }
 
-/** Whether the check fails: a Problem of any module, or a Violation without an Exception. */
+/**
+ * Whether the check fails: a Problem of any module, or a Violation without an Exception. An
+ * orphaned Annotation fails nothing.
+ */
 export function fails(report: CheckReport): boolean {
   return (
     (report.lint?.problems.length ?? 0) > 0 ||
+    report.config !== undefined ||
     report.declaration.length > 0 ||
     report.conformance.problems.length > 0 ||
-    report.conformance.violations.some((violation) => violation.exception === undefined)
+    report.conformance.violations.some((violation) => violation.exception === undefined) ||
+    report.review.problems.length > 0
   )
 }
 
-/** The Problems of the declaration and of the Rules, and every import of a Violation that fails. */
+/** What the one Problem of `.arch/config.yml` says, in English. */
+const configMessage = (problem: UnreadableConfig): string =>
+  sentenceOf(KERNEL_SENTENCES, problem.said)
+
+/**
+ * The Problems of the settings, of the declaration and of the Rules, every import of a
+ * Violation that fails, then the Problems of the Annotations and the orphaned ones, as notes.
+ */
 function entries(report: CheckReport): Entry[] {
-  const { conformance } = report
+  const { conformance, config, review } = report
   return [
+    ...(config
+      ? [
+          {
+            path: config.path,
+            line: config.line,
+            code: config.kind,
+            message: configMessage(config)
+          }
+        ]
+      : []),
     ...report.declaration.map(({ path, line, code, message }) => ({
       path,
       ...(line !== undefined && { line }),
@@ -88,7 +111,19 @@ function entries(report: CheckReport): Entry[] {
     })),
     ...conformance.violations
       .filter((violation) => violation.exception === undefined)
-      .flatMap(violationEntries)
+      .flatMap(violationEntries),
+    ...review.problems.map(({ path, line, code, message }) => ({
+      path,
+      ...(line !== undefined && { line }),
+      code,
+      message
+    })),
+    ...review.orphaned.map(({ path, code, message }) => ({
+      path,
+      code,
+      message,
+      note: true as const
+    }))
   ]
 }
 
@@ -129,17 +164,47 @@ function command(entry: Entry, checkout: string): string {
 
 const counted = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`
 
-/** The last lines: one for the Decision Logs, one for the declaration if needed, one for the Rules. */
+/**
+ * The last lines: one for the Decision Logs, one for the settings and one for the declaration
+ * if needed, one for the Rules, and one for the Annotations where there are any.
+ */
 function summaries(report: CheckReport): string[] {
-  const { conformance } = report
   const lines = [report.lint ? lintSummary(report.lint) : 'No Decision Log.']
+  if (report.config) lines.push(`1 Problem in ${CONFIG_PATH}.`)
   if (report.declaration.length > 0) {
     lines.push(`${counted(report.declaration.length, 'Problem')} in ${DECLARATION_PATH}.`)
   }
-  if (!conformance.present) {
-    lines.push(`No Rules: ${RULES_PATH} is not there.`)
-    return lines
+  lines.push(rulesSummary(report))
+  const review = reviewSummary(report)
+  if (review) lines.push(review)
+  return lines
+}
+
+/**
+ * The line of the Annotations: how many there are, their Problems, and how many are orphaned.
+ * None where there is no Annotation and nothing is wrong with where they are.
+ */
+function reviewSummary(report: CheckReport): string | undefined {
+  const { directory, annotations, problems, orphaned } = report.review
+  if (directory === undefined) {
+    return problems.length === 0
+      ? undefined
+      : `No Annotation is read: ${counted(problems.length, 'Problem')} in ${CONFIG_PATH}.`
   }
+  if (annotations === 0) {
+    return problems.length === 0
+      ? undefined
+      : `No Annotation: ${counted(problems.length, 'Problem')} in ${directory}.`
+  }
+  const found = problems.length === 0 ? 'no Problem' : counted(problems.length, 'Problem')
+  const lost = orphaned.length === 0 ? 'none orphaned' : `${orphaned.length} orphaned`
+  return `${counted(annotations, 'Annotation')}: ${found}, ${lost}.`
+}
+
+/** The line of the Rules. */
+function rulesSummary(report: CheckReport): string {
+  const { conformance } = report
+  if (!conformance.present) return `No Rules: ${RULES_PATH} is not there.`
   const rules = conformance.rules.length
   const open = conformance.violations.filter((violation) => !violation.exception).length
   const accepted = conformance.violations.length - open
@@ -155,18 +220,29 @@ function summaries(report: CheckReport): string[] {
   if (conformance.problems.length > 0) {
     line += `; ${counted(conformance.problems.length, 'Problem')} in ${RULES_PATH}`
   }
-  lines.push(`${line}.`)
-  return lines
+  return `${line}.`
 }
 
 /** The document of `--format json` (docs/cli.md, "adr check"). */
 function json(report: CheckReport): object {
-  const { conformance } = report
+  const { conformance, config, review } = report
   const decisions = report.lint ? lintJson(report.lint) : { logs: [], problems: [] }
   return {
     logs: decisions.logs,
     problems: [
       ...decisions.problems.map((problem) => ({ module: 'decisions', ...problem })),
+      ...(config
+        ? [
+            {
+              module: 'kernel',
+              code: config.kind,
+              message: configMessage(config),
+              path: config.path,
+              line: config.line,
+              problem: config
+            }
+          ]
+        : []),
       ...report.declaration.map(({ code, message, path, line, problem }) => ({
         module: 'structure',
         code,
@@ -182,16 +258,28 @@ function json(report: CheckReport): object {
         path: RULES_PATH,
         line: problem.line,
         problem
+      })),
+      ...review.problems.map((problem) => ({ module: 'review', ...problem }))
+    ],
+    notes: [
+      ...conformance.notes.map((note) => ({
+        module: 'conformance',
+        code: note.kind,
+        message: wordingOf(note),
+        path: RULES_PATH,
+        line: note.line,
+        note
+      })),
+      ...review.orphaned.map(({ problem, ...entry }) => ({
+        module: 'review',
+        ...entry,
+        note: problem
       }))
     ],
-    notes: conformance.notes.map((note) => ({
-      module: 'conformance',
-      code: note.kind,
-      message: wordingOf(note),
-      path: RULES_PATH,
-      line: note.line,
-      note
-    })),
+    annotations:
+      review.directory === undefined
+        ? null
+        : { directory: review.directory, count: review.annotations },
     rules: conformance.rules.map(({ id, kind, why, line }) => ({
       id,
       kind,

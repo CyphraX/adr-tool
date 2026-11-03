@@ -5,6 +5,7 @@ import { fails, renderCheck } from './check-report'
 import { describeRefusal, exportTo } from './export'
 import { repositoryFiles } from './files'
 import { lint } from './lint'
+import { gitIn } from './git'
 import { listRepository } from './listing'
 import { FORMATS, render, type Format } from './report'
 
@@ -25,7 +26,8 @@ Exit codes: 0 no Problem, 1 Problems found, 2 nothing could be checked.
 
 adr check does what adr lint does, checks .arch/components.yml, and checks the Rules of
 .arch/rules.yml against the code: every Violation without an Exception is printed at the
-line of the import that causes it.
+line of the import that causes it. It checks the Annotations of Review too: an orphaned one
+is a note, and fails nothing.
 Exit codes: 0 no Problem and no Violation without an Exception, 1 there is one,
 2 nothing could be checked.
 
@@ -91,10 +93,14 @@ export async function run(args: readonly string[], console: Console): Promise<nu
     const checkout = relative(console.cwd, root).split(sep).join('/')
     const inside = checkout !== '' && !checkout.startsWith('..') && !isAbsolute(checkout)
     if (command === 'check') {
-      const checked = await check(repositoryFiles(root, warn), await listRepository(root))
+      const checked = await check(
+        repositoryFiles(root, warn),
+        await listRepository(root),
+        gitIn(root)
+      )
       if (!checked) {
         console.err(
-          `adr check: Nothing to check in ${root}: no Decision Log is found there, and neither .arch/components.yml nor .arch/rules.yml is there.\n`
+          `adr check: Nothing to check in ${root}: no Decision Log is found there, neither .arch/components.yml nor .arch/rules.yml is there, and no Annotation is.\n`
         )
         return 2
       }

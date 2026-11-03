@@ -9,8 +9,9 @@
 import { dirname, join } from 'node:path'
 import { watch } from 'chokidar'
 import { lookAtAnnotations } from '@adr-tool/cli/annotations'
-import { openRepository, type Plan, type Repository } from '@adr-tool/core'
+import { openRepository, type Plan } from '@adr-tool/core'
 import {
+  adrReferencesOf,
   findAnchor,
   planAnnotation,
   planAttach,
@@ -50,13 +51,6 @@ export type WatchPaths = (
 const chokidar: WatchPaths = (paths, changed) =>
   watch([...paths], { depth: 0, ignoreInitial: true }).on('all', changed)
 
-/** The ADRs of a repository as a `cites` item names them: by the directory of their log, `.` at the top. */
-export function adrReferences(repository: Repository): AdrReference[] {
-  return repository.logs.flatMap((log) =>
-    log.adrs.map((adr) => ({ log: log.path === '' ? '.' : log.path, id: adr.id }))
-  )
-}
-
 /**
  * Look at the Annotations of the repository at `root`: read them, check their Traces against
  * the ADRs, and find each Anchor again with one cache for the run — HEAD and the changes since a
@@ -64,7 +58,7 @@ export function adrReferences(repository: Repository): AdrReference[] {
  */
 export async function lookAt(root: string, git: Git = gitIn(root)): Promise<Looked> {
   const fs = nodeFileSystem(root)
-  const looked = await lookAtAnnotations(fs, git, adrReferences(await openRepository(fs)))
+  const looked = await lookAtAnnotations(fs, git, adrReferencesOf((await openRepository(fs)).logs))
   const { directory } = looked
 
   // What is watched: the settings, the Annotations and their Replies, the files the Anchors
@@ -224,7 +218,7 @@ export async function planReview(
   git: Git = gitIn(root)
 ): Promise<Plan> {
   const fs = nodeFileSystem(root)
-  const adrs = async (): Promise<AdrReference[]> => adrReferences(await openRepository(fs))
+  const adrs = async (): Promise<AdrReference[]> => adrReferencesOf((await openRepository(fs)).logs)
   switch (request.kind) {
     case 'create':
       return planAnnotation(

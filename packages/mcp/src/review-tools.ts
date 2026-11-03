@@ -1,7 +1,7 @@
 import { lookAtAnnotations, type FoundAnnotation } from '@adr-tool/cli/annotations'
 import { gitIn } from '@adr-tool/cli/git'
 import { listRepository } from '@adr-tool/cli/listing'
-import type { Repository, WritableFileSystem } from '@adr-tool/core'
+import type { WritableFileSystem } from '@adr-tool/core'
 import type { Plan } from '@adr-tool/kernel'
 import {
   ANNOTATION_STATES,
@@ -43,12 +43,6 @@ export interface ReviewContext {
   /** Hold a plan and show it; `outcome` is said with it and when it is applied. */
   readonly hold: (plan: Plan, outcome?: Record<string, unknown>) => Record<string, unknown>
 }
-
-/** The ADRs of a repository as a `cites` item names them: by the directory of their log, `.` at the top. */
-export const adrReferences = (repository: Repository): AdrReference[] =>
-  repository.logs.flatMap((log) =>
-    log.adrs.map((adr) => ({ log: log.path === '' ? '.' : log.path, id: adr.id }))
-  )
 
 const text = (description: string): Schema => ({ type: 'string', description })
 const required = (description: string): Schema => ({ type: 'string', description, minLength: 1 })

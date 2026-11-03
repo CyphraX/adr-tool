@@ -36,9 +36,10 @@ import {
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
 import { gitIn } from '@adr-tool/cli/git'
 import type { Plan as KernelPlan } from '@adr-tool/kernel'
+import { adrReferencesOf } from '@adr-tool/review'
 import { repositoryFiles } from './files'
 import { Refusal, type Tool } from './protocol'
-import { adrReferences, reviewTools } from './review-tools'
+import { reviewTools } from './review-tools'
 import type { Schema } from './schema'
 
 /** How many planned changes wait at most; the oldest is forgotten first. */
@@ -626,7 +627,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       today,
       now: options.now ?? (() => new Date()),
       author,
-      adrs: async () => adrReferences((await open()).repository),
+      adrs: async () => adrReferencesOf((await open()).repository.logs),
       hold: (plan, outcome) => hold(undefined, plan, outcome)
     }),
     {
