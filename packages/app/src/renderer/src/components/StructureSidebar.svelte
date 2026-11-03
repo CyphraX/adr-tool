@@ -11,6 +11,9 @@
   const structure = $derived(app.active?.structure)
   const view = $derived(structure?.view)
   const selection = $derived(structure?.selection)
+  const libraries = $derived(
+    structure?.show === 'libraries' && !structure.code && !structure.problems
+  )
   const problems = $derived(app.repositoryProblems)
   const counting = $derived(problems?.structure.state === 'reading')
   const known = $derived(app.active?.outline.known)
@@ -69,7 +72,6 @@
       <p class="facts">
         {t.structure.sourceFiles(view.sourceFiles)}, {t.structure.testFiles(view.testFiles)}<br />
         {t.structure.dependencies(view.dependencies)}<br />
-        {t.structure.libraries(view.libraries)}<br />
         <span class="faint">{t.structure.analysedIn(view.milliseconds)}</span>
       </p>
       {#each view.lowerBound as language (language)}
@@ -83,6 +85,16 @@
         />
         {t.structure.includeTests}
       </label>
+      <!-- The Library inventory of the whole repository (docs/plan-vision.md, part 15). -->
+      <button
+        class="row"
+        class:current={libraries}
+        aria-pressed={libraries}
+        onclick={() => app.showInStructure('libraries')}
+      >
+        <span class="label">{t.structure.inventory.entry}</span>
+        <span class="count">{view.libraries}</span>
+      </button>
       <button
         class="row"
         class:current={selection?.kind === 'not-resolved'}

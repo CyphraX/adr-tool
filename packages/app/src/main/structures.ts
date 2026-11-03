@@ -385,7 +385,8 @@ export function viewOf(
       structure.sourceFiles.some((file) => file.language === language)
     ),
     dependencies: dependencies.dependencies.length,
-    libraries: new Set(dependencies.libraries.map((use) => use.library)).size,
+    libraries: analysis.inventory.libraries.length,
+    inventory: analysis.inventory,
     notResolvedCount: dependencies.notResolved.length,
     notResolved: dependencies.notResolved.slice(0, LISTED_AT_MOST),
     notAnalysed: dependencies.notAnalysed,
@@ -429,7 +430,12 @@ export function outlineOf(
       test: file.test
     })),
     problems: structure.problems,
-    hints: structure.hints
+    hints: structure.hints,
+    libraries: analysis.inventory.libraries.map(({ ecosystem, name, imports }) => ({
+      ecosystem,
+      name,
+      imports
+    }))
   }
 }
 

@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { metricsOf } from '@adr-tool/structure/model'
 import { analyse, readCache, writeCache, type Analysis } from '../src/main/analysis'
-import { AnalysisDropped, readSourceFile, Structures, viewOf } from '../src/main/structures'
+import {
+  AnalysisDropped,
+  outlineOf,
+  readSourceFile,
+  Structures,
+  viewOf
+} from '../src/main/structures'
 
 /** A small repository without git: a Cycle between two Components, one of which has children. */
 let root: string
@@ -336,6 +342,31 @@ describe('this repository, as the window gets it', () => {
         .find((c) => c.id === 'app')!
         .children.find((c) => c.id === 'app/renderer')!.children
     ).toEqual([])
+  })
+
+  // The done-when of part 15 of docs/plan-vision.md: the Libraries of each package, with the
+  // Components that use them, and their licences.
+  it('lists the Library inventory at every level, and each Library for the search', () => {
+    const top = viewOf('repo', analysis, undefined, false)
+    const below = viewOf('repo', analysis, 'app/renderer', true)
+    expect(top.inventory).toBe(analysis.inventory)
+    expect(below.inventory).toBe(analysis.inventory)
+    expect(top.libraries).toBe(analysis.inventory.libraries.length)
+    const electron = top.inventory.libraries.find((library) => library.name === 'electron')!
+    expect(electron.usedBy.map((user) => user.component)).toEqual(['app/main', 'app/preload'])
+    expect(electron.licence).toMatchObject({ kind: 'declared', licence: 'MIT' })
+    // What the window reads of node_modules is what an installed package declares.
+    const declared = top.inventory.libraries.filter((library) => library.installed)
+    expect(declared.length).toBeGreaterThan(20)
+    expect(declared.every((library) => library.licence.kind !== 'unknown')).toBe(true)
+
+    const outline = outlineOf('repo', analysis)
+    expect(outline.libraries).toContainEqual({
+      ecosystem: 'npm',
+      name: 'electron',
+      imports: ['electron']
+    })
+    expect(outline.libraries).toHaveLength(analysis.inventory.libraries.length)
   })
 })
 

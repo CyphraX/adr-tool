@@ -14,7 +14,9 @@ import type { Language as WindowLanguage } from './language'
 import type {
   Cycle,
   Dependency,
+  Ecosystem,
   Language,
+  LibraryInventory,
   MatrixCycle,
   Metrics,
   NotAnalysed,
@@ -301,8 +303,13 @@ export interface StructureView {
   /** The languages of the repository whose Dependencies are a lower bound, in this order. */
   readonly lowerBound: readonly LowerBound[]
   readonly dependencies: number
-  /** How many different Libraries the code uses. */
+  /** How many Libraries the manifests declare or the code uses: the entries of the inventory. */
   readonly libraries: number
+  /**
+   * The Library inventory of the whole repository (docs/structure-format.md, section 3), the
+   * same at every level: each Library with its declarations, its users and its licence.
+   */
+  readonly inventory: LibraryInventory
   /** The uses that are not resolved: all of them counted, the first few hundred listed. */
   readonly notResolvedCount: number
   readonly notResolved: readonly NotResolved[]
@@ -346,6 +353,14 @@ export interface StructureOutline {
   readonly problems: readonly StructureProblem[]
   /** What the checks find on the Draft: hints, not Problems. */
   readonly hints: readonly StructureProblem[]
+  /** Every Library of the inventory, by its name and the names the code imports it by. */
+  readonly libraries: readonly OutlinedLibrary[]
+}
+
+export interface OutlinedLibrary {
+  readonly ecosystem: Ecosystem
+  readonly name: string
+  readonly imports: readonly string[]
 }
 
 export interface OutlinedSourceFile {

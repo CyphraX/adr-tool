@@ -42,7 +42,13 @@ const SAME_IN_GERMAN = new Set([
   'I',
   'H',
   'Fan-in',
-  'Fan-out'
+  'Fan-out',
+  'Version',
+  // The ecosystems of Libraries, by their names.
+  'npm',
+  'Maven',
+  'Python',
+  'Go'
 ])
 
 /** Arguments to try a text that is a function with: a name or a count, a list, an object. */

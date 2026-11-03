@@ -10,7 +10,7 @@ import {
   type Status,
   type TemplateInfo
 } from '@adr-tool/core'
-import type { StructureProblem } from '@adr-tool/structure/model'
+import type { Ecosystem, StructureProblem } from '@adr-tool/structure/model'
 import type {
   BranchOverview,
   CommitPlan,
@@ -58,8 +58,11 @@ export type MiddleView =
 
 export type { Module }
 
-/** What the middle of the Structure view shows of a level: the drawing, the matrix, or the metrics. */
-export type StructureShow = 'graph' | 'matrix' | 'metrics'
+/**
+ * What the middle of the Structure view shows: the level as the drawing, the matrix, or the
+ * metrics; or the Libraries of the whole repository.
+ */
+export type StructureShow = 'graph' | 'matrix' | 'metrics' | 'libraries'
 
 /** What is selected in the Structure view: a node, a line, a Cycle, or one of the lists. */
 export type StructureSelection =
@@ -68,6 +71,7 @@ export type StructureSelection =
   | { kind: 'cycle'; index: number }
   | { kind: 'not-resolved' }
   | { kind: 'not-analysed' }
+  | { kind: 'library'; ecosystem: Ecosystem; name: string }
 
 /** A Source File open in the code viewer, with the lines to mark and the one to bring into view. */
 export interface CodeView {
@@ -513,6 +517,21 @@ class AppState {
       tab.structure.code = undefined
       tab.structure.problems = fromProblems
       void this.loadStructure(tab)
+    })
+  }
+
+  /** Show a Library in the inventory of Structure, from wherever the view is: the search. */
+  showLibrary(ecosystem: Ecosystem, name: string): void {
+    const tab = this.active
+    if (!tab) return
+    this.searching = undefined
+    this.leaveEditor(() => {
+      tab.module = 'structure'
+      tab.structure.show = 'libraries'
+      tab.structure.selection = { kind: 'library', ecosystem, name }
+      tab.structure.code = undefined
+      tab.structure.problems = false
+      if (!tab.structure.view) void this.loadStructure(tab)
     })
   }
 
@@ -1635,6 +1654,10 @@ function stillThere(selection: StructureSelection | undefined, view: StructureVi
     case 'not-resolved':
     case 'not-analysed':
       return true
+    case 'library':
+      return view.inventory.libraries.some(
+        (library) => library.ecosystem === selection.ecosystem && library.name === selection.name
+      )
   }
 }
 

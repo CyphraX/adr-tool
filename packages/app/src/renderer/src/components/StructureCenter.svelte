@@ -4,13 +4,14 @@
   import { t } from '../lib/strings'
   import CodeViewer from './CodeViewer.svelte'
   import StructureGraph from './StructureGraph.svelte'
+  import StructureLibraries from './StructureLibraries.svelte'
   import StructureMatrix from './StructureMatrix.svelte'
   import StructureMetrics from './StructureMetrics.svelte'
 
   // The middle of the Structure view: where you are in the hierarchy, and the level as a
   // drawing, as a matrix or as a table of its metrics — three views of one model, which
-  // share the filter and the selection. A Source File opened from the details takes their
-  // place until one of them is chosen again.
+  // share the filter and the selection —, or the Libraries of the whole repository. A Source
+  // File opened from the details takes their place until one of them is chosen again.
   let { view }: { view: StructureView } = $props()
 
   const show = $derived(app.active?.structure.show ?? 'graph')
@@ -21,7 +22,9 @@
 <div class="center">
   <div class="head">
     <nav class="way" aria-label={t.structure.graph.way}>
-      {#if view.path.length === 0}
+      {#if show === 'libraries'}
+        <span class="here">{t.structure.inventory.title}</span>
+      {:else if view.path.length === 0}
         <span class="here">{t.structure.graph.top}</span>
       {:else}
         <button onclick={() => app.openComponent(undefined)}>{t.structure.graph.top}</button>
@@ -57,6 +60,8 @@
     <StructureMatrix {view} />
   {:else if show === 'metrics'}
     <StructureMetrics {view} />
+  {:else if show === 'libraries'}
+    <StructureLibraries {view} />
   {:else}
     <StructureGraph {view} />
   {/if}

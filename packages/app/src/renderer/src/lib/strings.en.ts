@@ -1,4 +1,5 @@
 import type { RelationState, RelationType } from '@adr-tool/core'
+import type { Ecosystem, LibraryStatus, Mapping, UnknownLicence } from '@adr-tool/structure/model'
 import type { Decision, LowerBound } from '../../../shared/ipc'
 import type { Refusal } from './views'
 
@@ -493,7 +494,6 @@ export const en = {
     testFiles: (count: number): string =>
       many(count, 'one of them a test', `${count} of them tests`),
     dependencies: (count: number): string => many(count, 'One Dependency', `${count} Dependencies`),
-    libraries: (count: number): string => many(count, 'One Library', `${count} Libraries`),
     analysedIn: (milliseconds: number): string =>
       `Analysed in ${(milliseconds / 1000).toFixed(1)} s`,
     lowerBound: {
@@ -632,11 +632,12 @@ export const en = {
 
     viewer: {
       label: 'Source File',
-      back: (show: 'graph' | 'matrix' | 'metrics'): string =>
+      back: (show: 'graph' | 'matrix' | 'metrics' | 'libraries'): string =>
         ({
           graph: 'Back to the graph',
           matrix: 'Back to the matrix',
-          metrics: 'Back to the metrics'
+          metrics: 'Back to the metrics',
+          libraries: 'Back to the Libraries'
         })[show],
       marked: (lines: readonly number[]): string =>
         `${many(lines.length, 'Line', 'Lines')} ${lines.join(', ')} marked`,
@@ -710,6 +711,84 @@ export const en = {
         'They keep their Component and have no Dependencies of their own until they can be parsed.',
       unreadable: 'could not be read',
       none: 'None.'
+    },
+
+    /** The Library inventory (docs/structure-format.md, section 3): its table, a Library, a page's section. */
+    inventory: {
+      entry: 'Libraries',
+      title: 'Libraries',
+      label: 'The Libraries the manifests declare and the code uses',
+      library: 'Library',
+      version: 'Version',
+      usedBy: 'Used by',
+      files: 'Files',
+      licence: 'Licence',
+      sortBy: (column: string): string => `Sort by ${column}`,
+      filter: 'Which Libraries to show',
+      filters: {
+        all: 'All',
+        used: 'Used',
+        unused: 'Not used',
+        undeclared: 'Not declared'
+      } satisfies Record<'all' | LibraryStatus, string>,
+      status: {
+        used: 'Declared and used',
+        unused: 'Declared, and used by no Source File',
+        undeclared: 'Used by a Source File for which no manifest declares it'
+      } satisfies Record<LibraryStatus, string>,
+      tag: { unused: 'not used', undeclared: 'not declared' },
+      ecosystem: {
+        npm: 'npm',
+        maven: 'Maven',
+        python: 'Python',
+        go: 'Go'
+      } satisfies Record<Ecosystem, string>,
+      licenceFile: 'LICENSE file present',
+      licenceUnknown: {
+        'not-installed': 'cannot be told: not installed in the repository',
+        'not-declared': 'none declared',
+        unreadable: 'cannot be told: what it declares cannot be read',
+        outside: 'cannot be told: installed outside the repository'
+      } satisfies Record<UnknownLicence, string>,
+      licenceShort: {
+        'not-installed': 'cannot be told: not installed',
+        'not-declared': 'none declared',
+        unreadable: 'cannot be told: unreadable',
+        outside: 'cannot be told: outside the repository'
+      } satisfies Record<UnknownLicence, string>,
+      hint: 'Select a Library to see the manifests that declare it, the Source Files that use it, and its licence.',
+      unassigned: 'Unassigned',
+      testsOnly: 'tests only',
+      none: 'No manifest declares a Library, and no Source File uses one.',
+      noneShown: 'No Library is in this list.',
+      howToRead:
+        'A Library is read from the manifests — package.json, pom.xml, build.gradle, requirements files, pyproject.toml, go.mod — and from the imports of the Source Files. Its licence is what its installed package declares; nothing is looked up outside the repository. A tool that is run and never imported is declared and not used.',
+      javaLicence:
+        "The licence of a Java Library cannot be told: Maven's local repository lies outside the repository, and is not read.",
+
+      kind: (ecosystem: string): string => `Library · ${ecosystem}`,
+      declaredIn: 'Declared in',
+      notDeclared: 'No manifest declares it.',
+      importedAs: 'Imported as',
+      mapping: {
+        same: 'by the name it is declared by',
+        installed: 'as its installed package lists them',
+        known: "from the suite's table of known names",
+        normalised: 'a guess: its name taken as the name it is imported by',
+        group: 'a guess: its group ID taken as the prefix of its packages'
+      } satisfies Record<Mapping, string>,
+      usedByNone: 'No Source File uses it.',
+      undeclaredFile: 'No manifest in its directory or above declares the Library.',
+      installed: 'Installed',
+      notInstalled: 'Not installed in the repository.',
+      licenceFrom: (field: string, source: string): string => `As \`${field}\` in \`${source}\`.`,
+      licenceFileFrom: (source: string): string =>
+        `No metadata names it; \`${source}\` is there and is not read for a name.`,
+      fileCount: (count: number): string => many(count, 'one file', `${count} files`),
+      firstOf: (shown: number, total: number): string => `The first ${shown} of ${total}.`,
+
+      page: 'Libraries',
+      pageNone: 'It declares no Library, and its Source Files use none.'
     }
   },
 
@@ -755,15 +834,17 @@ export const en = {
   },
 
   searching: {
-    label: 'Search ADRs, Components and Source Files',
-    placeholder: 'Search ADRs, Components, Source Files — or type the number of an ADR',
+    label: 'Search ADRs, Components, Source Files and Libraries',
+    placeholder: 'Search ADRs, Components, Source Files, Libraries — or type the number of an ADR',
     found: 'Found',
     adrs: 'ADRs',
     components: 'Components',
     sourceFiles: 'Source Files',
+    libraries: 'Libraries',
     /** Beside each hit: what kind of thing it is. */
     component: 'Component',
     sourceFile: 'Source File',
+    library: 'Library',
     draft: 'Draft',
     unassigned: 'Unassigned',
     more: (shown: number, all: number): string =>
@@ -771,11 +852,11 @@ export const en = {
     moreOf: (shown: number, all: number): string => `The best ${shown} of ${all}.`,
     none: 'Nothing has all of these words.',
     analysing:
-      'Structure is still analysing the code: its Components and Source Files are searched once it is done.',
+      'Structure is still analysing the code: its Components, Source Files and Libraries are searched once it is done.',
     analysingAgain:
-      'Structure is analysing the code again: its Components and Source Files are searched as it last found them.',
+      'Structure is analysing the code again: its Components, Source Files and Libraries are searched as it last found them.',
     notAnalysed: (reason: string): string =>
-      `Components and Source Files are not searched: ${reason}`
+      `Components, Source Files and Libraries are not searched: ${reason}`
   },
 
   /** The dialog that shows a change before it is written, a refusal, or a question. */

@@ -33,6 +33,7 @@ const OUTLINE: StructureOutline = {
     { id: 'core/metadata', name: 'metadata' }
   ],
   sourceFiles: [],
+  libraries: [],
   problems: [
     { kind: 'dead-pattern', component: 'core/metadata', key: 'paths', pattern: 'nowhere/**' },
     {
