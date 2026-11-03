@@ -254,6 +254,7 @@ describe('this repository, as the window gets it', () => {
       'cli',
       'conformance',
       'core',
+      'diagrams',
       'kernel',
       'mcp',
       'structure',

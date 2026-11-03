@@ -52,7 +52,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted'],
     [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted'],
     [16, '0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image', 'accepted'],
-    [17, '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint', 'accepted']
+    [17, '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint', 'accepted'],
+    [18, '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it', 'accepted']
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -129,6 +130,17 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     ].map((to) => ({
       type: 'depends-on',
       from: '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint',
+      to,
+      state: 'in-effect'
+    })),
+    ...[
+      '0002-never-reserialize-markdown',
+      '0003-on-disk-contract',
+      '0004-operations-return-change-sets',
+      '0006-one-core-package-per-module-on-a-shared-kernel'
+    ].map((to) => ({
+      type: 'depends-on',
+      from: '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it',
       to,
       state: 'in-effect'
     }))

@@ -19,10 +19,16 @@ rules:
     from: conformance
     to: [kernel, structure]
 
+  - id: diagrams-on-structure
+    why: Diagrams binds its elements to Structure's Components and measures Drift against its Dependencies, and leans on no other module (ADR-0006, ADR-0018).
+    kind: may-only-depend
+    from: diagrams
+    to: [kernel, structure]
+
   - id: layered
     why: The window uses the command line and the servers, which use the module cores, which use the kernel.
     kind: layers
-    layers: [app, [cli, mcp], conformance, [core, structure], kernel]
+    layers: [app, [cli, mcp], [conformance, diagrams], [core, structure], kernel]
 
   - id: no-cycles-between-packages
     why: A package in a Cycle can be neither understood nor tested on its own.

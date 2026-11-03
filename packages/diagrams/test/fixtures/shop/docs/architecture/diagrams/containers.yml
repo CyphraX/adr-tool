@@ -1,0 +1,34 @@
+# The containers of the shop, drawn by hand. On purpose, it connects persistence to the web,
+# which the code does not, leaves out that the web uses persistence, and shows shipping, which
+# is not declared any more.
+title: The shop
+description: Its parts, and what each of them uses.
+level: container
+elements:
+  - component: persistence
+    at: [40, 40]
+  - component: billing
+    at: [260, 40]
+  - component: web
+    at: [480, 40]
+  - component: shipping
+    at: [260, 160]
+  - external: bank
+    name: The bank
+    description: Takes the payments.
+    at: [40, 160]
+connections:
+  - from: web
+    to: billing
+    label: shows invoices
+  - from: billing
+    to: persistence
+    label: stores invoices
+  - from: persistence
+    to: web
+    label: pushes updates
+  - from: shipping
+    to: persistence
+  - from: billing
+    to: bank
+    label: pays

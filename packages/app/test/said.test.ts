@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { SENTENCES, type CoreSaid, type Said } from '@adr-tool/core'
 import { STRUCTURE_SENTENCES, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
+import { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
 import { DE, inGerman } from '../src/renderer/src/lib/said.de'
 import { wordIn, wordOf, wordStructureProblem, wordWarnings } from '../src/renderer/src/lib/said'
 
-// The window in English: what `core` and `structure` say comes as they say it.
+// The window in English: what `core`, `structure` and `diagrams` say comes as they say it.
 vi.mock('../src/renderer/src/lib/language', () => ({ language: 'en' }))
 
 type Sentence = (values: unknown) => string
@@ -43,22 +44,40 @@ const MODULES = [
     name: 'structure',
     sentences: STRUCTURE_SENTENCES,
     detail: { code: 'top-not-map', values: {} }
+  },
+  {
+    name: 'diagrams',
+    sentences: DIAGRAMS_SENTENCES,
+    detail: { code: 'diagram-not-map', values: {} }
   }
 ] as const
 
 describe('German', () => {
-  it('has a sentence for every code of core and structure', () => {
-    // The compiler asks for them (`DE` is typed by both tables); this says so where it runs.
+  it('has a sentence for every code of core, structure and diagrams', () => {
+    // The compiler asks for them (`DE` is typed by the three tables); this says so where it runs.
     for (const { sentences } of MODULES) {
       for (const code of Object.keys(sentences)) expect(Object.keys(DE), code).toContain(code)
     }
-    const codes = new Set([...Object.keys(SENTENCES), ...Object.keys(STRUCTURE_SENTENCES)])
+    const codes = new Set(MODULES.flatMap(({ sentences }) => Object.keys(sentences)))
     expect(Object.keys(DE).filter((code) => !codes.has(code))).toEqual([])
   })
 
-  it('gives core and structure codes of their own: only the kernel’s are shared', () => {
-    const shared = Object.keys(SENTENCES).filter((code) => code in STRUCTURE_SENTENCES)
-    expect(shared.sort()).toEqual(['already-exists', 'no-longer-exists'])
+  it('gives each module codes of its own: only the kernel’s are shared', () => {
+    for (const [first, second] of [
+      [SENTENCES, STRUCTURE_SENTENCES],
+      [SENTENCES, DIAGRAMS_SENTENCES],
+      [STRUCTURE_SENTENCES, DIAGRAMS_SENTENCES]
+    ] as const) {
+      const shared = Object.keys(first).filter((code) => code in second)
+      // What any operation may refuse, and why .arch/config.yml cannot be read.
+      expect(shared.sort()).toEqual([
+        'already-exists',
+        'config-not-map',
+        'config-not-yaml',
+        'no-longer-exists',
+        'unreadable-config'
+      ])
+    }
   })
 
   it('says every sentence in German, not in English, and leaves no value out', () => {

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "What every module of the suite needs and none of them owns: the file-system port, splice edits and change sets",
+  "description": "What every module of the suite needs and none of them owns: the file-system port, splice edits, change sets and the reading of .arch/config.yml",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -11,6 +11,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.5",

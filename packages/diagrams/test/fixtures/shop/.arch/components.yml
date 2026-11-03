@@ -1,0 +1,18 @@
+# A small shop whose Diagrams are compared with its code (docs/diagrams-format.md). Its
+# container view shows shipping, which is not declared here any more.
+components:
+  web:
+    name: Web shop
+    description: The pages customers see.
+    paths: [src/web/**]
+  billing:
+    name: Billing
+    paths: [src/billing/**]
+    components:
+      invoices:
+        paths: [src/billing/invoices/**]
+      payments:
+        paths: [src/billing/payments/**]
+  persistence:
+    name: Persistence
+    paths: [src/persistence/**]
