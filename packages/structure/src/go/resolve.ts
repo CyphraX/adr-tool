@@ -97,9 +97,13 @@ export function resolveGo(
    * The directory an import path names, as seen from a module: through a `replace` that points
    * into the repository — go.work's before the module's —, else through the module of the
    * repository whose path is the longest that the import path lies below. A directory that a
-   * module deeper down holds is that module's, and not reached through the outer one.
+   * module deeper down holds is that module's, and not reached through the outer one: `null`,
+   * a path of the repository that names no directory of its.
    */
-  const directoryFor = (importPath: string, from: GoModule | undefined): string | undefined => {
+  const directoryFor = (
+    importPath: string,
+    from: GoModule | undefined
+  ): string | null | undefined => {
     const longest = <T extends { path: string }>(candidates: readonly T[]): T | undefined =>
       candidates
         .filter((candidate) => isBelow(importPath, candidate.path))
@@ -115,7 +119,7 @@ export function resolveGo(
     const module = longest(modules)
     if (!module) return undefined
     const directory = below(module.directory, importPath, module.path)
-    return moduleOf(directory) === module ? directory : undefined
+    return moduleOf(directory) === module ? directory : null
   }
 
   const uses: GoUse[] = []
@@ -150,7 +154,7 @@ export function resolveGo(
         libraryUsed.add(library)
         continue
       }
-      const pkg = packageAt(directory)
+      const pkg = directory === null ? undefined : packageAt(directory)
       if (pkg === undefined) {
         notResolved.push({ file: path, specifier: entry.path, line: entry.line })
       } else if (entry.name === '_') {

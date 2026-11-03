@@ -84,9 +84,9 @@ const SPECS = ['var_spec', 'const_spec', 'type_spec', 'type_alias']
 const lineOf = (node: Node): number => node.startPosition.row + 1
 const fields = (node: Node | null | undefined, field: string): Node[] =>
   (node?.childrenForFieldName(field) ?? []).filter((child): child is Node => child !== null)
-/** The identifiers of a name, or of a list of them: `a, b := …`. */
+/** The identifiers of a name — of a type as well —, or of a list of them: `a, b := …`. */
 const identifiersIn = (node: Node): Node[] =>
-  node.type === 'identifier'
+  node.type === 'identifier' || node.type === 'type_identifier'
     ? [node]
     : node.namedChildren.filter((child): child is Node => child?.type === 'identifier')
 
@@ -165,7 +165,7 @@ function outline(root: Node): GoOutline {
   for (const node of root.descendantsOfType(['identifier', 'type_identifier'])) {
     if (!node || keys.has(node.startIndex)) continue
     const name = node.text
-    if (declares.has(name) || local.has(name) || names.has(name)) continue
+    if (name === '_' || declares.has(name) || local.has(name) || names.has(name)) continue
     names.set(name, lineOf(node))
   }
 
