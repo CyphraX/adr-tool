@@ -17,9 +17,7 @@ export function memoryFileSystem(initial: Readonly<Record<string, string>>): Wri
     async readText(path, options) {
       const text = files.get(path)
       const atMost = options?.atMost
-      return atMost !== undefined && text !== undefined && bytesOf(text) > atMost
-        ? undefined
-        : text
+      return atMost !== undefined && text !== undefined && bytesOf(text) > atMost ? undefined : text
     },
     async list(path) {
       const prefix = path === '' ? '' : `${path}/`

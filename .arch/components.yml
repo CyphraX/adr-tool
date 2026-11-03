@@ -61,6 +61,8 @@ components:
         paths: [packages/structure/src/go/**]
       java:
         paths: [packages/structure/src/java/**]
+      libraries:
+        paths: [packages/structure/src/libraries/**]
       python:
         paths: [packages/structure/src/python/**]
       typescript:

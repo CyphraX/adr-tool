@@ -145,11 +145,290 @@ describe('the Libraries the manifests declare (docs/structure-format.md, section
     })
   })
 
+  it('reads the four groups of package.json, without the packages of the workspace and local specifiers', async () => {
+    expect(
+      await read({
+        'package.json': JSON.stringify(
+          {
+            name: 'shop',
+            workspaces: ['packages/*'],
+            devDependencies: { prettier: '^3.7.4', '@types/node': '^24' }
+          },
+          null,
+          2
+        ),
+        'packages/web/package.json': [
+          '{',
+          '  "name": "@shop/web",',
+          '  "dependencies": {',
+          '    "@shop/core": "workspace:*",',
+          '    "shop": "0.0.0",',
+          '    "react": "^19.0.0", "lodash": "npm:lodash-es@^4",',
+          '    "local": "file:../local",',
+          '    "linked": "link:../linked",',
+          '    "relative": "../relative",',
+          '    "odd\\"key": "1",',
+          '    "nothing": 3',
+          '  },',
+          '  "peerDependencies": { "react": ">=18" },',
+          '  "optionalDependencies": { "fsevents": "^2" },',
+          '  "scripts": { "dependencies": "not one" }',
+          '}'
+        ].join('\n'),
+        'packages/core/package.json': '{ "name": "@shop/core", "version": "0.0.0" }'
+      })
+    ).toEqual([
+      { manifest: 'package.json', name: 'prettier', version: '^3.7.4', group: 'dev', line: 7 },
+      { manifest: 'package.json', name: '@types/node', version: '^24', group: 'dev', line: 8 },
+      { manifest: 'packages/web/package.json', name: 'react', version: '^19.0.0', line: 6 },
+      {
+        manifest: 'packages/web/package.json',
+        name: 'lodash',
+        version: 'npm:lodash-es@^4',
+        line: 6
+      },
+      { manifest: 'packages/web/package.json', name: 'odd"key', version: '1', line: 10 },
+      {
+        manifest: 'packages/web/package.json',
+        name: 'react',
+        version: '>=18',
+        group: 'peer',
+        line: 13
+      },
+      {
+        manifest: 'packages/web/package.json',
+        name: 'fsevents',
+        version: '^2',
+        group: 'optional',
+        line: 14
+      }
+    ])
+  })
+
+  it("reads a pom's dependencies with their scope, versions from properties and dependencyManagement, its parent's too", async () => {
+    expect(
+      await read({
+        'pom.xml': [
+          '<?xml version="1.0"?>',
+          '<project>',
+          '  <groupId>com.shop</groupId><artifactId>shop</artifactId><version>1.4</version>',
+          '  <properties><slf4j.version>2.0.16</slf4j.version><junit>5.11.0</junit></properties>',
+          '  <dependencyManagement><dependencies>',
+          '    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId>',
+          '      <version>${slf4j.version}</version></dependency>',
+          '  </dependencies></dependencyManagement>',
+          '  <dependencies>',
+          '    <!-- <dependency><groupId>commented</groupId><artifactId>out</artifactId></dependency> -->',
+          '    <dependency>',
+          '      <groupId>org.junit.jupiter</groupId>',
+          '      <artifactId>junit-jupiter</artifactId>',
+          '      <version>${junit}</version>',
+          '      <scope>test</scope>',
+          '    </dependency>',
+          '  </dependencies>',
+          '</project>'
+        ].join('\n'),
+        'cart/pom.xml': [
+          '<project xmlns="http://maven.apache.org/POM/4.0.0">',
+          '  <parent><groupId>com.shop</groupId><artifactId>shop</artifactId><version>1.4</version></parent>',
+          '  <artifactId>cart</artifactId>',
+          '  <properties><guava.version>33.3.1-jre</guava.version></properties>',
+          '  <dependencies>',
+          '    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId></dependency>',
+          '    <dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId><version>${guava.version}</version></dependency>',
+          '    <dependency><groupId>com.shop</groupId><artifactId>catalog</artifactId><version>${project.version}</version></dependency>',
+          '    <dependency><groupId>jakarta.servlet</groupId><artifactId>jakarta.servlet-api</artifactId><version>${servlet.version}</version><scope>provided</scope></dependency>',
+          '    <dependency><groupId>org.x</groupId><artifactId>y</artifactId><optional>true</optional></dependency>',
+          '  </dependencies>',
+          '</project>'
+        ].join('\n'),
+        'catalog/pom.xml':
+          '<project><parent><groupId>com.shop</groupId><artifactId>shop</artifactId></parent><artifactId>catalog</artifactId></project>'
+      })
+    ).toEqual([
+      { manifest: 'cart/pom.xml', name: 'org.slf4j:slf4j-api', version: '2.0.16', line: 6 },
+      { manifest: 'cart/pom.xml', name: 'com.google.guava:guava', version: '33.3.1-jre', line: 7 },
+      // What no pom of the repository says stays as written.
+      {
+        manifest: 'cart/pom.xml',
+        name: 'jakarta.servlet:jakarta.servlet-api',
+        version: '${servlet.version}',
+        group: 'provided',
+        line: 9
+      },
+      { manifest: 'cart/pom.xml', name: 'org.x:y', group: 'optional', line: 10 },
+      {
+        manifest: 'pom.xml',
+        name: 'org.junit.jupiter:junit-jupiter',
+        version: '5.11.0',
+        group: 'test',
+        line: 11
+      }
+    ])
+  })
+
+  it('reads a parent pom only inside the repository, and only the one the pom names', async () => {
+    const found = await read({
+      'api/pom.xml': [
+        '<project>',
+        '  <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><relativePath/></parent>',
+        '  <artifactId>api</artifactId>',
+        '  <dependencies><dependency><groupId>org.x</groupId><artifactId>y</artifactId><version>${v}</version></dependency></dependencies>',
+        '</project>'
+      ].join('\n'),
+      'pom.xml':
+        '<project><artifactId>other</artifactId><properties><v>9</v></properties></project>'
+    })
+    expect(found).toEqual([{ manifest: 'api/pom.xml', name: 'org.x:y', version: '${v}', line: 4 }])
+  })
+
+  it('reads the forms of Gradle on one line, Kotlin and the version catalog, without projects and files', async () => {
+    expect(
+      await read({
+        'gradle/libs.versions.toml': [
+          '[versions]',
+          'jackson = "2.18.1"',
+          '[libraries]',
+          'jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }',
+          'jackson_core = { group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.18.1" }',
+          'slf4j = "org.slf4j:slf4j-api:2.0.16"',
+          '[bundles]',
+          'json = ["jackson-databind", "jackson_core"]'
+        ].join('\n'),
+        'app/build.gradle.kts': [
+          'plugins { id("org.jetbrains.kotlin.jvm") }',
+          'dependencies {',
+          '    implementation("com.google.guava:guava:33.3.1-jre") // the collections',
+          '    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.4.0"))',
+          '    implementation(project(":core"))',
+          '    implementation(files("libs/x.jar"))',
+          '    implementation(libs.jackson.databind)',
+          '    api(libs.bundles.json)',
+          '    runtimeOnly(libs.slf4j)',
+          '    testImplementation(kotlin("test"))',
+          '    compileOnly(group = "org.projectlombok", name = "lombok", version = "1.18.36")',
+          '    // implementation("commented:out:1")',
+          '}'
+        ].join('\n'),
+        'core/build.gradle': [
+          'buildscript { dependencies { classpath "com.android.tools.build:gradle:8.7" } }',
+          'dependencies {',
+          "    implementation 'org.apache.commons:commons-lang3:3.17.0'",
+          "    testImplementation group: 'junit', name: 'junit', version: '4.13.2'",
+          '    annotationProcessor "org.mapstruct:mapstruct-processor:$mapstructVersion"',
+          '}'
+        ].join('\n')
+      })
+    ).toEqual([
+      {
+        manifest: 'app/build.gradle.kts',
+        name: 'com.google.guava:guava',
+        version: '33.3.1-jre',
+        line: 3
+      },
+      {
+        manifest: 'app/build.gradle.kts',
+        name: 'org.springframework.boot:spring-boot-dependencies',
+        version: '3.4.0',
+        line: 4
+      },
+      {
+        manifest: 'app/build.gradle.kts',
+        name: 'com.fasterxml.jackson.core:jackson-databind',
+        version: '2.18.1',
+        line: 7
+      },
+      {
+        manifest: 'app/build.gradle.kts',
+        name: 'com.fasterxml.jackson.core:jackson-databind',
+        version: '2.18.1',
+        line: 8
+      },
+      {
+        manifest: 'app/build.gradle.kts',
+        name: 'com.fasterxml.jackson.core:jackson-core',
+        version: '2.18.1',
+        line: 8
+      },
+      { manifest: 'app/build.gradle.kts', name: 'org.slf4j:slf4j-api', version: '2.0.16', line: 9 },
+      {
+        manifest: 'app/build.gradle.kts',
+        name: 'org.jetbrains.kotlin:kotlin-test',
+        group: 'testImplementation',
+        line: 10
+      },
+      {
+        manifest: 'app/build.gradle.kts',
+        name: 'org.projectlombok:lombok',
+        version: '1.18.36',
+        group: 'compileOnly',
+        line: 11
+      },
+      {
+        manifest: 'core/build.gradle',
+        name: 'org.apache.commons:commons-lang3',
+        version: '3.17.0',
+        line: 3
+      },
+      {
+        manifest: 'core/build.gradle',
+        name: 'junit:junit',
+        version: '4.13.2',
+        group: 'testImplementation',
+        line: 4
+      },
+      {
+        manifest: 'core/build.gradle',
+        name: 'org.mapstruct:mapstruct-processor',
+        version: '$mapstructVersion',
+        group: 'annotationProcessor',
+        line: 5
+      }
+    ])
+  })
+
+  it('leaves out what go.mod requires from a module of the repository', async () => {
+    expect(
+      await read({
+        'go.mod': [
+          'module example.com/shop',
+          'require (',
+          '\texample.com/shop/billing v0.0.0',
+          '\tgithub.com/google/uuid v1.6.0',
+          ')',
+          'replace example.com/shop/billing => ./billing'
+        ].join('\n'),
+        'billing/go.mod': 'module example.com/shop/billing\n'
+      })
+    ).toEqual([{ manifest: 'go.mod', name: 'github.com/google/uuid', version: 'v1.6.0', line: 4 }])
+  })
+
+  it('reads a line of a megabyte in every manifest in time linear in its length', async () => {
+    const megabyte = 1024 * 1024
+    const started = performance.now()
+    await read({
+      'package.json': `{"dependencies": {"a": "${'\\"'.repeat(megabyte / 2)}"}, ${'['.repeat(megabyte)}`,
+      'pom.xml': `<project>${'<!--'.repeat(megabyte / 4)}`,
+      'a/pom.xml': `<project><dependencies>${'<dependency a="'.repeat(megabyte / 15)}`,
+      'b/pom.xml': `<project><version>${'${'.repeat(megabyte / 2)}</version></project>`,
+      'c/pom.xml': `<project>${'<a>'.repeat(megabyte / 3)}`,
+      'd/pom.xml': `<project>${'</a>'.repeat(megabyte / 4)}`,
+      'build.gradle': `implementation ${'('.repeat(megabyte)}`,
+      'a/build.gradle': `implementation ${"'".repeat(megabyte)}`,
+      'b/build.gradle': `${' '.repeat(megabyte)}implementation group: ${'a: '.repeat(megabyte / 3)}`,
+      'gradle/libs.versions.toml': `[libraries]\nx = "${':'.repeat(megabyte)}"\n`
+    })
+    expect(performance.now() - started).toBeLessThan(3000)
+  })
+
   it('names nothing from a manifest it cannot read, and nothing that is never looked at', async () => {
     expect(
       await read({
         'pyproject.toml': '[project\ndependencies = [',
-        'node_modules/x/requirements.txt': 'six\n'
+        'package.json': '{ "dependencies": ',
+        'pom.xml': '<pro',
+        'node_modules/x/requirements.txt': 'six\n',
+        'node_modules/x/package.json': '{ "dependencies": { "six": "1" } }'
       })
     ).toEqual([])
   })

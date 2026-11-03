@@ -149,7 +149,10 @@ export async function analyseDependencies(
   >()
   const notResolved: NotResolved[] = []
   /** Per file and Library: its lines, and per line whether every use on it is type-only. */
-  const libraryUses = new Map<string, { file: string; library: string; typed: Map<number, boolean> }>()
+  const libraryUses = new Map<
+    string,
+    { file: string; library: string; typed: Map<number, boolean> }
+  >()
   const useLibrary = ({ file, library, line, typeOnly }: LibraryUseAt): void => {
     const key = `${file}\n${library}`
     const known = libraryUses.get(key) ?? { file, library, typed: new Map<number, boolean>() }
@@ -207,7 +210,12 @@ export async function analyseDependencies(
           break
         }
         case 'library':
-          useLibrary({ file: path, library: resolution.name, line: use.line, typeOnly: use.typeOnly })
+          useLibrary({
+            file: path,
+            library: resolution.name,
+            line: use.line,
+            typeOnly: use.typeOnly
+          })
           break
         case 'not-resolved':
           notResolved.push({ file: path, specifier: use.specifier, line: use.line })
