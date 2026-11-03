@@ -184,8 +184,7 @@ it('computes the metrics of this repository as their definitions say', async () 
   // of the scale.
   expect(metrics.get('kernel')!.instability).toBe(0)
   expect(metrics.get('app')!.instability).toBe(1)
-  // It uses the cores of Decisions, Structure, Conformance and Review, the git and the export
-  // of the command line, and the sentences of Diagrams for its German, and reaches the kernel
-  // only through them.
-  expect(metrics.get('app')).toMatchObject({ fanOut: 6, fanIn: 0 })
+  // It uses the cores of Decisions, Structure, Conformance, Diagrams and Review, the git and
+  // the export of the command line, and the kernel for the settings of `.arch/config.yml`.
+  expect(metrics.get('app')).toMatchObject({ fanOut: 7, fanIn: 0 })
 })
