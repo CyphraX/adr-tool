@@ -212,6 +212,8 @@ export const SENTENCES = {
     `${v.finding} cites ${evidence(v.kind, v.name)} already.`,
   'evidence-not-there': (v: { kind: string; name: string }): string =>
     `${evidence(v.kind, v.name)} is not there, so a Finding cannot cite it.`,
+  'evidence-ambiguous-adr': (v: { adr: string; candidates: readonly string[] }): string =>
+    `${v.adr} is in several Decision Logs: ${listed(v.candidates)}. Name it with its log.`,
   'evidence-incomplete': (v: { kind: string }): string =>
     `The evidence is not complete: ${EVIDENCE[v.kind] ?? v.kind} needs every key its kind names.`,
   'snapshot-without-values': (): string =>
