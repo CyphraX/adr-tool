@@ -15,7 +15,7 @@ A desktop app for the architecture that lives in a git repository: its Architect
 
 Softarch Suite reads ADRs where they already are: Markdown files in a repository, written by people, by agents or by other tools. It lists them, shows how they relate, finds what is inconsistent, and writes new ones and changes to existing ones. Every change is shown as a diff before it is written, and nothing is changed beyond the lines it was asked to change. Markdown is never re-serialized ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)).
 
-The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built, and more are on the way:
+The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built, and the core of a third:
 
 - **Decisions** covers the ADRs. It was called ADR Tool until the suite got its name.
 - **Structure** shows the Components of the code and the Dependencies between them, and links them to the ADRs that affect them.

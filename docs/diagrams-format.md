@@ -55,7 +55,7 @@ connections:
 
 ### Keys at the top
 
-Every key is optional.
+`level` is required: a Diagram without one is a Problem (section 5), and is read and drawn all the same. Every other key may be left out.
 
 | Key           | Value                                         | Meaning                                                                                          |
 | ------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -94,13 +94,13 @@ Positions and sizes are in the units of the SVG, a pixel each, and grow to the r
 | `to`    | element ID | The element that is used. Required. The arrow points at it.                   |
 | `label` | text       | What the connection says, written on its line. Optional.                      |
 
-Whether a connection is type-only is not stored: a Diagram says that one part uses another, and Drift compares it with every Dependency, type-only or not (section 4).
+Whether a connection is type-only is not stored: a Diagram says that one part uses another, and Drift compares it with every Dependency, type-only or not (section 4). A connection has no type, so its line is always solid: the dashed line that [design.md](design.md) gives a type-only Dependency belongs to Structure's graph, and in a Diagram only the border of an External System is dashed.
 
 ### IDs
 
 - The **element ID** of a Component is its Component ID: `core`, `core/metadata`. That of an External System or of the repository is the text after `external` or `repository`, a segment as a Component ID has them — lowercase ASCII letters, digits and dashes, starting and ending with a letter or a digit — so that it can never be read as a Component below another.
 - Connections name elements by their element IDs. The elements of one Diagram have distinct IDs: an External System cannot share its ID with a Component the Diagram shows.
-- A Component ID is what a Rename of the Component rewrites (part 7): in `component`, `scope`, `from` and `to`, and nowhere else.
+- A Component ID is what a Rename of the Component rewrites (part 7), with the IDs below it — a Rename of `core` rewrites `core/metadata` too ([structure-format.md](structure-format.md), section 1): in `component` and `scope`, and in `from` and `to` where they name a Component element — not where they name an External System that has the same ID. Nowhere else.
 
 ### How the suite writes (part 7)
 
@@ -222,7 +222,7 @@ The `diagrams` package draws a Diagram as SVG itself, without a browser, so that
 - **A label** in the middle of each line, on a ground of the background's colour, so that it stays legible across a line.
 - **The title and the description** above the boxes; the Diagram ID in the picture's `<title>` where there is no title.
 - **The legend at the foot**, naming what the picture holds: "Component", "External System", "This repository", and "uses; the arrow points at what is used". It names only what the picture has.
-- The picture's `<desc>` holds the description and one sentence per connection — "app uses core: reads and plans ADRs." —, which a screen reader reads out ([design.md](design.md), "A graph is also a text").
+- The picture's `<desc>` holds the description and one sentence per connection — "app uses core: reads and plans ADRs." —, each ending in one full stop. A screen reader reads it out where the SVG is opened on its own or written into a page ([design.md](design.md), "A graph is also a text"). Where it is embedded as an image — `<img>`, or `![…](…)` in Markdown — a screen reader reads the alternative text of the embedding instead, so that text says what the picture shows (section 6, "The export").
 
 **Drift is not drawn**, and neither are Problems: the export is the picture as it is intended.
 
@@ -268,7 +268,13 @@ Text in bold is 5 % wider. The figures are on the wide side of the common sans s
 
 The export writes the picture beside its Diagram, `<Diagram ID>.svg` in the same directory, as a previewed change set ([ADR-0004](adr/0004-operations-return-change-sets.md)): a new file, or the whole of the file that is there. The SVG beside a Diagram belongs to the suite, and is not edited by hand. When the file is there already with the same bytes, the change set is empty. A Diagram that cannot be read is not exported, and no Diagram is while `.arch/components.yml` is there but cannot be read: the picture would lose the names of its Components until the declaration is fixed.
 
-GitHub shows the SVG where the repository is browsed, and an ADR embeds it as an image: `![The packages](../architecture/diagrams/packages.svg)`. That it is committed although it is derived is recorded in [ADR-0018](adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md); nothing checks yet that it is current — export again after changing the Diagram.
+GitHub shows the SVG where the repository is browsed, and an ADR embeds it as an image. A screen reader reads the embedding's alternative text, not the picture's `<desc>`, so the alternative text says in a sentence what the picture shows:
+
+```markdown
+![The packages of Softarch Suite: the app uses the command line and the cores of the modules, which stand on the kernel.](../architecture/diagrams/packages.svg)
+```
+
+That it is committed although it is derived is recorded in [ADR-0018](adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md); nothing checks yet that it is current — export again after changing the Diagram.
 
 ## 7. What is not in the repository (part 6)
 
