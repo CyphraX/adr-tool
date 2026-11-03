@@ -187,17 +187,29 @@
   {/if}
 
   <footer>
-    <p class="reading">{t.structure.graph.howToRead}</p>
+    <p class="reading">
+      {violations ? t.conformance.center.howToRead : t.structure.graph.howToRead}
+    </p>
     <ul class="legend" aria-label={t.structure.graph.legend}>
       <li>
         <svg width="34" height="10" aria-hidden="true">
-          <path class="line" d="M1 5H32" marker-end="url(#dependency-arrow)" />
+          <path
+            class="line"
+            class:quiet={violations}
+            d="M1 5H32"
+            marker-end="url(#dependency-arrow)"
+          />
         </svg>
         {t.structure.graph.dependency}
       </li>
       <li>
         <svg width="34" height="10" aria-hidden="true">
-          <path class="line type-only" d="M1 5H32" marker-end="url(#dependency-arrow)" />
+          <path
+            class="line type-only"
+            class:quiet={violations}
+            d="M1 5H32"
+            marker-end="url(#dependency-arrow)"
+          />
         </svg>
         {t.structure.graph.typeOnly}
       </li>
