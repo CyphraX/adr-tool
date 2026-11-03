@@ -77,11 +77,15 @@ describe('the Diagram of this repository’s packages', () => {
     const suggested = suggestConnections(packages, structure, analysis)
     expect(pairs(suggested)).toEqual([
       'app > cli',
+      'app > conformance',
       'app > core',
       'app > diagrams',
       'app > structure',
+      'cli > conformance',
       'cli > core',
       'cli > structure',
+      'conformance > kernel',
+      'conformance > structure',
       'core > kernel',
       'diagrams > kernel',
       'diagrams > structure',
@@ -168,7 +172,7 @@ describe('the Diagram of this repository’s packages', () => {
     expect(
       problems.map((problem) => `${problem.path}:${problem.line}: ${wordingOf(problem)}`)
     ).toEqual([
-      'docs/architecture/diagrams/packages.yml:14: The Diagram shows mcp, which is not a declared Component.'
+      'docs/architecture/diagrams/packages.yml:18: The Diagram shows mcp, which is not a declared Component.'
     ])
 
     // Planned against the repository as it is: this test never writes into it.

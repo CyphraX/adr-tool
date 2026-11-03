@@ -6,32 +6,39 @@ description: Each package of this repository, which of them uses which, and what
 level: container
 elements:
   - component: kernel
-    at: [40, 320]
+    at: [40, 380]
   - component: core
-    at: [260, 80]
+    at: [260, 100]
   - component: structure
-    at: [260, 320]
-  - component: mcp
-    at: [480, 80]
-  - component: cli
-    at: [480, 200]
+    at: [260, 300]
+  - component: conformance
+    at: [520, 380]
   - component: diagrams
-    at: [480, 460]
-  - component: app
+    at: [480, 580]
+  - component: mcp
+    at: [700, 120]
+  - component: cli
     at: [700, 200]
+  - component: app
+    at: [960, 380]
   - external: agent
     name: A coding agent
     description: Brought by the person, connected over MCP.
-    at: [740, 40]
+    at: [960, 140]
   - external: git
     name: git
     description: Holds the history of the repository.
-    at: [700, 400]
+    at: [740, 560]
 connections:
   - from: core
     to: kernel
   - from: structure
     to: kernel
+  - from: conformance
+    to: kernel
+  - from: conformance
+    to: structure
+    label: Components, Dependencies
   - from: diagrams
     to: kernel
   - from: diagrams
@@ -47,12 +54,18 @@ connections:
     label: lints and exports
   - from: cli
     to: structure
+  - from: cli
+    to: conformance
+    label: checks the Rules
   - from: app
     to: core
     label: Decisions
   - from: app
     to: structure
     label: Structure
+  - from: app
+    to: conformance
+    label: renames in the Rules
   - from: app
     to: cli
     label: the export
