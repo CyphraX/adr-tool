@@ -55,6 +55,15 @@ export {
   type SuggestedConnection
 } from './connections'
 export { planRepair, removeComponent } from './repair'
+export {
+  editDiagramText,
+  planDiagramEdit,
+  spliceBetween,
+  yamlText,
+  type DiagramEdit,
+  type NewConnection,
+  type NewElement
+} from './edit'
 export { drawDiagram, textWidth } from './svg'
 export { planExport, type ExportModel, type ExportPlan } from './export'
 export {

@@ -4,21 +4,14 @@
  * the text is spliced: the YAML is parsed to find where the items stand, and only their lines
  * are taken out, so that comments, quoting and everything else stay what a person made them.
  */
-import { isMap, isScalar, isSeq, parseDocument, type Pair, type YAMLSeq } from 'yaml'
+import { parseDocument } from 'yaml'
 import { applyEdits, plan, type FileSystem, type Plan, type TextEdit } from '@adr-tool/kernel'
-import { readDiagram, type Diagram } from './diagram'
+import { readDiagram } from './diagram'
+import { comparable, itemLines, listOf, mapsOf, textAt } from './lines'
 import type { DiagramProblem } from './problems'
 import { refusal, refuse } from './sentences'
 
 const asText = (text: string): string => text
-
-const lineStart = (text: string, offset: number): number => text.lastIndexOf('\n', offset - 1) + 1
-
-/** The offset behind the line break of the line an offset stands in; the end of the text without one. */
-function lineEnd(text: string, offset: number): number {
-  const next = text.indexOf('\n', offset)
-  return next === -1 ? text.length : next + 1
-}
 
 /** The Repair of a Problem, as a change set. A Repair exists only where exactly one change is right. */
 export function planRepair(fs: FileSystem, problem: DiagramProblem): Promise<Plan> {
@@ -49,81 +42,38 @@ export function removeComponent(path: string, text: string, component: string): 
   const cannot = refusal({ code: 'cannot-remove-element', values: { path, component } })
 
   const doc = parseDocument(text, { uniqueKeys: false })
-  const listOf = (key: string): YAMLSeq | undefined => {
-    if (!isMap(doc.contents)) return undefined
-    const pair = doc.contents.items.find(
-      (item: Pair) => isScalar(item.key) && item.key.value === key
-    )
-    return isSeq(pair?.value) ? pair.value : undefined
-  }
-  const valueOf = (item: unknown, key: string): unknown => {
-    if (!isMap(item)) return undefined
-    const pair = item.items.find(
-      (candidate) => isScalar(candidate.key) && candidate.key.value === key
-    )
-    return isScalar(pair?.value) ? pair.value.value : undefined
+  const lines = (item: unknown): TextEdit => {
+    const found = itemLines(text, item)
+    if (!found) throw cannot
+    return { ...found, insert: '' }
   }
 
   const edits: TextEdit[] = []
-  const elements = listOf('elements')
+  const elements = listOf(doc, 'elements')
   if (!elements || elements.flow) throw cannot
   for (const item of elements.items) {
-    if (valueOf(item, 'component') === component) edits.push(itemLines(text, item, cannot))
+    if (textAt(item, 'component') === component) edits.push(lines(item))
   }
-  const connections = listOf('connections')
+  const connections = listOf(doc, 'connections')
   if (!kept && connections) {
-    const goes = connections.items.filter(
-      (item) => valueOf(item, 'from') === component || valueOf(item, 'to') === component
+    const goes = mapsOf(connections).filter(
+      (item) => textAt(item, 'from') === component || textAt(item, 'to') === component
     )
     if (goes.length > 0 && connections.flow) throw cannot
-    for (const item of goes) edits.push(itemLines(text, item, cannot))
+    for (const item of goes) edits.push(lines(item))
   }
 
   // What is handed out reads back as the same Diagram without those items.
   const after = readDiagram(path, applyEdits(text, edits))
   const expected = {
-    ...comparable(before),
-    elements: comparable(before).elements.filter(
+    ...before,
+    elements: before.elements.filter(
       (element) => !(element.kind === 'component' && element.id === component)
     ),
-    connections: comparable(before).connections.filter(
+    connections: before.connections.filter(
       (connection) => kept || (connection.from !== component && connection.to !== component)
     )
   }
-  if (!after.readable || JSON.stringify(comparable(after)) !== JSON.stringify(expected))
-    throw cannot
+  if (!after.readable || comparable(after) !== comparable(expected)) throw cannot
   return edits
-}
-
-/**
- * The lines of one item of a block list: from the start of the line of its `-` to the end of
- * the line of its last key. Refused where they hold anything else.
- */
-function itemLines(text: string, item: unknown, cannot: Error): TextEdit {
-  const range = (item as { range?: readonly [number, number, number] | null }).range
-  if (!range) throw cannot
-  const [valueStart, valueEnd] = range
-  const dash = text.lastIndexOf('-', valueStart)
-  const start = lineStart(text, dash)
-  const lead = text.slice(start, dash) + text.slice(dash + 1, valueStart)
-  if (dash < 0 || lead.trim() !== '') throw cannot
-  // A block map ends behind the line break of its last key already, with a comment behind that
-  // key; a flow map ends at its brace, and only a comment may follow it on its line.
-  const end = text[valueEnd - 1] === '\n' ? valueEnd : lineEnd(text, valueEnd)
-  if (!/^[ \t]*(?:#[^\n]*)?\r?\n?$/.test(text.slice(valueEnd, end))) throw cannot
-  return { start, end, insert: '' }
-}
-
-/** A Diagram as a comparison needs it: without its lines and its Problems, which move. */
-function comparable(diagram: Diagram): {
-  elements: Diagram['elements']
-  connections: Diagram['connections']
-  rest: unknown
-} {
-  const { elements, connections, title, description, level, scope } = diagram
-  return {
-    elements: elements.map((element) => ({ ...element, line: 0 })),
-    connections: connections.map((connection) => ({ ...connection, line: 0 })),
-    rest: { title, description, level, scope }
-  }
 }

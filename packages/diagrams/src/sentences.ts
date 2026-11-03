@@ -137,7 +137,29 @@ export const SENTENCES = {
   'no-export-without-declaration': (v: { path: string }): string =>
     `${v.path} cannot be read, so the picture would not have the names of its Components. Fix it, then export.`,
   'cannot-remove-element': (v: { path: string; component: string }): string =>
-    `${v.path} is written in a way the suite cannot take ${v.component} out of. Remove it and its connections in an editor.`
+    `${v.path} is written in a way the suite cannot take ${v.component} out of. Remove it and its connections in an editor.`,
+
+  // The edits of the window and of agents (docs/diagrams-format.md, section 2).
+  'cannot-edit-diagram': (v: { path: string; edit: Said | string }): string =>
+    `The suite cannot ${english(v.edit)} in ${v.path} without rewriting more of the file than the lines of the change. Make this change in an editor.`,
+  'editing-move': (v: { id: string }): string => `move ${v.id}`,
+  'editing-add': (v: { id: string }): string => `add ${v.id}`,
+  'editing-remove': (v: { id: string }): string => `take ${v.id} out`,
+  'editing-describe': (v: { id: string }): string =>
+    `change the name or the description of ${v.id}`,
+  'editing-connect': (v: Ends): string => `connect ${v.from} to ${v.to}`,
+  'editing-disconnect': (v: Ends): string => `take the connection from ${v.from} to ${v.to} out`,
+  'editing-label': (v: Ends): string => `label the connection from ${v.from} to ${v.to}`,
+  'invalid-position': (): string =>
+    'A position is two numbers, [x, y], each between -1000000 and 1000000.',
+  'already-shown': (v: { path: string; id: string }): string => `${v.path} shows ${v.id} already.`,
+  'named-by-declaration': (v: { id: string }): string =>
+    `The name and the description of ${v.id} are those of its declaration in .arch/components.yml, not of the Diagram.`,
+  'connected-to-itself': (v: { id: string }): string =>
+    `An element does not use itself: ${v.id} cannot be connected to ${v.id}.`,
+  'already-connected': (v: Ends): string => `The Diagram connects ${v.from} to ${v.to} already.`,
+  'not-connected': (v: Ends & { path: string }): string =>
+    `${v.path} does not connect ${v.from} to ${v.to}. Look at the file again.`
 } satisfies Sentences
 
 /** What `diagrams` may say: one of its codes, with the values of its sentence. */

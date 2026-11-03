@@ -381,7 +381,28 @@ export const DE: Wording<Codes> = {
   'no-export-without-declaration': (v) =>
     `${v.path} kann nicht gelesen werden, darum hätte das Bild nicht die Namen seiner Komponenten. Vor dem Export muss die Datei korrigiert werden.`,
   'cannot-remove-element': (v) =>
-    `${v.path} ist so geschrieben, dass die Suite ${v.component} nicht herausnehmen kann. Es muss mit seinen Verbindungen in einem Editor entfernt werden.`
+    `${v.path} ist so geschrieben, dass die Suite ${v.component} nicht herausnehmen kann. Es muss mit seinen Verbindungen in einem Editor entfernt werden.`,
+
+  // Diagrams: the edits of the window and of agents.
+  'cannot-edit-diagram': (v) =>
+    `Die Suite kann in ${v.path} nicht ${german(v.edit)}, ohne mehr von der Datei neu zu schreiben als die Zeilen der Änderung. Diese Änderung muss in einem Editor gemacht werden.`,
+  'editing-move': (v) => `${v.id} verschieben`,
+  'editing-add': (v) => `${v.id} hinzufügen`,
+  'editing-remove': (v) => `${v.id} herausnehmen`,
+  'editing-describe': (v) => `den Namen oder die Beschreibung von ${v.id} ändern`,
+  'editing-connect': (v) => `${v.from} mit ${v.to} verbinden`,
+  'editing-disconnect': (v) => `die Verbindung von ${v.from} zu ${v.to} herausnehmen`,
+  'editing-label': (v) => `die Verbindung von ${v.from} zu ${v.to} beschriften`,
+  'invalid-position': () =>
+    'Eine Position sind zwei Zahlen, [x, y], jede zwischen -1000000 und 1000000.',
+  'already-shown': (v) => `${v.path} zeigt ${v.id} schon.`,
+  'named-by-declaration': (v) =>
+    `Name und Beschreibung von ${v.id} sind die seiner Deklaration in .arch/components.yml, nicht die des Diagramms.`,
+  'connected-to-itself': (v) =>
+    `Ein Element benutzt sich nicht selbst: ${v.id} kann nicht mit ${v.id} verbunden werden.`,
+  'already-connected': (v) => `Das Diagramm verbindet ${v.from} schon mit ${v.to}.`,
+  'not-connected': (v) =>
+    `${v.path} verbindet ${v.from} nicht mit ${v.to}. Die Datei sollte neu angesehen werden.`
 }
 
 /** What a module said, in German; `undefined` for a code that has no German sentence. */
