@@ -4,6 +4,13 @@
  * segment any number of segments, none included. A pattern without a wildcard is an ID.
  */
 
+/**
+ * What names the top level in the `of` of propagation cost, and in the fingerprint of the
+ * level: `/`, which no Component ID can be, so that `*` matches every top-level Component there
+ * as everywhere else.
+ */
+export const TOP_LEVEL = '/'
+
 /** Whether a pattern has a wildcard, and so may name several Components or none. */
 export const hasWildcard = (pattern: string): boolean => pattern.includes('*')
 

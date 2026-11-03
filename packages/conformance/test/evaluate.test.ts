@@ -505,11 +505,11 @@ describe('threshold on what is measured inside the code (part 13)', () => {
     )
   })
 
-  it('checks the propagation cost of the top level, named *, and of the level below a Component', async () => {
+  it('checks the propagation cost of the top level, named /, and of the level below a Component', async () => {
     const report = await checked(
       measured,
       rules(
-        rule('loose', 'kind: threshold', 'metric: propagation-cost', 'max: 0.4', "of: ['*', cart]"),
+        rule('loose', 'kind: threshold', 'metric: propagation-cost', 'max: 0.4', 'of: [/, cart]'),
         rule(
           'loose-tests',
           'kind: threshold',
@@ -522,8 +522,9 @@ describe('threshold on what is measured inside the code (part 13)', () => {
     )
     // cart reaches pricing: one of the two pairs. Below cart there is one file, and so no
     // propagation cost; with its test, two that do not use each other.
-    expect(found(report)).toEqual(['loose: *'])
-    expect(report.violations[0]).toMatchObject({ component: '*', value: 0.5 })
+    expect(found(report)).toEqual(['loose: /'])
+    expect(report.violations[0]).toMatchObject({ component: '/', value: 0.5 })
+    expect(report.problems).toEqual([])
     expect(sentenceAt(report.violations[0]!)).toBe(
       'The metric propagation-cost of the top level is 0.5, above the maximum of 0.4.'
     )
@@ -544,5 +545,26 @@ describe('threshold on what is measured inside the code (part 13)', () => {
     expect(sentenceAt(below.violations[0]!)).toBe(
       'The metric propagation-cost of the level below cart is 0, below the minimum of 0.5.'
     )
+    // `*` matches every top-level Component, as for every other metric: the levels below them.
+    const each = await checked(
+      measured,
+      rules(
+        rule(
+          'each',
+          'kind: threshold',
+          'metric: propagation-cost',
+          'min: 0.5',
+          "of: '*'",
+          'tests: included'
+        )
+      )
+    )
+    expect(found(each)).toEqual(['each: cart'])
+    // `/` names no Component, and the top level only for propagation cost.
+    const elsewhere = await checked(
+      measured,
+      rules(rule('files', 'kind: threshold', 'metric: files', 'max: 9', 'of: /'))
+    )
+    expect(elsewhere.problems.map((problem) => problem.kind)).toEqual(['unknown-component'])
   })
 })

@@ -197,8 +197,8 @@ What the metric is of decides what breaks the Rule (part 13):
 
 - **Of a Component** — the metrics of part 3, abstractness and distance: each matched Component, as above. Abstractness is undefined where a Component declares nothing — no type, no function — and distance with it.
 - **Of a function** — complexity: each function in the Source Files that the matched Components contain, their children's included. `of: '*'` checks every function of the declared Components. Its Violation is reported at the line the function begins on: in Java the line of its name, in TypeScript and JavaScript the line where its text begins, past its decorators (structure-format.md, section 5, "Names").
-- **Of a class** — LCOM4: each class there, as for a function; a class without methods has no LCOM4 and breaks nothing.
-- **Of a level** — propagation cost: the level below each matched Component, as Structure draws it (structure-format.md, section 4) — its children, its own Source Files, and below a Component without children its directories. `'*'` in `of` names the top level, which lies below no Component; with propagation cost it matches no Component. A level of fewer than two nodes has no propagation cost.
+- **Of a class** — LCOM4: each class there, as for a function; a class without a method that LCOM4 counts has no LCOM4 and breaks nothing.
+- **Of a level** — propagation cost: the level below each matched Component, as Structure draws it (structure-format.md, section 4) — its children, its own Source Files, and below a Component without children its directories. `/` in `of` names the top level, which lies below no Component, and names no Component: `of: [/, core]` checks the top level and the level below `core`. `*` matches every top-level Component, as it does for every other metric, and so checks the level below each of them, not the top level. `/` is read only with propagation cost; with another metric it is a Component that is not declared. A level of fewer than two nodes has no propagation cost.
 
 ```yaml
 - id: functions-stay-simple
@@ -213,7 +213,7 @@ What the metric is of decides what breaks the Rule (part 13):
   kind: threshold
   metric: propagation-cost
   max: 0.3
-  of: '*'
+  of: /
 ```
 
 | Metric | Structure's name | Arrives with |
@@ -230,7 +230,7 @@ What the metric is of decides what breaks the Rule (part 13):
 | `abstractness`, `distance` | Abstractness, distance from the main sequence, per Component | part 13 |
 | `complexity` | Cyclomatic complexity, per function — a Violation per function, at its line | part 13 |
 | `lcom4` | LCOM4, per class — a Violation per class, at its line | part 13 |
-| `propagation-cost` | Propagation cost, of the level below each matched Component (`'*'`: the top level) | part 13 |
+| `propagation-cost` | Propagation cost, of the level below each matched Component (`/`: the top level) | part 13 |
 
 A metric is named in lowercase words joined by dashes. A metric has a subject — a Component, a function, a class, a level —, and its Violations are named by it (section 3). A metric the suite does not know is a Problem of the Rule: a name that a later version knows is read by that version.
 
@@ -253,7 +253,7 @@ The **fingerprint** names a Violation without line numbers, so that it stays the
 | `no-cycles` | the Rule, and the members of the Cycle: Component IDs for `among`, the paths of Source Files for `inside`, in any order; an Exception may name more (section 4) | `rule`, `cycle` |
 | `threshold` | the Rule, and the Component | `rule`, `component` |
 | `threshold` on a metric per function or per class (part 13) | the Rule, the Source File, and the qualified name of the function or class | `rule`, `file`, `name` |
-| `threshold` on propagation cost (part 13) | the Rule, and the Component the level lies below — `'*'` for the top level | `rule`, `component` |
+| `threshold` on propagation cost (part 13) | the Rule, and the Component the level lies below — `/` for the top level | `rule`, `component` |
 
 The **name** of a function or class in a fingerprint is qualified by what contains it, joined by `.`: `Cart.total` for the method `total` of the class `Cart`, `Cart.Line` for a nested class, `formatDate` for a function at the top of its file, `load.map()` for a callback passed to `load.map(…)`; a Java method carries the types of its parameters, `Cart.add(Product)`, so that overloads are told apart. Structure names them (structure-format.md, section 5, "Inside a Source File"). So a method keeps its fingerprint when its lines move, and when another function is added to the file under another name. Some changes give a function another fingerprint all the same:
 

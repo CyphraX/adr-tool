@@ -17,7 +17,7 @@ import {
   type Metrics,
   type Structure
 } from '@adr-tool/structure/model'
-import { matcherOf } from './component-patterns'
+import { matcherOf, TOP_LEVEL } from './component-patterns'
 import type { Fingerprint } from './fingerprint'
 import {
   SUBJECT_OF,
@@ -37,10 +37,11 @@ export interface Model {
   /** How many lines each Source File has (Structure's Size). */
   readonly lineCounts: ReadonlyMap<string, number>
   /**
-   * What is measured inside each Source File: its functions, classes and declarations. Left
-   * out, no function or class has a metric, and no Component an abstractness.
+   * What is measured inside each Source File: its functions, classes and declarations. A file
+   * that is not in it has no function or class with a metric, and counts towards no
+   * abstractness.
    */
-  readonly measures?: ReadonlyMap<string, FileMeasures>
+  readonly measures: ReadonlyMap<string, FileMeasures>
 }
 
 /** One place where the code breaks a Rule. */
@@ -80,10 +81,9 @@ export interface Violation {
   readonly dependencies: readonly Dependency[]
 }
 
-const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+export { TOP_LEVEL }
 
-/** What names the top level in the `of` of propagation cost, and in the fingerprint of a level. */
-export const TOP_LEVEL = '*'
+const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /** The chains of Components that contain each Source File, top down, and which files are tests. */
 interface Chains {
@@ -447,7 +447,7 @@ function insideOutside(rule: ThresholdRule, model: Model): Outside[] {
     .map(([path]) => path)
     .sort(compare)
   return files.flatMap((file) => {
-    const measured = model.measures?.get(file)
+    const measured = model.measures.get(file)
     if (measured === undefined) return []
     const subjects =
       kind === 'function'
@@ -475,7 +475,7 @@ function insideOutside(rule: ThresholdRule, model: Model): Outside[] {
 }
 
 /**
- * The level below each matched Component, and the top level where `of` names `*`: Structure's
+ * The level below each matched Component, and the top level where `of` names `/`: Structure's
  * levels (structure-format.md, section 4), where one has a propagation cost.
  */
 function levelsOutside(rule: ThresholdRule, model: Model): Outside[] {

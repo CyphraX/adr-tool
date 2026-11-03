@@ -14,6 +14,7 @@ import {
   type Sentences
 } from '@adr-tool/kernel'
 import { UNASSIGNED } from '@adr-tool/structure/model'
+import { TOP_LEVEL } from './component-patterns'
 
 /** What makes a Rule ID, as the end of a sentence about one. */
 export const RULE_ID_RULE =
@@ -85,7 +86,7 @@ const subjectOf = (v: ThresholdSubject): string => {
     case 'component':
       return v.component
     case 'level':
-      return v.component === '*' ? 'the top level' : `the level below ${v.component}`
+      return v.component === TOP_LEVEL ? 'the top level' : `the level below ${v.component}`
     case 'function':
     case 'class':
       return `the ${v.subject} ${v.name} at ${v.file}:${v.line}`

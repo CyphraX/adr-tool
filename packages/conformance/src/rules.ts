@@ -13,6 +13,7 @@ import {
   type ParsedNode,
   type YAMLMap
 } from 'yaml'
+import { TOP_LEVEL } from './component-patterns'
 import { RULE_KIND_NAMES, type ConformanceProblem } from './problems'
 import type { ConformanceSaid } from './sentences'
 
@@ -389,6 +390,12 @@ function readRule(
         throw new Wrong({ code: 'max-or-min', values: {} }, line)
       }
       const of = patternsAt('of', true)!
+      // `/` names the top level, of propagation cost alone; it names no Component.
+      if (metric === 'propagation-cost') {
+        for (let at = names.length - 1; at >= 0; at--) {
+          if (names[at]!.key === 'of' && names[at]!.pattern === TOP_LEVEL) names.splice(at, 1)
+        }
+      }
       return {
         rule: {
           ...common,

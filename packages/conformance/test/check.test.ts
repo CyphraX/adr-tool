@@ -193,11 +193,11 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
         'rules:',
         "  - {id: simple, why: W., kind: threshold, metric: complexity, max: 1, of: '*'}",
         "  - {id: cohesive, why: W., kind: threshold, metric: lcom4, max: 1, of: '*'}",
-        "  - {id: loose, why: W., kind: threshold, metric: propagation-cost, max: 0.4, of: '*'}",
+        '  - {id: loose, why: W., kind: threshold, metric: propagation-cost, max: 0.4, of: /}',
         'exceptions:',
         '  - {rule: simple, file: src/a/a.ts, name: decide, reason: R.}',
         '  - {rule: cohesive, file: src/a/a.ts, name: Two, reason: R.}',
-        "  - {rule: loose, component: '*', reason: R.}",
+        '  - {rule: loose, component: /, reason: R.}',
         '  - {rule: simple, component: a, reason: R.}',
         '  - {rule: simple, file: src/a/a.ts, reason: R.}',
         '  - {rule: loose, file: src/a/a.ts, name: decide, reason: R.}',
@@ -208,7 +208,7 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
       'simple: decide in src/a/a.ts (accepted)',
       'simple: b in src/b/b.ts',
       'cohesive: Two in src/a/a.ts (accepted)',
-      'loose: * (accepted)'
+      'loose: / (accepted)'
     ])
     expect(problems(report)).toEqual([
       '9: invalid-exception: An Exception from the Rule simple cannot be read: an Exception from a Rule of the kind threshold names its Violation by "file" and "name".',
