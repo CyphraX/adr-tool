@@ -1,0 +1,12 @@
+# A shop of three layers, broken on purpose: the invoice formats its date with the web's helper.
+rules:
+  - id: billing-not-web
+    why: Billing is the domain; the web is how it is shown, and may change without it.
+    kind: must-not-depend
+    from: billing
+    to: [web]
+
+  - id: layered
+    why: The web uses billing, which uses persistence.
+    kind: layers
+    layers: [web, billing, persistence]

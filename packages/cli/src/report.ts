@@ -25,7 +25,7 @@ export function render(report: LintReport, format: Format, checkout = ''): strin
  * written as its escape, and a line never begins with `::`, which GitHub Actions would take
  * for a workflow command.
  */
-const oneLine = (text: string): string => {
+export const oneLine = (text: string): string => {
   // eslint-disable-next-line no-control-regex
   const escaped = text.replace(/[\u0000-\u001f\u007f]/g, (char) =>
     JSON.stringify(char).slice(1, -1)
@@ -40,12 +40,17 @@ const said = (problem: LintedProblem): string =>
   oneLine(`${where(problem)}: ${problem.code}: ${problem.message}`)
 
 function text(report: LintReport): string {
-  const lines = report.problems.flatMap((group) => [
+  const lines = textLines(report)
+  return [...lines, ...(lines.length > 0 ? [''] : []), summary(report), ''].join('\n')
+}
+
+/** The lines of the Problems in `--format text`, without the count. `adr check` prints them too. */
+export function textLines(report: LintReport): string[] {
+  return report.problems.flatMap((group) => [
     said(group),
     ...(group.lead === undefined ? [] : [`  ${oneLine(group.lead)}`]),
     ...group.consequences.map((consequence) => `  ${said(consequence)}`)
   ])
-  return [...lines, ...(lines.length > 0 ? [''] : []), summary(report), ''].join('\n')
 }
 
 /** The last line: how many Problems, where, and how many follow from them. */
@@ -68,7 +73,8 @@ export function summary(report: LintReport): string {
   return `${found} in ${places}${rest}.`
 }
 
-function json(report: LintReport): object {
+/** The document of `--format json`. `adr check` holds its Problems too. */
+export function json(report: LintReport): { logs: readonly string[]; problems: object[] } {
   const one = ({ code, message, path, line, log, problem }: LintedProblem): object => ({
     code,
     message,
@@ -98,9 +104,9 @@ function withoutSaid(problem: Problem): Problem {
 }
 
 /** Escaped as the workflow commands of GitHub Actions want it. */
-const data = (value: string): string =>
+export const data = (value: string): string =>
   value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
-const property = (value: string): string =>
+export const property = (value: string): string =>
   data(value).replaceAll(':', '%3A').replaceAll(',', '%2C')
 
 function command(
@@ -119,7 +125,12 @@ function command(
 }
 
 function github(report: LintReport, checkout: string): string {
-  const lines = report.problems.flatMap((group) => [
+  return [...githubLines(report, checkout), summary(report), ''].join('\n')
+}
+
+/** The workflow commands of `--format github`, without the count. */
+export function githubLines(report: LintReport, checkout: string): string[] {
+  return report.problems.flatMap((group) => [
     command('error', group, group.message, checkout),
     ...group.consequences.map((consequence) =>
       command(
@@ -130,5 +141,4 @@ function github(report: LintReport, checkout: string): string {
       )
     )
   ])
-  return [...lines, summary(report), ''].join('\n')
 }

@@ -1,0 +1,7 @@
+components:
+  web:
+    paths: [src/web/**]
+  billing:
+    paths: [src/billing/**]
+  persistence:
+    paths: [src/persistence/**]

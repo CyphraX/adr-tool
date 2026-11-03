@@ -21,9 +21,22 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
       ].join('\n'),
       'src/b.ts': ''
     })
+    // Line 1 uses b for its types alone: a Rule that ignores those leaves it out.
     expect(dependencies).toEqual([
-      { from: 'src/a.ts', to: 'src/b.ts', typeOnly: false, lines: [1, 2, 4] }
+      { from: 'src/a.ts', to: 'src/b.ts', typeOnly: false, lines: [1, 2, 4], typeOnlyLines: [1] }
     ])
+  })
+
+  it('mark a line type-only only where every use that begins on it is', async () => {
+    const { dependencies } = await analyse({
+      'src/a.ts': [
+        "import type { T } from './b'; import { b } from './b'",
+        "import type { U } from './b'",
+        "export type { V } from './b'"
+      ].join('\n'),
+      'src/b.ts': ''
+    })
+    expect(dependencies[0]!.typeOnlyLines).toEqual([2, 3])
   })
 
   it('are type-only only where every use is, or where the file used is a declaration file', async () => {

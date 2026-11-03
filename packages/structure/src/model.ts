@@ -39,7 +39,7 @@ export {
   type LevelNode,
   type LevelOptions
 } from './levels'
-export type { Cycle } from './cycles'
+export { findCycles, type Cycle, type WeightedEdge } from './cycles'
 export { metricsOf, sizeOf, type Metrics, type Size } from './metrics'
 export {
   matrixOf,

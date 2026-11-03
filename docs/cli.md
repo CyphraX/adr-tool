@@ -1,16 +1,17 @@
 # The command line — `adr`
 
-The contract of the suite's command line (`packages/cli`): what it reads, what it prints, and how it ends. It is written for CI first — a pipeline that should fail when a Decision Log breaks — and for anyone who wants the app's checks without the window. It is built on `core` and says what the app says ([plan-roadmap.md](plan-roadmap.md), part 4).
+The contract of the suite's command line (`packages/cli`): what it reads, what it prints, and how it ends. It is written for CI first — a pipeline that should fail when a Decision Log breaks — and for anyone who wants the app's checks without the window. It is built on `core` and says what the app says ([plan-roadmap.md](plan-roadmap.md), part 4); `adr check` adds `structure` and `conformance` ([plan-vision.md](plan-vision.md), part 3).
 
-`adr lint` reads and never writes. Repairs stay in the app, where each one is previewed. `adr export` writes, and only into the directory it is given ([ADR-0014](adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
+`adr lint` and `adr check` read and never write. Repairs stay in the app, where each one is previewed. `adr export` writes, and only into the directory it is given ([ADR-0014](adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
 
 ## Running it
 
-The command is one file with nothing to install beside it: `pnpm build` writes it to `packages/cli/dist/adr.mjs`, and Node.js 22.12 or later runs it, wherever it is copied to — the `.mjs` makes it a module whatever `package.json` stands beside it.
+The command is one file with nothing to install beside it: `pnpm build` writes it to `packages/cli/dist/adr.mjs`, and Node.js 22.12 or later runs it, wherever it is copied to — the `.mjs` makes it a module whatever `package.json` stands beside it. It is about 12 MB: the TypeScript compiler, which `adr check` reads TypeScript and JavaScript with, is most of it, and the WebAssembly of tree-sitter and its Java grammar are in it as text ([ADR-0017](adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)), so that nothing has to stand beside it.
 
 ```sh
 node packages/cli/dist/adr.mjs lint            # the repository in the current directory
 node packages/cli/dist/adr.mjs lint ../shop    # another one
+node packages/cli/dist/adr.mjs check           # the same, and the Rules against the code
 pnpm adr lint                                 # the same, from this repository
 node packages/cli/dist/adr.mjs export --out site   # the Decision Logs as pages, into ./site
 ```
@@ -113,6 +114,105 @@ The code of a Problem is its kind in `core` (`packages/core/src/problems/problem
 
 A new kind of Problem gets a new code. A code is never given a different meaning, and is renamed only with a note in this document.
 
+## `adr check [path] [--format text|json|github]`
+
+Does what `adr lint` does, then checks the declaration of Components in `.arch/components.yml` ([structure-format.md](structure-format.md)) and the Rules in `.arch/rules.yml` against the code ([conformance-format.md](conformance-format.md)). It fails on every Problem — of a Decision Log, of the declaration, of the file of Rules — and on every Violation that no Exception accepts. Its options are those of `adr lint`, and they may stand anywhere on the line.
+
+```sh
+node packages/cli/dist/adr.mjs check                  # the repository in the current directory
+node packages/cli/dist/adr.mjs check --format github  # in a pipeline
+```
+
+- **The Decision Logs** are found and checked as `adr lint` checks them, with the same lines and codes. A repository without one is checked all the same, when it has `.arch/components.yml` or `.arch/rules.yml`.
+- **The files of the repository** are what the app lists ([structure-format.md, section 2](structure-format.md#2-source-files-part-2)): in a git repository, what git tracks and what it neither tracks nor ignores; elsewhere, a walk of the directory that honours `.gitignore`. git is run without a pager, without locks, without the file system monitor and without fetching what a partial clone lacks; nothing the repository brings along is run ([ADR-0007](adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)).
+- **The code** is read only when a Rule needs it: TypeScript and JavaScript with the TypeScript compiler, Java with the tree-sitter grammar that the command carries. A Source File that cannot be parsed is named on standard error; it has no Dependencies of its own, and the check goes on.
+- **The Rules** are evaluated only against a declaration that can be read. On a Draft — no `.arch/components.yml`, or one that cannot be read — the file of Rules has the Problem `rules-without-declaration`, and no Rule is checked ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)).
+
+Nothing is written. `adr lint` stays as it was: it reads no Rules, and what it prints and how it ends do not change.
+
+### What it prints
+
+First what `adr lint` prints, without its count; then the Problems of `.arch/components.yml`, named by the file (`path: code: message`) — and by the line the YAML parser stopped at, for a file that is not YAML; then the Problems of `.arch/rules.yml` at their line; then each Violation that no Exception accepts, once for each line of each import behind it:
+
+```
+src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
+```
+
+- **The file and the line** are those of the import — where the person who wrote it reads the message. A Violation with no import behind it, a `threshold`, is printed at the line of its Rule in `.arch/rules.yml`.
+- **The code** is the ID of the Rule, which the architect chose and which stays as long as the Rule does. A Problem has its code, as in `adr lint`.
+- **The message** is the sentence of the Violation ([conformance-format.md, section 3](conformance-format.md#3-violations-and-their-fingerprint-part-3)), the import that causes it, and the reason the Rule gives, in the architect's words.
+
+A Violation that an Exception accepts is not printed; it is counted. A note about `.arch/rules.yml` — an Exception of a Cycle that can be narrowed — is printed among the Problems of the file, at its line, and fails nothing. After an empty line, the last lines count: one for the Decision Logs, as `adr lint` counts them, or `No Decision Log.`; one for the declaration when it has Problems, `1 Problem in .arch/components.yml.`; and one for the Rules:
+
+| Last line | When |
+| --------- | ---- |
+| `5 Rules hold.` | No Violation |
+| `2 Violations of 5 Rules.` | Violations, none accepted |
+| `1 Violation of 5 Rules, and 1 accepted as an Exception.` | Some accepted, some not |
+| `5 Rules hold, but for 2 Violations accepted as Exceptions.` | Every Violation accepted |
+| `5 Rules, not checked` | On a Draft: no Rule is checked |
+| `No Rules in .arch/rules.yml.` | The file is there, and has no Rule that can be read |
+| `No Rules: .arch/rules.yml is not there.` | No file of Rules |
+
+Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem in .arch/rules.yml.` A Rule with a Problem of its own form is not counted among the Rules.
+
+`--format json` prints one JSON document instead, and nothing else. It holds every Violation, the accepted ones too, each with its fingerprint ([conformance-format.md, section 3](conformance-format.md#the-fingerprint)) — what an Exception names to accept it:
+
+```json
+{
+  "logs": ["docs/adr"],
+  "problems": [],
+  "notes": [],
+  "rules": [
+    { "id": "billing-not-web", "kind": "must-not-depend", "why": "Billing is the domain; …", "path": ".arch/rules.yml", "line": 3 }
+  ],
+  "violations": [
+    {
+      "code": "must-not-depend",
+      "rule": "billing-not-web",
+      "message": "billing must not depend on web.",
+      "why": "Billing is the domain; the web is how it is shown, and may change without it.",
+      "fingerprint": { "kind": "dependency", "rule": "billing-not-web", "from": "billing", "to": "web" },
+      "fingerprintText": "billing-not-web: billing -> web",
+      "path": "src/billing/invoice.ts",
+      "line": 3,
+      "dependencies": [{ "from": "src/billing/invoice.ts", "to": "src/web/format.ts", "typeOnly": false, "lines": [3] }],
+      "exception": { "reason": "…", "justified-by": "docs/adr/0001-invoices-format-dates-like-the-web", "path": ".arch/rules.yml", "line": 15 }
+    }
+  ]
+}
+```
+
+- **`notes`** holds the notes of `.arch/rules.yml`, each with `module`, `code`, `message`, `path`, `line` and `note` as Conformance reports it; they fail nothing.
+- **`problems`** holds the Problems of every module, each with `module`: `decisions` (as `adr lint` writes them), `structure` (of `.arch/components.yml`) or `conformance` (of `.arch/rules.yml`), with `code`, `message`, `path`, `line` where there is one, and `problem` as the module reports it.
+- **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, or of the Rule when there is none; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
+
+`--format github` prints one `::error` [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message) for each line of the text format, so that a pull request shows each Violation on the line of its import, titled with the ID of the Rule, and each Problem titled with its code — a note as a `::notice`; the Problems of the Decision Logs are written as `adr lint` writes them. The counts come last, as lines of their own. The files are named from the directory the command runs in, as with `adr lint`:
+
+```
+::error file=src/billing/invoice.ts,line=3,title=billing-not-web::billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
+```
+
+### How it ends
+
+| Exit code | When |
+| --------- | ---- |
+| 0 | There is no Problem, and every Violation has an Exception |
+| 1 | There is at least one Problem — in a Decision Log, in `.arch/components.yml` or in `.arch/rules.yml`, an Exception that matches nothing or names an ADR that is not there among them — or a Violation without an Exception |
+| 2 | Nothing could be checked: `path` is no directory; no Decision Log is found there, and neither `.arch/components.yml` nor `.arch/rules.yml` is there; the command line is not understood; or reading failed in a way the command did not expect. What went wrong is printed to standard error |
+
+### The codes
+
+The Problems of the Decision Logs have the codes of `adr lint`, above. The others:
+
+| Code | The Problem |
+| ---- | ----------- |
+| `unreadable-declaration`, `invalid-segment`, `duplicate-component`, `dead-pattern`, `pattern-outside-repository`, `overlapping-components`, `empty-component` | The Problems of `.arch/components.yml` ([structure-format.md, section 6](structure-format.md#6-problems-part-2)), as Structure names them (`packages/structure/src/problems.ts`) |
+| `unreadable-rules`, `rules-without-declaration`, `unknown-rule-kind`, `invalid-rule`, `duplicate-rule`, `unknown-component`, `no-component-matches`, `invalid-exception`, `exception-unknown-rule`, `unmatched-exception`, `duplicate-exception`, `unknown-justification`, `invalid-justification`, `invalid-applied-pattern` | The Problems of `.arch/rules.yml` ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)) |
+| `exception-can-shrink` | A note of `.arch/rules.yml`, which fails nothing (the same section) |
+
+A Violation is named by the ID of its Rule, and in JSON its `code` is the kind of the Rule: `must-not-depend`, `may-only-depend`, `layers`, `no-cycles`, `threshold`. The same rule for new codes holds as for `adr lint`.
+
 ## `adr export [path] --out <directory> [--log <directory>]...`
 
 Writes the Decision Logs of the repository at `path` — the current directory when it is left out — as HTML pages that open from disk, into `--out`. `--log` names a Decision Log by its directory, as `adr lint` finds it (`docs/adr`, or `.` for the root); it may be given more than once, and every Decision Log is exported when it is not given. The repository is found and read as `adr lint` reads it; nothing of it is changed.
@@ -155,7 +255,9 @@ A PDF comes from the app (**Export → PDF…**), which prints `print.html` with
 ```yaml
 - run: pnpm install --frozen-lockfile
 - run: pnpm build
-- run: node packages/cli/dist/adr.mjs lint --format github
+- run: node packages/cli/dist/adr.mjs check --format github
 ```
 
-This repository runs the command on itself in its own CI (`.github/workflows/ci.yml`), so a broken Relation in `docs/adr` fails the build.
+`adr check` checks the Decision Logs as `adr lint` does, so one step is enough. A step of `adr lint` before it would end the job on a Problem of a Decision Log before the Violations are shown; `adr lint` alone suits a repository without Rules, or a pipeline that wants no analysis of the code.
+
+This repository runs `adr check` on itself in its own CI (`.github/workflows/ci.yml`), so a broken Relation in `docs/adr`, or an import that breaks a Rule of `.arch/rules.yml`, fails the build.
