@@ -229,9 +229,9 @@ A Cycle that consists of type-only Dependencies alone is marked as such; it does
 
 In Structure a Cycle is a fact. It becomes a Violation only through a Rule of the Conformance module.
 
-## 5. Metrics (part 5)
+## 5. Metrics (parts 5 and 13)
 
-Every metric is shown with its definition. All of them are computed per Component on the Source Files it contains, and per directory node of section 4 on the Source Files of its Component beneath it; "outside" means outside what it contains. By default test files are left out and type-only Dependencies count; Unassigned files count as outside. A Component that contains no Source File has no metrics. "Dependencies" are Source File Dependencies here, each pair of files once, as in section 3.
+Every metric is shown with its definition. Those of the table are computed per Component on the Source Files it contains, and per directory node of section 4 on the Source Files of its Component beneath it; "outside" means outside what it contains. By default test files are left out and type-only Dependencies count; Unassigned files count as outside. A Component that contains no Source File has no metrics. "Dependencies" are Source File Dependencies here, each pair of files once, as in section 3.
 
 | Metric                 | Definition                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -242,8 +242,59 @@ Every metric is shown with its definition. All of them are computed per Componen
 | Fan-out, fan-in        | Components with the same parent — or directory nodes on the same level — that this one depends on, and that depend on it. |
 | Relational cohesion, H | (R + 1) / N, with N the number of Source Files inside and R the number of Dependencies among them.            |
 | Internal share         | Dependencies among the files inside, divided by all Dependencies that start or end inside; undefined when there are none. |
+| Abstractness, A (part 13) | The abstract declarations inside, divided by all declarations inside ("Declarations", below); undefined where the files inside declare nothing that is counted. 0 is wholly concrete, 1 wholly abstract. |
+| Distance from the main sequence, D (part 13) | \|A + I − 1\|; undefined where A or I is. 0 lies on the main sequence, A + I = 1; 1 in one of its corners — stable and concrete, the zone of pain, or unstable and abstract, the zone of uselessness. |
 
-Ce, Ca and I follow Robert C. Martin's definitions, with the Source File in the place of the class.
+Ce, Ca and I follow Robert C. Martin's definitions, with the Source File in the place of the class; so do A and D, with the declarations below in the place of his classes. The window draws I across and A up, with the main sequence from (0, 1) to (1, 0), for the Components of a level.
+
+### Inside a Source File (part 13)
+
+What is measured inside a Source File comes from the tree its parser builds for its Dependencies (section 3, [ADR-0008](adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)), and is extracted and cached with its uses (section 7): what one file yields depends on that file alone. A file that cannot be parsed has nothing measured, nor has a file of a language whose adapter measures nothing yet. Test files are left out unless included, as everywhere.
+
+**Functions.**
+
+- TypeScript, JavaScript and Svelte (its script blocks): every function with a body — a function declaration or expression, an arrow function, a method, a constructor, a `get` or `set` accessor, of a class or of an object literal. An overload, an abstract method and what is declared with `declare` have no body and are no functions. Every function counts on its own, an arrow function passed as an argument too.
+- Java: every method and constructor with a body — a record's compact constructor, the methods of an anonymous class and of an enum constant's body included. A lambda is part of the method it is written in; a lambda in the initializer of a field is a function of its own.
+- Code outside every function — the top level of a module or of a component's script, the value of a class field that is not a function, an initializer or static block — lies in no function and is not counted.
+
+**Names.** A function is named by what contains it, joined by `.` ([conformance-format.md](conformance-format.md), section 3):
+
+- TypeScript and JavaScript: a function, class or namespace by its name; a method, field or property by its key, `[expression]` where it is computed; a constructor `constructor`; an accessor `get total` or `set total`; a function expression or arrow function by the variable, property or field it is assigned to — `const total = () => …` is `total` —, `default` where a module exports it by default, otherwise by its own name, or `<anonymous>`. An object literal that is assigned to a name contains its methods, `api.load`; one that is not contains nothing.
+- Java: a type by its name; a method or constructor by its name and the types of its parameters as written, without annotations, type arguments and spaces — `Cart.add(Product)`, `Cart.Cart()`, `Cart.add(List,String...)` —, so that overloads are told apart; an anonymous class `<anonymous>`; a lambda in a field by the field.
+- A name that comes again in the same file — two anonymous functions in one function, a class declared twice in two blocks — gets `#2`, `#3`, … in the order of the file: `total.<anonymous>#2`. Names do not change when lines move; one changes when a function of the same name is added before it.
+- A function begins on the line of its name in Java, and in TypeScript where its text begins, past its decorators; it ends where its text ends.
+
+**Cyclomatic complexity** (McCabe, 1976) of a function: 1, and 1 more for each point at which it decides which way to go:
+
+| Decides | TypeScript, JavaScript, Svelte | Java |
+| ------- | ------------------------------ | ---- |
+| Branches | each `if` — an `else if` is an `if` of its own, `else` counts nothing —, each `?:` | each `if`, each `?:` |
+| Loops | each `for`, `for … in`, `for … of`, `while`, `do … while` | each `for`, enhanced `for`, `while`, `do … while` |
+| `switch` | each `case` with a value; `default` counts nothing | each `case` label, `case A, B` once; `default` counts nothing; each `when` guard |
+| Exceptions | each `catch` | each `catch` |
+| Short circuits | each `&&`, `\|\|`, `??`, `&&=`, `\|\|=`, `??=`, and each optional access or call `?.` | each `&&`, `\|\|` |
+| Defaults | each default value of a parameter or of a destructuring | — |
+
+That is the count of ESLint's rule `complexity` in its classic variant, default values and `?.` included, for TypeScript and JavaScript, and that of Checkstyle's `CyclomaticComplexity` with each `case` counted (`switchBlockAsSingleDecisionPoint` off) for Java, lambdas counted with their method as Checkstyle counts them — so that a person who knows either tool finds the same numbers. Both tools count a class field's value and a static or initializer block as units of their own; the suite counts no code outside a function, and makes a lambda in a field's initializer the one function there. `try`, `finally`, `throw`, `return`, `break` and labels count nothing, nor do types: a conditional type is no branch.
+
+**LCOM4** of a class (Hitz and Montazeri, 1995): the number of connected groups among its methods, two methods being connected when both use one field of the class, or one of them uses the other. 1 is a cohesive class; 2 or more, a class whose groups could be classes of their own. Undefined for a class without methods.
+
+- Classes: TypeScript and JavaScript classes, class expressions included; Java classes, enums and records. Not interfaces.
+- Methods: those with a body, static ones and accessors included; a field whose value is a function (`handle = () => …`) is a method. Constructors are left out: they set every field, and would join what does not belong together.
+- Fields: TypeScript property declarations and parameter properties (`constructor(private readonly lines: Line[])`); Java fields, a record's components, an enum's constants.
+- Uses: in TypeScript `this.x`, `this['x']`, `Cart.x` for a static member, `const { x } = this` — inside arrow functions too, but not inside a nested class or a function written with `function`, which have a `this` of their own. In Java the name of a field that no parameter or local variable of the method hides, `this.x`, a call of a method of the class without an object or on `this`, `this::m`, the accessor of a record's component.
+- Not seen: members inherited from another class, and uses through another variable of the same class (`other.x`).
+
+**Declarations**, for abstractness:
+
+- Java: every class, interface, enum, record and annotation type — top-level, nested or local. Abstract are interfaces, annotation types, which Java declares as interfaces, and classes declared `abstract`. An anonymous class is no declaration.
+- TypeScript and JavaScript: what a module declares at its top level and inside its namespaces — classes, interfaces, type aliases, enums, functions; a function or class also as a variable initialised with one, and as what the module exports by default. Abstract are interfaces, type aliases, classes declared `abstract`, and what is declared without an implementation: under `declare`, or in a declaration file. A function's overloads are one declaration.
+- Svelte: a component is one concrete declaration; what its scripts declare is part of it.
+- **Limits.** Martin counts classes; a TypeScript module offers functions and types more often than classes, so both are counted: an interface or a type alias is abstract — what is used of it has no implementation —, a function or a class is concrete. An interface that only describes the shape of data counts as abstract all the same; a constant, an object of functions, and what CommonJS assigns to `module.exports` count as nothing. As [vision.md](vision.md) says, A means most for Java.
+
+### Propagation cost of a level (part 13)
+
+How much of a level a change to one of its nodes may reach, on average: the share of the ordered pairs of distinct nodes of the level of which the first depends on the second, directly or through other nodes of the level — the density of the transitive closure of the level's Dependencies (MacCormack, Rusnak and Baldwin, 2006). The nodes are those of section 4 but `(unassigned)`, which takes no part, as in Cycles; test files are left out unless included, type-only Dependencies count. It is 0 where no node depends on another and 1 where every node reaches every other; undefined for a level of fewer than two nodes. MacCormack et al. count the diagonal, every element reaching itself: for N nodes their figure is (P · N (N − 1) + N) / N². The suite leaves it out, since a level has few nodes, where the diagonal would add 1/N to every figure.
 
 **The dependency structure matrix** lists the nodes of one level as rows and columns, in the same order. The cell in the row of A and the column of B holds the Dependency from A to B: its weight, and the same list of Source File Dependencies as the edge in the graph opens. The diagonal stays empty. Graph and matrix are two views of one model and share filter and selection.
 
@@ -273,4 +324,4 @@ A Trace adds one more, reported on the ADR among the Problems of its Decision Lo
 
 ## 7. What is not in the repository (part 3)
 
-The model, the Dependencies, the Cycles and the metrics are derived and never stored in the repository. The app caches, per Source File and keyed by the hash of its content, what was extracted from it (its uses, unresolved); resolution, graph and metrics are recomputed. The cache lives in the app's user-data folder, separately per repository and per version of the analysis. A command-line run computes everything afresh.
+The model, the Dependencies, the Cycles and the metrics are derived and never stored in the repository. The app caches, per Source File and keyed by the hash of its content, what was extracted from it — its uses, unresolved, and what is measured inside it (section 5); resolution, graph and metrics are recomputed. The cache lives in the app's user-data folder, separately per repository and per version of the analysis. A command-line run computes everything afresh.
