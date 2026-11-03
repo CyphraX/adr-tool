@@ -43,6 +43,7 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
   const top = structure.components.map((component) => component.id)
   expect(top).toEqual([
     'app',
+    'assessment',
     'cli',
     'conformance',
     'core',
@@ -185,7 +186,7 @@ it('computes the metrics of this repository as their definitions say', async () 
   expect(metrics.get('kernel')!.instability).toBe(0)
   expect(metrics.get('app')!.instability).toBe(1)
   // It uses the cores of Decisions, Structure, Conformance and Review, the git and the export
-  // of the command line, and the sentences of Diagrams for its German, and reaches the kernel
-  // only through them.
-  expect(metrics.get('app')).toMatchObject({ fanOut: 6, fanIn: 0 })
+  // of the command line, and the sentences of Diagrams and Assessment for its German, and
+  // reaches the kernel only through them.
+  expect(metrics.get('app')).toMatchObject({ fanOut: 7, fanIn: 0 })
 })

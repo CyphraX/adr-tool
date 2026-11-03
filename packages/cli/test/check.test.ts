@@ -12,6 +12,9 @@ const shop = fileURLToPath(
 const mavenShop = fileURLToPath(
   new URL('../../structure/test/fixtures/maven-shop/', import.meta.url)
 )
+const assessedShop = fileURLToPath(
+  new URL('../../assessment/test/fixtures/maven-shop/', import.meta.url)
+)
 const pythonShop = fileURLToPath(
   new URL('../../structure/test/fixtures/python-shop/', import.meta.url)
 )
@@ -345,6 +348,27 @@ describe('adr check (docs/cli.md)', () => {
       '',
       'No Decision Log.',
       '2 Violations of 2 Rules.'
+    ])
+  })
+
+  // The Assessment of the Java shop (packages/assessment/test/fixtures) cites the Violation of
+  // its Rule by this fingerprint; its test derives the same one from the Dependencies.
+  it('finds the Violation that the Assessment of the Java shop cites, and nothing else', async () => {
+    const { code, out } = await adrIn(assessedShop, 'check', '--format', 'json')
+    expect(code).toBe(1)
+    const report = JSON.parse(out)
+    expect(report.logs).toEqual(['docs/adr'])
+    expect(report.problems).toEqual([])
+    expect(
+      report.violations.map((violation: { fingerprint: unknown; fingerprintText: string }) => [
+        violation.fingerprint,
+        violation.fingerprintText
+      ])
+    ).toEqual([
+      [
+        { kind: 'dependency', rule: 'web-through-cart', from: 'web', to: 'catalog' },
+        'web-through-cart: web -> catalog'
+      ]
     ])
   })
 

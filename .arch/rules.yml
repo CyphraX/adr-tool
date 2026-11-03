@@ -31,6 +31,12 @@ rules:
     from: review
     to: [kernel, structure]
 
+  - id: assessment-on-structure
+    why: Assessment freezes Structure's metrics in its Snapshots and is told about Decisions, Rules and Annotations by its caller, and leans on no other module (ADR-0006, ADR-0021).
+    kind: may-only-depend
+    from: assessment
+    to: [kernel, structure]
+
   - id: git-port-stands-alone
     why: The kernel's git port is types and a history in memory; git itself is run in the command line's one module (ADR-0020).
     kind: may-only-depend
@@ -40,7 +46,7 @@ rules:
   - id: layered
     why: The window uses the command line and the servers, which use the module cores, which use the kernel.
     kind: layers
-    layers: [app, [cli, mcp], [conformance, diagrams, review], [core, structure], kernel]
+    layers: [app, [cli, mcp], [conformance, diagrams, review, assessment], [core, structure], kernel]
 
   - id: no-cycles-between-packages
     why: A package in a Cycle can be neither understood nor tested on its own.
