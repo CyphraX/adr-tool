@@ -308,6 +308,24 @@ describe('replying, resolving and reopening', () => {
     })
   })
 
+  it('takes no ID that is not one part of a path inside the directory, whatever is on the disk', async () => {
+    // On Windows `\` parts a path as `/` does: `..\x` would be the file x.md above the
+    // directory. The ID of `..md` is `.`, whose Replies would be Annotations of their own.
+    const reply = { author: 'Lena', date: '2026-11-03', text: 'Yes.' }
+    const ids = ['..\\x', '.', '..', 'a\\b', 'x\u0000', 'trailing ', 'readme', 'README']
+    const fs = memoryFileSystem({
+      ...Object.fromEntries(ids.map((id) => [`${DIR}/${id}.md`, BY_HAND])),
+      'docs/architecture/x.md': BY_HAND
+    })
+    for (const id of ids) {
+      expect(await planReply(fs, id, reply)).toMatchObject({ said: { code: 'no-annotation' } })
+      expect(await planState(fs, id, 'resolved')).toMatchObject({
+        said: { code: 'no-annotation' }
+      })
+    }
+    expect((await readAnnotations(fs)).annotations).toEqual([])
+  })
+
   it('resolves and reopens on the line of state, or inserts it after type', async () => {
     const fs = memoryFileSystem({ [PATH]: BY_HAND })
     await applied(fs, await planState(fs, ID, 'resolved'))

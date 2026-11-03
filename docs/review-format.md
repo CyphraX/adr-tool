@@ -35,6 +35,7 @@ docs/architecture/annotations/
 ```
 
 - Every `.md` file directly in the directory is an Annotation, except a `README.md` (in any case). Its **ID** is the file name without `.md`; it is frozen when the Annotation is created, and a Finding of an Assessment names it by it.
+- An ID names the directory of its Replies too, so it must be one part of a path on every system: a file whose name without `.md` holds a `\` or a control character, or ends in a dot or a space — `..md` and `...md` among them —, is not an Annotation. Windows parts a path at `\` and drops a dot or a space at the end of a name. The suite writes nothing for such an ID.
 - A directory beside it with the same name holds its **Replies**: every `.md` file directly in it is one. Other files, and directories further down, are ignored.
 - **Bytes** as in an ADR ([file-format.md](file-format.md), section 1): UTF-8, a byte order mark kept and never added, each file's line endings kept. A new Annotation takes the line ending most Annotations of the directory have, LF when there are none or on a tie; a new Reply takes that of its Annotation.
 

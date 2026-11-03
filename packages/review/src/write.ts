@@ -24,7 +24,7 @@ import {
   setValue
 } from './frontmatter'
 import { saidOf, type ReviewProblem } from './problems'
-import { annotationsDirectory } from './read'
+import { annotationsDirectory, isAnnotationId } from './read'
 import { refuse, type ReviewSaid } from './sentences'
 import { slugOf } from './slug'
 import { citedAdr, type AdrReference } from './traces'
@@ -60,7 +60,7 @@ async function directoryOf(fs: FileSystem): Promise<string> {
 async function annotationFile(fs: FileSystem, id: string): Promise<{ path: string; text: string }> {
   const directory = await directoryOf(fs)
   const path = joinPath(directory, `${id}.md`)
-  const text = id.includes('/') || id === '..' ? undefined : await fs.readText(path)
+  const text = isAnnotationId(id) ? await fs.readText(path) : undefined
   if (text === undefined) refuse({ code: 'no-annotation', values: { id } })
   return { path, text }
 }

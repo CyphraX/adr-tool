@@ -18,6 +18,7 @@ export {
   annotationsDirectory,
   CONFIGURATION_PATH,
   DEFAULT_ANNOTATIONS_DIRECTORY,
+  isAnnotationId,
   readAnnotations,
   type AnnotationsDirectory,
   type AnnotationsReading

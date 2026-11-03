@@ -48,6 +48,17 @@ export async function annotationsDirectory(fs: FileSystem): Promise<AnnotationsD
   return { directory }
 }
 
+/**
+ * Whether a text is the ID of an Annotation the suite reads: the name of its file without `.md`,
+ * and the name of the directory of its Replies, on every system (docs/review-format.md,
+ * section 1). One part of a path, inside the directory: no `/` or `\`, no control character,
+ * not ending in a dot — `.` and `..` among them — or a space, which Windows drops from a name.
+ * `README` is the directory's own file.
+ */
+export function isAnnotationId(id: string): boolean {
+  return /^[^/\\\p{Cc}]*[^/\\\p{Cc}. ]$/u.test(id) && id.toLowerCase() !== 'readme'
+}
+
 export interface AnnotationsReading {
   /** Where the Annotations are; `undefined` while the configuration cannot be used. */
   readonly directory: string | undefined
@@ -75,7 +86,7 @@ export async function readAnnotations(fs: FileSystem): Promise<AnnotationsReadin
     (entry) =>
       entry.kind === 'file' &&
       entry.name.endsWith('.md') &&
-      entry.name.toLowerCase() !== 'readme.md'
+      isAnnotationId(entry.name.slice(0, -'.md'.length))
   )
   const ids = new Set(files.map((entry) => entry.name.slice(0, -'.md'.length)))
 
