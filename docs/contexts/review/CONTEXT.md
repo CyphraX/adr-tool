@@ -39,3 +39,23 @@ _Avoid_: Stale, outdated, detached, broken
 **Attach again**:
 To give an Annotation a new Anchor by selecting the lines it is about: what a person does for an orphaned one, or for one that the suite found in the wrong place.
 _Avoid_: Re-anchor, reattach, fix, Repair (an orphaned Annotation has none)
+
+## In German
+
+The window's German (`packages/app/src/renderer/src/lib/strings.de.ts`, `said.de.ts`) says these terms so, and no other way. Trace stays a term of the tool, as in the other modules.
+
+| Term | German |
+| --- | --- |
+| Annotation | Annotation, die Annotationen |
+| `note`, `question`, `concern` | Notiz, Frage, Bedenken |
+| open, resolved | offen, erledigt |
+| Reply | Antwort |
+| Resolve, Reopen | Erledigen, Wieder öffnen |
+| Anchor | Anker |
+| Quoted lines | die zitierten Zeilen |
+| Similarity | „gleichen den zitierten Zeilen zu … %“ |
+| Moved | verschoben |
+| Update the Anchor | Anker aktualisieren |
+| Orphaned | verwaist |
+| Attach again | Neu anheften |
+| Cite, Uncite (a Trace to an ADR) | auf ein ADR verweisen, Verweis entfernen; the ADRs an Annotation cites: „Verweist auf“, the Annotations that cite an ADR: „Darauf verweisen“ |
