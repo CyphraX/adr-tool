@@ -325,6 +325,11 @@
         >
           <title>{t.diagrams.uses(nameOf(from), nameOf(to), line.label?.text)}</title>
         </path>
+      {/each}
+
+      <!-- The labels lie over every line, as in the picture the export draws. -->
+      {#each geometry.lines as line (key(line.ends.from, line.ends.to))}
+        {@const { from, to } = line.ends}
         {#if line.label && !(labelling?.from === from && labelling.to === to)}
           {@const ground = line.label.ground}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
