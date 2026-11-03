@@ -32,7 +32,7 @@ export const WINDOW = 50
 /** How many commits of a Source File's history are looked at for the text an Anchor was read in. */
 export const STAND_IN_COMMITS = 50
 
-/** How many commits are followed for renames when neither the Anchor's commit nor its day is known. */
+/** How many of the last commits are followed for renames when the Anchor's commit is gone. */
 export const RENAME_COMMITS = 1000
 
 /** What finding Anchors again reads; what it reads once it keeps, for every Annotation of a run. */
@@ -119,7 +119,10 @@ export async function findAnchor(anchor: Anchor, finding: Finding, date?: string
 
 /**
  * Where git says the Source File went: from the Anchor's commit to HEAD when the repository has
- * the commit, and otherwise through the renames of the commits since the day before `date`.
+ * the commit. Otherwise through the renames of the last commits — the last `RENAME_COMMITS`,
+ * and every one since the day before `date` when those are more —, from the last rename away
+ * from the Anchor's path on: the file may have been renamed upstream before the Annotation was
+ * written on a branch that was rebased onto it.
  */
 async function renamedTo(
   anchor: Anchor,
@@ -136,16 +139,30 @@ async function renamedTo(
     return changes?.find((change) => change.kind === 'renamed' && change.from === anchor.path)?.path
   }
   const since = date === undefined ? undefined : dayBefore(date)
-  const log = await once(cache.logs, since ?? '', () =>
-    git.log(since === undefined ? { limit: RENAME_COMMITS } : { since })
-  )
+  const log = (await once(cache.logs, since ?? '', () => recentCommits(git, since))) ?? []
+  const renamedFrom = (entry: LogEntry, path: string): ChangedFile | undefined =>
+    entry.changes.find((change) => change.kind === 'renamed' && change.from === path)
+  // Newest first: the last time the file left the Anchor's path, and from there on, forward.
+  const last = log.findIndex((entry) => renamedFrom(entry, anchor.path) !== undefined)
+  if (last === -1) return undefined
   let path = anchor.path
-  for (const entry of [...(log ?? [])].reverse()) {
-    for (const change of entry.changes) {
-      if (change.kind === 'renamed' && change.from === path) path = change.path
-    }
-  }
+  for (let at = last; at >= 0; at--) path = renamedFrom(log[at]!, path)?.path ?? path
   return path === anchor.path ? undefined : path
+}
+
+/** The last `RENAME_COMMITS` commits, and all since `since` when those are more; newest first. */
+async function recentCommits(
+  git: Git,
+  since: string | undefined
+): Promise<readonly LogEntry[] | undefined> {
+  const [recent, dated] = await Promise.all([
+    git.log({ limit: RENAME_COMMITS }),
+    since === undefined ? undefined : git.log({ since })
+  ])
+  if (recent === undefined || dated === undefined) return recent ?? dated
+  const [longer, shorter] = recent.length >= dated.length ? [recent, dated] : [dated, recent]
+  const seen = new Set(longer.map((entry) => entry.commit))
+  return [...longer, ...shorter.filter((entry) => !seen.has(entry.commit))]
 }
 
 /**

@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { devNull, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { findAnchor, findAnchors, readAnnotations, type Anchor } from '@adr-tool/review'
 import { repositoryFiles } from '../src/files'
 import { gitIn } from '../src/git'
@@ -31,8 +31,15 @@ const CART = [
 const TOTAL = CART.slice(7, 10)
 const text = (lines: readonly string[]): string => `${lines.join('\n')}\n`
 
+// No configuration of the machine's: neither the helpers' git nor the port's sees any.
+beforeAll(() => {
+  vi.stubEnv('GIT_CONFIG_GLOBAL', devNull)
+  vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1')
+})
+
 const made: string[] = []
 afterAll(() => {
+  vi.unstubAllEnvs()
   for (const top of made) rmSync(top, { recursive: true, force: true })
 })
 
@@ -40,7 +47,8 @@ afterAll(() => {
 function repository() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'softarch-anchors-')))
   made.push(root)
-  const run = (...args: string[]): string =>
+  /** git in the scratch repository; at `date`, when it is given, for what it commits. */
+  const at = (date: string | undefined, ...args: string[]): string =>
     execFileSync('git', args, {
       cwd: root,
       encoding: 'utf8',
@@ -49,21 +57,23 @@ function repository() {
         GIT_AUTHOR_NAME: 'Aylin Demir',
         GIT_AUTHOR_EMAIL: 'aylin@example.com',
         GIT_COMMITTER_NAME: 'Aylin Demir',
-        GIT_COMMITTER_EMAIL: 'aylin@example.com'
+        GIT_COMMITTER_EMAIL: 'aylin@example.com',
+        ...(date !== undefined && { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date })
       }
     }).trim()
+  const run = (...args: string[]): string => at(undefined, ...args)
   run('init', '-q', '-b', 'trunk')
   run('config', 'user.name', 'Aylin Demir')
   run('config', 'user.email', 'aylin@example.com')
   run('config', 'core.autocrlf', 'false')
   run('config', 'commit.gpgsign', 'false')
-  const commit = (files: Record<string, string>, subject: string): string => {
+  const commit = (files: Record<string, string>, subject: string, date?: string): string => {
     for (const [path, content] of Object.entries(files)) {
       mkdirSync(dirname(join(root, path)), { recursive: true })
       writeFileSync(join(root, path), content)
     }
     run('add', '-A')
-    run('commit', '-q', '-m', subject)
+    at(date, 'commit', '-q', '-m', subject)
     return run('rev-parse', 'HEAD')
   }
   const finding = () => ({ fs: repositoryFiles(root), git: gitIn(root) })
@@ -160,6 +170,44 @@ describe('finding an Anchor again in a git repository', () => {
       kind: 'moved',
       anchor: { path: 'src/cart.ts', start: 10, end: 12, quote: TOTAL, commit: head },
       similarity: 1
+    })
+  })
+
+  it('follows a rename made upstream before the Annotation was written, after a rebase onto it', async () => {
+    // The branch starts before the rename; upstream renames the file ten days before the
+    // Annotation is written on the branch at the old path; the branch is rebased, its old
+    // commits pruned. The rename is older than the Annotation, and is followed all the same.
+    const { run, commit, finding } = repository()
+    commit({ 'src/cart.ts': text(CART) }, 'Start the cart', '2026-10-01T10:00:00Z')
+    run('checkout', '-q', '-b', 'feature')
+    run('checkout', '-q', 'trunk')
+    run('mv', 'src/cart.ts', 'src/basket.ts')
+    commit({}, 'Call it a basket', '2026-10-10T10:00:00Z')
+    run('checkout', '-q', 'feature')
+    const written = commit(
+      { 'src/line.ts': 'export interface Line {}\n' },
+      'Lines',
+      '2026-10-20T10:00:00Z'
+    )
+    const anchor: Anchor = { path: 'src/cart.ts', start: 8, end: 10, quote: TOTAL, commit: written }
+    expect(await findAnchor(anchor, finding(), '2026-10-20')).toMatchObject({ kind: 'unchanged' })
+
+    run('rebase', '-q', 'trunk')
+    run('reflog', 'expire', '--expire=now', '--all')
+    run('gc', '-q', '--prune=now')
+    const { fs, git } = finding()
+    expect(await git.hasCommit(written)).toBe(false)
+    expect(await findAnchor(anchor, { fs, git }, '2026-10-20')).toEqual({
+      kind: 'moved',
+      anchor: {
+        path: 'src/basket.ts',
+        start: 8,
+        end: 10,
+        quote: TOTAL,
+        commit: run('rev-parse', 'HEAD')
+      },
+      similarity: 1,
+      renamedFrom: 'src/cart.ts'
     })
   })
 
