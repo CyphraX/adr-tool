@@ -12,7 +12,7 @@ import {
   preparePython
 } from '../src'
 import type { LibraryUse } from '../src/dependencies'
-import { libraryInventory } from '../src/libraries/inventory'
+import { librariesIn, libraryInventory } from '../src/libraries/inventory'
 import { manifestLibraries } from '../src/manifests'
 import type { OwnedSourceFile } from '../src/ownership'
 import { languageOf, isTestByConvention } from '../src/source-files'
@@ -161,6 +161,29 @@ describe('the Library inventory (docs/structure-format.md, section 3, "The Libra
       path: 'node_modules/react',
       version: '19.1.0'
     })
+
+    // Seen from the repository, from a Component, and from a Component that declares nothing.
+    const scoped = (component?: string) =>
+      librariesIn({ libraries }, component).map(
+        (one) =>
+          `${one.library.name} ${one.status} ${one.versions.join(',')} ${one.declared.length}/${one.usedBy.length}`
+      )
+    expect(scoped()).toEqual([
+      '@types/react used ^19 1/1',
+      'left-pad unused ^1 1/0',
+      'lodash undeclared ^4.17.21 1/2',
+      'react used ^19.0.0 1/1',
+      'vitest used ^5 1/1',
+      'zod undeclared  0/2'
+    ])
+    expect(scoped('web')).toEqual([
+      '@types/react used ^19 0/1',
+      'left-pad unused ^1 1/0',
+      'lodash used ^4.17.21 1/1',
+      'react used ^19.0.0 1/1',
+      'zod undeclared  0/1'
+    ])
+    expect(scoped('core')).toEqual(['lodash undeclared ^4.17.21 0/1', 'vitest used ^5 0/1'])
   })
 
   it('maps Python distributions by what a virtual environment of the repository installs, the table, or the normalised name', async () => {

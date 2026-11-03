@@ -373,6 +373,64 @@ export async function libraryInventory(
   }
 }
 
+/**
+ * What a Library is to a scope — the whole repository, or a Component with the Components
+ * inside it:
+ * - `used`: its files use it, and a manifest declares it for each of them;
+ * - `unused`: a manifest of the scope declares it, and none of its files uses it;
+ * - `undeclared`: one of its files uses it, and no manifest in that file's directory or above
+ *   declares it.
+ */
+export type LibraryStatus = 'used' | 'unused' | 'undeclared'
+
+/** A Library as a scope sees it. */
+export interface ScopedLibrary {
+  readonly library: InventoryLibrary
+  readonly status: LibraryStatus
+  /** The declarations of the manifests that belong to the scope. */
+  readonly declared: readonly LibraryDeclaration[]
+  /**
+   * The versions declared, each once, in the order of the manifests: those of the scope, or,
+   * where none of its manifests declares the Library, those of every manifest that does.
+   */
+  readonly versions: readonly string[]
+  /** The uses by the Source Files of the scope, per Component. */
+  readonly usedBy: readonly LibraryUser[]
+}
+
+/**
+ * The Libraries a scope declares or uses, in the order of the inventory: the whole repository
+ * when `component` is left out, or else the Component and those inside it. A manifest belongs to
+ * the scope by its Component; a manifest of no Component, to the repository's alone.
+ */
+export function librariesIn(inventory: LibraryInventory, component?: string): ScopedLibrary[] {
+  const inScope = (id: string | undefined): boolean =>
+    component === undefined ||
+    (id !== undefined && (id === component || id.startsWith(`${component}/`)))
+  const scoped: ScopedLibrary[] = []
+  for (const library of inventory.libraries) {
+    const declared = library.declared.filter((declaration) => inScope(declaration.component))
+    const usedBy = library.usedBy.filter((user) => inScope(user.component))
+    if (declared.length === 0 && usedBy.length === 0) continue
+    const versionsOf = (declarations: readonly LibraryDeclaration[]): string[] => [
+      ...new Set(declarations.flatMap((declaration) => declaration.version ?? []))
+    ]
+    const status: LibraryStatus = usedBy.some((user) => user.undeclared.length > 0)
+      ? 'undeclared'
+      : usedBy.length === 0
+        ? 'unused'
+        : 'used'
+    scoped.push({
+      library,
+      status,
+      declared,
+      versions: versionsOf(declared.length > 0 ? declared : library.declared),
+      usedBy
+    })
+  }
+  return scoped
+}
+
 /** How a declared name is tied to the names the code uses. */
 function mappingOf(
   ecosystem: Ecosystem,

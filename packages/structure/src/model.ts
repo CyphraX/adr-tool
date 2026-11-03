@@ -40,13 +40,16 @@ export type {
 export type { ManifestLibrary } from './manifests'
 export {
   ecosystemOfManifest,
+  librariesIn,
   libraryInventory,
   type Ecosystem,
   type InventoryLibrary,
   type LibraryDeclaration,
   type LibraryInventory,
+  type LibraryStatus,
   type LibraryUser,
-  type Mapping
+  type Mapping,
+  type ScopedLibrary
 } from './libraries/inventory'
 export type { Installed, Licence, LicenceField, UnknownLicence } from './libraries/installed'
 export {
