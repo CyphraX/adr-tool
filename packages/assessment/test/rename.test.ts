@@ -164,6 +164,33 @@ describe('a Repair', () => {
     ])
   })
 
+  it('takes out the broken item alone, with the comments indented below its dash', async () => {
+    const finding = (evidence: string): string =>
+      `---\ndate: 2026-11-03\n---\n\n## F1\n\n\`\`\`yaml\nfinding: F1\nevidence:\n${evidence}  - risk: there\n\`\`\`\n`
+    const repaired = async (evidence: string, kind: string): Promise<string> => {
+      const fs = memoryFileSystem({
+        [PATH]: finding(evidence),
+        'docs/architecture/risks/there.md': '---\nstate: open\n---\n\n# There\n'
+      })
+      const problems = traceProblems(await openAssessments(fs), { adrs: [], violations: [] })
+      expect(problems.map((problem) => problem.kind)).toEqual([kind])
+      return Object.values(changed(await planRepair(fs, problems[0]!)))[0]!
+    }
+    // The yaml library ends such an item after the indentation of the next one.
+    expect(await repaired('  - adr: gone\n    # why it was cited\n', 'finding-unknown-adr')).toBe(
+      finding('')
+    )
+    expect(
+      await repaired(
+        '  - violation: web-through-cart\n    from: web\n    to: catalog\n    # seen in Page.java\n',
+        'violation-gone'
+      )
+    ).toBe(finding(''))
+    expect(
+      await repaired('  - adr: gone\n    # its own\n\n  # what follows\n', 'finding-unknown-adr')
+    ).toBe(finding('\n  # what follows\n'))
+  })
+
   it('is refused for a Problem without one, and for one that is gone', async () => {
     const fs = memoryFileSystem(FILES)
     const reason = async (plan: Promise<Plan>) => {

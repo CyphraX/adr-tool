@@ -129,8 +129,11 @@ const lineStart = (text: string, offset: number): number => text.lastIndexOf('\n
 export function nodeEnd(region: Region, node: unknown): number {
   const at = region.abs((node as { range: [number, number, number] }).range[2])
   const text = region.text
-  // A collection's range may end after its line break; a scalar's ends at its value.
-  const lf = text.indexOf('\n', at - (text[at - 1] === '\n' ? 1 : 0))
+  // A collection's range may end after its line break, or after the indentation of the line
+  // that follows it, which is not its own; a scalar's ends at its value.
+  const start = lineStart(text, at)
+  if (text.slice(start, at).trim() === '') return Math.min(start, region.span.end)
+  const lf = text.indexOf('\n', at)
   return Math.min(lf === -1 ? text.length : lf + 1, region.span.end)
 }
 
@@ -376,15 +379,22 @@ export function appendBlockItem(
   return [{ start: at, end: at, insert: lead + item(indent) }]
 }
 
-/** Where the last line of an item of a block list ends that is not blank and not a comment of its own. */
-function itemEnd(region: Region, item: { range?: [number, number, number] }): number {
+/**
+ * Where the lines of an item of a block list end, its dash at `column`: a comment indented
+ * deeper than the dash is the item's own; a blank line, or a comment at the dash or before it,
+ * belongs to what follows.
+ */
+function itemEnd(region: Region, item: { range?: [number, number, number] }, column: number): number {
   const text = region.text
   let end = nodeEnd(region, item)
   // A collection's range runs on over the comments and blank lines after it.
   for (;;) {
     const start = lineStart(text, end - 1)
-    const line = text.slice(start, end).trim()
-    if (start <= region.abs(item.range![0]) || (line !== '' && !line.startsWith('#'))) return end
+    const line = text.slice(start, end)
+    const content = line.trim()
+    const indent = line.length - line.trimStart().length
+    if (start <= region.abs(item.range![0])) return end
+    if (content !== '' && (!content.startsWith('#') || indent > column)) return end
     end = start
   }
 }
@@ -402,7 +412,7 @@ export function removeBlockItem(region: Region, key: string, index: number): Tex
   const start = lineStart(region.text, dash)
   if (region.text.slice(start, dash).trim() !== '') byHand(region, key)
   // Its own lines only: a comment or a blank line below it belongs to what follows.
-  return [{ start, end: itemEnd(region, item), insert: '' }]
+  return [{ start, end: itemEnd(region, item, dash - start), insert: '' }]
 }
 
 /** Rewrite a scalar where it stands, its quoting kept; `undefined` where a splice cannot serve. */

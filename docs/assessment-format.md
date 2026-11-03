@@ -391,7 +391,7 @@ Assessment adds these **Problems**. Each has a code and an English sentence; the
 | `finding-unknown-risk` | *file*: *Finding* cites *ID*, which is no Risk of this repository. | the piece of evidence is taken out |
 | `finding-unknown-debt-item` | *file*: *Finding* cites *ID*, which is no Technical Debt Item of this repository. | the piece of evidence is taken out |
 
-- A Repair takes out the one item that points nowhere, where it stands, and never puts one in: where something was renamed by hand, only a person knows the new name ([ADR-0009](adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)). It writes into a final Assessment too: a Trace that points nowhere is no record of anything.
+- A Repair takes out the one item that points nowhere, where it stands — an item of a block list with its own lines and the comments indented below its dash; a blank line, or a comment at the dash, belongs to what follows —, and never puts one in: where something was renamed by hand, only a person knows the new name ([ADR-0009](adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)). It writes into a final Assessment too: a Trace that points nowhere is no record of anything.
 - A Problem of a file's form comes first: the Traces of an entry that cannot be read are not checked.
 - A Trace is checked against what the caller hands in (section 3); an ADR of another repository (`name:log/ID`) is no ADR of this one.
 
