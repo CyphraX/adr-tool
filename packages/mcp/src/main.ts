@@ -51,7 +51,8 @@ export function instructionsFor(root: string): string {
     'Read with list_decision_logs, list_adrs, read_adr, search_adrs and list_problems.',
     'Every write takes two steps. A plan_* tool returns the change — each file as a diff, and warnings — and writes nothing. Show it to the person; apply_change writes it, discard_change drops it.',
     'To edit the text of an ADR, read it with read_adr first and pass the revision it returns to plan_edit_body: an edit of a body that changed since is refused.',
-    'The tool decides IDs, numbers and Metadata, and keeps Relations and Back-references consistent. Do not write ADR files directly.'
+    'The tool decides IDs, numbers and Metadata, and keeps Relations and Back-references consistent. Do not write ADR files directly.',
+    'Annotations are remarks of people on lines of Source Files. Read them with list_annotations and read_annotation, which say where their lines are in the code as it is now; plan_annotation, plan_reply, plan_annotation_state, plan_update_anchor, plan_attach, plan_cite and plan_uncite plan their writes, applied as every other change. Name the file and the lines: the tool quotes them.'
   ].join('\n')
 }
 

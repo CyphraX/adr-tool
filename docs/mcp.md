@@ -1,6 +1,6 @@
 # The MCP server — `adr-mcp`
 
-The contract of the suite's server for agents (`packages/mcp`): how it is started, what its tools take and answer, and how it writes. It gives an agent the Decision Logs of one repository the way the app sees them — built on `core`, with the same rules for numbers, Metadata, Relations and Back-references — so that the agent does not edit ADR files by hand ([vision.md](vision.md), principle 5; [plan-roadmap.md](plan-roadmap.md), part 9; [ADR-0013](adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
+The contract of the suite's server for agents (`packages/mcp`): how it is started, what its tools take and answer, and how it writes. It gives an agent the Decision Logs of one repository the way the app sees them — built on `core`, with the same rules for numbers, Metadata, Relations and Back-references — so that the agent does not edit ADR files by hand ([vision.md](vision.md), principle 5; [plan-roadmap.md](plan-roadmap.md), part 9; [ADR-0013](adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)). It gives it the repository's Annotations as well, the remarks of Review on lines of code ([Review](#review); [plan-vision.md](plan-vision.md), part 9).
 
 **It writes in two steps.** A `plan_*` tool returns the change — each file as a unified diff, and warnings — and writes nothing. `apply_change` writes it, after the person has seen it; `discard_change` drops it. Only `apply_change` is marked as writing — and as destructive, since it overwrites and renames files — so a client that asks before a tool writes asks before that one alone.
 
@@ -96,6 +96,28 @@ A planned change answers:
 
 A plan the operation does not allow — accepting an ADR that is not `proposed`, superseding one that is — is refused as a tool error with `core`'s reason, and nothing is held.
 
+## Review
+
+An **Annotation** is a remark of a person on lines of a Source File — a note, a question or a concern —, kept beside the code and never in it ([review-format.md](review-format.md)). Its **Anchor** names the lines, quotes them, and records the commit they were read at; whenever these tools read the Annotations they find each Anchor again in the code as it is on disk, as the app does ([review-format.md, section 4](review-format.md#4-finding-the-anchor-again)), and say what became of it: `unchanged`, `moved` — found at other lines, with other text or in a renamed file — or `orphaned`. An Annotation is named by its ID, its file name without `.md`, `20261102-why-is-the-total-computed`; an ADR it cites, a **Trace**, as its `cites` names it: the ADR's ID where only one Decision Log has it, `<log>/<ID>` otherwise.
+
+| Tool | Takes | Answers |
+| --- | --- | --- |
+| `list_annotations` | `state`?, `type`?, `anchor`?, `author`?, `path`?, `component`?, `adr`? | `directory`, where the Annotations are; `annotations`, newest first, each with `id`, `path`, `type`, `state`, `author`, `date`, `firstLine` of its text, `anchor` — `state`, `path`, `lines` and `commit` as the Anchor has them, `now` with `path`, `lines`, `similarity` and `renamedFrom` for a moved one, `file` (`there` or `gone`) for an orphaned one —, the number of its `replies` and its `cites`; `problems`, those of Review with their `code`, `path`, `annotation` and `message` ([review-format.md, section 6](review-format.md#6-problems)). Every filter that is given must hold: `anchor` is `unchanged`, `moved` or `orphaned`; `path` a Source File or a directory; `component` a Component of `list_components`, with the Components inside it, the owner taken where the lines are now; `adr` an ADR as `cites` names it. |
+| `read_annotation` | `id` | The Annotation as in `list_annotations`, with its `quote`, the quoted lines; its `text`, the Markdown after them; its `replies` in the order they were written, each with `path`, `author`, `date` and `text`; `cited`, each item of `cites` with the ADR it names (`<log>/<ID>`) or `null`; `writable`, whether its file can be written into; and its `problems`. |
+
+Each of these plans a write of Review as the app plans it, and answers with the planned change as above; `apply_change` writes it. The tool reads the lines from the disk and quotes them: an agent names the file and the lines, never the quoted lines. `author` is the name the Annotation or the Reply is written under — git's `user.name` when it is left out, and the call is refused when git names nobody.
+
+| Tool | Takes | Plans |
+| --- | --- | --- |
+| `plan_annotation` | `path`, `start`, `end`?, `type`, `text`, `author`?, `cites`? | A new Annotation, `open`, on the lines `start` to `end` (the one line `start` when it is left out) of the Source File `path`: `type` is `note`, `question` or `concern`, `text` Markdown, `cites` the ADRs it traces to. Its Anchor records HEAD's commit; its ID is today's date and the first words of the text, and the answer names it as `annotation.id`. |
+| `plan_reply` | `id`, `text`, `author`? | A Reply under the Annotation, a file of its own named by the moment and the author, so that two Replies on two branches meet without a conflict. |
+| `plan_annotation_state` | `id`, `state` | `resolved` to Resolve the Annotation, `open` to Reopen it. Nothing is deleted. |
+| `plan_update_anchor` | `id` | For a moved Annotation, the lines it is found at now, quoted as they are, and HEAD's commit, written into its Anchor. Refused for one that is unchanged or orphaned. |
+| `plan_attach` | `id`, `path`, `start`, `end`? | Attach again: a new Anchor on the lines a person chose — what is done for an orphaned Annotation, which has no Repair. |
+| `plan_cite`, `plan_uncite` | `id`, `adr` | The ADR added to the Annotation's `cites`, or taken out where it stands; `plan_uncite` is also the Repair of a Trace to an ADR that is not there (`unknown-adr`). Which Annotations cite an ADR is computed, never written into the ADR. |
+
+While `.arch/config.yml` cannot be read, no Annotation is read or written, and every one of these tools is refused with the file to fix. While its key `annotations` names no directory inside the repository, `list_annotations` answers no Annotation and that Problem, and every plan is refused.
+
 ## Applying it
 
 | Tool | Takes | Does |
@@ -105,4 +127,4 @@ A plan the operation does not allow — accepting an ADR that is not `proposed`,
 
 A planned change is applied once. The server holds the 50 most recent ones while it runs; a change that was applied, discarded or forgotten — or planned before the server was restarted — is answered with a tool error that says to plan it again.
 
-The server writes nothing but planned changes, and only below the directory it was started for: a path that would lead out of it — with `..`, absolute, or through a symbolic link — is no file of the repository, and a symbolic link to nothing is not written through; the same rules the app's main process keeps. It runs no program but `git config user.name`, read for the author of a Correction through the suite's one module that runs git, as every read of git is run ([ADR-0020](adr/0020-git-is-a-port-of-the-kernel-implemented-once-for-node.md)) — on Windows the `git.exe` of the PATH, never one in the repository; it commits nothing. Standard output carries the protocol alone: what a library would print there goes to standard error.
+The server writes nothing but planned changes, and only below the directory it was started for: a path that would lead out of it — with `..`, absolute, or through a symbolic link — is no file of the repository, and a symbolic link to nothing is not written through; the same rules the app's main process keeps. It runs no program but git, and only to read: `git config user.name` for the author of a Correction, an Annotation or a Reply, and for Review's tools HEAD's commit and what became of a Source File since an Anchor's commit, to find the Anchor again ([review-format.md, section 4](review-format.md#4-finding-the-anchor-again)) — each through the suite's one module that runs git, as every read of git is run ([ADR-0020](adr/0020-git-is-a-port-of-the-kernel-implemented-once-for-node.md)) — on Windows the `git.exe` of the PATH, never one in the repository; it commits nothing. Standard output carries the protocol alone: what a library would print there goes to standard error.
