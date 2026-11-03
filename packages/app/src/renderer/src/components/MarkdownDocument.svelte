@@ -9,14 +9,22 @@
   let {
     markdown,
     base,
+    typing = false,
     onfile = (fileName: string) => app.selectByFileName(fileName)
   }: {
     markdown: string
     base?: DocumentBase | undefined
+    /**
+     * The text changes as it is typed, as in the preview beside the editor: a Mermaid block not
+     * drawn before is drawn once the typing pauses.
+     */
+    typing?: boolean
     /** A link to a file next to the ADR: by default, the ADR of this log it names is selected. */
     onfile?: (fileName: string) => void
   } = $props()
   const html = $derived(renderMarkdown(markdown, base))
+  /** How long the typing pauses before a Mermaid block is drawn beside it. */
+  const DRAW_WHILE_TYPING_MS = 400
 
   // A Mermaid block is drawn in place (docs/adr/0016-…). The document is set here rather than
   // by Svelte, so that what takes a block's place is the document's and nobody else's.
@@ -27,11 +35,14 @@
     scheme.addEventListener('change', follow)
     return () => scheme.removeEventListener('change', follow)
   })
+  // The Mermaid sources shown below their drawing stay shown as the document is set again.
+  const open = new Set<string>()
   function setDocument(html: string, theme: Theme): Attachment<HTMLElement> {
     return (element) => {
       // Sanitized in lib/markdown.ts.
       element.innerHTML = html
-      drawIn(element, theme)
+      // What waits to be drawn is not drawn once the document is set again.
+      return drawIn(element, theme, { open, delay: typing ? DRAW_WHILE_TYPING_MS : 0 })
     }
   }
 

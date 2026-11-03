@@ -2,8 +2,8 @@
   import { onMount } from 'svelte'
   import type { EditorView } from '@codemirror/view'
   import { recordsCorrection, type Adr } from '@adr-tool/core'
-  import { drawInto } from '../lib/diagrams'
-  import { createBodyEditor, replaceText, setLive } from '../lib/editor'
+  import { drawInto, windowTheme } from '../lib/diagrams'
+  import { createBodyEditor, replaceText, setDiagramTheme, setLive } from '../lib/editor'
   import { baseOf, renderMarkdown } from '../lib/markdown'
   import { app, type EditorMode } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -35,10 +35,20 @@
       // A table in the live mode is the preview's table, its images included.
       renderTable: (markdown) => renderMarkdown(markdown, base),
       // A Mermaid block in the live mode is the preview's diagram.
-      renderDiagram: drawInto
+      renderDiagram: drawInto,
+      diagramTheme: windowTheme()
     })
     view.focus()
-    return () => view?.destroy()
+    // A Mermaid block follows the window into its other theme.
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)')
+    const follow = (): void => {
+      if (view) setDiagramTheme(view, windowTheme())
+    }
+    scheme.addEventListener('change', follow)
+    return () => {
+      scheme.removeEventListener('change', follow)
+      view?.destroy()
+    }
   })
 
   // The live mode decorates the same editor; switching keeps the text, the cursor and the history.
@@ -98,7 +108,7 @@
       <div class="source" bind:this={host}></div>
       {#if editing.mode === 'split'}
         <div class="preview">
-          <MarkdownDocument markdown={editing.text} {base} />
+          <MarkdownDocument markdown={editing.text} {base} typing />
         </div>
       {/if}
     </div>

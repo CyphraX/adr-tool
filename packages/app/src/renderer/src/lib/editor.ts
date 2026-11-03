@@ -1,7 +1,15 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language'
-import { Compartment, EditorState, Facet, Prec, StateField, type Range } from '@codemirror/state'
+import {
+  Compartment,
+  EditorState,
+  Facet,
+  Prec,
+  StateEffect,
+  StateField,
+  type Range
+} from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -236,28 +244,51 @@ function tablesOf(state: EditorState): DecorationSet {
   )
 }
 
+/** The theme a Mermaid block of the live mode is drawn in: the window's. */
+export type DiagramTheme = 'light' | 'dark'
+
 /**
- * How the live mode draws a Mermaid block into a box: its diagram, or its source with the
- * sentence that says why there is none; `done` once the box has its size. Without one, the
+ * How the live mode draws a Mermaid block into a box, in a theme: its diagram, or its source with
+ * the sentence that says why there is none; `done` once the box has its size. Without one, the
  * blocks stay source.
  */
-const diagramRenderer = Facet.define<
-  (source: string, box: HTMLElement, done: () => void) => void,
-  ((source: string, box: HTMLElement, done: () => void) => void) | undefined
->({
+export type DiagramRenderer = (
+  source: string,
+  theme: DiagramTheme,
+  box: HTMLElement,
+  done: () => void
+) => void
+
+const diagramRenderer = Facet.define<DiagramRenderer, DiagramRenderer | undefined>({
   combine: (values) => values[0]
 })
 
-/** A Mermaid block of the text, drawn in place of its lines. A click into it puts the cursor there. */
+/** The window's theme changed: the Mermaid blocks are drawn again, in it. */
+const themeChanged = StateEffect.define<DiagramTheme>()
+
+const diagramTheme = StateField.define<DiagramTheme>({
+  create: () => 'light',
+  update: (value, transaction) =>
+    transaction.effects.reduce(
+      (theme, effect) => (effect.is(themeChanged) ? effect.value : theme),
+      value
+    )
+})
+
+/**
+ * A Mermaid block of the text, drawn in place of its lines. A click into it puts the cursor
+ * there; one on its source below the drawing opens or closes the source.
+ */
 class Diagram extends WidgetType {
   constructor(
     readonly source: string,
-    readonly render: (source: string, box: HTMLElement, done: () => void) => void
+    readonly theme: DiagramTheme,
+    readonly render: DiagramRenderer
   ) {
     super()
   }
   override eq(other: Diagram): boolean {
-    return other.source === this.source
+    return other.source === this.source && other.theme === this.theme
   }
   toDOM(view: EditorView): HTMLElement {
     const box = document.createElement('div')
@@ -266,27 +297,30 @@ class Diagram extends WidgetType {
     const pre = document.createElement('pre')
     pre.textContent = this.source
     box.append(pre)
-    this.render(this.source, box, () => view.requestMeasure())
+    this.render(this.source, this.theme, box, () => view.requestMeasure())
     const inert = (event: Event): void => {
       if ((event.target as Element).closest('a')) event.preventDefault()
     }
     for (const type of ['click', 'auxclick', 'dragstart']) box.addEventListener(type, inert)
+    // The source opened below the drawing changes the box's size.
+    box.addEventListener('toggle', () => view.requestMeasure(), true)
     return box
   }
-  override ignoreEvent(): boolean {
-    return false
+  override ignoreEvent(event: Event): boolean {
+    return event.target instanceof Element && event.target.closest('details') !== null
   }
 }
 
 function diagramsOf(state: EditorState): DecorationSet {
   const render = state.facet(diagramRenderer)
   if (!render) return Decoration.none
+  const theme = state.field(diagramTheme)
   return Decoration.set(
     liveDiagrams(state).map((diagram) =>
-      Decoration.replace({ widget: new Diagram(diagram.source, render), block: true }).range(
-        diagram.from,
-        diagram.to
-      )
+      Decoration.replace({
+        widget: new Diagram(diagram.source, theme, render),
+        block: true
+      }).range(diagram.from, diagram.to)
     )
   )
 }
@@ -297,11 +331,18 @@ const diagrams = StateField.define<DecorationSet>({
   update: (value, transaction) =>
     transaction.docChanged ||
     transaction.selection ||
+    transaction.effects.some((effect) => effect.is(themeChanged)) ||
     syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
       ? diagramsOf(transaction.state)
       : value,
   provide: (field) => EditorView.decorations.from(field)
 })
+
+/** Draw the Mermaid blocks of an editor in another theme, the window's. */
+export function setDiagramTheme(view: EditorView, theme: DiagramTheme): void {
+  if (view.state.field(diagramTheme, false) === theme) return
+  view.dispatch({ effects: themeChanged.of(theme) })
+}
 
 /**
  * The tables of the live mode. A table spans lines, and only a field of the state may replace
@@ -368,7 +409,9 @@ export interface BodyEditorOptions {
   /** How the live mode renders a table, as sanitized HTML. */
   renderTable?: (markdown: string) => string
   /** How the live mode draws a Mermaid block into a box, sanitized. */
-  renderDiagram?: (source: string, box: HTMLElement, done: () => void) => void
+  renderDiagram?: DiagramRenderer
+  /** The theme the live mode draws Mermaid blocks in at first. */
+  diagramTheme?: DiagramTheme
 }
 
 /** A CodeMirror 6 editor for the body of an ADR. It holds plain text; nothing is ever re-serialized. */
@@ -385,6 +428,7 @@ export function createBodyEditor(options: BodyEditorOptions): EditorView {
         liveMode.of(options.live ? live : []),
         options.renderTable ? tableRenderer.of(options.renderTable) : [],
         options.renderDiagram ? diagramRenderer.of(options.renderDiagram) : [],
+        diagramTheme.init(() => options.diagramTheme ?? 'light'),
         syntaxHighlighting(highlighting),
         theme,
         keymap.of([
