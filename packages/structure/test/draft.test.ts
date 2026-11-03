@@ -149,7 +149,7 @@ describe('the Draft (docs/structure-format.md, section 1)', () => {
         'packages/legacy/old.py': '',
         // Not a member: no pyproject.toml of its own.
         'packages/notes/todo.py': '',
-        // The root is a project of its own, whose directories are drafted beside the members.
+        // The root holds Python of its own: its directories are drafted beside the members.
         'scripts/release.py': ''
       })
     ).toEqual([
@@ -159,6 +159,52 @@ describe('the Draft (docs/structure-format.md, section 1)', () => {
       'core ← packages/core/**',
       'scripts ← scripts/**'
     ])
+  })
+
+  it('does not take the root for code where its Python configuration only configures tools', async () => {
+    const workspace = {
+      'package.json': '{ "name": "root" }',
+      'pnpm-workspace.yaml': 'packages:\n  - packages/*\n',
+      'packages/a/package.json': '{}',
+      'packages/a/src/index.ts': '',
+      'packages/b/package.json': '{}',
+      'packages/b/src/index.ts': '',
+      'scripts/release.ts': '',
+      'e2e/smoke.spec.ts': ''
+    }
+    const members = ['a ← packages/a/**', 'b ← packages/b/**']
+    expect(await draft(workspace)).toEqual(members)
+    expect(
+      await draft({ ...workspace, 'pyproject.toml': '[tool.ruff]\nline-length = 100\n' })
+    ).toEqual(members)
+    expect(
+      await draft({ ...workspace, 'setup.cfg': '[flake8]\nmax-line-length = 100\n' })
+    ).toEqual(members)
+    const maven = {
+      'pom.xml': '<project><modules><module>api</module><module>core</module></modules></project>',
+      'api/pom.xml': '<project/>',
+      'api/src/main/java/com/x/api/A.java': '',
+      'core/pom.xml': '<project/>',
+      'core/src/main/java/com/x/core/C.java': '',
+      'docs/snippets/Example.java': '',
+      'pyproject.toml': '[tool.black]\n'
+    }
+    expect(await draft(maven)).toEqual(['api ← api/**', 'core ← core/**'])
+    // A project it declares, or Python beside the units, does.
+    for (const root of [
+      { 'pyproject.toml': '[project]\nname = "tools"\n' },
+      { 'pyproject.toml': '[tool.poetry]\nname = "tools"\n' },
+      { 'setup.cfg': '[metadata]\nname = tools\n' },
+      { 'setup.py': 'from setuptools import setup\nsetup()\n' },
+      { 'pyproject.toml': '[tool.ruff]\n', 'tools/gen.py': '' }
+    ]) {
+      expect(await draft({ ...maven, ...root })).toEqual([
+        'api ← api/**',
+        'core ← core/**',
+        'docs ← docs/**',
+        ...('tools/gen.py' in root ? ['tools ← tools/**'] : [])
+      ])
+    }
   })
 
   it("takes a Python project's source root, but not pytest's, which may name the tests", async () => {

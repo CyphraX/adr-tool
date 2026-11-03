@@ -1,7 +1,12 @@
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import type { DeclaredComponent } from './declaration'
-import { configuredSourceRoot, PYTHON_PROJECT_FILES, uvWorkspaceMembers } from './python/projects'
-import { isNeverLookedAt, type SourceFile } from './source-files'
+import {
+  configuredSourceRoot,
+  declaresPythonProject,
+  PYTHON_PROJECT_FILES,
+  uvWorkspaceMembers
+} from './python/projects'
+import { isNeverLookedAt, type Language, type SourceFile } from './source-files'
 import { workspacePackages } from './workspace'
 
 /**
@@ -22,9 +27,6 @@ export async function draftComponents(
     ...(await uvWorkspaceMembers(fs, files)),
     ...goModuleDirectories(files)
   ])
-  // A go.mod or a Python project at the root makes the root a unit of code of its own, whose
-  // directories are drafted beside the units it holds.
-  const rootHoldsCode = ['go.mod', ...PYTHON_PROJECT_FILES].some((name) => files.includes(name))
 
   // The Source Files beneath each unit, found once: everything below works on these few.
   const beneath = new Map<string, string[]>()
@@ -34,6 +36,7 @@ export async function draftComponents(
     if (own.length > 0) beneath.set(unit, own)
   }
   const units = [...beneath.keys()].sort()
+  const rootIsCode = await rootHoldsCode(fs, files, sourceFiles, units)
   // The source root a Python project names for itself, where it names one.
   const pythonRoots = new Map<string, string>()
   for (const unit of ['', ...units]) {
@@ -52,7 +55,7 @@ export async function draftComponents(
     // Where build files name units, they are the top level; directories beside them are not drafted.
     const directories =
       unit === ''
-        ? units.length > 0 && !rootHoldsCode
+        ? units.length > 0 && !rootIsCode
           ? []
           : childDirectories('', sources, isTaken, pythonRoots.get(''))
         : childDirectories(unit, beneath.get(unit) ?? [], isTaken, pythonRoots.get(unit))
@@ -73,6 +76,27 @@ const isBeneath = (path: string, directory: string): boolean =>
   directory === '' || path.startsWith(`${directory}/`)
 
 const lastSegment = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
+
+/**
+ * Whether the root is a unit of code of its own, whose directories are drafted beside the units
+ * it holds: where it declares a Python project, or where its `go.mod` or Python configuration
+ * stands beside Source Files of that language that lie in no unit. A `pyproject.toml` or a
+ * `setup.cfg` that only configures a tool does not make it one.
+ */
+async function rootHoldsCode(
+  fs: FileSystem,
+  files: readonly string[],
+  sourceFiles: readonly SourceFile[],
+  units: readonly string[]
+): Promise<boolean> {
+  const outsideUnits = (language: Language): boolean =>
+    sourceFiles.some(
+      (file) => file.language === language && !units.some((unit) => isBeneath(file.path, unit))
+    )
+  if (files.includes('go.mod') && outsideUnits('go')) return true
+  if (!PYTHON_PROJECT_FILES.some((name) => files.includes(name))) return false
+  return outsideUnits('python') || (await declaresPythonProject(fs, files, ''))
+}
 
 /**
  * The directory a Python project names as its source root, `src/main/java`, `src`, in this

@@ -211,6 +211,29 @@ export async function pythonProjects(
 }
 
 /**
+ * Whether a directory declares a Python project, rather than configuring tools alone:
+ * `[project]` or `[tool.poetry]` in its `pyproject.toml`, a `setup.py`, or `[metadata]` in its
+ * `setup.cfg`. A `pyproject.toml` with `[tool.ruff]` alone declares none.
+ */
+export async function declaresPythonProject(
+  fs: FileSystem,
+  files: readonly string[],
+  directory: string
+): Promise<boolean> {
+  const at = (name: string): string => join(directory, name)
+  if (files.includes(at('setup.py'))) return true
+  if (files.includes(at('pyproject.toml'))) {
+    const document = await readPyproject(fs, at('pyproject.toml'))
+    if (tableAt(document, 'project') || tableAt(document, 'tool', 'poetry')) return true
+  }
+  if (files.includes(at('setup.cfg'))) {
+    const text = (await fs.readText(at('setup.cfg')).catch(() => undefined)) ?? ''
+    if (text.split(/\r?\n/).some((line) => line.trim() === '[metadata]')) return true
+  }
+  return false
+}
+
+/**
  * The directory the Draft takes as a Python project's source root: the first that its
  * packaging configuration names — not pytest's, which may name the tests. `undefined` where
  * it names none.
