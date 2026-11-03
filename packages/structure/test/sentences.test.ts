@@ -14,7 +14,9 @@ import {
   type StructureProblem,
   type StructureSaid
 } from '../src/model'
+import { prepareGo } from '../src/go/outline'
 import { prepareJava } from '../src/java/outline'
+import { preparePython } from '../src/python/outline'
 
 // What `structure` says has a code beside its English sentence (docs/plan-roadmap.md, part 12).
 
@@ -135,6 +137,23 @@ describe('a Java file that cannot be read', () => {
     const broken = read('class Broken { void x( { }\n')
     if (broken.analysed) throw new Error('analysed')
     expect(broken.said?.code).toMatch(/^java-(missing|unreadable)$/)
+    expect(structureEnglishOf(broken.said!)).toBe(broken.message)
+  })
+})
+
+describe('a Python or a Go file that cannot be read', () => {
+  it.each([
+    ['python', preparePython, 'def broken(:\n'],
+    ['go', prepareGo, 'package x\nfunc broken( {\n']
+  ] as const)('says why as a code, in %s', async (language, prepare, text) => {
+    const require = createRequire(import.meta.url)
+    const read = await prepare({
+      runtime: await readFile(require.resolve('web-tree-sitter/web-tree-sitter.wasm')),
+      grammar: await readFile(require.resolve(`tree-sitter-${language}/tree-sitter-${language}.wasm`))
+    })
+    const broken = read(text)
+    if (broken.analysed) throw new Error('analysed')
+    expect(broken.said?.code).toMatch(new RegExp(`^${language}-(missing|unreadable)$`))
     expect(structureEnglishOf(broken.said!)).toBe(broken.message)
   })
 })
