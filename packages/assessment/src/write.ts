@@ -423,9 +423,10 @@ function afterSection(text: string, place: EntryPlace): number {
   return lines.findLast((line) => !isBlank(line.content))!.next
 }
 
-/** Whether the text before an offset ends in a blank line, or is nothing but a frontmatter. */
+/** Whether the text before an offset ends in a blank line, or is nothing at all. */
 function blankBefore(view: FileView, at: number): boolean {
-  if (at <= view.bodyStart) return true
+  // A frontmatter is followed by a blank line, as a new file has it.
+  if (at <= view.bodyStart) return view.frontmatter === undefined
   const before = linesOf(view.text, view.bodyStart, at)
   const last = before.at(-1)
   return last === undefined || isBlank(last.content)
@@ -464,11 +465,16 @@ function entryEdit(outline: Outline, entry: NewEntry): TextEdit {
 
   const firstFinding = outline.entries.find((place) => place.kind === 'finding')
   if (entry.kind === 'scenario' && firstFinding) {
-    // Before the section that holds the Findings, where there is one below the title.
-    const parent = outline.headings
-      .filter((heading) => heading.line.start < firstFinding.heading.line.start)
-      .findLast((heading) => heading.level < firstFinding.heading.level)
-    const before = parent && parent.level >= 2 ? parent : firstFinding.heading
+    // Before the outermost section below the title that holds the first Finding: not inside
+    // one of its subsections.
+    let before = firstFinding.heading
+    for (const heading of outline.headings.toReversed()) {
+      if (heading.line.start >= firstFinding.heading.line.start || heading.level >= before.level) {
+        continue
+      }
+      if (heading.level < 2) break
+      before = heading
+    }
     const at = before.line.start
     return {
       start: at,

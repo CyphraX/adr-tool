@@ -336,6 +336,47 @@ describe('the entries of an Assessment', () => {
     expect(read.assessment.findings[0]!.title).toBe('The web reaches past the cart #')
   })
 
+  it('take the first Scenario before the outermost section of the Findings, never inside it', async () => {
+    const text = [
+      '---',
+      'date: 2026-11-03',
+      '---',
+      '',
+      '# A',
+      '',
+      '## Findings',
+      '',
+      '### About the web',
+      '',
+      '#### F one',
+      '',
+      '```yaml',
+      'finding: F1',
+      '```',
+      ''
+    ].join('\n')
+    const plan = await planScenario(memoryFileSystem({ [PATH]: text }), '20261103-the-shop', {
+      ...SCENARIO,
+      text: ''
+    })
+    const added = inserted(text, await textAfter(plan), '# A\n\n')
+    expect(
+      added.startsWith('## Quality Scenarios\n\n### The catalog changes how it searches\n')
+    ).toBe(true)
+    const read = readAssessment('x', PATH, await textAfter(plan))
+    expect(read.assessment.scenarios.map((one) => one.id)).toEqual(['S1'])
+    expect(read.assessment.findings.map((one) => one.id)).toEqual(['F1'])
+  })
+
+  it('take a blank line after a frontmatter that is all there is', async () => {
+    const text = '---\ndate: 2026-11-03\n---\n'
+    const plan = await planScenario(memoryFileSystem({ [PATH]: text }), '20261103-the-shop', {
+      ...SCENARIO,
+      text: ''
+    })
+    expect((await textAfter(plan)).startsWith(`${text}\n## Quality Scenarios\n\n### `)).toBe(true)
+  })
+
   it('take a new Finding after the last one, with its Scenarios and its evidence', async () => {
     const fs = memoryFileSystem({
       [PATH]: SHOP,

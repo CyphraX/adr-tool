@@ -327,7 +327,7 @@ Nothing is written without a preview: every operation plans a change set ([ADR-0
 | --- | --- |
 | New Assessment | a new file: `date`, `status: draft`, `authors`, `scope` and `previous` where given, and the title as `# …` |
 | New Assessment from the last one | the same, with `previous` the last Assessment — the latest by `date`, then by ID — and its `scope`; and its Quality Scenarios, under `## Quality Scenarios`, each as its heading and its block without `rating`, with the same IDs. Their texts, the ratings and the Findings stay behind |
-| Add a Scenario | an entry: its heading, at the level of the Scenarios before it, and its block — after the last Scenario's text; the first one before the Findings, or at the end of the document, under `## Quality Scenarios` |
+| Add a Scenario | an entry: its heading, at the level of the Scenarios before it, and its block — after the last Scenario's text; the first one before the Findings — before the outermost section below the title that holds the first of them —, or at the end of the document, under `## Quality Scenarios` |
 | Rate a Scenario | `rating` in its block: the value where it stands, or the key inserted in the order of the table; taken out to rate it no longer |
 | Add a Finding | an entry: its heading, its block with `scenarios` and `evidence` where given, and its text — after the last Finding's text; the first one at the end of the document, under `## Findings` |
 | Add evidence | an item at the end of the Finding's `evidence`, in block style; the key inserted when it is not there |
