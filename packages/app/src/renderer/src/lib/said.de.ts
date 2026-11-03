@@ -590,8 +590,7 @@ export const DE: Wording<Codes> = {
     'braucht, wovon die Metrik ist: „component“ oder „file“ und „name“',
 
   // Why an operation of Assessment is refused.
-  'directory-unavailable': (v) =>
-    `Es kann ${kept(v.key)} geschrieben werden: ${german(v.detail)}`,
+  'directory-unavailable': (v) => `Es kann ${kept(v.key)} geschrieben werden: ${german(v.detail)}`,
   'no-assessment': (v) => `Es gibt kein Assessment ${v.id}.`,
   'no-risk': (v) => `Es gibt kein Risiko ${v.id}.`,
   'no-debt-item': (v) => `Es gibt keinen Schuldposten ${v.id}.`,
@@ -645,8 +644,7 @@ export const DE: Wording<Codes> = {
     `${v.path} nennt ${v.id} vielleicht dort, wo die Suite es nicht umschreiben kann: Die Datei kann nicht gelesen werden, oder die ID ist so geschrieben, dass kein Einfügen an ihrer Stelle möglich ist. Sie muss zuerst in einem Editor geändert werden.`,
   'has-no-repair': () =>
     'Dieses Problem hat keine Reparatur: Die Suite kann nicht wissen, was gemeint war.',
-  'problem-no-longer-there': () =>
-    'Das Problem besteht nicht mehr: Es gibt nichts zu reparieren.'
+  'problem-no-longer-there': () => 'Das Problem besteht nicht mehr: Es gibt nichts zu reparieren.'
 }
 
 /** What a module said, in German; `undefined` for a code that has no German sentence. */

@@ -49,7 +49,8 @@ const ASSESSMENT = [
 
 const FILES = {
   [PATH]: ASSESSMENT,
-  [SNAPSHOT]: "components:\n  cart:\n    files: 3\n  'cart/lines':\n    files: 1\n  cartography:\n    files: 2\n",
+  [SNAPSHOT]:
+    "components:\n  cart:\n    files: 3\n  'cart/lines':\n    files: 1\n  cartography:\n    files: 2\n",
   [RISK]: '---\ncomponents:\n  - catalog\n  - cart\n---\n\n# The cart\n'
 }
 
@@ -96,13 +97,16 @@ describe('a Rename of a Component in the Assessments', () => {
     )
     expect(
       await refused({
-        [PATH]: '---\ndate: 2026-11-03\n---\n\n## F1\n\n```yaml\nfinding: F1\nfinding: F2\nevidence: [{metric: files, component: cart}]\n```\n'
+        [PATH]:
+          '---\ndate: 2026-11-03\n---\n\n## F1\n\n```yaml\nfinding: F1\nfinding: F2\nevidence: [{metric: files, component: cart}]\n```\n'
       })
     ).toContain(`${PATH} may name cart`)
     expect(await refused({ [PATH]: '# A\n', [SNAPSHOT]: 'components:\n  cart: [\n' })).toContain(
       `${SNAPSHOT} may name cart`
     )
-    expect(await refused({ [RISK]: '---\ncomponents: [cart\n---\n' })).toContain(`${RISK} may name cart`)
+    expect(await refused({ [RISK]: '---\ncomponents: [cart\n---\n' })).toContain(
+      `${RISK} may name cart`
+    )
     // Where a Trace is an alias, the suite cannot tell what else the rewrite would change.
     expect(await refused({ [PATH]: '---\nx: &s [cart]\nscope: *s\n---\n' })).toContain(
       `${PATH} may name cart`
@@ -134,12 +138,30 @@ describe('a Repair', () => {
     ])
     const repaired = await Promise.all(problems.map((problem) => planRepair(fs, problem)))
     const texts = repaired.map((plan) => Object.values(changed(plan))[0]!)
-    expect(texts[0]).toBe(ASSESSMENT.replace("scope: [cart, 'cart/lines', web]", 'scope: [cart, web]'))
+    expect(texts[0]).toBe(
+      ASSESSMENT.replace("scope: [cart, 'cart/lines', web]", 'scope: [cart, web]')
+    )
     expect(texts[1]).toBe(ASSESSMENT.replace('scenarios: [S1, S7]', 'scenarios: [S1]'))
-    expect(texts[2]).toBe(ASSESSMENT.replace('  - metric: instability\n    component: cart # the one\n', ''))
+    expect(texts[2]).toBe(
+      ASSESSMENT.replace('  - metric: instability\n    component: cart # the one\n', '')
+    )
     expect(texts[3]).toBe(ASSESSMENT.replace('  - annotation: 20261102-gone\n', ''))
     expect(texts[4]).toBe(ASSESSMENT.replace('  - risk: cart\n', ''))
     expect(texts[5]).toBe('---\ncomponents:\n  - cart\n---\n\n# The cart\n')
+  })
+
+  it('leaves the comments and blank lines below the item it takes out', async () => {
+    const text = ASSESSMENT.replace(
+      '  - annotation: 20261102-gone\n',
+      '  - annotation: 20261102-gone\n\n  # The Risk of it:\n'
+    )
+    const fs = memoryFileSystem({ [PATH]: text })
+    const [problem] = traceProblems(await openAssessments(fs), { annotations: [] }).filter(
+      (one) => one.kind === 'finding-unknown-annotation'
+    )
+    expect(Object.values(changed(await planRepair(fs, problem!)))).toEqual([
+      text.replace('  - annotation: 20261102-gone\n', '')
+    ])
   })
 
   it('is refused for a Problem without one, and for one that is gone', async () => {

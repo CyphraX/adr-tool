@@ -87,7 +87,13 @@ export async function shopIn(files: Record<string, string>) {
     .map((path) => path.slice(path.lastIndexOf('/') + 1, -'.md'.length))
   const known: Known = {
     components: everyComponent(structure.components).map((component) => component.id),
-    violations: mustNotDepend('web-through-cart', 'web', 'catalog', structure, analysis.dependencies),
+    violations: mustNotDepend(
+      'web-through-cart',
+      'web',
+      'catalog',
+      structure,
+      analysis.dependencies
+    ),
     ...(values && { metrics: values }),
     annotations,
     adrs: [{ log: 'docs/adr', id: '0001-the-web-shows-the-catalog-through-the-cart' }]

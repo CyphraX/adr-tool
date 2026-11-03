@@ -17,14 +17,18 @@ describe('the sentences of assessment', () => {
   it('say every sentence with whatever values it is given, and the kernel’s too', () => {
     const values = new Proxy(
       {},
-      { get: (_target, key) => (key === 'candidates' ? ['a', 'b', 'c'] : key === 'line' ? 7 : String(key)) }
+      {
+        get: (_target, key) =>
+          key === 'candidates' ? ['a', 'b', 'c'] : key === 'line' ? 7 : String(key)
+      }
     )
     for (const [code, sentence] of Object.entries(ASSESSMENT_SENTENCES)) {
       if (code in KERNEL_SENTENCES) continue
       const said = (sentence as (v: unknown) => string)(values)
       expect(said, code).not.toMatch(/undefined|\[object/)
     }
-    for (const code of Object.keys(KERNEL_SENTENCES)) expect(ASSESSMENT_SENTENCES).toHaveProperty([code])
+    for (const code of Object.keys(KERNEL_SENTENCES))
+      expect(ASSESSMENT_SENTENCES).toHaveProperty([code])
   })
 
   it('name each kind of evidence, and list names as a sentence does', () => {

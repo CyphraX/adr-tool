@@ -73,7 +73,11 @@ const KNOWN: Known = {
   adrs: ADRS
 }
 
-async function reading(frontmatter: string, findings = EVIDENCE, more: Record<string, string> = {}) {
+async function reading(
+  frontmatter: string,
+  findings = EVIDENCE,
+  more: Record<string, string> = {}
+) {
   return openAssessments(
     memoryFileSystem({
       [`${DIR}/a.md`]: assessment(frontmatter, findings),
@@ -100,7 +104,18 @@ describe('the Traces of an Assessment', () => {
       `${DIR}/a.md: F1 cites gone, which is no Risk of this repository.`,
       'docs/architecture/debt/d.md names gone in "components", which is not a declared Component.'
     ])
-    expect(problems.map(hasRepair)).toEqual([true, false, true, true, true, true, false, true, true, true])
+    expect(problems.map(hasRepair)).toEqual([
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ])
   })
 
   it('check nothing that is not handed in: on a Draft, no Component; without Rules, no Violation', async () => {
@@ -138,7 +153,9 @@ describe('the Traces of an Assessment', () => {
     expect(kinds).not.toContain('violation-gone')
     expect(kinds).not.toContain('metric-not-measured')
     expect(kinds).toContain('final-without-snapshot')
-    expect(wordingOf(traceProblems(read, KNOWN).find((p) => p.kind === 'final-without-snapshot')!)).toBe(
+    expect(
+      wordingOf(traceProblems(read, KNOWN).find((p) => p.kind === 'final-without-snapshot')!)
+    ).toBe(
       `${DIR}/a.md is final and cites metric values, but has no Snapshot that keeps them: they read differently with every commit.`
     )
   })
@@ -147,9 +164,14 @@ describe('the Traces of an Assessment', () => {
     const cycle = (members: string): Known => ({
       violations: [{ kind: 'cycle', rule: 'no-cycles', cycle: members.split(' ') }]
     })
-    const read = await reading('date: 2026-11-03', 'evidence:\n  - violation: no-cycles\n    cycle: [cart, web]')
+    const read = await reading(
+      'date: 2026-11-03',
+      'evidence:\n  - violation: no-cycles\n    cycle: [cart, web]'
+    )
     expect(traceProblems(read, cycle('web cart'))).toEqual([])
-    expect(traceProblems(read, cycle('web cart order')).map((p) => p.kind)).toEqual(['violation-gone'])
+    expect(traceProblems(read, cycle('web cart order')).map((p) => p.kind)).toEqual([
+      'violation-gone'
+    ])
   })
 })
 
@@ -164,7 +186,9 @@ describe('the other direction of a Trace', () => {
         (found) => found.finding.id
       )
     ).toEqual(['F1'])
-    expect(findingsCiting(read.assessments, { kind: 'annotation', id: '20261102-gone' })).toHaveLength(1)
+    expect(
+      findingsCiting(read.assessments, { kind: 'annotation', id: '20261102-gone' })
+    ).toHaveLength(1)
     const cart = citingComponent(read, 'cart')
     expect(cart.assessments.map((one) => one.id)).toEqual(['a'])
     expect(cart.findings.map((found) => found.finding.id)).toEqual(['F1'])

@@ -88,9 +88,7 @@ export function planRenameInAssessments(fs: FileSystem, from: string, to: string
       const edits = renamingList(region, pairOf(region.map, 'components')?.value)
       if (edits.length === 0) continue
       const after = readRegisterEntry(entry.register, entry.id, entry.path, applyEdits(text, edits))
-      if (
-        JSON.stringify(after.entry.components) !== JSON.stringify(entry.components.map(named))
-      ) {
+      if (JSON.stringify(after.entry.components) !== JSON.stringify(entry.components.map(named))) {
         cannot(entry.path)
       }
       await pending.write(entry.path, () => edits)
@@ -149,12 +147,12 @@ export function planRenameInAssessments(fs: FileSystem, from: string, to: string
 
     /** What an Assessment reads as under the new IDs. */
     function renamedAssessment(assessment: Assessment): Assessment {
-      // The Snapshot is read beside the file, not from it.
-      const { snapshot: _snapshot, ...file } = assessment
       return {
-        ...file,
+        ...assessment,
+        // The Snapshot is read beside the file, not from it.
+        snapshot: undefined,
         ...(assessment.scope && { scope: assessment.scope.map(named) }),
-        findings: file.findings.map((finding) => ({
+        findings: assessment.findings.map((finding) => ({
           ...finding,
           evidence: finding.evidence.map(renamedEvidence)
         }))
@@ -213,4 +211,3 @@ export function planRenameInAssessments(fs: FileSystem, from: string, to: string
 /** What an Assessment reads as, to compare: everything but the lines, which a rename may move. */
 const shapeOf = (assessment: Assessment): string =>
   JSON.stringify(assessment, (key, value: unknown) => (key === 'line' ? undefined : value))
-

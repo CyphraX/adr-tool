@@ -245,7 +245,7 @@ describe('this repository', () => {
           '    to: [kernel, structure]',
           '    to: [kernel, structure]',
           '    to: [kernel, structure]',
-          '    layers: [app, [cli, mcp], [conformance, diagrams, review, assessment], [core, structure], kernel]'
+          '      [app, [cli, mcp], [conformance, diagrams, review, assessment], [core, structure], kernel]'
         ]
       }
     ])

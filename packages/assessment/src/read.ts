@@ -43,7 +43,10 @@ export interface AssessmentLocations {
  */
 export function readLocations(config: Config): AssessmentLocations {
   if (!config.readable) {
-    return { directories: { assessments: undefined, risks: undefined, debt: undefined }, problems: [] }
+    return {
+      directories: { assessments: undefined, risks: undefined, debt: undefined },
+      problems: []
+    }
   }
   const problems: AssessmentProblem[] = []
   const directories = {} as Record<DirectoryKey, string | undefined>
@@ -57,7 +60,12 @@ export function readLocations(config: Config): AssessmentLocations {
     const directory = typeof setting.value === 'string' ? normalizePath(setting.value) : undefined
     if (directory === undefined || directory === '') {
       directories[key] = undefined
-      problems.push({ kind: 'invalid-directory-setting', path: CONFIG_PATH, line: setting.line, key })
+      problems.push({
+        kind: 'invalid-directory-setting',
+        path: CONFIG_PATH,
+        line: setting.line,
+        key
+      })
     } else directories[key] = directory
   }
   return { directories, problems }

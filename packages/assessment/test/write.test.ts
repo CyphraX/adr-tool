@@ -164,7 +164,13 @@ describe('a new Assessment', () => {
 
   it('is refused without what it needs', async () => {
     const fs = memoryFileSystem({})
-    const plan = (title: string, date: string, authors: string[], scope?: string[], declared?: string[]) =>
+    const plan = (
+      title: string,
+      date: string,
+      authors: string[],
+      scope?: string[],
+      declared?: string[]
+    ) =>
       planAssessment(fs, { title, date, authors, ...(scope && { scope }) }, declared).then(refused)
     expect(await plan('!!!', '2026-11-03', ['A'])).toBe(
       'The title "!!!" leaves no name for the file: it needs a letter or a digit.'
@@ -201,7 +207,11 @@ describe('a new Assessment', () => {
       date: '2027-05-03',
       authors: ['Lena Becker']
     })
-    expect(plan).toMatchObject({ ok: true, id: '20270503-the-shop-again', previous: '20261103-the-shop' })
+    expect(plan).toMatchObject({
+      ok: true,
+      id: '20270503-the-shop-again',
+      previous: '20261103-the-shop'
+    })
     expect(await textAfter(plan, `${DIR}/20270503-the-shop-again.md`)).toBe(
       [
         '---',
@@ -338,7 +348,10 @@ describe('the entries of an Assessment', () => {
         title: 'Two Utils',
         scenarios: ['S1'],
         evidence: [
-          { kind: 'violation', violation: { kind: 'dependency', rule: 'r', from: 'web', to: 'catalog' } },
+          {
+            kind: 'violation',
+            violation: { kind: 'dependency', rule: 'r', from: 'web', to: 'catalog' }
+          },
           { kind: 'metric', metric: 'propagation-cost', subject: { component: '*' } },
           { kind: 'risk', id: 'r' }
         ],
@@ -393,7 +406,10 @@ describe('the entries of an Assessment', () => {
     )
     expect(await scenario({ title: '  ' })).toBe('An entry needs a title, which is its heading.')
 
-    const finding = (evidence: Parameters<typeof planFinding>[2]['evidence'], scenarios?: string[]) =>
+    const finding = (
+      evidence: Parameters<typeof planFinding>[2]['evidence'],
+      scenarios?: string[]
+    ) =>
       planFinding(
         fs,
         '20261103-the-shop',
@@ -479,7 +495,10 @@ describe('evidence', () => {
     )
     expect(
       refused(
-        await planEvidence(fs, '20261103-the-shop', 'F1', { kind: 'annotation', id: '20261102-there' })
+        await planEvidence(fs, '20261103-the-shop', 'F1', {
+          kind: 'annotation',
+          id: '20261102-there'
+        })
       )
     ).toBe('F1 cites the Annotation 20261102-there already.')
   })
@@ -499,7 +518,9 @@ describe('evidence', () => {
 })
 
 describe('a Snapshot', () => {
-  const values = { components: { web: { files: 3, instability: 1 }, cart: { instability: 0.5, files: 2 } } }
+  const values = {
+    components: { web: { files: 3, instability: 1 }, cart: { instability: 0.5, files: 2 } }
+  }
 
   it('is written beside the Assessment as a whole, with the commit HEAD points at', async () => {
     const fs = memoryFileSystem({ [PATH]: SHOP })
@@ -546,14 +567,18 @@ describe('a Snapshot', () => {
     const git = memoryGit({ commits: [] })
     const fs = memoryFileSystem({ [PATH]: SHOP })
     expect(
-      refused(await planSnapshot(fs, git, '20261103-the-shop', { date: '2026-11-03', values: undefined }))
+      refused(
+        await planSnapshot(fs, git, '20261103-the-shop', { date: '2026-11-03', values: undefined })
+      )
     ).toBe(
       'There are no metric values to freeze: the Components have to be declared, and to hold Source Files.'
     )
     const final = memoryFileSystem({ [PATH]: SHOP.replace('nav_order: 2', 'status: final') })
     expect(
       refused(await planSnapshot(final, git, '20261103-the-shop', { date: '2026-11-03', values }))
-    ).toBe('20261103-the-shop is final: its record is complete. A person may still change it in an editor.')
+    ).toBe(
+      '20261103-the-shop is final: its record is complete. A person may still change it in an editor.'
+    )
   })
 })
 
@@ -564,10 +589,14 @@ describe('Finish', () => {
     expect(inserted(SHOP, await textAfter(plan), '# the day we met\n')).toBe('status: final\n')
     expect(await textAfter(plan)).toContain('date: 2026-11-03 # the day we met\nstatus: final\n')
     await applied(fs, plan)
-    expect(refused(await planFinish(fs, '20261103-the-shop'))).toBe('20261103-the-shop is final already.')
+    expect(refused(await planFinish(fs, '20261103-the-shop'))).toBe(
+      '20261103-the-shop is final already.'
+    )
 
     const draft = memoryFileSystem({ [PATH]: SHOP.replace('nav_order: 2', "status: 'draft'") })
-    expect(await textAfter(await planFinish(draft, '20261103-the-shop'))).toContain("status: 'final'")
+    expect(await textAfter(await planFinish(draft, '20261103-the-shop'))).toContain(
+      "status: 'final'"
+    )
     const bare = memoryFileSystem({ [PATH]: '# A\n' })
     expect(await textAfter(await planFinish(bare, '20261103-the-shop'))).toBe(
       '---\nstatus: final\n---\n\n# A\n'
@@ -591,7 +620,10 @@ describe('the registers', () => {
     )
     expect(risk).toMatchObject({ ok: true, id: '20261103-a-change-to-the-search-breaks-the-page' })
     expect(
-      await textAfter(risk, 'docs/architecture/risks/20261103-a-change-to-the-search-breaks-the-page.md')
+      await textAfter(
+        risk,
+        'docs/architecture/risks/20261103-a-change-to-the-search-breaks-the-page.md'
+      )
     ).toBe(
       [
         '---',
@@ -633,7 +665,10 @@ describe('the registers', () => {
     )
     const bare = memoryFileSystem({ 'docs/architecture/debt/d.md': '# D\n' })
     expect(
-      await textAfter(await planState(bare, 'debt', 'd', 'paid-off', '2026-11-04'), 'docs/architecture/debt/d.md')
+      await textAfter(
+        await planState(bare, 'debt', 'd', 'paid-off', '2026-11-04'),
+        'docs/architecture/debt/d.md'
+      )
     ).toBe('---\nstate: paid-off\nchanged: 2026-11-04\n---\n\n# D\n')
   })
 

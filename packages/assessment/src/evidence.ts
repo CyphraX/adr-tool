@@ -3,12 +3,7 @@
  * its fingerprint (docs/conformance-format.md, section 3), a metric by its subject, everything
  * else by its ID.
  */
-import type {
-  Evidence,
-  MetricSubject,
-  NamedViolation,
-  ViolationFingerprint
-} from './model'
+import type { Evidence, MetricSubject, NamedViolation, ViolationFingerprint } from './model'
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 

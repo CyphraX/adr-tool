@@ -71,7 +71,7 @@ export function lineAt(text: string, start: number): Line {
 export function linesOf(text: string, from = 0, to = text.length): Line[] {
   const lines: Line[] = []
   let number = lineNumberAt(text, from)
-  for (let start = from; start < to; ) {
+  for (let start = from; start < to;) {
     const line = lineFrom(text, start, number++)
     lines.push(line)
     start = line.next
@@ -148,7 +148,9 @@ export function outlineOf(text: string, bodyStart: number): (Heading | Fence)[] 
       const info = opening[3]!
       // CommonMark: the info string of a backtick fence holds no backtick.
       if (!(fence.startsWith('`') && info.includes('`'))) {
-        const closing = new RegExp(`^ {0,3}${fence[0] === '`' ? '`' : '~'}{${fence.length},}[ \\t]*$`)
+        const closing = new RegExp(
+          `^ {0,3}${fence[0] === '`' ? '`' : '~'}{${fence.length},}[ \\t]*$`
+        )
         let end = index + 1
         while (end < lines.length && !closing.test(lines[end]!.content)) end++
         const close = lines[end]

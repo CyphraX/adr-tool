@@ -36,12 +36,7 @@ function evidenceIn(problem: AssessmentProblem): NewEvidence | undefined {
 }
 
 /** The block of a Finding, as the file has it now. */
-function findingRegion(
-  view: FileView,
-  path: string,
-  assessment: string,
-  finding: string
-): Region {
+function findingRegion(view: FileView, path: string, assessment: string, finding: string): Region {
   const place = outlineAssessment(assessment, path, view.text).entries.find(
     (one) => one.kind === 'finding' && one.id === finding
   )

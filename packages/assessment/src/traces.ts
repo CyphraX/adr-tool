@@ -246,9 +246,7 @@ export function assessmentsNaming(
   kind: 'risk' | 'debt',
   id: string
 ): Assessment[] {
-  return [
-    ...new Set(findingsCiting(assessments, { kind, id }).map((found) => found.assessment))
-  ]
+  return [...new Set(findingsCiting(assessments, { kind, id }).map((found) => found.assessment))]
 }
 
 /** Whether a piece of evidence names a Component: in a fingerprint, or as a metric's subject. */
@@ -286,9 +284,7 @@ export function citingComponent(
 } {
   return {
     assessments: reading.assessments.filter((one) => one.scope?.includes(component)),
-    findings: findingsWhere(reading.assessments, (evidence) =>
-      namesComponent(evidence, component)
-    ),
+    findings: findingsWhere(reading.assessments, (evidence) => namesComponent(evidence, component)),
     risks: reading.risks.filter((risk) => risk.components.includes(component)),
     debtItems: reading.debtItems.filter((item) => item.components.includes(component))
   }

@@ -34,7 +34,7 @@ export interface Values {
 const NEEDS_TEXT: AssessmentSaid = { code: 'must-be-text', values: {} }
 
 export function valuesOf(region: Region, map: YAMLMap | undefined, wrong: Wrong): Values {
-  const pair = (key: string) => pairOf(map, key)
+  const pair = (key: string): ReturnType<typeof pairOf> => pairOf(map, key)
   const node = (key: string): unknown => pair(key)?.value ?? undefined
   const has = (key: string): boolean => {
     const value = node(key)
@@ -113,6 +113,7 @@ export function frontmatterOf(view: FileView, path: string): ReadFrontmatter {
       unreadable: { code: 'frontmatter-not-valid-yaml', values: { message: region.errors[0]! } }
     }
   }
-  if (region.errors.length > 0) return { unreadable: { code: 'frontmatter-no-mapping', values: {} } }
+  if (region.errors.length > 0)
+    return { unreadable: { code: 'frontmatter-no-mapping', values: {} } }
   return { region }
 }

@@ -40,9 +40,7 @@ export function readRegisterEntry<R extends Register>(
   const view = viewFile(text)
   const frontmatter = frontmatterOf(view, path)
   const states: readonly string[] = register === 'risks' ? RISK_STATES : DEBT_STATES
-  const body = view.unterminated
-    ? { description: '' }
-    : titleAndDescription(text, view.bodyStart)
+  const body = view.unterminated ? { description: '' } : titleAndDescription(text, view.bodyStart)
   const base = {
     register,
     id,

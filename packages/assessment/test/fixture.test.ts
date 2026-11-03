@@ -166,13 +166,15 @@ describe('the Assessment of the shop', () => {
     )
 
     // The Snapshot is what it was, and so is what a Finding reads from it, though the code moved on.
-    expect(assessment!.snapshot).toEqual((await openAssessments(before.fs)).assessments[0]!.snapshot)
+    expect(assessment!.snapshot).toEqual(
+      (await openAssessments(before.fs)).assessments[0]!.snapshot
+    )
     expect(after.values!.components['catalog']!['fan-in']).toBe(1)
     const metric = fanIn as Extract<Evidence, { kind: 'metric' }>
     expect(metric).toMatchObject({ metric: 'fan-in', subject: { component: 'catalog' } })
     expect(metricValueOf(assessment!, metric, after.values)).toEqual({ value: 2, frozen: true })
     // Without the Snapshot, a draft reads the value of the code now.
-    const { snapshot: _snapshot, ...unfrozen } = assessment!
+    const unfrozen = { ...assessment!, snapshot: undefined }
     expect(metricValueOf(unfrozen, metric, after.values)).toEqual({ value: 1, frozen: false })
   })
 

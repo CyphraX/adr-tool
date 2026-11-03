@@ -18,7 +18,12 @@ import type {
  * whichever the Rule's metric is about (part 13).
  */
 export type NamedViolation =
-  | { readonly kind: 'dependency'; readonly rule: string; readonly from: string; readonly to: string }
+  | {
+      readonly kind: 'dependency'
+      readonly rule: string
+      readonly from: string
+      readonly to: string
+    }
   | { readonly kind: 'cycle'; readonly rule: string; readonly cycle: readonly string[] }
   | { readonly kind: 'component'; readonly rule: string; readonly component: string }
   | { readonly kind: 'inside'; readonly rule: string; readonly file: string; readonly name: string }
@@ -29,7 +34,12 @@ export type NamedViolation =
  * fingerprints is one of these, part 13's per function and per class among them.
  */
 export type ViolationFingerprint =
-  | { readonly kind: 'dependency'; readonly rule: string; readonly from: string; readonly to: string }
+  | {
+      readonly kind: 'dependency'
+      readonly rule: string
+      readonly from: string
+      readonly to: string
+    }
   | { readonly kind: 'cycle'; readonly rule: string; readonly cycle: readonly string[] }
   | { readonly kind: 'component'; readonly rule: string; readonly component: string }
   | {
@@ -41,8 +51,7 @@ export type ViolationFingerprint =
 
 /** What a metric value is of: a Component (`*` for the top level), or a function or class in a Source File. */
 export type MetricSubject =
-  | { readonly component: string }
-  | { readonly file: string; readonly name: string }
+  { readonly component: string } | { readonly file: string; readonly name: string }
 
 /** One piece of a Finding's evidence: a Trace (docs/assessment-format.md, section 2). */
 export type Evidence = (

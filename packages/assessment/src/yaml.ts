@@ -345,9 +345,7 @@ export function appendBlockItem(
 ): TextEdit[] {
   const pair = pairOf(region.map, key)
   const item = (indent: string): string =>
-    lines
-      .map((line, index) => `${indent}${index === 0 ? '- ' : '  '}${line}${region.eol}`)
-      .join('')
+    lines.map((line, index) => `${indent}${index === 0 ? '- ' : '  '}${line}${region.eol}`).join('')
   if (!pair) {
     const edit = insertKey(region, key, [`${key}:`], order)
     return [{ ...edit, insert: edit.insert + item(keyIndent(region) + '  ') }]
@@ -378,6 +376,19 @@ export function appendBlockItem(
   return [{ start: at, end: at, insert: lead + item(indent) }]
 }
 
+/** Where the last line of an item of a block list ends that is not blank and not a comment of its own. */
+function itemEnd(region: Region, item: { range?: [number, number, number] }): number {
+  const text = region.text
+  let end = nodeEnd(region, item)
+  // A collection's range runs on over the comments and blank lines after it.
+  for (;;) {
+    const start = lineStart(text, end - 1)
+    const line = text.slice(start, end).trim()
+    if (start <= region.abs(item.range![0]) || (line !== '' && !line.startsWith('#'))) return end
+    end = start
+  }
+}
+
 /** Take an item of the block list of `key` out, with all its lines. */
 export function removeBlockItem(region: Region, key: string, index: number): TextEdit[] {
   const pair = pairOf(region.map, key)
@@ -390,11 +401,8 @@ export function removeBlockItem(region: Region, key: string, index: number): Tex
   const dash = region.text.lastIndexOf('-', region.abs(item.range[0]))
   const start = lineStart(region.text, dash)
   if (region.text.slice(start, dash).trim() !== '') byHand(region, key)
-  const next = node.items[index + 1] as { range?: [number, number, number] } | undefined
-  const end = next?.range
-    ? lineStart(region.text, region.text.lastIndexOf('-', region.abs(next.range[0])))
-    : nodeEnd(region, item)
-  return [{ start, end, insert: '' }]
+  // Its own lines only: a comment or a blank line below it belongs to what follows.
+  return [{ start, end: itemEnd(region, item), insert: '' }]
 }
 
 /** Rewrite a scalar where it stands, its quoting kept; `undefined` where a splice cannot serve. */

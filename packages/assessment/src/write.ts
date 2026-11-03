@@ -183,14 +183,17 @@ function checkedComponents(
   if (unique.length === 0) return []
   if (!declared) refuse({ code: 'components-need-declaration', values: {} })
   for (const component of unique) {
-    if (!declared.includes(component)) refuse({ code: 'component-not-known', values: { component } })
+    if (!declared.includes(component))
+      refuse({ code: 'component-not-known', values: { component } })
   }
   return unique
 }
 
 /** The authors of a new Assessment, at least one. */
 function checkedAuthors(authors: readonly string[]): string[] {
-  const named = [...new Set(authors.map((author) => author.trim()).filter((author) => author !== ''))]
+  const named = [
+    ...new Set(authors.map((author) => author.trim()).filter((author) => author !== ''))
+  ]
   if (named.length === 0) refuse({ code: 'assessment-needs-author', values: {} })
   return named
 }
@@ -338,7 +341,9 @@ export function planAssessmentFromLast(
           scenarios
             .map(
               (place) =>
-                eol + linesText([headingLine(3, place.heading.text), ''], eol) + carriedBlock(place, eol)
+                eol +
+                linesText([headingLine(3, place.heading.text), ''], eol) +
+                carriedBlock(place, eol)
             )
             .join('')
     await pending.create(
@@ -356,7 +361,9 @@ export function planAssessmentFromLast(
 
 /** The IDs an entry of a kind cannot take: its entries', and those of blocks that cannot be read as one. */
 function takenIds(outline: Outline, kind: 'scenario' | 'finding'): Set<string> {
-  const taken = new Set(outline.entries.filter((place) => place.kind === kind).map((place) => place.id))
+  const taken = new Set(
+    outline.entries.filter((place) => place.kind === kind).map((place) => place.id)
+  )
   for (const problem of outline.problems) {
     if ('entry' in problem) taken.add(problem.entry)
   }
@@ -441,12 +448,14 @@ function entryEdit(outline: Outline, entry: NewEntry): TextEdit {
     return {
       start: at,
       end: at,
-      insert: (blankBefore(view, at) ? '' : eol) + linesText([section, ''], eol) + entryLines(3) + eol
+      insert:
+        (blankBefore(view, at) ? '' : eol) + linesText([section, ''], eol) + entryLines(3) + eol
     }
   }
 
   const at = text.length
-  const lead = text === '' ? '' : text.endsWith('\n') ? (blankBefore(view, at) ? '' : eol) : eol + eol
+  const lead =
+    text === '' ? '' : text.endsWith('\n') ? (blankBefore(view, at) ? '' : eol) : eol + eol
   return { start: at, end: at, insert: lead + linesText([section, ''], eol) + entryLines(3) }
 }
 
@@ -538,7 +547,10 @@ function entryIn(
   if (outline.problems.some((problem) => 'entry' in problem && problem.entry === id)) {
     refuse({ code: 'entry-needs-fixing', values: { path, id } })
   }
-  return refuse({ code: kind === 'scenario' ? 'no-scenario' : 'no-finding', values: { assessment, id } })
+  return refuse({
+    code: kind === 'scenario' ? 'no-scenario' : 'no-finding',
+    values: { assessment, id }
+  })
 }
 
 /**
@@ -561,7 +573,13 @@ export function planRating(
     const now = read.scenarios.find((one) => one.id === scenario)
     if (now?.rating === rating) refuse({ code: 'rating-unchanged', values: { id: scenario } })
     await pending.write(path, (view) => {
-      const place = entryIn(outlineAssessment(assessment, path, view.text), path, assessment, 'scenario', scenario)
+      const place = entryIn(
+        outlineAssessment(assessment, path, view.text),
+        path,
+        assessment,
+        'scenario',
+        scenario
+      )
       return rating === undefined
         ? removeKey(place.region, 'rating')
         : setScalar(place.region, 'rating', rating, SCENARIO_KEYS, asText)
@@ -645,12 +663,19 @@ function checkEvidence(
   known: Known,
   registers: { readonly risks?: readonly Risk[]; readonly debt?: readonly TechnicalDebtItem[] }
 ): void {
-  if (!isComplete(evidence)) refuse({ code: 'evidence-incomplete', values: { kind: evidence.kind } })
+  if (!isComplete(evidence))
+    refuse({ code: 'evidence-incomplete', values: { kind: evidence.kind } })
   const notThere = (): never =>
-    refuse({ code: 'evidence-not-there', values: { kind: evidence.kind, name: evidenceName(evidence) } })
+    refuse({
+      code: 'evidence-not-there',
+      values: { kind: evidence.kind, name: evidenceName(evidence) }
+    })
   switch (evidence.kind) {
     case 'violation':
-      if (known.violations && !known.violations.some((one) => namesViolation(evidence.violation, one))) {
+      if (
+        known.violations &&
+        !known.violations.some((one) => namesViolation(evidence.violation, one))
+      ) {
         notThere()
       }
       return
@@ -772,7 +797,13 @@ export function planEvidence(
       evidence.kind === 'risk' || evidence.kind === 'debt' ? await registersOf(fs) : {}
     checkEvidence(evidence, read, known, registers)
     await pending.write(path, (view) => {
-      const place = entryIn(outlineAssessment(assessment, path, view.text), path, assessment, 'finding', finding)
+      const place = entryIn(
+        outlineAssessment(assessment, path, view.text),
+        path,
+        assessment,
+        'finding',
+        finding
+      )
       return appendBlockItem(place.region, 'evidence', evidenceLines(evidence), FINDING_KEYS)
     })
     return {}
@@ -932,7 +963,10 @@ export function planState(
   return planning(fs, async (pending) => {
     const states: readonly string[] = register === 'risks' ? RISK_STATES : DEBT_STATES
     if (!states.includes(state)) {
-      refuse({ code: register === 'risks' ? 'not-a-risk-state' : 'not-a-debt-state', values: { state } })
+      refuse({
+        code: register === 'risks' ? 'not-a-risk-state' : 'not-a-debt-state',
+        values: { state }
+      })
     }
     if (!isDay(date)) refuse({ code: 'date-not-a-day', values: { date } })
     const directory = await directoryOf(fs, register)

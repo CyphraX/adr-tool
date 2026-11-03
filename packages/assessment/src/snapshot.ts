@@ -177,7 +177,7 @@ export function readSnapshot(
   assessment: string,
   text: string
 ): { snapshot?: Snapshot; problems: AssessmentProblem[] } {
-  const unreadable = (detail: AssessmentSaid) => ({
+  const unreadable = (detail: AssessmentSaid): { problems: AssessmentProblem[] } => ({
     problems: [{ kind: 'unreadable-snapshot' as const, path, assessment, detail }]
   })
   const doc = parseDocument(text, { lineCounter: new LineCounter() })
@@ -202,7 +202,8 @@ export function readSnapshot(
   const components: Record<string, Record<string, number>> = {}
   const listed = get('components')
   if (listed !== undefined && listed !== null) {
-    if (!isMap(listed)) return unreadable({ code: 'snapshot-numbers', values: { key: 'components' } })
+    if (!isMap(listed))
+      return unreadable({ code: 'snapshot-numbers', values: { key: 'components' } })
     for (const pair of listed.items) {
       const id = scalarText(pair.key)
       const values = numbersOf(pair.value)

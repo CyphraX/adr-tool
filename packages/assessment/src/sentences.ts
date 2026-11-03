@@ -43,8 +43,7 @@ const EVIDENCE: Record<string, string> = {
   risk: 'the Risk',
   debt: 'the Technical Debt Item'
 }
-const evidence = (kind: string, name: string): string =>
-  `${EVIDENCE[kind] ?? kind} ${name}`
+const evidence = (kind: string, name: string): string => `${EVIDENCE[kind] ?? kind} ${name}`
 
 // The values are types, not interfaces: a Said's values are a record of names, and only a type
 // is one without saying so.
@@ -110,7 +109,8 @@ export const SENTENCES = {
     finding: string
     metric: string
     subject: string
-  }): string => `${v.path}: ${v.finding} cites ${v.metric} of ${v.subject}, which the code does not have.`,
+  }): string =>
+    `${v.path}: ${v.finding} cites ${v.metric} of ${v.subject}, which the code does not have.`,
   'final-without-snapshot': (v: { path: string }): string =>
     `${v.path} is final and cites metric values, but has no Snapshot that keeps them: they read differently with every commit.`,
   'finding-unknown-annotation': (v: Cited): string =>
@@ -157,7 +157,8 @@ export const SENTENCES = {
   'evidence-not-a-mapping': (): string => 'is no mapping',
   'evidence-of-no-kind': (): string =>
     'names none of violation, metric, annotation, adr, risk and debt',
-  'evidence-of-two-kinds': (): string => 'names more than one of violation, metric, annotation, adr, risk and debt',
+  'evidence-of-two-kinds': (): string =>
+    'names more than one of violation, metric, annotation, adr, risk and debt',
   'evidence-needs-key': (v: { key: string }): string => `needs "${v.key}" as a text`,
   'evidence-needs-members': (): string =>
     'needs "cycle" as a list of the members of the Cycle, two at least',
@@ -199,8 +200,7 @@ export const SENTENCES = {
   'entry-id-taken': (v: { assessment: string; id: string }): string =>
     `${v.assessment} has an entry ${v.id} already.`,
   'entry-needs-title': (): string => 'An entry needs a title, which is its heading.',
-  'scenario-needs-key': (v: { key: string }): string =>
-    `A Quality Scenario needs a "${v.key}".`,
+  'scenario-needs-key': (v: { key: string }): string => `A Quality Scenario needs a "${v.key}".`,
   'not-a-quality-attribute': (v: { value: string }): string =>
     `"${v.value}" is no characteristic of ISO/IEC 25010, nor one of its sub-characteristics.`,
   'not-a-level': (v: { value: string }): string => `"${v.value}" is none of H, M and L.`,
@@ -227,8 +227,10 @@ export const SENTENCES = {
     `"${v.key}" of ${v.path} is written in a way the suite cannot change where it stands. Change it in an editor.`,
   'cannot-rename-in-assessments': (v: { path: string; id: string }): string =>
     `${v.path} may name ${v.id} where the suite cannot rewrite it: it cannot be read, or the ID is written in a way a splice cannot serve. Change it in an editor first.`,
-  'has-no-repair': (): string => 'This Problem has no Repair: the suite cannot know what was meant.',
-  'problem-no-longer-there': (): string => 'The Problem is no longer there: there is nothing to repair.'
+  'has-no-repair': (): string =>
+    'This Problem has no Repair: the suite cannot know what was meant.',
+  'problem-no-longer-there': (): string =>
+    'The Problem is no longer there: there is nothing to repair.'
 } satisfies Sentences
 
 /** What `assessment` may say: one of its codes, with the values of its sentence. */

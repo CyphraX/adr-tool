@@ -16,14 +16,7 @@ import {
   type QualityAttribute
 } from './quality'
 import type { AssessmentSaid } from './sentences'
-import {
-  outlineOf,
-  trimmedText,
-  viewFile,
-  type Fence,
-  type FileView,
-  type Heading
-} from './text'
+import { outlineOf, trimmedText, viewFile, type Fence, type FileView, type Heading } from './text'
 import { frontmatterOf, valuesOf, type Values } from './values'
 import { pairOf, parseRegion, scalarText, type Region } from './yaml'
 
@@ -250,7 +243,9 @@ function entryValues(
   )
 }
 
-const common = (place: EntryPlace) => ({
+const common = (
+  place: EntryPlace
+): Pick<QualityScenario, 'id' | 'title' | 'line' | 'level' | 'text'> => ({
   id: place.id,
   title: place.heading.text,
   line: place.heading.line.number,
@@ -360,7 +355,10 @@ export function evidenceOf(
 ): Evidence | { readonly line: number; readonly detail: AssessmentSaid } {
   const at = (item as { range?: number[] } | null)?.range?.[0]
   const line = at === undefined ? region.lineOf(0) : region.lineOf(at)
-  const wrong = (detail: AssessmentSaid) => ({ line, detail })
+  const wrong = (detail: AssessmentSaid): { line: number; detail: AssessmentSaid } => ({
+    line,
+    detail
+  })
   if (!isMap(item)) return wrong({ code: 'evidence-not-a-mapping', values: {} })
   const map = item as YAMLMap
   const kinds = EVIDENCE_KINDS.filter((kind) => pairOf(map, kind) !== undefined)
@@ -372,7 +370,8 @@ export function evidenceOf(
     return isScalar(value) ? scalarText(value) : undefined
   }
   const has = (key: string): boolean => pairOf(map, key) !== undefined
-  const needs = (key: string) => wrong({ code: 'evidence-needs-key', values: { key } })
+  const needs = (key: string): { line: number; detail: AssessmentSaid } =>
+    wrong({ code: 'evidence-needs-key', values: { key } })
   const named = text(kind)
   if (named === undefined) return needs(kind)
 
@@ -406,8 +405,8 @@ function violationOf(
   text: (key: string) => string | undefined,
   has: (key: string) => boolean
 ): NamedViolation | { readonly detail: AssessmentSaid } {
-  const needs = (key: string) => ({
-    detail: { code: 'evidence-needs-key', values: { key } } as AssessmentSaid
+  const needs = (key: string): { readonly detail: AssessmentSaid } => ({
+    detail: { code: 'evidence-needs-key', values: { key } }
   })
   if (has('from') || has('to')) {
     const [from, to] = [text('from'), text('to')]

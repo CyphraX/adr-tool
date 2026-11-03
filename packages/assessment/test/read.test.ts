@@ -164,22 +164,24 @@ describe('reading an Assessment', () => {
       ]
     })
 
-    expect(problems.map((problem) => [problem.kind, 'line' in problem ? problem.line : 0])).toEqual([
-      ['entry-without-heading', 73],
-      ['entry-of-two-kinds', 79],
-      ['invalid-entry-id', 86],
-      ['duplicate-entry', 92],
-      ['unreadable-entry', 98],
-      ['unreadable-entry', 105],
-      ['missing-entry-key', 43],
-      ['missing-entry-key', 43],
-      ['unknown-quality-attribute', 45],
-      ['invalid-entry-value', 47],
-      ['invalid-entry-value', 48],
-      ['invalid-evidence', 64],
-      ['invalid-evidence', 65],
-      ['invalid-evidence', 67]
-    ])
+    expect(problems.map((problem) => [problem.kind, 'line' in problem ? problem.line : 0])).toEqual(
+      [
+        ['entry-without-heading', 73],
+        ['entry-of-two-kinds', 79],
+        ['invalid-entry-id', 86],
+        ['duplicate-entry', 92],
+        ['unreadable-entry', 98],
+        ['unreadable-entry', 105],
+        ['missing-entry-key', 43],
+        ['missing-entry-key', 43],
+        ['unknown-quality-attribute', 45],
+        ['invalid-entry-value', 47],
+        ['invalid-entry-value', 48],
+        ['invalid-evidence', 64],
+        ['invalid-evidence', 65],
+        ['invalid-evidence', 67]
+      ]
+    )
     expect(problems.map(wordingOf)).toEqual([
       `${DIR}/x.md, line 73: the block of F2 does not follow a heading, which gives the entry its title.`,
       `${DIR}/x.md, line 79: a block is either a Quality Scenario or a Finding, and has both "scenario" and "finding".`,
@@ -228,9 +230,11 @@ describe('reading an Assessment', () => {
       `${DIR}/x.md: "status" must be draft or final.`,
       `${DIR}/x.md: "authors" must be a list of texts.`
     ])
-    expect(readAssessment('x', `${DIR}/x.md`, '# No frontmatter\n').problems.map(wordingOf)).toEqual(
-      [`${DIR}/x.md has no date: "date" must say the day of the Assessment, as YYYY-MM-DD.`]
-    )
+    expect(
+      readAssessment('x', `${DIR}/x.md`, '# No frontmatter\n').problems.map(wordingOf)
+    ).toEqual([
+      `${DIR}/x.md has no date: "date" must say the day of the Assessment, as YYYY-MM-DD.`
+    ])
   })
 
   it('knows the quality attributes of ISO/IEC 25010 and their sub-characteristics', () => {
@@ -283,7 +287,9 @@ describe('reading a Risk and a Technical Debt Item', () => {
       'r.md: "state" must be open, mitigated, accepted or closed.'
     ])
     const debt = readRegisterEntry('debt', 'd', 'd.md', '---\nstate: mitigated\n---\n')
-    expect(debt.problems.map(wordingOf)).toEqual(['d.md: "state" must be open, scheduled or paid-off.'])
+    expect(debt.problems.map(wordingOf)).toEqual([
+      'd.md: "state" must be open, scheduled or paid-off.'
+    ])
     const open = readRegisterEntry('debt', 'd', 'd.md', '---\nstate: [\n---\n')
     expect(open.entry.writable).toBe(false)
     expect(open.problems[0]!.kind).toBe('unreadable-debt-item')
@@ -313,7 +319,10 @@ describe('reading a Snapshot', () => {
         path: 's.yml',
         commit: 'a'.repeat(40),
         date: '2026-11-03',
-        components: { cart: { instability: 0.5, 'some-new-metric': 3 }, '*': { 'propagation-cost': 0.25 } },
+        components: {
+          cart: { instability: 0.5, 'some-new-metric': 3 },
+          '*': { 'propagation-cost': 0.25 }
+        },
         sourceFiles: { 'cart/Cart.java': { 'Cart.total()': { complexity: 1 } } }
       },
       problems: []
@@ -321,7 +330,8 @@ describe('reading a Snapshot', () => {
   })
 
   it('says why one cannot be read', () => {
-    const said = (text: string): string[] => readSnapshot('s.yml', 'x', text).problems.map(wordingOf)
+    const said = (text: string): string[] =>
+      readSnapshot('s.yml', 'x', text).problems.map(wordingOf)
     expect(said('a: [')[0]).toMatch(/^s\.yml cannot be read: it is not valid YAML: /)
     expect(said('- a\n')).toEqual(['s.yml cannot be read: its top level must be a mapping.'])
     expect(said('commit: abc\n')).toEqual([
@@ -340,8 +350,14 @@ describe('reading the directories of a repository', () => {
   it('takes the keys of .arch/config.yml, and the defaults without them', () => {
     const config = readConfig('assessments: design/assessments\nrisks: 123\n')
     expect(readLocations(config)).toEqual({
-      directories: { assessments: 'design/assessments', risks: undefined, debt: 'docs/architecture/debt' },
-      problems: [{ kind: 'invalid-directory-setting', path: '.arch/config.yml', line: 2, key: 'risks' }]
+      directories: {
+        assessments: 'design/assessments',
+        risks: undefined,
+        debt: 'docs/architecture/debt'
+      },
+      problems: [
+        { kind: 'invalid-directory-setting', path: '.arch/config.yml', line: 2, key: 'risks' }
+      ]
     })
     expect(wordingOf(readLocations(config).problems[0]!)).toBe(
       '"risks" in .arch/config.yml must be a relative path inside the repository. No Risk is read until it is fixed.'
