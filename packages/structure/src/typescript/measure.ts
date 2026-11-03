@@ -66,17 +66,19 @@ type Body =
   | ts.GetAccessorDeclaration
   | ts.SetAccessorDeclaration
 
+const FUNCTIONS = new Set([
+  ts.SyntaxKind.FunctionDeclaration,
+  ts.SyntaxKind.FunctionExpression,
+  ts.SyntaxKind.ArrowFunction,
+  ts.SyntaxKind.MethodDeclaration,
+  ts.SyntaxKind.Constructor,
+  ts.SyntaxKind.GetAccessor,
+  ts.SyntaxKind.SetAccessor
+])
+
+// The walk asks these of every node: by its kind, which is quicker than asking TypeScript.
 function hasBody(node: ts.Node): node is Body {
-  return (
-    (ts.isFunctionDeclaration(node) ||
-      ts.isFunctionExpression(node) ||
-      ts.isArrowFunction(node) ||
-      ts.isMethodDeclaration(node) ||
-      ts.isConstructorDeclaration(node) ||
-      ts.isGetAccessorDeclaration(node) ||
-      ts.isSetAccessorDeclaration(node)) &&
-    node.body !== undefined
-  )
+  return FUNCTIONS.has(node.kind) && (node as Body).body !== undefined
 }
 
 /** What a value is once the parentheses and the assertions around it are taken off. */
@@ -237,23 +239,62 @@ function isDestructuringDefault(node: ts.BinaryExpression): boolean {
   )
 }
 
+// The kinds `decides` asks about, read from TypeScript once: a switch over `ts.SyntaxKind.…`
+// would look each of them up again for every node.
+const BINARY = ts.SyntaxKind.BinaryExpression
+const PARAMETER = ts.SyntaxKind.Parameter
+const BINDING_ELEMENT = ts.SyntaxKind.BindingElement
+const SHORTHAND = ts.SyntaxKind.ShorthandPropertyAssignment
+const PROPERTY_ACCESS = ts.SyntaxKind.PropertyAccessExpression
+const ELEMENT_ACCESS = ts.SyntaxKind.ElementAccessExpression
+const CALL = ts.SyntaxKind.CallExpression
+
 /** Whether a node decides which way the function goes: one more for its complexity. */
 function decides(node: ts.Node): boolean {
-  if (DECISIONS.has(node.kind)) return true
-  if (ts.isBinaryExpression(node)) {
-    return SHORT_CIRCUIT.has(node.operatorToken.kind) || isDestructuringDefault(node)
+  switch (node.kind) {
+    case BINARY: {
+      const binary = node as ts.BinaryExpression
+      return SHORT_CIRCUIT.has(binary.operatorToken.kind) || isDestructuringDefault(binary)
+    }
+    case PARAMETER:
+    case BINDING_ELEMENT:
+      return (node as ts.ParameterDeclaration | ts.BindingElement).initializer !== undefined
+    case SHORTHAND:
+      return (node as ts.ShorthandPropertyAssignment).objectAssignmentInitializer !== undefined
+    case PROPERTY_ACCESS:
+    case ELEMENT_ACCESS:
+    case CALL:
+      return (
+        (node as ts.PropertyAccessExpression | ts.ElementAccessExpression | ts.CallExpression)
+          .questionDotToken !== undefined
+      )
+    default:
+      return DECISIONS.has(node.kind)
   }
-  if (ts.isParameter(node) || ts.isBindingElement(node)) return node.initializer !== undefined
-  if (ts.isShorthandPropertyAssignment(node)) return node.objectAssignmentInitializer !== undefined
-  if (
-    ts.isPropertyAccessExpression(node) ||
-    ts.isElementAccessExpression(node) ||
-    ts.isCallExpression(node)
-  ) {
-    return node.questionDotToken !== undefined
-  }
-  return false
 }
+
+const CLASS = ts.SyntaxKind.ClassDeclaration
+const CLASS_EXPRESSION = ts.SyntaxKind.ClassExpression
+/** What the walk treats in a way of its own; everything else it only walks through. */
+const SPECIAL = new Set([
+  ts.SyntaxKind.ObjectLiteralExpression,
+  ts.SyntaxKind.ModuleDeclaration,
+  ts.SyntaxKind.PropertyDeclaration,
+  ts.SyntaxKind.ClassStaticBlockDeclaration
+])
+/**
+ * The kinds of the nodes of types — what TypeScript's `isTypeNode` says by the kind alone —
+ * but not `extends Base<T>`, whose `Base` is a value.
+ */
+const TYPES = new Set(
+  Object.values(ts.SyntaxKind)
+    .filter((kind): kind is ts.SyntaxKind => typeof kind === 'number')
+    .filter(
+      (kind) =>
+        kind !== ts.SyntaxKind.ExpressionWithTypeArguments && ts.isTypeNode({ kind } as ts.Node)
+    )
+)
+const isType = (node: ts.Node): boolean => TYPES.has(node.kind)
 
 const lineOf = (source: ts.SourceFile, position: number): number =>
   source.getLineAndCharacterOfPosition(position).line + 1
@@ -269,16 +310,20 @@ export function measureTypeScript(source: ts.SourceFile, component?: string): Fi
 
   const visit = (node: ts.Node, scope: Scope): void => {
     // Types decide nothing at run time.
-    if (ts.isTypeNode(node) && !ts.isExpressionWithTypeArguments(node)) return
+    if (isType(node)) return
     if (hasBody(node)) {
       enterFunction(node, scope)
       return
     }
-    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
-      enterClass(node, scope)
+    if (node.kind === CLASS || node.kind === CLASS_EXPRESSION) {
+      enterClass(node as ts.ClassLikeDeclaration, scope)
       return
     }
     if (scope.counting && decides(node)) scope.counting.complexity++
+    if (!SPECIAL.has(node.kind)) {
+      ts.forEachChild(node, (child) => visit(child, scope))
+      return
+    }
     if (ts.isObjectLiteralExpression(node)) {
       // A named object holds its methods as a class does: `api.load`.
       const name = givenName(node, source)
