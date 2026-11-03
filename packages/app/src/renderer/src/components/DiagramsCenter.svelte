@@ -4,9 +4,9 @@
   import type { DiagramsTab } from '../lib/diagrams-tab.svelte'
   import {
     componentsOfLevel,
-    freeSpot,
     idFromName,
     isElementId,
+    placed,
     readingOrder
   } from '../lib/diagram-canvas'
   import { wordDiagramProblem, wordDrift } from '../lib/diagram-words'
@@ -53,7 +53,7 @@
     if (
       app.diagrams.edit({
         kind: 'add-element',
-        element: { kind: 'component', id, at: freeSpot(geometry.boxes) }
+        element: placed({ kind: 'component', id }, geometry.boxes, declared)
       })
     ) {
       app.diagrams.select({ kind: 'element', id })
@@ -68,13 +68,16 @@
     const description = external.description.trim()
     const added = app.diagrams.edit({
       kind: 'add-element',
-      element: {
-        kind: 'external',
-        id,
-        ...(external.name.trim() !== id && { name: external.name.trim() }),
-        ...(description !== '' && { description }),
-        at: freeSpot(geometry.boxes)
-      }
+      element: placed(
+        {
+          kind: 'external',
+          id,
+          ...(external.name.trim() !== id && { name: external.name.trim() }),
+          ...(description !== '' && { description })
+        },
+        geometry.boxes,
+        declared
+      )
     })
     if (added) {
       app.diagrams.select({ kind: 'element', id })

@@ -6,7 +6,9 @@
  */
 import {
   geometryOf,
+  type Declared,
   type Diagram,
+  type Element,
   type NewDiagram,
   type NewElement,
   type PlacedBox,
@@ -26,6 +28,7 @@ export const GRID = 20
 const MARGIN = 40
 const GAP = { x: 80, y: 40 }
 
+/** A value on the grid; `+ 0` makes the -0 of a small negative value 0. */
 export const snap = (value: number): number => Math.round(value / GRID) * GRID + 0
 
 export const snapPoint = (point: Point): Point => ({ x: snap(point.x), y: snap(point.y) })
@@ -69,12 +72,50 @@ export function componentsOfLevel(
 export const scopesOf = (declared: readonly DeclaredComponent[]): DeclaredComponent[] =>
   everyComponent(declared).filter((component) => component.children.length > 0)
 
-/** Where a box that is added goes: at the left, below everything there is. */
-export function freeSpot(boxes: readonly Pick<PlacedBox, 'x' | 'y' | 'height'>[]): Point {
+type Rect = Pick<PlacedBox, 'x' | 'y' | 'width' | 'height'>
+
+/**
+ * Where a box of a size that is added goes: the first place on the grid, read as the boxes are
+ * read — top to bottom, left to right —, that keeps a gap to every box, within the width the
+ * drawing has; below everything when there is no such place. So it is where one looks first.
+ */
+export function freeSpot(boxes: readonly Rect[], size: Pick<Rect, 'width' | 'height'>): Point {
   if (boxes.length === 0) return { x: MARGIN, y: MARGIN }
-  const left = Math.min(...boxes.map((box) => box.x))
+  const apart = GAP.y
+  const right = Math.max(MARGIN + size.width, ...boxes.map((box) => box.x + box.width))
   const bottom = Math.max(...boxes.map((box) => box.y + box.height))
-  return { x: snap(left), y: snap(bottom + GAP.y) }
+  const free = (x: number, y: number): boolean =>
+    boxes.every(
+      (box) =>
+        x + size.width + apart <= box.x ||
+        box.x + box.width + apart <= x ||
+        y + size.height + apart <= box.y ||
+        box.y + box.height + apart <= y
+    )
+  for (let y = MARGIN; y < bottom; y += GRID) {
+    for (let x = MARGIN; x + size.width <= right; x += GRID) {
+      if (free(x, y)) return { x, y }
+    }
+  }
+  const left = Math.min(...boxes.map((box) => box.x))
+  return { x: snap(Math.max(left, MARGIN)), y: snap(bottom + apart) }
+}
+
+/** Each kind of element without where it stands. */
+type Unplaced<E> = E extends unknown ? Omit<E, 'at'> : never
+
+/** An element that is added, placed at the first free spot for the box the picture draws of it. */
+export function placed(
+  element: Unplaced<NewElement>,
+  boxes: readonly Rect[],
+  declared: Declared
+): NewElement {
+  const drawn: Element =
+    element.kind === 'component'
+      ? { ...element, at: { x: 0, y: 0 }, line: 1 }
+      : { ...element, name: element.name || element.id, at: { x: 0, y: 0 }, line: 1 }
+  const [size] = geometryOf({ elements: [drawn], connections: [] }, declared).boxes
+  return { ...element, at: freeSpot(boxes, size!) }
 }
 
 /**

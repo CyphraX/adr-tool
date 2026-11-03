@@ -81,14 +81,25 @@ describe('where a box goes', () => {
     expect(Object.is(snap(-4), 0)).toBe(true)
   })
 
-  it('is at the left, below everything, when it is added', () => {
-    expect(freeSpot([])).toEqual({ x: 40, y: 40 })
+  it('is the first free place on the grid when it is added, top to bottom, left to right', () => {
+    const size = { width: 120, height: 48 }
+    expect(freeSpot([], size)).toEqual({ x: 40, y: 40 })
+    // Beside the first box, a gap away, within the width the drawing has.
     expect(
-      freeSpot([
-        { x: 120, y: 40, height: 60 },
-        { x: 60, y: 200, height: 56 }
-      ])
-    ).toEqual({ x: 60, y: 300 })
+      freeSpot(
+        [
+          { x: 40, y: 40, width: 120, height: 48 },
+          { x: 400, y: 40, width: 120, height: 48 },
+          { x: 40, y: 300, width: 120, height: 48 }
+        ],
+        size
+      )
+    ).toEqual({ x: 200, y: 40 })
+    // Below a box that fills the width.
+    expect(freeSpot([{ x: 40, y: 40, width: 400, height: 60 }], size)).toEqual({ x: 40, y: 140 })
+    expect(
+      freeSpot([{ x: 60, y: 40, width: 120, height: 60 }], { width: 200, height: 48 })
+    ).toEqual({ x: 60, y: 140 })
   })
 
   it('is found under a point, the box drawn last first', () => {

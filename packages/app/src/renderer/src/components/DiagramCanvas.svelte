@@ -231,6 +231,23 @@
     return { x: (line.from.x + line.to.x) / 2 - 60, y: (line.from.y + line.to.y) / 2 - 10 }
   }
 
+  // A box selected from elsewhere — added, found, or chosen beside the canvas — is brought into
+  // view when none of it is in view; one that is clicked or dragged stays where it is.
+  let view = $state<HTMLDivElement>()
+  $effect(() => {
+    const id = selection?.kind === 'element' ? selection.id : undefined
+    if (id === undefined || !view) return
+    const box = view.querySelector<HTMLElement>(`[data-element="${CSS.escape(id)}"]`)
+    if (!box) return
+    const [seen, at] = [view.getBoundingClientRect(), box.getBoundingClientRect()]
+    const outside =
+      at.right <= seen.left ||
+      at.left >= seen.right ||
+      at.bottom <= seen.top ||
+      at.top >= seen.bottom
+    if (outside) box.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+
   /** Focus the field of a label as it appears. */
   function focused(field: HTMLInputElement): void {
     field.focus()
@@ -239,7 +256,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="canvas" onkeydown={onKey}>
+<div class="canvas" bind:this={view} onkeydown={onKey}>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     class="drawing"
@@ -349,6 +366,7 @@
       {@const selected = selection?.kind === 'element' && selection.id === box.id}
       <button
         class="box {box.kind}"
+        data-element={box.id}
         class:selected
         class:dragged={drag?.id === box.id && drag.moved}
         style:left="{box.x - origin.x}px"
