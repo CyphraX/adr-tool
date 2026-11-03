@@ -269,6 +269,12 @@ importers:
 
   packages/mcp:
     devDependencies:
+      '@adr-tool/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@adr-tool/conformance':
+        specifier: workspace:*
+        version: link:../conformance
       '@adr-tool/core':
         specifier: workspace:*
         version: link:../core

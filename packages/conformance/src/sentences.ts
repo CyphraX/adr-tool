@@ -201,6 +201,8 @@ export const SENTENCES = {
   'exception-exists': (v: Printed): string => `There is an Exception ${v.fingerprint} already.`,
   'no-exception': (v: Printed & { path: string; line: number }): string =>
     `${v.path} has no Exception ${v.fingerprint} at line ${v.line} any more. Look at the file again.`,
+  'no-such-exception': (v: Printed & { path: string }): string =>
+    `${v.path} has no Exception ${v.fingerprint}.`,
   // Why the file cannot be written there: the rest of a sentence.
   'top-in-braces': (): string => 'its top level is written in braces',
   'list-in-brackets': (v: { key: string }): string => `"${v.key}" is written in brackets`,

@@ -118,12 +118,17 @@ describe('the MCP server (docs/mcp.md)', () => {
       'list_problems',
       'list_templates',
       'list_components',
+      'read_structure',
+      'list_rules',
+      'list_violations',
       'plan_create_adr',
       'plan_decision',
       'plan_edit_body',
       'plan_edit_metadata',
       'plan_repair',
       'plan_migration',
+      'plan_rule',
+      'plan_exception',
       'apply_change',
       'discard_change'
     ])
@@ -311,6 +316,212 @@ describe('the MCP server (docs/mcp.md)', () => {
     } finally {
       rmSync(empty, { recursive: true, force: true })
     }
+  })
+})
+
+describe('the Structure and the Rules (docs/plan-vision.md, part 4)', () => {
+  let shop: string
+  beforeEach(() => {
+    // A shop with a Decision Log to justify an Exception by: web uses billing, billing persistence.
+    shop = mkdtempSync(join(tmpdir(), 'adr-tool-mcp-shop-'))
+    cpSync(join(repository, 'docs/adr'), join(shop, 'docs/adr'), { recursive: true })
+    const files: Record<string, string> = {
+      '.arch/components.yml': [
+        'components:',
+        '  web:',
+        '    paths: [src/web/**]',
+        '  billing:',
+        '    paths: [src/billing/**]',
+        '  persistence:',
+        '    paths: [src/persistence/**]',
+        ''
+      ].join('\n'),
+      'src/web/page.ts': "import { invoice } from '../billing/invoice'\n",
+      'src/billing/invoice.ts':
+        "import { save } from '../persistence/db'\nexport const invoice = 1\n",
+      'src/persistence/db.ts': 'export const save = 1\n'
+    }
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(join(shop, path, '..'), { recursive: true })
+      writeFileSync(join(shop, path), text)
+    }
+  })
+  afterEach(() => rmSync(shop, { recursive: true, force: true }))
+
+  const ADR = 'docs/adr/0004-operations-return-change-sets'
+
+  it('lets the agent see a Rule before it writes the code, and the person accept what it breaks', async () => {
+    const { client, close } = await connect(shop)
+    const rules = join(shop, '.arch/rules.yml')
+
+    // Lena's Rule, planned and applied: the file is started.
+    const rule = await call(client, 'plan_rule', {
+      id: 'persistence-alone',
+      why: 'What is stored knows nothing of the domain.',
+      kind: 'may-only-depend',
+      from: ['persistence'],
+      to: []
+    })
+    expect(rule.files[0]).toMatchObject({ path: '.arch/rules.yml', creates: true })
+    expect(rule.files[0].diff).toContain('+  - id: persistence-alone')
+    expect(existsSync(rules)).toBe(false)
+    await call(client, 'apply_change', { changeId: rule.changeId })
+
+    const listed = await call(client, 'list_rules')
+    expect(listed.rules).toEqual([
+      {
+        id: 'persistence-alone',
+        why: 'What is stored knows nothing of the domain.',
+        kind: 'may-only-depend',
+        from: ['persistence'],
+        to: [],
+        line: 2,
+        violations: 0,
+        accepted: 0
+      }
+    ])
+
+    // The agent asks before it writes an import, by the specifier it would write.
+    const asked = await call(client, 'list_violations', {
+      from: 'src/persistence/db.ts',
+      to: '../billing/invoice'
+    })
+    expect(asked.import).toEqual({
+      from: 'src/persistence/db.ts',
+      to: 'src/billing/invoice.ts',
+      written: '../billing/invoice',
+      fromComponent: 'persistence',
+      toComponent: 'billing',
+      exists: false
+    })
+    expect(asked.breaks).toBe(1)
+    expect(asked.violations[0]).toMatchObject({
+      rule: 'persistence-alone',
+      sentence: 'persistence may depend on no other Component, and depends on billing.',
+      fingerprint: { rule: 'persistence-alone', from: 'persistence', to: 'billing' }
+    })
+    // From a file that is not written yet, and an import that breaks nothing.
+    const fresh = await call(client, 'list_violations', {
+      from: 'src/persistence/cache.ts',
+      to: 'src/web/page.ts'
+    })
+    expect(fresh.violations[0].fingerprint).toEqual({
+      rule: 'persistence-alone',
+      from: 'persistence',
+      to: 'web'
+    })
+    const fine = await call(client, 'list_violations', {
+      from: 'src/web/page.ts',
+      to: 'src/persistence/db.ts'
+    })
+    expect(fine).toMatchObject({ breaks: 0, violations: [], next: 'The import breaks no Rule.' })
+    const library = await call(client, 'list_violations', {
+      from: 'src/persistence/db.ts',
+      to: 'yaml'
+    })
+    expect(library.note).toContain('is the Library yaml')
+
+    // It is written all the same, and the person accepts it, citing an ADR.
+    writeFileSync(
+      join(shop, 'src/persistence/db.ts'),
+      "import { invoice } from '../billing/invoice'\nexport const save = 1\n"
+    )
+    const found = await call(client, 'list_violations', { component: 'billing' })
+    expect(found.breaks).toBe(1)
+    expect(found.violations[0].imports).toEqual([
+      { file: 'src/persistence/db.ts', line: 1, imports: 'src/billing/invoice.ts' }
+    ])
+    expect(
+      await refusal(client, 'plan_exception', {
+        ...found.violations[0].fingerprint,
+        reason: 'For now.',
+        justifiedBy: 'docs/adr/9999-none'
+      })
+    ).toContain('which is not an ADR of this repository')
+    const exception = await call(client, 'plan_exception', {
+      ...found.violations[0].fingerprint,
+      reason: 'The invoice is saved as it is printed, until part 5.',
+      justifiedBy: ADR
+    })
+    expect(exception.files[0].diff).toContain('+exceptions:')
+    expect(exception.files[0].diff).toContain(`+    justified-by: ${ADR}`)
+    await call(client, 'apply_change', { changeId: exception.changeId })
+    const accepted = await call(client, 'list_violations')
+    expect(accepted.breaks).toBe(0)
+    expect(accepted.violations[0].acceptedBy).toEqual({
+      line: 8,
+      reason: 'The invoice is saved as it is printed, until part 5.',
+      justifiedBy: ADR
+    })
+
+    // The Structure as data: the Dependencies, the Cycle, the metrics.
+    const structure = await call(client, 'read_structure')
+    expect(structure.components).toBe('declared')
+    expect(structure.nodes.map((node: { id: string }) => node.id)).toEqual([
+      'web',
+      'billing',
+      'persistence'
+    ])
+    expect(structure.nodes[0]).toMatchObject({ files: 1, fanOut: 1, fanIn: 0, instability: 1 })
+    expect(
+      structure.dependencies.map((edge: { from: string; to: string }) => `${edge.from}->${edge.to}`)
+    ).toEqual(['billing->persistence', 'persistence->billing', 'web->billing'])
+    expect(structure.cycles[0].members).toEqual(['billing', 'persistence'])
+
+    // The import goes again: the Exception matches nothing, and its Repair takes it out.
+    writeFileSync(join(shop, 'src/persistence/db.ts'), 'export const save = 1\n')
+    const stale = await call(client, 'list_rules')
+    expect(stale.problems).toHaveLength(1)
+    expect(stale.problems[0]).toMatchObject({ code: 'unmatched-exception', line: 8 })
+    const repair = await call(client, 'plan_exception', stale.problems[0].repair.arguments)
+    await call(client, 'apply_change', { changeId: repair.changeId })
+    expect((await call(client, 'list_rules')).problems).toEqual([])
+
+    // A change keeps what it does not name; a removal takes the Rule's lines.
+    const changed = await call(client, 'plan_rule', {
+      action: 'change',
+      id: 'persistence-alone',
+      to: ['billing']
+    })
+    expect(changed.files[0].diff).toContain('+    to: [billing]')
+    expect(changed.files[0].diff).not.toContain('-    why:')
+    const removed = await call(client, 'plan_rule', { action: 'remove', id: 'persistence-alone' })
+    expect(removed.files[0].diff).toContain('-  - id: persistence-alone')
+    await close()
+  })
+
+  it('refuses what it cannot plan, in words the agent can act on', async () => {
+    const { client, close } = await connect(shop)
+    expect(await refusal(client, 'plan_rule', { id: 'x', why: 'X.' })).toBe(
+      'A new Rule needs a "kind": one of must-not-depend, may-only-depend, layers, no-cycles, threshold.'
+    )
+    expect(
+      await refusal(client, 'plan_rule', {
+        id: 'x',
+        why: 'X.',
+        kind: 'must-not-depend',
+        from: ['web']
+      })
+    ).toBe('A Rule of the kind must-not-depend needs "to".')
+    expect(await refusal(client, 'plan_rule', { action: 'change', id: 'x', why: 'X.' })).toBe(
+      '.arch/rules.yml has no Rule x. Look at the file again.'
+    )
+    expect(await refusal(client, 'list_violations', { from: 'src/web/page.ts' })).toBe(
+      'A planned import needs both "from" and "to".'
+    )
+    expect(
+      await refusal(client, 'list_violations', { from: 'README.md', to: 'src/web/page.ts' })
+    ).toContain('README.md is no Source File')
+    expect(
+      await refusal(client, 'list_violations', { from: 'src/web/page.ts', to: './nowhere' })
+    ).toContain('./nowhere cannot be resolved from src/web/page.ts')
+    expect(await refusal(client, 'plan_exception', { rule: 'x', from: 'web', reason: 'R.' })).toBe(
+      'An Exception from x names its Violation by "from" and "to", as list_violations gives them in "fingerprint".'
+    )
+    expect(await refusal(client, 'read_structure', { component: 'nowhere' })).toContain(
+      'There is no Component nowhere.'
+    )
+    await close()
   })
 })
 

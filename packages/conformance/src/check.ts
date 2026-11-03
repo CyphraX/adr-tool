@@ -319,7 +319,8 @@ export interface PlannedImport {
 /**
  * The Violations an import would be part of, before it is written (docs/mcp.md,
  * `list_violations`): the Rules are checked with the import added to the Dependencies, and
- * what is found with it behind is returned — accepted by an Exception or not. An import that is
+ * what is found with it behind is returned — accepted by an Exception or not —, and a
+ * threshold it would cross. A threshold crossed already is not its doing. An import that is
  * there already is checked as it is. `structure` has to know `from` as a Source File, a file
  * that is not written yet included: whoever calls lists it among the files of the repository.
  */
@@ -338,11 +339,17 @@ export function checkPlannedImport(
         ...model.dependencies,
         { from, to, typeOnly: planned.typeOnly ?? false, lines: [planned.line ?? 1] }
       ]
+  const before = there ? undefined : checkConformance(file, structure, model, decisions)
+  const known = new Set(before?.violations.map((one) => fingerprintKey(one.fingerprint)))
   const report = checkConformance(file, structure, { ...model, dependencies }, decisions)
   return {
     ...report,
-    violations: report.violations.filter((violation) =>
-      violation.dependencies.some((one) => one.from === from && one.to === to)
+    violations: report.violations.filter(
+      (violation) =>
+        violation.dependencies.some((one) => one.from === from && one.to === to) ||
+        (violation.fingerprint.kind === 'component' &&
+          before !== undefined &&
+          !known.has(fingerprintKey(violation.fingerprint)))
     ),
     exists: there !== undefined
   }

@@ -31,13 +31,14 @@ async function planned(
   files: Record<string, string>,
   from: string,
   to: string,
-  extra: readonly string[] = []
+  extra: readonly string[] = [],
+  written = rules
 ) {
   const fs = memoryFileSystem(files)
   const paths = [...Object.keys(files), ...extra]
   const structure = await openStructure(fs, paths)
   const model = await analyseDependencies(fs, paths, structure.sourceFiles)
-  return checkPlannedImport(readRules(rules), structure, model, { from, to })
+  return checkPlannedImport(readRules(written), structure, model, { from, to })
 }
 
 describe('a planned import (docs/mcp.md, list_violations)', () => {
@@ -84,5 +85,25 @@ describe('a planned import (docs/mcp.md, list_violations)', () => {
     expect(found.violations.map((violation) => violation.fingerprint)).toEqual([
       { kind: 'dependency', rule: 'billing-not-web', from: 'billing', to: 'web' }
     ])
+  })
+
+  it('names a threshold the import would cross, and not one that is crossed already', async () => {
+    const thresholds = yaml(
+      'rules:',
+      '  - {id: few-uses, why: W., kind: threshold, metric: fan-out, max: 1, of: persistence}',
+      '  - {id: web-small, why: W., kind: threshold, metric: fan-out, max: 1, of: web}'
+    )
+    const crossing = await planned(
+      shop,
+      'src/persistence/db.ts',
+      'src/billing/invoice.ts',
+      [],
+      thresholds
+    )
+    expect(crossing.violations.map((violation) => violation.fingerprint)).toEqual([
+      { kind: 'component', rule: 'few-uses', component: 'persistence' }
+    ])
+    const crossed = await planned(shop, 'src/web/page.ts', 'src/features/a/x.ts', [], thresholds)
+    expect(crossed.violations).toEqual([])
   })
 })

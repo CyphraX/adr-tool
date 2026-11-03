@@ -27,7 +27,7 @@ import { hasWildcard, matcherOf } from './component-patterns'
 import { FINGERPRINT_KEYS, fingerprintOf, justification, type Decisions } from './check'
 import { fingerprintKey, fingerprintText, membersOf, type Fingerprint } from './fingerprint'
 import { RULES_PATH, saidOf, type ConformanceNote, type ConformanceProblem } from './problems'
-import { readRules, scalarText, type Rule } from './rules'
+import { readRules, scalarText, type Rule, type RulesFile, type WrittenException } from './rules'
 import { englishOf, refusal, type Change, type ConformanceSaid } from './sentences'
 
 /** A Rule as a form or an agent describes it, before it is written: a Rule without its place. */
@@ -41,6 +41,47 @@ export type RuleDraft = Rule extends infer R
       }
     : never
   : never
+
+/** A Rule of the file as a draft: what a form that changes it starts from. */
+export function draftOf(rule: Rule): RuleDraft {
+  const common = { id: rule.id, why: rule.why, tests: rule.tests }
+  switch (rule.kind) {
+    case 'must-not-depend':
+    case 'may-only-depend':
+      return {
+        ...common,
+        ignoreTypeOnly: rule.ignoreTypeOnly,
+        kind: rule.kind,
+        from: rule.from,
+        to: rule.to
+      }
+    case 'layers':
+      return {
+        ...common,
+        ignoreTypeOnly: rule.ignoreTypeOnly,
+        kind: rule.kind,
+        layers: rule.layers,
+        mode: rule.mode
+      }
+    case 'no-cycles':
+      return {
+        ...common,
+        ignoreTypeOnly: rule.ignoreTypeOnly,
+        kind: rule.kind,
+        scope: rule.scope,
+        components: rule.components
+      }
+    case 'threshold':
+      return {
+        ...common,
+        kind: rule.kind,
+        metric: rule.metric,
+        ...(rule.max !== undefined && { max: rule.max }),
+        ...(rule.min !== undefined && { min: rule.min }),
+        of: rule.of
+      }
+  }
+}
 
 /** An Exception as it is asked for: the Violation it accepts, why, and the ADR behind it. */
 export interface ExceptionDraft {
@@ -541,12 +582,7 @@ function removePair(text: string, pair: Pair, change: Change): TextEdit {
 }
 
 /** The item a key names, among those of a list at the top. */
-function indexOf(
-  text: string,
-  items: readonly unknown[],
-  key: string,
-  value: string
-): number | undefined {
+function indexOf(items: readonly unknown[], key: string, value: string): number | undefined {
   const index = items.findIndex((item) => {
     const found = isMap(item) ? findPair(item, key)?.value : undefined
     return scalarText(found) === value
@@ -568,7 +604,7 @@ export function addRuleEdits(text: string, draft: RuleDraft): TextEdit[] {
   const change = 'add-rule'
   const file = parsed(text, change)
   validRule(draft)
-  if (indexOf(text, itemsOf(file.top, 'rules', change), 'id', draft.id) !== undefined) {
+  if (indexOf(itemsOf(file.top, 'rules', change), 'id', draft.id) !== undefined) {
     refuse({ code: 'rule-exists', values: { path: RULES_PATH, id: draft.id } })
   }
   return appendItem(text, file, 'rules', ruleKeys(draft), change)
@@ -585,9 +621,9 @@ export function changeRuleEdits(text: string, id: string, draft: RuleDraft): Tex
   const file = parsed(text, change)
   validRule(draft)
   const items = itemsOf(file.top, 'rules', change)
-  const index = indexOf(text, items, 'id', id)
+  const index = indexOf(items, 'id', id)
   if (index === undefined) return refuse({ code: 'no-rule', values: { path: RULES_PATH, id } })
-  if (draft.id !== id && indexOf(text, items, 'id', draft.id) !== undefined) {
+  if (draft.id !== id && indexOf(items, 'id', draft.id) !== undefined) {
     refuse({ code: 'rule-exists', values: { path: RULES_PATH, id: draft.id } })
   }
   const item = items[index]
@@ -658,7 +694,7 @@ export function renameRuleEdits(text: string, from: string, to: string): TextEdi
 export function removeRuleEdits(text: string, id: string): TextEdit[] {
   const change = 'remove-rule'
   const file = parsed(text, change)
-  const index = indexOf(text, itemsOf(file.top, 'rules', change), 'id', id)
+  const index = indexOf(itemsOf(file.top, 'rules', change), 'id', id)
   if (index === undefined) return refuse({ code: 'no-rule', values: { path: RULES_PATH, id } })
   return removeItem(text, file, 'rules', index, change)
 }
@@ -666,7 +702,7 @@ export function removeRuleEdits(text: string, id: string): TextEdit[] {
 /** The first Exception that names the Rule `id`, by its place in the list. */
 function exceptionOfRule(text: string, id: string): number | undefined {
   const file = parsed(text, 'remove-exception')
-  return indexOf(text, itemsOf(file.top, 'exceptions', 'remove-exception'), 'rule', id)
+  return indexOf(itemsOf(file.top, 'exceptions', 'remove-exception'), 'rule', id)
 }
 
 // Exceptions.
@@ -769,6 +805,24 @@ function writtenFingerprint(
     case 'component':
       return { kind: like.kind, rule: written.rule, component: written.component ?? '' }
   }
+}
+
+/**
+ * The first Exception of the file that names `fingerprint` — by the keys of its Rule's kind, or,
+ * of a Rule that is not there, by the keys of the fingerprint —; `undefined` where none does.
+ * What a Repair needs to name it: its line.
+ */
+export function findException(
+  file: RulesFile,
+  fingerprint: Fingerprint
+): WrittenException | undefined {
+  const rule = file.rules.find((candidate) => candidate.id === fingerprint.rule)
+  const key = fingerprintKey(fingerprint)
+  return file.exceptions.find((exception) => {
+    if (exception.rule !== fingerprint.rule) return false
+    const named = rule ? fingerprintOf(exception, rule) : writtenFingerprint(exception, fingerprint)
+    return named !== undefined && fingerprintKey(named) === key
+  })
 }
 
 /** Take an Exception out, with its lines: the Repair of one that matches nothing, or that is there twice. */

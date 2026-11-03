@@ -22,6 +22,7 @@ export type Schema =
       readonly minLength?: number
     }
   | { readonly type: 'boolean'; readonly description?: string }
+  | { readonly type: 'number'; readonly description?: string; readonly minimum?: number }
 
 /** What is wrong with `value`, said of `where`; `undefined` when it fits. */
 export function validate(schema: Schema, value: unknown, where: string): string | undefined {
@@ -72,5 +73,39 @@ export function validate(schema: Schema, value: unknown, where: string): string 
     }
     case 'boolean':
       return typeof value === 'boolean' ? undefined : `${where} must be true or false.`
+    case 'number':
+      if (typeof value !== 'number' || !Number.isFinite(value)) return `${where} must be a number.`
+      if (schema.minimum !== undefined && value < schema.minimum) {
+        return `${where} must be at least ${schema.minimum}.`
+      }
+      return undefined
   }
 }
+
+/** A text the tool takes as it is. */
+export const text = (description: string): Schema => ({ type: 'string', description })
+/** A text that must say something. */
+export const required = (description: string): Schema => ({
+  type: 'string',
+  description,
+  minLength: 1
+})
+export const list = (description: string): Schema => ({
+  type: 'array',
+  description,
+  items: { type: 'string' }
+})
+export const number = (description: string): Schema => ({ type: 'number', description })
+export const flag = (description: string): Schema => ({ type: 'boolean', description })
+export const oneOf = (values: readonly string[], description: string): Schema => ({
+  type: 'string',
+  enum: values,
+  description
+})
+/** The input of a tool: these keys and no others, `needed` among them. */
+export const object = (properties: Record<string, Schema>, needed: string[] = []): Schema => ({
+  type: 'object',
+  properties,
+  required: needed,
+  additionalProperties: false
+})

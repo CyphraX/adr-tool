@@ -37,9 +37,10 @@ import {
   type WritableFileSystem
 } from '@adr-tool/core'
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
+import { architectureTools } from './architecture'
 import { repositoryFiles } from './files'
-import { Refusal, type Tool } from './protocol'
-import type { Schema } from './schema'
+import { PLAN, READ, Refusal, type Tool } from './protocol'
+import { list, object, required, text } from './schema'
 
 /** How many planned changes wait at most; the oldest is forgotten first. */
 const MAX_PLANNED = 50
@@ -57,22 +58,9 @@ interface Planned {
   readonly changeSet: ChangeSet
   readonly created?: { readonly id: string; readonly path: string }
   readonly renamed?: { readonly from: string; readonly to: string }
-  readonly log: string
+  /** The Decision Log of a plan of an ADR. */
+  readonly log?: string
 }
-
-const text = (description: string): Schema => ({ type: 'string', description })
-const required = (description: string): Schema => ({ type: 'string', description, minLength: 1 })
-const list = (description: string): Schema => ({
-  type: 'array',
-  description,
-  items: { type: 'string' }
-})
-const object = (properties: Record<string, Schema>, needed: string[] = []): Schema => ({
-  type: 'object',
-  properties,
-  required: needed,
-  additionalProperties: false
-})
 
 const LOG = text(
   'The directory of the Decision Log, e.g. "docs/adr"; "." for a log at the top of the repository. Can be left out when the repository has one log, or when the ID is found in one log only.'
@@ -87,23 +75,11 @@ const revisionOf = (body: string): string =>
 const ID = required(
   'The ADR\'s ID: its file name without ".md", e.g. "0007-use-kafka". "<log>/<ID>" names an ADR of another log.'
 )
-const READ = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false
-}
-/** A plan writes nothing either; it is held until it is applied or discarded. */
-const PLAN = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: false,
-  openWorldHint: false
-}
 
 /**
  * The tools of the server (docs/mcp.md): reading the Decision Logs, their ADRs and Problems,
- * and every write as a change set — planned and shown first, written only by `apply_change`.
+ * the Structure, the Rules and their Violations, and every write as a change set — planned and
+ * shown first, written only by `apply_change`.
  * Each call reads the repository afresh, as the app does before it plans.
  */
 export function toolsFor(options: ToolOptions): Tool[] {
@@ -187,13 +163,16 @@ export function toolsFor(options: ToolOptions): Tool[] {
     return adr
   }
 
-  /** Hold a plan, and show it: what each file becomes, as a diff, and what to look out for. */
-  const preview = (log: DecisionLog, plan: Plan): Record<string, unknown> => {
+  /**
+   * Hold a plan, and show it: what each file becomes, as a diff, and what to look out for.
+   * `log` is the Decision Log of a plan of an ADR.
+   */
+  const preview = (log: DecisionLog | undefined, plan: Plan): Record<string, unknown> => {
     if (!plan.ok) throw new Refusal(plan.reason)
     const changeId = randomUUID()
     planned.set(changeId, {
       changeSet: plan.changeSet,
-      log: log.path,
+      ...(log && { log: log.path }),
       ...(plan.created && { created: plan.created }),
       ...(plan.renamed && { renamed: plan.renamed })
     })
@@ -202,11 +181,18 @@ export function toolsFor(options: ToolOptions): Tool[] {
       changeId,
       files: plan.changeSet.files.map(fileOf),
       warnings: plan.warnings ?? [],
-      ...(plan.created && { created: { log: shown(log.path), ...plan.created } }),
+      ...(plan.created && { created: { log: shown(log?.path ?? ''), ...plan.created } }),
       ...(plan.renamed && { renamed: plan.renamed }),
       next: 'Nothing is written yet. Show the person the files and the warnings; apply_change with this changeId writes them, discard_change drops them.'
     }
   }
+
+  const architecture = architectureTools({
+    root: options.root,
+    fs,
+    repository: async () => (await open()).repository,
+    preview: (plan) => preview(undefined, plan)
+  })
 
   return [
     {
@@ -369,6 +355,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
         }
       }
     },
+    ...architecture.reads,
     {
       name: 'plan_create_adr',
       title: 'Plan a new ADR',
@@ -602,6 +589,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return preview(log, await planMigration(fs, log, id))
       }
     },
+    ...architecture.plans,
     {
       name: 'apply_change',
       title: 'Apply a planned change',
@@ -655,7 +643,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return {
           applied: true,
           files: held.changeSet.files.map((file) => file.renameTo ?? file.path),
-          ...(held.created && { created: { log: shown(held.log), ...held.created } }),
+          ...(held.created && { created: { log: shown(held.log ?? ''), ...held.created } }),
           ...(held.renamed && { renamed: held.renamed })
         }
       }

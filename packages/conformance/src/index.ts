@@ -37,6 +37,8 @@ export { evaluate, type Model, type Violation } from './evaluate'
 export {
   adrExists,
   checkConformance,
+  FINGERPRINT_KEYS,
+  fingerprintOf,
   checkPlannedImport,
   justification,
   needsModel,
@@ -48,6 +50,8 @@ export {
 } from './check'
 export { planRenameInRules, renameInRules } from './rename'
 export {
+  draftOf,
+  findException,
   planAddException,
   planAddRule,
   planChangeRule,

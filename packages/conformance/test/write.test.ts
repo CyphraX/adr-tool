@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { applyChangeSet, applyEdits, memoryFileSystem } from '@adr-tool/kernel'
 import {
+  draftOf,
+  findException,
   planAddException,
   planAddRule,
   planChangeRule,
@@ -557,5 +559,31 @@ describe('planning a Rule', () => {
       ok: false,
       said: { code: 'no-rule' }
     })
+  })
+})
+
+describe('finding an Exception', () => {
+  it('names the first one with the fingerprint, by the keys of its Rule, or of a Rule that is gone', () => {
+    const text = yaml(
+      'rules:',
+      '  - {id: apart, why: W., kind: no-cycles, among: [a, b, c]}',
+      'exceptions:',
+      '  - {rule: apart, cycle: [b, a], reason: R.}',
+      '  - {rule: gone, from: a, to: b, reason: R.}'
+    )
+    const read = readRules(text)
+    expect(findException(read, { kind: 'cycle', rule: 'apart', cycle: ['a', 'b'] })?.line).toBe(4)
+    expect(
+      findException(read, { kind: 'dependency', rule: 'gone', from: 'a', to: 'b' })?.line
+    ).toBe(5)
+    expect(findException(read, { kind: 'cycle', rule: 'apart', cycle: ['a', 'c'] })).toBeUndefined()
+  })
+})
+
+describe('a Rule as a draft', () => {
+  it('is what the form starts from, and changes nothing when it is written back', () => {
+    for (const rule of readRules(file).rules) {
+      expect(changeRuleEdits(file, rule.id, draftOf(rule))).toEqual([])
+    }
   })
 })
