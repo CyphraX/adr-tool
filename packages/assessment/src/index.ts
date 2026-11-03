@@ -58,6 +58,7 @@ export {
   snapshotText,
   snapshotValuesOf,
   SNAPSHOT_SUFFIX,
+  TOP_LEVEL,
   type MeasuredInside,
   type NewSnapshot
 } from './snapshot'

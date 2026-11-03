@@ -80,8 +80,14 @@ export async function shopIn(files: Record<string, string>) {
     structure.sourceFiles,
     extractorOf({ java: await javaReader() })
   )
-  const metrics = metricsOf(structure, analysis.dependencies, analysis.lineCounts)
-  const values = snapshotValuesOf(structure, metrics)
+  const metrics = metricsOf(
+    structure,
+    analysis.dependencies,
+    analysis.lineCounts,
+    {},
+    analysis.measures
+  )
+  const values = snapshotValuesOf(structure, metrics, analysis.measures, analysis.dependencies)
   const annotations = paths
     .filter((path) => path.startsWith('docs/architecture/annotations/') && path.endsWith('.md'))
     .map((path) => path.slice(path.lastIndexOf('/') + 1, -'.md'.length))

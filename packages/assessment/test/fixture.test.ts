@@ -89,20 +89,42 @@ describe('the Assessment of the shop', () => {
     ])
     expect(f2!.evidence.map((evidence) => evidence.kind)).toEqual(['metric', 'metric'])
     expect(f3!.evidence.map((evidence) => evidence.kind)).toEqual(['debt', 'risk', 'metric'])
+    expect(f4!.evidence.at(-1)).toMatchObject({
+      kind: 'metric',
+      metric: 'complexity',
+      subject: { file: 'cart/src/main/java/com/shop/cart/Cart.java', name: 'Cart.total()' }
+    })
     expect(f4!.text).toBe(
-      'Fast enough today. Kept as a debt until the rewrite keeps the total with the lines.'
+      'Fast enough today, and as simple as a function gets: one way through it. Kept as a debt until\nthe rewrite keeps the total with the lines.'
     )
 
     // The Snapshot beside it freezes what Structure measures now, as the suite writes it.
     const snapshot = assessment!.snapshot!
     expect(snapshot).toMatchObject({
       commit: '3f2a9c0e8b1d4f6a7c5e2b9d0f1a3c4e5b6d7f8a',
-      date: '2026-11-03',
-      sourceFiles: {}
+      date: '2026-11-03'
     })
     expect(snapshot.components).toEqual(shop.values!.components)
+    expect(snapshot.sourceFiles).toEqual(shop.values!.sourceFiles)
     expect(snapshot.components['cart']).toMatchObject({ instability: 0.5, 'fan-in': 1 })
     expect(snapshot.components['catalog']).toMatchObject({ instability: 0, 'fan-in': 2 })
+    // What part 13 measures is frozen with the rest: abstractness and distance of a Component,
+    // propagation cost of a level — `/` the top level —, complexity of a function, LCOM4 of a class.
+    expect(snapshot.components['catalog']).toMatchObject({
+      abstractness: 1 / 3,
+      distance: 0.666666666667,
+      'propagation-cost': 0.5
+    })
+    expect(snapshot.components['/']).toEqual({ 'propagation-cost': 0.5 })
+    const cart = 'cart/src/main/java/com/shop/cart/Cart.java'
+    expect(snapshot.sourceFiles[cart]).toEqual({
+      'Cart.add(Product)': { complexity: 1 },
+      'Cart.total()': { complexity: 1 },
+      'Cart.discount(long)': { complexity: 5 },
+      Cart: { lcom4: 1 }
+    })
+    // Test files are left out, as from every metric.
+    expect(Object.keys(snapshot.sourceFiles).filter((file) => file.includes('/test/'))).toEqual([])
     expect(await shop.fs.readText(snapshot.path)).toBe(
       snapshotText(
         ID,
@@ -188,18 +210,18 @@ describe('the Assessment of the shop', () => {
     const cost = {
       kind: 'metric',
       metric: 'propagation-cost',
-      subject: { component: 'cart' }
+      subject: { component: 'web' }
     } as const
-    // The code now has no files of the catalog, and a propagation cost of the cart.
-    const now = { metrics: { components: { cart: { 'propagation-cost': 0.4 } } } }
+    // The code now has no files of the catalog, and a propagation cost below the web.
+    const now = { metrics: { components: { web: { 'propagation-cost': 0.4 } } } }
     const outcome = (plan: Plan): string => (plan.ok ? 'planned' : plan.reason)
 
-    // The Snapshot holds the files of the catalog, and no propagation cost.
+    // The Snapshot holds the files of the catalog, and no propagation cost below the web.
     const fs = memoryFileSystem(files)
     const taken = await planEvidence(fs, ID, 'F3', catalog, now)
     expect(outcome(taken)).toBe('planned')
     expect(outcome(await planEvidence(fs, ID, 'F3', cost, now))).toBe(
-      'the metric propagation-cost of cart is not there, so a Finding cannot cite it.'
+      'the metric propagation-cost of web is not there, so a Finding cannot cite it.'
     )
     if (taken.ok) await applyChangeSet(fs, taken.changeSet)
     expect(traceProblems(await openAssessments(fs), now)).toEqual([])

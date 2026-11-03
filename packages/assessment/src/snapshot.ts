@@ -6,7 +6,15 @@
  */
 import { isMap, isScalar, LineCounter, parseDocument, type YAMLMap } from 'yaml'
 import { isDay, isObjectName } from '@adr-tool/kernel'
-import { everyComponent, type Metrics, type Structure } from '@adr-tool/structure/model'
+import {
+  everyComponent,
+  levelOf,
+  propagationCostOf,
+  type Dependency,
+  type FileMeasures,
+  type Metrics,
+  type Structure
+} from '@adr-tool/structure/model'
 import type { MetricSubject, Snapshot, SnapshotValues } from './model'
 import type { AssessmentProblem } from './problems'
 import { METRIC_NAMES } from './quality'
@@ -62,40 +70,54 @@ export function componentValuesOf(metrics: Metrics): Record<string, number> {
 }
 
 /**
- * What is measured inside a Source File, as part 13's Structure measures it: each function with
- * its complexity, each class with its LCOM4.
+ * What is measured inside a Source File, as Structure measures it (part 13): each function
+ * with its complexity, each class with its LCOM4.
  */
-export interface MeasuredInside {
-  readonly functions?: readonly { readonly name: string; readonly complexity: number }[]
-  readonly classes?: readonly { readonly name: string; readonly lcom4: number | undefined }[]
-}
+export type MeasuredInside = Pick<FileMeasures, 'functions' | 'classes'>
+
+/** The name a Snapshot gives the top level, which lies below no Component, as a Rule does. */
+export const TOP_LEVEL = '/'
 
 /**
  * The values a Snapshot freezes, from Structure's metrics: every declared Component that has
- * any, and — where `inside` is given — what is measured in each Source File that is not a test.
- * `undefined` on a Draft, whose IDs follow directories and are no names to freeze.
+ * any; where `inside` is given, what is measured in each Source File that is not a test; and
+ * where `dependencies` are given, the propagation cost of the level below each Component and
+ * of the top level, `/`. `undefined` on a Draft, whose IDs follow directories and are no names
+ * to freeze.
  */
 export function snapshotValuesOf(
   structure: Pick<Structure, 'origin' | 'components' | 'sourceFiles'>,
   metrics: ReadonlyMap<string, Metrics>,
-  inside?: ReadonlyMap<string, MeasuredInside>
+  inside?: ReadonlyMap<string, MeasuredInside>,
+  dependencies?: readonly Dependency[]
 ): SnapshotValues | undefined {
   if (structure.origin !== 'declared') return undefined
   const components = table<Record<string, number>>()
-  for (const { id } of everyComponent(structure.components)) {
+  const add = (id: string, values: Record<string, number>): void => {
+    if (Object.keys(values).length === 0) return
+    components[id] = Object.assign(components[id] ?? table<number>(), values)
+  }
+  const ids = everyComponent(structure.components).map((component) => component.id)
+  for (const id of ids) {
     const known = metrics.get(id)
-    const values = known && componentValuesOf(known)
-    if (values && Object.keys(values).length > 0) components[id] = values
+    if (known) add(id, componentValuesOf(known))
+  }
+  if (dependencies) {
+    for (const parent of [undefined, ...ids]) {
+      const level = levelOf(structure, dependencies, parent)
+      const cost = level && propagationCostOf(level)
+      if (cost !== undefined) add(parent ?? TOP_LEVEL, { 'propagation-cost': cost })
+    }
   }
   const sourceFiles = table<Record<string, Record<string, number>>>()
   for (const file of structure.sourceFiles) {
     const measured = file.test ? undefined : inside?.get(file.path)
     if (!measured) continue
     const names = table<Record<string, number>>()
-    for (const { name, complexity } of measured.functions ?? []) {
+    for (const { name, complexity } of measured.functions) {
       names[name] = Object.assign(names[name] ?? table<number>(), { complexity })
     }
-    for (const { name, lcom4 } of measured.classes ?? []) {
+    for (const { name, lcom4 } of measured.classes) {
       if (lcom4 !== undefined)
         names[name] = Object.assign(names[name] ?? table<number>(), { lcom4 })
     }

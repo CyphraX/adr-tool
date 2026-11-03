@@ -49,7 +49,7 @@ export type ViolationFingerprint =
       readonly name: string
     }
 
-/** What a metric value is of: a Component (`*` for the top level), or a function or class in a Source File. */
+/** What a metric value is of: a Component (`/` for the top level, of a level's metric), or a function or class in a Source File. */
 export type MetricSubject =
   { readonly component: string } | { readonly file: string; readonly name: string }
 
@@ -103,7 +103,7 @@ export interface Finding extends Entry {
 
 /** The metric values a Snapshot freezes: per Component, and per function or class of a Source File. */
 export interface SnapshotValues {
-  /** Component ID — `*` for the top level — to metric name to value. */
+  /** Component ID — `/` for the top level, of a level's metric — to metric name to value. */
   readonly components: Readonly<Record<string, Readonly<Record<string, number>>>>
   /** Path of a Source File to the qualified name of a function or class to metric name to value (part 13). */
   readonly sourceFiles?: Readonly<

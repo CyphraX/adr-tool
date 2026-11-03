@@ -209,20 +209,20 @@ evidence:
     component: cart
   - violation: functions-stay-simple # a threshold per function (part 13)
     file: cart/src/main/java/com/shop/cart/Cart.java
-    name: Cart.total()
+    name: Cart.discount(long)
   - metric: instability
     component: cart
   - metric: complexity # per function (part 13)
     file: cart/src/main/java/com/shop/cart/Cart.java
-    name: Cart.total()
+    name: Cart.discount(long)
   - annotation: 20261102-the-page-searches-the-catalog-itself
   - adr: 0001-the-web-shows-the-catalog-through-the-cart
   - risk: 20261103-a-change-to-the-search-breaks-the-page
   - debt: 20261103-two-classes-util-in-one-package
 ```
 
-- A Violation is named by its fingerprint as **keys**, as an Exception names one ([ADR-0017](adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)): the keys are matched, and messages print the fingerprint on one line — `web-through-cart: web -> catalog`. A fingerprint names Component IDs and paths as written, never a pattern. `file` and `name` stand for a function or for a class, whichever the Rule's metric is about.
-- A metric is named as a Rule names it ([conformance-format.md](conformance-format.md), section 2): `files`, `lines`, `efferent-coupling`, `afferent-coupling`, `instability`, `fan-out`, `fan-in`, `relational-cohesion`, `internal-share`; from part 13 on `abstractness` and `distance` of a Component, `complexity` of a function, `lcom4` of a class, and `propagation-cost` of the level below a Component (`component: '*'`: of the top level). Its value is not written in the Finding: it is read from the Snapshot (section 4).
+- A Violation is named by its fingerprint as **keys**, as an Exception names one ([ADR-0017](adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)): the keys are matched, and messages print the fingerprint on one line — `web-through-cart: web -> catalog`. A fingerprint names Component IDs and paths as written, never a pattern. `file` and `name` stand for a function or for a class, whichever the Rule's metric is about, named as Structure names it: qualified by what contains it, a Java method with the types of its parameters — `Cart.discount(long)`, `Cart.total()` ([conformance-format.md](conformance-format.md), section 3).
+- A metric is named as a Rule names it ([conformance-format.md](conformance-format.md), section 2): `files`, `lines`, `efferent-coupling`, `afferent-coupling`, `instability`, `fan-out`, `fan-in`, `relational-cohesion`, `internal-share`; from part 13 on `abstractness` and `distance` of a Component, `complexity` of a function, `lcom4` of a class, and `propagation-cost` of the level below a Component (`component: /`: of the top level, as a Rule names it). Its value is not written in the Finding: it is read from the Snapshot (section 4).
 - An item with none of the six keys, or with two of them, or without the keys its kind needs, is a Problem of its form (section 7); so is an item that is no mapping.
 
 ## 3. What a Trace is checked against (part 10)
@@ -247,37 +247,53 @@ The **Snapshot** of an Assessment is the file beside it, named by its ID with `.
 commit: 3f2a9c0e8b1d4f6a7c5e2b9d0f1a3c4e5b6d7f8a
 date: 2026-11-03
 components:
+  /:
+    propagation-cost: 0.5
   cart:
     files: 3
-    lines: 31
+    lines: 43
     efferent-coupling: 2
     afferent-coupling: 2
     instability: 0.5
     fan-out: 1
     fan-in: 1
     relational-cohesion: 1
-    internal-share: 0.5
+    internal-share: 0.3333333333333333
+    abstractness: 0
+    distance: 0.5
+    propagation-cost: 0
   catalog:
-    files: 2
-    lines: 19
+    files: 3
+    lines: 26
     efferent-coupling: 0
     afferent-coupling: 3
     instability: 0
     fan-out: 0
     fan-in: 2
-    relational-cohesion: 1.5
-    internal-share: 0.25
+    relational-cohesion: 1.3333333333333333
+    internal-share: 0.5
+    abstractness: 0.3333333333333333
+    distance: 0.666666666667
+    propagation-cost: 0.5
+  # … and web
 source-files:
   cart/src/main/java/com/shop/cart/Cart.java:
+    Cart.add(Product):
+      complexity: 1
     Cart.total():
       complexity: 1
+    Cart.discount(long):
+      complexity: 5
+    Cart:
+      lcom4: 1
+  # … and the other Source Files that are no tests
 ```
 
 | Key | Value |
 | --- | --- |
 | `commit` | the commit HEAD pointed at when it was taken, by its full name of 40 or 64 hexadecimal digits. Absent where there was none, or no git |
 | `date` | `YYYY-MM-DD`: the day it was taken |
-| `components` | a mapping from Component ID to a mapping from metric name to number: the metrics of each declared Component. `'*'` stands for the top level, where a metric is of a level (part 13) |
+| `components` | a mapping from Component ID to a mapping from metric name to number: the metrics of each declared Component, and the propagation cost of the level below it. `/` stands for the top level, which lies below no Component, as in a Rule (part 13) |
 | `source-files` | a mapping from the path of a Source File to a mapping from the qualified name of a function or class in it to a mapping from metric name to number: what is measured inside a file (part 13) |
 
 - Metric names are those of section 2, "Evidence". The Snapshot freezes whatever metric values Structure computes: a name a later version brings is read and kept, and a metric of part 13 joins without a change of the format.

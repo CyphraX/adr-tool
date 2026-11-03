@@ -175,6 +175,10 @@ scenarios: [S1]
 evidence:
   - debt: 20261103-the-total-is-computed-on-every-call
   - risk: 20261103-a-large-cart-is-slow-at-the-peak
+  - metric: complexity
+    file: cart/src/main/java/com/shop/cart/Cart.java
+    name: Cart.total()
 ```
 
-Fast enough today. Kept as a debt until the rewrite keeps the total with the lines.
+Fast enough today, and as simple as a function gets: one way through it. Kept as a debt until
+the rewrite keeps the total with the lines.
