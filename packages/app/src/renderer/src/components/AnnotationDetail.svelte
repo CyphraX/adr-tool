@@ -96,16 +96,16 @@
     {@const resolved = annotation.state === 'resolved'}
     {@const primary = !replying && !attachingThis}
     <header>
-      <p class="kind">{type}</p>
-      <h2>{firstLine(annotation.text) || t.annotations.noText}</h2>
-      <p class="id">
-        <code>{annotation.id}</code>
+      <p class="kind">
+        {type}
         {#if annotation.state}
           <span class="state" class:open={!resolved}>
             {t.annotations.states[annotation.state]}
           </span>
         {/if}
       </p>
+      <h2>{firstLine(annotation.text) || t.annotations.noText}</h2>
+      <p class="id"><code>{annotation.id}</code></p>
       <p class="faint">{t.annotations.detail.written(annotation.author, annotation.date)}</p>
 
       {#if annotation.writable}
@@ -368,6 +368,9 @@
   }
 
   .kind {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     color: var(--ink-faint);
     font-size: 11.5px;
     font-weight: 600;
@@ -397,12 +400,6 @@
     color: var(--ink-soft);
   }
 
-  .id {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
   code,
   .file {
     font-family: var(--code);
@@ -412,6 +409,7 @@
 
   .state {
     padding: 0 6px;
+    font-weight: 400;
     border: 1px solid var(--line-strong);
     border-radius: 8px;
     color: var(--ink-soft);
@@ -551,8 +549,26 @@
     white-space: pre;
   }
 
+  /* The author's own text, set as a document, but at the measure of the pane. */
   .text {
-    margin-top: 16px;
+    margin-top: 14px;
+  }
+
+  .text :global(.document),
+  .reply :global(.document) {
+    padding: 0;
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+
+  .text :global(.document > :first-child),
+  .reply :global(.document > :first-child) {
+    margin-top: 0;
+  }
+
+  .text :global(.document > :last-child),
+  .reply :global(.document > :last-child) {
+    margin-bottom: 0;
   }
 
   .reply {
