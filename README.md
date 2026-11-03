@@ -15,11 +15,12 @@ A desktop app for the architecture that lives in a git repository: its Architect
 
 Softarch Suite reads ADRs where they already are: Markdown files in a repository, written by people, by agents or by other tools. It lists them, shows how they relate, finds what is inconsistent, and writes new ones and changes to existing ones. Every change is shown as a diff before it is written, and nothing is changed beyond the lines it was asked to change. Markdown is never re-serialized ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)).
 
-The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built:
+The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built, and the cores of two more:
 
 - **Decisions** covers the ADRs. It was called ADR Tool until the suite got its name.
 - **Structure** shows the Components of the code and the Dependencies between them, and links them to the ADRs that affect them.
 - **Conformance** checks the code against Rules the architect writes down. Its core and `adr check` are built; its window is next.
+- **Diagrams** draws pictures of the architecture whose boxes are Components, and says where a picture and the code drift apart. Its core is built; its window is next.
 
 The app runs locally: there is no backend, no account and no telemetry.
 
@@ -66,11 +67,13 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![The live mode: the text reads as rendered, the line with the cursor shows its source](docs/screenshots/readme/live.png)
 
-- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Where it can know what was meant, a Problem comes with a Repair, which is previewed like any other change. What only follows from a file that cannot be read, or from a Status that is none of the five values, is listed under that root cause.
+- **Mermaid.** A `mermaid` code block is drawn as a diagram in the reading view, the preview, the live mode and the app's export. A block that does not parse stays code, with what Mermaid says beside it. An ADR is untrusted input, so Mermaid draws at its strictest and what it draws is sanitized. The export shows each drawing as an image beside its page, and still runs no script. `adr export` has no browser to draw with and keeps the block as code ([ADR-0016](docs/adr/0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image.md)).
+
+- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Where it can know what was meant, a Problem comes with a Repair, which is previewed like any other change. What only follows from a file that cannot be read, or from a Status that is none of the five values, is listed under that root cause. **Repository Problems**, in the sidebar of Decisions and of Structure, puts every Problem of the repository in one list. That covers each Decision Log, the declaration of Components, and every Trace of an ADR to a Component that is not declared. Each Problem opens what it is about in its module, with its Repair.
 
   ![The Problems of a Decision Log, each with its Repair](docs/screenshots/readme/problems.png)
 
-- **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body, in every repository that is open. It ignores case and accents, and reads "ß" as "ss": "strasse" finds "Straße".
+- **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body, in every repository that is open. It ignores case and accents, and reads "ß" as "ss": "strasse" finds "Straße". Below the ADRs it finds the Components of the repository in front, by ID and name, and its Source Files, by path. A Component opens on its page, a Source File in the code viewer.
 - **Several repositories.** Each repository opens in a tab of its own. With more than one open, **Every ADR** and **Every Problem** list them together, and an ADR may depend on or relate to an ADR of another repository, written `payments:docs/adr/0001-ledger`; where both are open, the Relation reads as such from both ends.
 
   ![Every ADR of two open repositories, with the detail of a ledger ADR that an ADR of the other repository depends on](docs/screenshots/readme/together.png)
@@ -143,7 +146,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![Renaming a Component: one line in the declaration, one in the ADR that affects it](docs/screenshots/readme/structure-rename.png)
 
-The analysis runs in a worker thread and caches its results per file. It follows changes on disk while the view is open.
+The analysis runs in a worker thread and caches its results per file. It follows changes on disk once Structure is opened. Before that, a repository coming to the front is analysed once, for the count of Repository Problems, which then says when it was counted.
 
 ### Conformance
 
@@ -328,6 +331,7 @@ The kinds of Rules, the fingerprint an Exception names and the Problems of the f
 | `pnpm adr lint` | Checks this repository's ADRs with the built command line |
 | `pnpm adr check` | Checks them too, and this repository's code against `.arch/rules.yml` |
 | `pnpm adr export --out <dir>` | Exports this repository's ADRs as HTML pages |
+| `pnpm --filter @adr-tool/diagrams export-own` | Draws this repository's Diagram again, into `docs/architecture/diagrams/packages.svg`; a test fails while the picture is stale |
 
 CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr check` on the repository itself: its Decision Log, its declaration of Components, and its code against `.arch/rules.yml`.
 
@@ -337,10 +341,11 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 
 | Package | Contents |
 | --- | --- |
-| [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets |
+| [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets, and the reading of `.arch/config.yml` |
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
 | [`packages/conformance`](packages/conformance) | The core of the Conformance module, on `kernel` and `structure` alone and under the same guard: the Rules and Exceptions of `.arch/rules.yml`, their evaluation against the Dependencies, the Problems of the file, and Rename in it |
+| [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the Repair of an element whose Component is gone, and the SVG, drawn without a browser |
 | [`packages/cli`](packages/cli) | The command line, `adr lint`, `adr check` and `adr export`, built on the cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)) |
 | [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` and Structure's analysis into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
@@ -350,7 +355,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 - **Language.** Code and documents use the terms of [CONTEXT.md](CONTEXT.md) (Decisions) and [docs/contexts/structure/CONTEXT.md](docs/contexts/structure/CONTEXT.md) (Structure). [CONTEXT-MAP.md](CONTEXT-MAP.md) maps the two.
 - **Decisions.** Every decision of consequence is recorded as an ADR in [docs/adr/](docs/adr/), written in the suite's own format.
 - **Bytes.** Prettier never formats Markdown in this repository. The fixtures under `packages/core/test/fixtures` are exempt from git's line-ending normalization. The tool promises never to change a byte it was not asked to change, and this repository is its first test case.
-- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.en.ts` and `wording.en.ts`, with the German beside them (`strings.de.ts`, `wording.de.ts`); the main process has its own in `packages/app/src/main/strings.ts`. What `core` and `structure` say in sentences carries a code, and the window words it by that code. Tests check that no component carries text of its own and that nothing English is left in the German.
+- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.en.ts` and `wording.en.ts`, with the German beside them (`strings.de.ts`, `wording.de.ts`); the main process has its own in `packages/app/src/main/strings.ts`. What `core`, `structure` and `diagrams` say in sentences carries a code, and the window words it by that code. Tests check that no component carries text of its own and that nothing English is left in the German.
 
 ## Documentation
 
@@ -367,6 +372,8 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
 | [docs/conformance-format.md](docs/conformance-format.md) | The contract of the Conformance module: Rules, Violations and their fingerprint, Exceptions, the Problems of `.arch/rules.yml` |
+| [docs/diagrams-format.md](docs/diagrams-format.md) | The contract of the Diagrams module: the file of a Diagram, its view levels, suggested connections and Drift, its Problems, and the SVG |
+| [docs/configuration.md](docs/configuration.md) | The contract of `.arch/config.yml`, the suite's settings: one key per module, and what happens when the file cannot be read |
 | [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` and `adr check` with their output, codes and exit codes, and `adr export` |
 | [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
@@ -400,7 +407,7 @@ Changes go through pull requests against `main`, and CI must pass. Before you op
 1. Run the five CI checks locally: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test` and `pnpm build`.
 2. Use the terms of the glossaries.
 3. Write down a decision of consequence as an ADR.
-4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md), [docs/structure-format.md](docs/structure-format.md) or [docs/conformance-format.md](docs/conformance-format.md).
+4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md), [docs/structure-format.md](docs/structure-format.md), [docs/conformance-format.md](docs/conformance-format.md), [docs/diagrams-format.md](docs/diagrams-format.md) or [docs/configuration.md](docs/configuration.md).
 
 ## License
 

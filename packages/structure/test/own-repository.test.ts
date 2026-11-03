@@ -41,7 +41,16 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
 
   // The packages of the workspace are the top level.
   const top = structure.components.map((component) => component.id)
-  expect(top).toEqual(['app', 'cli', 'conformance', 'core', 'kernel', 'mcp', 'structure'])
+  expect(top).toEqual([
+    'app',
+    'cli',
+    'conformance',
+    'core',
+    'diagrams',
+    'kernel',
+    'mcp',
+    'structure'
+  ])
   expect(structure.components.find((component) => component.id === 'core')!.paths).toEqual([
     'packages/core/**'
   ])
@@ -152,7 +161,9 @@ it('finds the Dependency from app to core, and the Source File Dependencies behi
   ).toBe(true)
   // The export is written as `adr export` writes it, by the same code (part 10).
   expect(edges).toContain('app > cli')
-})
+  // The whole repository is analysed; beside the tests of the other packages, that can take
+  // longer than vitest's 5 seconds.
+}, 30_000)
 
 // The done-when of part 5, as far as `structure` goes: the app shows these numbers.
 it('computes the metrics of this repository as their definitions say', async () => {
@@ -176,7 +187,7 @@ it('computes the metrics of this repository as their definitions say', async () 
   // of the scale.
   expect(metrics.get('kernel')!.instability).toBe(0)
   expect(metrics.get('app')!.instability).toBe(1)
-  // It uses the cores of the three modules and the export of the command line, and reaches
-  // the kernel only through them.
-  expect(metrics.get('app')).toMatchObject({ fanOut: 4, fanIn: 0 })
+  // It uses the cores of Decisions, Structure and Conformance, the export of the command line,
+  // and the sentences of Diagrams for its German, and reaches the kernel only through them.
+  expect(metrics.get('app')).toMatchObject({ fanOut: 5, fanIn: 0 })
 })

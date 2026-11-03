@@ -347,6 +347,53 @@ export interface StructureView {
   readonly components: readonly StructureComponent[]
 }
 
+/**
+ * What the Structure module knows of a whole repository, for the views that look across the
+ * modules — the Problems of the repository, and the search: every Component with its name, every
+ * Source File, and what is wrong with the declaration. From the same analysis as the levels.
+ */
+export interface StructureOutline {
+  readonly repositoryId: string
+  /**
+   * Kept current: Structure is open, and its files are watched. Otherwise the outline is as
+   * of `analysedAt`, and the files may have changed since.
+   */
+  readonly current: boolean
+  /** When the analysis it comes from was asked for, in milliseconds since the epoch. */
+  readonly analysedAt: number
+  /** Declared in `.arch/components.yml`, or the Draft. */
+  readonly origin: 'declared' | 'draft'
+  /** Every Component, each parent before its children; directories are none. */
+  readonly components: readonly ComponentName[]
+  /** Every Source File, by its path, in the order of the paths; test files included. */
+  readonly sourceFiles: readonly OutlinedSourceFile[]
+  readonly problems: readonly StructureProblem[]
+  /** What the checks find on the Draft: hints, not Problems. */
+  readonly hints: readonly StructureProblem[]
+}
+
+export interface OutlinedSourceFile {
+  readonly path: string
+  /** The Component that owns it; absent when it is Unassigned. */
+  readonly component?: string
+  readonly test: boolean
+}
+
+export type OutlineResult =
+  | { readonly ok: true; readonly outline: StructureOutline }
+  | { readonly ok: false; readonly reason: string }
+  /** Another tab came to the front before the analysis began: ask again when this one does. */
+  | { readonly ok: false; readonly dropped: true }
+
+/**
+ * A Mermaid block of an ADR as the window drew it: its source as the block holds it, and the
+ * SVG, sanitized (docs/adr/0016-…). The export shows the SVG where the block stands.
+ */
+export interface DrawnDiagram {
+  readonly source: string
+  readonly svg: string
+}
+
 export type StructureResult =
   | { readonly ok: true; readonly view: StructureView }
   | { readonly ok: false; readonly reason: string }
@@ -432,6 +479,13 @@ export type ExportResult =
   | { readonly ok: true; readonly path: string; readonly adrs: number }
   | { readonly ok: false; readonly reason: string }
 
+/** What an export is written as: web pages into a folder, or one PDF file. */
+export type ExportKind = 'site' | 'pdf'
+
+/** Where the person picked for an export, held by the main process and named by a ticket. */
+export type ExportDestination =
+  { readonly ok: true; readonly ticket: string } | { readonly ok: false; readonly reason: string }
+
 export type ApplyResult =
   | { readonly applied: true; readonly repository: OpenRepository }
   | {
@@ -494,12 +548,17 @@ export interface Api {
   /** An ADR as the commit of a branch has it, read from git; `undefined` for any other file. */
   branchAdr(repositoryId: string, sha: string, path: string): Promise<Adr | undefined>
   /**
-   * Export the Decision Logs as web pages into a folder the person picks; `undefined` when they
-   * pick none (docs/plan-roadmap.md, part 10).
+   * Ask the person where to export the Decision Logs: a folder for web pages, a file for a PDF
+   * with one ADR per page (docs/plan-roadmap.md, part 10). The place stays in the main process;
+   * the window gets a ticket for it, or `undefined` when the person picks none.
    */
-  exportSite(repositoryId: string): Promise<ExportResult | undefined>
-  /** Export them as a PDF, one ADR per page, to a file the person picks. */
-  exportPdf(repositoryId: string): Promise<ExportResult | undefined>
+  pickExport(repositoryId: string, kind: ExportKind): Promise<ExportDestination | undefined>
+  /** Export to the place a ticket names, once. */
+  exportTo(
+    ticket: string,
+    /** The Mermaid blocks of the ADRs as the window drew them; a block without one stays code. */
+    diagrams: readonly DrawnDiagram[]
+  ): Promise<ExportResult>
   /** Open what an export wrote, as the system opens such a file; nothing else. */
   openExported(path: string): Promise<void>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
@@ -525,6 +584,15 @@ export interface Api {
    * main process looks the path up among the Source Files of its analysis first.
    */
   readSourceFile(repositoryId: string, path: string): Promise<SourceFileResult>
+  /**
+   * Every Component and Source File of the repository, and the Problems of its declaration,
+   * from the last analysis — analysed off the main thread the first time it is asked for.
+   */
+  /**
+   * What Structure knows of the whole repository. `fresh` asks for an analysis of now where
+   * Structure is not open: for the Problems of the repository, and the search.
+   */
+  structureOutline(repositoryId: string, fresh?: boolean): Promise<OutlineResult>
   /** Called when the analysis of a repository changed: files changed, or a change was applied. */
   onStructureChanged(listener: (repositoryId: string) => void): () => void
   /** Plan writing the Draft into `.arch/components.yml`. Nothing is written until the change is applied. */
@@ -568,6 +636,7 @@ export const CHANNEL = {
   planRename: 'change:plan-rename',
   structureView: 'structure:view',
   readSourceFile: 'structure:read-source-file',
+  structureOutline: 'structure:outline',
   structureChanged: 'structure:changed',
   listTemplates: 'templates:list',
   history: 'git:history',
@@ -577,8 +646,8 @@ export const CHANNEL = {
   discardCommit: 'git:discard-commit',
   branches: 'git:branches',
   branchAdr: 'git:branch-adr',
-  exportSite: 'export:site',
-  exportPdf: 'export:pdf',
+  pickExport: 'export:pick',
+  exportTo: 'export:write',
   openExported: 'export:open',
   applyChange: 'change:apply',
   discardChange: 'change:discard',

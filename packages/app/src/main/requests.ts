@@ -1,7 +1,9 @@
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
+import { drawingRefused } from '../shared/drawing'
 import type {
   CreateRequest,
+  DrawnDiagram,
   MetadataEditRequest,
   MigrationRequest,
   RenameRequest,
@@ -92,6 +94,30 @@ export function structureRepairRequest(problem: unknown): StructureProblem | und
     return undefined
   }
   return key === 'paths' || key === 'tests' ? { kind, component, key, pattern } : undefined
+}
+
+/** A drawing larger than this is no drawing of a block of an ADR. */
+const DIAGRAM_LIMIT = 4 * 1024 * 1024
+/** More drawings than this are no export of Decision Logs. */
+const DIAGRAMS_AT_MOST = 2000
+
+/**
+ * The Mermaid blocks the window drew for an export, by their source. A drawing that is not an
+ * SVG and nothing else is left out: its block stays a code block.
+ */
+export function diagramsRequest(diagrams: unknown): Map<string, string> {
+  const drawn = new Map<string, string>()
+  if (!Array.isArray(diagrams)) return drawn
+  for (const given of diagrams.slice(0, DIAGRAMS_AT_MOST)) {
+    const { source, svg } = record(given) as Partial<Record<keyof DrawnDiagram, unknown>>
+    if (typeof source !== 'string' || typeof svg !== 'string') continue
+    const text = svg.trim()
+    // Sanitized in the window already; its markup is looked at again here, against what a
+    // drawing may hold, before anything of it is written to disk (docs/adr/0016-…).
+    if (text.length > DIAGRAM_LIMIT || drawingRefused(text) !== undefined) continue
+    drawn.set(source, text)
+  }
+  return drawn
 }
 
 function repairOf(given: Record<string, unknown>): Repair | undefined {

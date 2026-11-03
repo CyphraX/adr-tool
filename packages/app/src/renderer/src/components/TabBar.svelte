@@ -1,7 +1,8 @@
 <script lang="ts">
   import { LANGUAGES, isLanguage } from '../../../shared/language'
   import { chosenLanguage } from '../lib/language'
-  import { app, type Module } from '../lib/state.svelte'
+  import { MODULES } from '../lib/modules'
+  import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
 
   // The language chosen in the window; none leaves it to the system's.
@@ -11,9 +12,6 @@
     const select = event.currentTarget
     app.speak(isLanguage(select.value) ? select.value : undefined, () => (select.value = chosen))
   }
-
-  // The modules of the suite, for the repository in front. More of them follow.
-  const MODULES: readonly Module[] = ['decisions', 'structure']
 </script>
 
 <header>
@@ -44,13 +42,14 @@
   </div>
   {#if app.active}
     <div class="modules" role="group" aria-label={t.modules.label}>
-      {#each MODULES as module (module)}
+      <!-- The modules of the suite, for the repository in front: lib/modules.ts. -->
+      {#each MODULES as { id } (id)}
         <button
-          class:current={app.active.module === module}
-          aria-pressed={app.active.module === module}
-          onclick={() => app.showModule(module)}
+          class:current={app.active.module === id}
+          aria-pressed={app.active.module === id}
+          onclick={() => app.showModule(id)}
         >
-          {t.modules[module]}
+          {t.modules[id]}
         </button>
       {/each}
     </div>

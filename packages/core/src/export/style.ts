@@ -137,3 +137,25 @@ footer { padding-top: 1rem; padding-bottom: 2.5rem; color: var(--ink-faint); fon
   a { color: inherit; text-decoration: none; }
 }
 `
+
+/**
+ * What a page needs for a drawn Mermaid block (docs/adr/0016-…), added to the style sheet only
+ * when the export has one: an export without drawings, `adr export`'s among them, is written as
+ * before. A drawing stands on light paper, which it was drawn for, in either scheme.
+ */
+export const DIAGRAM_STYLE = `
+.body figure.diagram { margin: 0 0 1rem; }
+.body figure.diagram img { display: block; max-width: 100%; height: auto; padding: 0.75rem; border-radius: 6px; background: #fcfcfd; border: 1px solid var(--line); }
+.body details.diagram-source { margin-top: 0.35rem; font-family: var(--ui); font-size: 0.8rem; color: var(--ink-faint); }
+
+@media print {
+  .body figure.diagram { break-inside: avoid; }
+  .body details.diagram-source { display: none; }
+}
+`
+
+/**
+ * The fonts a drawing of the export is drawn with: what the reader's system has, since an SVG
+ * shown as an image loads no font of its own, and the app's own fonts are not installed there.
+ */
+export const DIAGRAM_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"

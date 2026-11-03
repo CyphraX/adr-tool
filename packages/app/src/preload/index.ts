@@ -29,8 +29,8 @@ const api: Api = {
   branches: (repositoryId) => ipcRenderer.invoke(CHANNEL.branches, repositoryId),
   branchAdr: (repositoryId, sha, path) =>
     ipcRenderer.invoke(CHANNEL.branchAdr, repositoryId, sha, path),
-  exportSite: (repositoryId) => ipcRenderer.invoke(CHANNEL.exportSite, repositoryId),
-  exportPdf: (repositoryId) => ipcRenderer.invoke(CHANNEL.exportPdf, repositoryId),
+  pickExport: (repositoryId, kind) => ipcRenderer.invoke(CHANNEL.pickExport, repositoryId, kind),
+  exportTo: (ticket, diagrams) => ipcRenderer.invoke(CHANNEL.exportTo, ticket, diagrams),
   openExported: (path) => ipcRenderer.invoke(CHANNEL.openExported, path),
   applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
   discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),
@@ -44,6 +44,8 @@ const api: Api = {
     ipcRenderer.invoke(CHANNEL.structureView, repositoryId, parent, tests, expanded),
   readSourceFile: (repositoryId, path) =>
     ipcRenderer.invoke(CHANNEL.readSourceFile, repositoryId, path),
+  structureOutline: (repositoryId, fresh) =>
+    ipcRenderer.invoke(CHANNEL.structureOutline, repositoryId, fresh === true),
   onStructureChanged: (listener) => {
     const handler = (_: unknown, repositoryId: string): void => listener(repositoryId)
     ipcRenderer.on(CHANNEL.structureChanged, handler)

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, type Snippet } from 'svelte'
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
   import BoardView from './components/BoardView.svelte'
@@ -14,6 +14,7 @@
   import PaneDivider from './components/PaneDivider.svelte'
   import ProblemsList from './components/ProblemsList.svelte'
   import RelationsGraph from './components/RelationsGraph.svelte'
+  import RepositoryProblems from './components/RepositoryProblems.svelte'
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import StructureDetail from './components/StructureDetail.svelte'
@@ -31,11 +32,22 @@
     type MiddlePane,
     type PaneSizes
   } from './lib/panes'
+  import type { Module } from './lib/modules'
   import { app } from './lib/state.svelte'
   import { t } from './lib/strings'
   import { codeSpans, describeProblem } from './lib/wording'
 
   onMount(() => void app.start())
+
+  /** The tab in front, with a repository open. */
+  type Active = NonNullable<typeof app.active>
+
+  // Each module of the suite has its three panes here (lib/modules.ts): what there is, how it
+  // hangs together, and what this one is (docs/design.md, "The frame").
+  const FRAMES: Record<Module, Snippet<[Active]>> = {
+    decisions: decisionsFrame,
+    structure: structureFrame
+  }
 
   // The main process holds the window open while there is something to lose — text in the
   // editor, what a dialog holds — and asks back.
@@ -115,132 +127,8 @@
         <p>{t.welcome.noRepositoryLead}</p>
         <button class="primary" onclick={() => app.open()}>{t.tabs.open}</button>
       </main>
-    {:else if app.active.module === 'structure'}
-      {@const structure = app.active.structure}
-      {#if structure.view}
-        <div class="panes structure" style:--sidebar="{sidebarWidth}px">
-          <StructureSidebar />
-          <StructureCenter view={structure.view} />
-          <StructureDetail view={structure.view} />
-        </div>
-      {:else if structure.error}
-        <main class="message">
-          <h1>{t.structure.failed}</h1>
-          <p>{structure.error}</p>
-        </main>
-      {:else}
-        <main class="message">
-          <p>{t.structure.analysing}</p>
-        </main>
-      {/if}
-    {:else if repository.logs.length === 0}
-      <main class="message">
-        {#if repository.problems.length > 0}
-          <h1>{t.welcome.badConfiguration}</h1>
-          {#each repository.problems as problem, position (position)}
-            <p>{describeProblem(problem)}</p>
-          {/each}
-        {:else}
-          <h1>{t.welcome.noAdrs(app.active.repository.name)}</h1>
-          <p>{@render withCode(t.welcome.whereItLooks)}</p>
-          <p>{@render withCode(t.welcome.orStartHere)}</p>
-          <button class="primary" onclick={() => app.startCreating()}
-            >{t.welcome.createFirst}</button
-          >
-        {/if}
-      </main>
     {:else}
-      <div class="body">
-        {#if repository.problems.length > 0}
-          <!-- A log loads, another one or a setting of the configuration does not. -->
-          <div class="configuration" role="status">
-            <strong>{t.welcome.partOfConfiguration}</strong>
-            {#each repository.problems as problem, position (position)}
-              <span>{describeProblem(problem)}</span>
-            {/each}
-          </div>
-        {/if}
-        <div
-          class="panes"
-          class:wide-editor={app.editing?.mode === 'split'}
-          class:wide-middle={wide}
-          bind:clientWidth={panesWidth}
-          style:--sidebar="{sidebarWidth}px"
-          style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
-          style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
-        >
-          <Sidebar />
-          <PaneDivider
-            label={t.panes.sidebar}
-            min={LIMITS.sidebar.min}
-            max={fitSidebar(LIMITS.sidebar.max, panesWidth)}
-            onresize={(width) => resize('sidebar', fitSidebar(width, panesWidth))}
-            onreset={() => resize('sidebar', undefined)}
-          />
-          {#if app.active.view === 'problems'}
-            <ProblemsList />
-          {:else if app.active.view === 'branches'}
-            <BranchList />
-          {:else if app.active.view === 'graph' && app.log}
-            <RelationsGraph log={app.log} />
-          {:else if app.active.view === 'timeline' && app.log}
-            <TimelineView log={app.log} />
-          {:else if app.active.view === 'board' && app.log}
-            <BoardView log={app.log} />
-          {:else if app.active.view === 'dashboard' && app.log}
-            <DashboardView log={app.log} />
-          {:else if app.active.view === 'all-adrs' || app.active.view === 'all-problems'}
-            <TogetherView />
-          {:else}
-            <AdrList />
-          {/if}
-          {#if app.editing?.mode !== 'split'}
-            <!-- A divider watches the pane in front of it: another pane, another divider. -->
-            {#key app.active.view}
-              <PaneDivider
-                label={t.panes.middle}
-                min={LIMITS.middle.min}
-                max={maxMiddle(panesWidth, sidebarWidth, middlePane)}
-                onresize={(width) =>
-                  resize(middlePane, fitMiddle(width, panesWidth, sidebarWidth, middlePane))}
-                onreset={() => resize(middlePane, undefined)}
-              />
-            {/key}
-          {/if}
-          {#if app.active.view === 'branches'}
-            {@const branches = app.active.branches}
-            {#if branches.selected && branches.adr}
-              <BranchAdrDetail
-                adr={branches.adr}
-                sha={branches.selected.sha}
-                branch={branches.selected.branch}
-              />
-            {:else}
-              <main class="message on-paper">
-                <p>
-                  {branches.selected === undefined
-                    ? t.branches.select
-                    : branches.adr === null
-                      ? t.branches.gone
-                      : t.branches.reading}
-                </p>
-              </main>
-            {/if}
-          {:else if app.selected && app.log}
-            <AdrDetail adr={app.selected} log={app.log} />
-          {:else}
-            <main class="message on-paper">
-              <p>
-                {app.active.view === 'problems'
-                  ? t.welcome.selectToSeeProblems
-                  : app.active.view === 'all-adrs' || app.active.view === 'all-problems'
-                    ? t.together.hint
-                    : t.welcome.selectToRead}
-              </p>
-            </main>
-          {/if}
-        </div>
-      </div>
+      {@render FRAMES[app.active.module](app.active)}
     {/if}
   </div>
   <NewAdrDialog />
@@ -250,6 +138,147 @@
   <SearchPalette />
   <ChangeDialog />
 {/if}
+
+{#snippet structureFrame(active: Active)}
+  {@const structure = active.structure}
+  <!-- The sidebar stands from the start: the Problems of the repository are reached from it
+       while the level is still being analysed, or could not be. -->
+  <div class="panes structure" style:--sidebar="{sidebarWidth}px">
+    <StructureSidebar />
+    {#if structure.problems}
+      <RepositoryProblems />
+    {:else if structure.view}
+      <StructureCenter view={structure.view} />
+    {:else if structure.error}
+      <main class="message">
+        <h1>{t.structure.failed}</h1>
+        <p>{structure.error}</p>
+      </main>
+    {:else}
+      <main class="message">
+        <p>{t.structure.analysing}</p>
+      </main>
+    {/if}
+    {#if structure.view}
+      <StructureDetail view={structure.view} />
+    {:else}
+      <aside class="no-detail"></aside>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet decisionsFrame(active: Active)}
+  {@const repository = active.repository.repository}
+  {#if repository.logs.length === 0}
+    <main class="message">
+      {#if repository.problems.length > 0}
+        <h1>{t.welcome.badConfiguration}</h1>
+        {#each repository.problems as problem, position (position)}
+          <p>{describeProblem(problem)}</p>
+        {/each}
+      {:else}
+        <h1>{t.welcome.noAdrs(active.repository.name)}</h1>
+        <p>{@render withCode(t.welcome.whereItLooks)}</p>
+        <p>{@render withCode(t.welcome.orStartHere)}</p>
+        <button class="primary" onclick={() => app.startCreating()}>{t.welcome.createFirst}</button>
+      {/if}
+    </main>
+  {:else}
+    <div class="body">
+      {#if repository.problems.length > 0}
+        <!-- A log loads, another one or a setting of the configuration does not. -->
+        <div class="configuration" role="status">
+          <strong>{t.welcome.partOfConfiguration}</strong>
+          {#each repository.problems as problem, position (position)}
+            <span>{describeProblem(problem)}</span>
+          {/each}
+        </div>
+      {/if}
+      <div
+        class="panes"
+        class:wide-editor={app.editing?.mode === 'split'}
+        class:wide-middle={wide}
+        bind:clientWidth={panesWidth}
+        style:--sidebar="{sidebarWidth}px"
+        style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
+        style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
+      >
+        <Sidebar />
+        <PaneDivider
+          label={t.panes.sidebar}
+          min={LIMITS.sidebar.min}
+          max={fitSidebar(LIMITS.sidebar.max, panesWidth)}
+          onresize={(width) => resize('sidebar', fitSidebar(width, panesWidth))}
+          onreset={() => resize('sidebar', undefined)}
+        />
+        {#if active.view === 'problems'}
+          <ProblemsList />
+        {:else if active.view === 'repository-problems'}
+          <RepositoryProblems />
+        {:else if active.view === 'branches'}
+          <BranchList />
+        {:else if active.view === 'graph' && app.log}
+          <RelationsGraph log={app.log} />
+        {:else if active.view === 'timeline' && app.log}
+          <TimelineView log={app.log} />
+        {:else if active.view === 'board' && app.log}
+          <BoardView log={app.log} />
+        {:else if active.view === 'dashboard' && app.log}
+          <DashboardView log={app.log} />
+        {:else if active.view === 'all-adrs' || active.view === 'all-problems'}
+          <TogetherView />
+        {:else}
+          <AdrList />
+        {/if}
+        {#if app.editing?.mode !== 'split'}
+          <!-- A divider watches the pane in front of it: another pane, another divider. -->
+          {#key active.view}
+            <PaneDivider
+              label={t.panes.middle}
+              min={LIMITS.middle.min}
+              max={maxMiddle(panesWidth, sidebarWidth, middlePane)}
+              onresize={(width) =>
+                resize(middlePane, fitMiddle(width, panesWidth, sidebarWidth, middlePane))}
+              onreset={() => resize(middlePane, undefined)}
+            />
+          {/key}
+        {/if}
+        {#if active.view === 'branches'}
+          {@const branches = active.branches}
+          {#if branches.selected && branches.adr}
+            <BranchAdrDetail
+              adr={branches.adr}
+              sha={branches.selected.sha}
+              branch={branches.selected.branch}
+            />
+          {:else}
+            <main class="message on-paper">
+              <p>
+                {branches.selected === undefined
+                  ? t.branches.select
+                  : branches.adr === null
+                    ? t.branches.gone
+                    : t.branches.reading}
+              </p>
+            </main>
+          {/if}
+        {:else if app.selected && app.log}
+          <AdrDetail adr={app.selected} log={app.log} />
+        {:else}
+          <main class="message on-paper">
+            <p>
+              {active.view === 'problems' || active.view === 'repository-problems'
+                ? t.welcome.selectToSeeProblems
+                : active.view === 'all-adrs' || active.view === 'all-problems'
+                  ? t.together.hint
+                  : t.welcome.selectToRead}
+            </p>
+          </main>
+        {/if}
+      </div>
+    </div>
+  {/if}
+{/snippet}
 
 <style>
   .window {
@@ -327,6 +356,11 @@
     padding: 0 32px;
     color: var(--ink-soft);
     line-height: 1.55;
+  }
+
+  .no-detail {
+    border-left: 1px solid var(--line);
+    background: var(--paper);
   }
 
   .message.on-paper {

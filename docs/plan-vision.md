@@ -56,6 +56,68 @@ For Lena and Aylin. What a window with six modules needs before the third one ar
 
 *Done when:* on this repository, a Trace of an ADR to a Component that does not exist and a broken Relation stand in one list of Problems, each opening in its module; "kernel" finds the Component and its Source Files; an ADR with a flowchart shows it drawn, and a broken one shows its error.
 
+*Status (2026-11-02):* built.
+
+- **The module switcher** is made from a list (`packages/app/src/renderer/src/lib/modules.ts`), as are the frames of the modules in `App.svelte` (`FRAMES`). A module joins with one entry there, its name in `strings.*.ts`, its frame, and its section of the Problems of the repository. A tab already kept the view of Decisions and that of Structure apart, so nothing was added for that.
+- **The Problems of the repository** are put together by `repositoryProblems` (`lib/repository-problems.ts`) from what the window holds, in three sections:
+  - each Decision Log's Problems, by log, each root cause once with the Repairs `core` offers;
+  - every Trace to a Component that is not declared, set apart and listed once;
+  - the Problems of the declaration.
+  
+  The last come from a new request, `structureOutline` (`main/structures.ts`), which answers from the analysis that Structure keeps for the repository with every Component, Source File, Problem and hint. `RepositoryProblems.svelte` stands in the middle of Decisions and of Structure, and both sidebars hold the row **Repository Problems** with its red count. While Structure analyses, the count carries a "…" and the list says the section follows. On a Draft, what the checks find are hints, with no Repair. A Repair goes through the preview that already exists for it, and the Problems view of a log stays (`packages/app/test/repository-problems.test.ts`).
+- **The search** gained `searchComponents` and `searchSourceFiles` (`lib/search.ts`). Every word has to match: the ID or name of a Component, or the path of a Source File, where the file name counts most. Case and accents are ignored, as for ADRs (`packages/app/test/search-artefacts.test.ts`). The palette lists ADRs as before, with the same ranking and at most 12. Below them come at most 6 Components and 8 Source Files, each section under its heading and each hit named by its kind in words, all in one list for the keyboard. While Structure analyses, the palette says whether it searches the last analysis or nothing yet.
+- **Mermaid** is [ADR-0016](adr/0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image.md), which amends ADR-0014.
+  - The code: `lib/mermaid.ts` is pure (configuration, addresses, Mermaid's sentence, a cache of drawings). `lib/sanitize.ts` runs DOMPurify and then reads the drawing's CSS with the browser's own parser. `shared/drawing.ts` is the allowlist of a drawing's markup, which the window and main both hold it against. `lib/diagrams.ts` loads Mermaid and DOMPurify lazily and draws one block at a time, only while it is shown.
+  - Where blocks are drawn: `MarkdownDocument.svelte` replaces a block with its drawing and puts its source below it, in the reading view and the preview. In the live mode a block is a widget while the cursor is outside it (`liveDiagrams`, `lib/editor.ts`).
+  - The export: `ExportOptions.diagrams` in `core` and `ExportRequest.diagrams` in `packages/cli/src/export.ts` carry the drawings, and `mermaidSources` finds the blocks. The app draws every block light and passes the drawings in, and main checks each one again (`diagramsRequest`).
+  - Tests: `packages/core/test/export.test.ts`, and in `packages/app/test/` `mermaid.test.ts`, `drawing.test.ts`, `requests.test.ts`, `live.test.ts`, and `sanitize.test.ts` and `diagrams.test.ts` in jsdom 30.1.3, a dev dependency of the app only. jsdom's CSS parser is not Chrome's: it drops `u\72l(…)` where Chrome decodes it to a `url()`. So the backslash is refused either way, and the escapes are also tried in the running app.
+
+In the running app, in English and in German, on a copy of this repository set up as follows:
+
+- `plugins` added to `affects` of ADR 0006;
+- `depends-on: [0099-a-decision-that-is-gone]` added to ADR 0012;
+- a pattern `packages/gone/**` added to `cli`;
+- an ADR 0016 with a flowchart, and an ADR 0017 whose block does not parse;
+- after the review, an ADR 0018 with the review's hostile blocks: `style`, `classDef`, `%%{init}%%` and frontmatter `config:` that hide `url()` behind the escape `u\72l(`, in flowcharts and class, state, ER and block diagrams, each with a beacon on `127.0.0.1`.
+
+What the app showed:
+
+- Both sidebars say "Repository Problems 3". The list holds the broken Relation under Decisions, the Trace under Traces, and the pattern that matches nothing under Structure.
+- 0012 opens in Decisions with the list beside it, and `cli` opens its page in Structure.
+- The Repair of the Trace previews "Remove plugins from affects" on one file, and Cancel writes nothing.
+- "kernel" finds ADRs 0006, 0009 and 0015, then the Components `kernel`, `kernel/change`, `kernel/fs` and `kernel/text`, then the best 8 of 10 Source Files under `packages/kernel/`. A Component opens on its page, and "kernel change-set" opens `packages/kernel/src/change/change-set.ts` in the code viewer.
+- ADR 0016 shows the flowchart drawn in the reading view and the live mode, with no script, `foreignObject` or handler in it. "Mermaid source" below it opens its source in both, and the live block stays drawn. With the cursor in the block, its source shows.
+- ADR 0017 keeps its code, with "This Mermaid diagram cannot be drawn. Mermaid says: Parse error on line 2: Expecting 'SQE', 'DOUBLECIRCLEEND', 'PE', '-)', …, got 'PS'" beside it.
+- **Export → Web pages…** wrote 19 pages and one drawing, `docs/adr/0016-….diagram-1.svg`. No page holds a script, and the content security policy is ADR-0014's. The page of 0016, opened from disk, shows the drawing, and 0017's block stays code. After the review, the drawing is 657 × 191, the size of its view box, in the export's fonts.
+- ADR 0018 draws 9 of its 10 blocks with nothing of the beacon in them. The ER diagram is refused by Mermaid itself ("Lexical error on line 3"). The export writes 9 drawings, none naming the beacon or holding a backslash. Opened on their own, they fetch nothing, and nothing reached the beacon. While Mermaid measured the blocks, the window's content security policy blocked their loads.
+- The copy changed only as it was set up.
+
+What changed on the way:
+
+- The app takes `mermaidSources` from `core`'s index, as it takes all of `core`.
+- The sidebar row is "Repository Problems", since "Problems of the repository" did not fit.
+- A drawing is a "Mermaid diagram": Diagram is the Diagrams module's term.
+
+What the review of PR #49 changed:
+
+- CSS escapes got past the scrubbing of the CSS as text. The CSS is now read by the browser's parser (`CSSStyleSheet.replaceSync` for a style sheet, `element.style` for a style attribute), and what is left with a backslash is refused. The `secure` keys gained `theme`, `themeCSS`, `themeVariables`, `fontFamily`, `altFontFamily` and `layout`, among others.
+- Main's check of a drawing was a list of words; it is the allowlist of `shared/drawing.ts`, on the markup and never on a label.
+- Analysis on demand, as the PO decided: a repository coming to the front is analysed once in the background, with no watcher. The watcher starts once Structure is opened. A repository analysed only for the count is analysed again when its Problems view or the search opens. The repository in front goes first, and an analysis nobody waits for any more is dropped. The count says it is "as of" the last analysis.
+- A block no longer shown when its turn comes is not drawn. The preview beside the editor draws once the typing pauses. What failed for a block no longer shown is not kept, nor what failed for reasons other than the block. An open source stays open as the document is set again.
+- The export asks where it goes first, then draws. Main keeps the place and gives the window a ticket. A block that Mermaid takes more than 15 seconds over stays code.
+- An exported drawing has the size of its view box, so `<img>` does not stretch it, and it uses the export's fonts. It is named by its `accTitle` and `accDescr`. `style.css` gets the rules for drawings only when there are drawings, so an export without any is unchanged byte for byte.
+- A link in a drawing opens from the reading view (`xlink:href`). The live block follows the window's theme, and the roles of a drawing are kept for screen readers.
+- **Repository Problems** stands in Structure's sidebar always, also before a view exists and in a repository without a Decision Log.
+- The outlines are kept out of Svelte's deep proxy, so searching 50,000 Source Files is not slowed down by it.
+
+What remains:
+
+- The search finds the Components and Source Files of the repository in front only. It finds ADRs, as before, in every repository that is open.
+- To count the Problems of the declaration, a repository is analysed once when it comes to the front, in the worker, without following changes on disk. Until Structure is opened, the count can be older than the files; it says when it was counted.
+- What Mermaid says is in English, in a German window too.
+- A drawing in the export is always light. `adr export` does not draw.
+- Structure's catch-up with [design.md](design.md) is part 4's.
+
 ### Part 3 — Conformance: Rules, Violations and `adr check`
 
 For Lena and Jonas. The core of the third module, without a window yet: [conformance-format.md](conformance-format.md), written first, and `packages/conformance`.
@@ -106,6 +168,8 @@ For Lena and Priya. The core of the fourth module: [diagrams-format.md](diagrams
 - An ADR records the file format, and that the SVG beside a Diagram is derived data that is committed on purpose.
 
 *Done when:* a Diagram of this repository's packages, written by hand in the format, draws to SVG, suggests the connections the code has, reports a connection added on purpose as Drift, and reports an element with a removed Component as a Problem.
+
+*Status (2026-11-03):* the core is built; the window is part 7, so there is no screenshot yet. The contract is [diagrams-format.md](diagrams-format.md), written first, its terms are in the [glossary](contexts/diagrams/CONTEXT.md), and the decision is [ADR-0018](adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md): a Diagram is `<ID>.yml` directly in `docs/architecture/diagrams/` — `diagrams` in `.arch/config.yml` moves it, a file of settings that every module shares, each with a key of its own ([configuration.md](configuration.md)), and that the kernel reads (`readConfig`, `openConfig`) —, with a `title`, a `description`, a `level` and the `scope` of a component view, `elements` — a Component by ID, an External System, or the repository in a system context, each `at: [x, y]` with an optional `size` — and `connections` with `from`, `to` and `label`. `packages/diagrams` stands on `kernel` and `@adr-tool/structure/model` alone, under the cores' guard: `openDiagrams` lists and reads them, with fifteen Problem codes, each said as a code with an English sentence and in German in the window's `said.de.ts`; `suggestConnections` counts a Source File for the deepest shown Component that contains it, without test files unless asked; `driftOf` says a connection the code does not have and a Dependency the Diagram leaves out, only against a declaration; `planRepair` takes out an element whose Component is gone, with its connections, by its lines alone; `drawDiagram` draws the SVG — deterministic, without a script or anything fetched, light and dark, without Drift —, and `planExport` writes it as `<ID>.svg` beside the Diagram as a change set that is empty while the picture is current. 58 tests in `packages/diagrams/test`, on the fixture `shop` — a container view with a gone Component, a connection on purpose and a Dependency left out, a component view and a system context — and on this repository: [docs/architecture/diagrams/packages.yml](architecture/diagrams/packages.yml), written by hand, draws to the `packages.svg` beside it, its sixteen suggested connections are all drawn, a connection from `kernel` to `core` is Drift, and without `mcp` in the declaration the element on line 18 is a Problem whose Repair takes out its lines and those of its three connections (`test/own-repository.test.ts`; `pnpm --filter @adr-tool/diagrams export-own` draws the picture again). The review of the part changed seven things: in a component view the scope's own Source Files — `packages/core/src/index.ts`, say — count for the scope, so a connection from outside to a part that the code reaches through them is not Drift, and a Dependency through them that the Diagram leaves out is `scope-dependency-not-in-diagram`; a connection the code does not have is only perhaps not in it, `connection-perhaps-not-in-code` with the counts, while Structure could not resolve imports or read files; a key the suite owns written twice is `unreadable-diagram` with the detail `key-twice`; a position or a size beyond 1 000 000 is a Problem; the export is refused while the declaration cannot be read, `no-export-without-declaration`, and on a Draft the picture shows the IDs; `.arch/config.yml` is read by the kernel, which says its one Problem `unreadable-config` once for every module, and ADR-0018 records the file with a key per module and now depends on ADR-0006; and a test holds the package to the kernel, Structure's model and `yaml` among its imports. The Diagram of this repository now shows `conformance`, and `.arch/rules.yml` holds `diagrams` to `kernel` and `structure`, beside `conformance` in the layers: `adr check` prints "6 Rules hold.", and fails at the line of an import of `@adr-tool/core` added to `packages/diagrams/src/svg.ts`. Open: the window, the tools of the MCP server, Rename in a Diagram and the placing of a new Diagram, which are part 7's, and a check — in `adr check`, say — that the committed picture is current.
 
 ### Part 7 — Diagrams in the app
 
