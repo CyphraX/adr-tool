@@ -45,6 +45,27 @@ describe('Source Files (docs/structure-format.md, section 2)', () => {
     expect(sourceFilesAmong(files).map((file) => file.path)).toEqual(['src/node_modules_like/a.ts'])
   })
 
+  it('are no Go where the go command does not look: testdata, vendor, and names with _ or .', () => {
+    const files = [
+      'cart/cart.go',
+      'cart/testdata/broken.go',
+      'vendor/github.com/google/uuid/uuid.go',
+      '_examples/main.go',
+      'cart/.cache/x.go',
+      'cart/_generated.go',
+      'cart/cart_test.go',
+      // Only Go: the go command's rules are no other language's.
+      'testdata/fixture.ts',
+      'vendor/lib.py'
+    ]
+    expect(sourceFilesAmong(files).map((file) => file.path)).toEqual([
+      'cart/cart.go',
+      'cart/cart_test.go',
+      'testdata/fixture.ts',
+      'vendor/lib.py'
+    ])
+  })
+
   it('are not left out for being called dist or build: that is for git to say', () => {
     expect(sourceFilesAmong(['src/build/plan.ts', 'dist/index.js'])).toHaveLength(2)
   })

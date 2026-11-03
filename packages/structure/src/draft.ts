@@ -6,7 +6,7 @@ import {
   PYTHON_PROJECT_FILES,
   uvWorkspaceMembers
 } from './python/projects'
-import { isNeverLookedAt, type Language, type SourceFile } from './source-files'
+import { isIgnoredByGo, isNeverLookedAt, type Language, type SourceFile } from './source-files'
 import { workspacePackages } from './workspace'
 
 /**
@@ -196,11 +196,12 @@ export function segmentOf(name: string): string {
 /**
  * The directories below the root that hold a `go.mod`, where the root holds a `go.mod` or a
  * `go.work`: to Go a nested module is a module of its own, whether anything names it or not.
+ * Not where the go command does not look: a module in `testdata` is a fixture.
  */
 function goModuleDirectories(files: readonly string[]): string[] {
   if (!files.includes('go.mod') && !files.includes('go.work')) return []
   return files
-    .filter((path) => path.endsWith('/go.mod'))
+    .filter((path) => path.endsWith('/go.mod') && !isIgnoredByGo(path))
     .map((path) => path.slice(0, -'/go.mod'.length))
 }
 

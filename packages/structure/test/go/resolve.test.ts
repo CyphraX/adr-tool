@@ -193,6 +193,20 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     ])
   })
 
+  it('reads no Go and no module where the go command does not look', async () => {
+    const { edges, unresolved, used, notAnalysed, manifests } = await analyse({
+      'go.mod': MODULE,
+      'p/p.go': ['package p', 'import "github.com/x/y"', 'func F() { y.Z() }'],
+      'p/testdata/broken.go': ['package broken', 'func {'],
+      'p/testdata/mod/go.mod': 'module example.com/shop/p\n\nrequire example.com/fake v1.0.0\n',
+      'vendor/github.com/x/y/y.go': ['package y', 'func Z() {}'],
+      'vendor/modules.txt': '# github.com/x/y v1.0.0\n'
+    })
+    expect([edges, unresolved, notAnalysed]).toEqual([[], [], []])
+    expect(used).toEqual(['p/p.go github.com/x/y'])
+    expect(manifests).toEqual([])
+  })
+
   it('applies the replacements of go.work before those of a module', async () => {
     const { edges } = await analyse({
       'go.work': 'go 1.22\n\nuse ./app\n\nreplace example.com/lib => ./lib\n',

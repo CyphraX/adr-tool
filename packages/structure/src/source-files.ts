@@ -32,6 +32,20 @@ export function isNeverLookedAt(path: string): boolean {
   return path.split('/').some((segment) => NEVER.has(segment))
 }
 
+/**
+ * Whether the go command passes over a path: beneath a directory named `testdata` or `vendor`,
+ * or with a directory or a name that begins with `_` or `.`. Go Source Files are looked at only
+ * where it looks, and so are `go.mod` files.
+ */
+export function isIgnoredByGo(path: string): boolean {
+  const segments = path.split('/')
+  const name = segments.pop() ?? ''
+  return (
+    segments.some((segment) => segment === 'testdata' || segment === 'vendor') ||
+    [...segments, name].some((segment) => segment.startsWith('_') || segment.startsWith('.'))
+  )
+}
+
 /** A test by the conventions of section 2; the `tests` patterns of Components come on top. */
 export function isTestByConvention(path: string): boolean {
   const segments = path.split('/')
@@ -56,6 +70,7 @@ export function sourceFilesAmong(files: readonly string[]): SourceFile[] {
   for (const path of new Set(files)) {
     const language = languageOf(path)
     if (language === undefined || isNeverLookedAt(path)) continue
+    if (language === 'go' && isIgnoredByGo(path)) continue
     found.push({ path, language, test: isTestByConvention(path) })
   }
   return found.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))

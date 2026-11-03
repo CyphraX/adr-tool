@@ -261,6 +261,21 @@ describe('the Draft (docs/structure-format.md, section 1)', () => {
         'testdata/x.go': ''
       })
     ).toEqual(['lib ← src/lib/**'])
+    // Nor is one where the go command does not look, and Go there is no Source File.
+    expect(
+      await draft({
+        'go.mod': 'module example.com/t\n',
+        'cmd/t/main.go': '',
+        'internal/p/p.go': '',
+        'internal/p/testdata/mod/go.mod': 'module example.com/fake\n',
+        'internal/p/testdata/mod/fake.go': '',
+        'vendor/github.com/x/y/y.go': '',
+        '_examples/go.mod': 'module example.com/examples\n',
+        '_examples/main.go': '',
+        '.tools/go.mod': 'module example.com/tools\n',
+        '.tools/gen.go': ''
+      })
+    ).toEqual(['cmd ← cmd/**', 'internal ← internal/**'])
   })
 
   it('takes the directories under the source root where nothing names units', async () => {

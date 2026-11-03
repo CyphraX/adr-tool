@@ -5,7 +5,7 @@
  * command never runs, and nothing is downloaded.
  */
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
-import { isNeverLookedAt } from '../source-files'
+import { isIgnoredByGo, isNeverLookedAt } from '../source-files'
 
 export interface GoRequirement {
   /** The module path: `github.com/google/uuid`. */
@@ -90,7 +90,8 @@ export async function goModules(fs: FileSystem, files: readonly string[]): Promi
   const modules: GoModule[] = []
   for (const file of files) {
     if (file !== 'go.mod' && !file.endsWith('/go.mod')) continue
-    if (isNeverLookedAt(file) || file.split('/').includes('vendor')) continue
+    // Where the go command does not look — `vendor`, `testdata`, `_examples` — is no module.
+    if (isNeverLookedAt(file) || isIgnoredByGo(file)) continue
     const directory = file === 'go.mod' ? '' : file.slice(0, -'/go.mod'.length)
     const text = await fs.readText(file).catch(() => undefined)
     if (text === undefined) continue
