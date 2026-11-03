@@ -191,13 +191,14 @@ describe('the Draft (docs/structure-format.md, section 1)', () => {
     }
     expect(await draft(maven)).toEqual(['api ← api/**', 'core ← core/**'])
     // A project it declares, or Python beside the units, does.
-    for (const root of [
+    const roots: Record<string, string>[] = [
       { 'pyproject.toml': '[project]\nname = "tools"\n' },
       { 'pyproject.toml': '[tool.poetry]\nname = "tools"\n' },
       { 'setup.cfg': '[metadata]\nname = tools\n' },
       { 'setup.py': 'from setuptools import setup\nsetup()\n' },
       { 'pyproject.toml': '[tool.ruff]\n', 'tools/gen.py': '' }
-    ]) {
+    ]
+    for (const root of roots) {
       expect(await draft({ ...maven, ...root })).toEqual([
         'api ← api/**',
         'core ← core/**',
