@@ -112,12 +112,21 @@ interface Scope {
   readonly field?: string
 }
 
-/** Measure a parsed Java file. */
+/**
+ * Measure a parsed Java file. The walk keeps a stack of its own, in the order of the file: a
+ * constant concatenated over 2,000 lines is as deep a tree, which would exhaust the runtime's.
+ */
 export function measureJava(root: Node): FileMeasures {
   const names = new Names()
-  const functions: FunctionMeasure[] = []
+  const functions: (Omit<FunctionMeasure, 'complexity'> & { readonly counting: Counting })[] = []
   const classes: ClassMeasure[] = []
   const declarations: DeclarationMeasure[] = []
+  const stack: { readonly node: Node; readonly scope: Scope }[] = []
+  /** Visit the nodes next, the first first. */
+  const next = (nodes: readonly Node[], scope: Scope): void => {
+    for (let index = nodes.length - 1; index >= 0; index--)
+      stack.push({ node: nodes[index]!, scope })
+  }
 
   const visit = (node: Node, scope: Scope): void => {
     if (TYPES.has(node.type)) {
@@ -142,29 +151,39 @@ export function measureJava(root: Node): FileMeasures {
     }
     if (node.type === 'object_creation_expression') {
       // An anonymous class: its methods are functions of their own, inside what makes it.
-      for (const child of children(node)) {
-        if (child.type === 'class_body') {
-          visitAll(child, { names: [...scope.names, ANONYMOUS], counting: undefined })
-        } else visit(child, scope)
+      const anonymous: Scope = { names: [...scope.names, ANONYMOUS], counting: undefined }
+      const parts = children(node)
+      for (let index = parts.length - 1; index >= 0; index--) {
+        const part = parts[index]!
+        stack.push({ node: part, scope: part.type === 'class_body' ? anonymous : scope })
       }
       return
     }
     if (node.type === 'field_declaration' || node.type === 'constant_declaration') {
+      const values: { node: Node; scope: Scope }[] = []
       for (const child of children(node)) {
         if (child.type !== 'variable_declarator') continue
         const field = child.childForFieldName('name')?.text
         const value = child.childForFieldName('value')
-        if (value) visit(value, { ...scope, counting: undefined, ...(field && { field }) })
+        if (value)
+          values.push({
+            node: value,
+            scope: { ...scope, counting: undefined, ...(field && { field }) }
+          })
       }
+      for (let index = values.length - 1; index >= 0; index--) stack.push(values[index]!)
       return
     }
     if (node.type === 'enum_constant') {
       const body = node.childForFieldName('body')
-      const name = node.childForFieldName('name')?.text ?? ANONYMOUS
-      for (const child of children(node)) {
-        if (body !== null && child.equals(body)) {
-          visitAll(child, { names: [...scope.names, name], counting: undefined })
-        } else visit(child, scope)
+      const inner: Scope = {
+        names: [...scope.names, node.childForFieldName('name')?.text ?? ANONYMOUS],
+        counting: undefined
+      }
+      const parts = children(node)
+      for (let index = parts.length - 1; index >= 0; index--) {
+        const part = parts[index]!
+        stack.push({ node: part, scope: body !== null && part.equals(body) ? inner : scope })
       }
       return
     }
@@ -173,28 +192,18 @@ export function measureJava(root: Node): FileMeasures {
       (node.type === 'block' && node.parent?.type === 'class_body')
     ) {
       // An initializer block runs apart from every method.
-      visitAll(node, { ...scope, counting: undefined })
+      next(children(node), { ...scope, counting: undefined })
       return
     }
     if (scope.counting && decides(node)) scope.counting.complexity++
-    visitAll(node, scope)
-  }
-  const visitAll = (node: Node, scope: Scope): void => {
-    for (const child of children(node)) visit(child, scope)
+    next(children(node), scope)
   }
 
   const enter = (node: Node, named: Node, written: string, scope: Scope, parts: Node[]): void => {
     const name = names.take([...scope.names, written].join('.'))
     const counting: Counting = { complexity: 1 }
-    const at = functions.length
-    functions.push({ name, line: 0, endLine: 0, complexity: 0 })
-    for (const part of parts) visit(part, { names: [name], counting })
-    functions[at] = {
-      name,
-      line: lineOf(named),
-      endLine: endLineOf(node),
-      complexity: counting.complexity
-    }
+    functions.push({ name, line: lineOf(named), endLine: endLineOf(node), counting })
+    next(parts, { names: [name], counting })
   }
 
   const enterType = (node: Node, scope: Scope): void => {
@@ -206,25 +215,30 @@ export function measureJava(root: Node): FileMeasures {
       node.type === 'annotation_type_declaration' ||
       (modifiers?.children.some((child) => child?.type === 'abstract') ?? false)
     declarations.push({ name, line: lineOf(own ?? node), abstract: isAbstract })
-    const at = classes.length
-    if (CLASSES.has(node.type))
-      classes.push({ name, line: 0, endLine: 0, methods: 0, lcom4: undefined })
-    // What a type's header computes — an annotation's value — belongs to no method.
-    visitAll(node, { names: [name], counting: undefined })
     if (CLASSES.has(node.type)) {
       const methods = methodsOf(node)
-      classes[at] = {
+      classes.push({
         name,
         line: lineOf(own ?? node),
         endLine: endLineOf(node),
         methods: methods.length,
         lcom4: lcom4Of(methods)
-      }
+      })
     }
+    // What a type's header computes — an annotation's value — belongs to no method.
+    next(children(node), { names: [name], counting: undefined })
   }
 
-  visitAll(root, { names: [], counting: undefined })
-  return { functions, classes, declarations }
+  next(children(root), { names: [], counting: undefined })
+  for (let task = stack.pop(); task !== undefined; task = stack.pop()) visit(task.node, task.scope)
+  return {
+    functions: functions.map(({ counting, ...measured }) => ({
+      ...measured,
+      complexity: counting.complexity
+    })),
+    classes,
+    declarations
+  }
 }
 
 /** The members of a class body, enum constants' bodies aside. */

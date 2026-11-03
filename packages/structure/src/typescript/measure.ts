@@ -299,14 +299,42 @@ const isType = (node: ts.Node): boolean => TYPES.has(node.kind)
 const lineOf = (source: ts.SourceFile, position: number): number =>
   source.getLineAndCharacterOfPosition(position).line + 1
 
+/** What the walk does next: a node to visit where it stands, or what follows on what it visited. */
+type Task = { readonly node: ts.Node; readonly scope: Scope } | (() => void)
+
 /**
  * Measure a parsed file. `component` is the name of a Svelte component, which counts as one
  * concrete declaration of its own, whatever its scripts declare.
+ *
+ * The walk keeps a stack of its own, in the order of the file: a chain of 4,000 `+` or 1,000
+ * nested `if`s is as deep a tree, which would exhaust the runtime's.
  */
 export function measureTypeScript(source: ts.SourceFile, component?: string): FileMeasures {
   const names = new Names()
-  const functions: FunctionMeasure[] = []
+  const functions: (Omit<FunctionMeasure, 'complexity'> & { readonly counting: Counting })[] = []
   const classes: ClassMeasure[] = []
+  const stack: Task[] = []
+  /** Do the tasks next, the first first. */
+  const next = (...tasks: Task[]): void => {
+    for (let index = tasks.length - 1; index >= 0; index--) stack.push(tasks[index]!)
+  }
+  /** Visit the children of a node next, in their order. */
+  const nextChildren = (node: ts.Node, scope: Scope): void => {
+    const from = stack.length
+    ts.forEachChild(node, (child) => {
+      stack.push({ node: child, scope })
+    })
+    for (let a = from, b = stack.length - 1; a < b; a++, b--) {
+      const task = stack[a]!
+      stack[a] = stack[b]!
+      stack[b] = task
+    }
+  }
+  const decoratorsOf = (node: ts.Node, scope: Scope): Task[] =>
+    ((ts.canHaveDecorators(node) && ts.getDecorators(node)) || []).map((decorator) => ({
+      node: decorator,
+      scope
+    }))
 
   const visit = (node: ts.Node, scope: Scope): void => {
     // Types decide nothing at run time.
@@ -321,81 +349,86 @@ export function measureTypeScript(source: ts.SourceFile, component?: string): Fi
     }
     if (scope.counting && decides(node)) scope.counting.complexity++
     if (!SPECIAL.has(node.kind)) {
-      ts.forEachChild(node, (child) => visit(child, scope))
+      nextChildren(node, scope)
       return
     }
     if (ts.isObjectLiteralExpression(node)) {
       // A named object holds its methods as a class does: `api.load`.
       const name = givenName(node, source)
-      const inner = name === undefined ? scope : { ...scope, names: [...scope.names, name] }
-      ts.forEachChild(node, (child) => visit(child, inner))
+      nextChildren(node, name === undefined ? scope : { ...scope, names: [...scope.names, name] })
       return
     }
     if (ts.isModuleDeclaration(node) && ts.isIdentifier(node.name)) {
-      const inner = { ...scope, names: [...scope.names, node.name.text] }
-      if (node.body) visit(node.body, inner)
+      if (node.body)
+        next({ node: node.body, scope: { ...scope, names: [...scope.names, node.name.text] } })
       return
     }
     if (ts.isPropertyDeclaration(node) && node.initializer !== undefined) {
       // A field's value is computed apart from every function, unless it is one.
-      for (const decorator of ts.getDecorators(node) ?? []) visit(decorator, scope)
-      if (ts.isComputedPropertyName(node.name)) visit(node.name, scope)
-      visit(node.initializer, { ...scope, counting: undefined })
+      next(
+        ...decoratorsOf(node, scope),
+        ...(ts.isComputedPropertyName(node.name) ? [{ node: node.name, scope }] : []),
+        { node: node.initializer, scope: { ...scope, counting: undefined } }
+      )
       return
     }
     if (ts.isClassStaticBlockDeclaration(node)) {
-      visit(node.body, { ...scope, counting: undefined })
+      next({ node: node.body, scope: { ...scope, counting: undefined } })
       return
     }
-    ts.forEachChild(node, (child) => visit(child, scope))
+    nextChildren(node, scope)
   }
 
   const enterFunction = (node: Body, scope: Scope): void => {
     // Decorators and a computed name are evaluated where the function stands, not inside it.
-    for (const decorator of (ts.canHaveDecorators(node) && ts.getDecorators(node)) || []) {
-      visit(decorator, scope)
-    }
-    if (!ts.isConstructorDeclaration(node) && node.name && ts.isComputedPropertyName(node.name)) {
-      visit(node.name, scope)
-    }
-    const name = names.take([...scope.names, functionName(node, source)].join('.'))
-    const counting: Counting = { complexity: 1 }
-    const at = functions.length
-    functions.push({ name, line: 0, endLine: 0, complexity: 0 })
-    const inner: Scope = { names: [name], counting }
-    for (const parameter of node.parameters) visit(parameter, inner)
-    if (node.body) visit(node.body, inner)
-    functions[at] = {
-      name,
-      line: lineOf(source, startOf(node, source)),
-      endLine: lineOf(source, node.end),
-      complexity: counting.complexity
-    }
+    const computed =
+      !ts.isConstructorDeclaration(node) && node.name && ts.isComputedPropertyName(node.name)
+        ? [{ node: node.name, scope }]
+        : []
+    next(...decoratorsOf(node, scope), ...computed, () => {
+      const name = names.take([...scope.names, functionName(node, source)].join('.'))
+      const counting: Counting = { complexity: 1 }
+      functions.push({
+        name,
+        line: lineOf(source, startOf(node, source)),
+        endLine: lineOf(source, node.end),
+        counting
+      })
+      const inner: Scope = { names: [name], counting }
+      next(
+        ...node.parameters.map((parameter) => ({ node: parameter, scope: inner })),
+        ...(node.body ? [{ node: node.body, scope: inner }] : [])
+      )
+    })
   }
 
   const enterClass = (node: ts.ClassLikeDeclaration, scope: Scope): void => {
-    for (const decorator of (ts.canHaveDecorators(node) && ts.getDecorators(node)) || []) {
-      visit(decorator, scope)
-    }
-    for (const clause of node.heritageClauses ?? []) visit(clause, scope)
-    const name = names.take([...scope.names, className(node, source)].join('.'))
-    const at = classes.length
-    classes.push({ name, line: 0, endLine: 0, methods: 0, lcom4: undefined })
-    const inner: Scope = { names: [name], counting: scope.counting }
-    for (const member of node.members) visit(member, inner)
-    const methods = methodsOf(node, source)
-    classes[at] = {
-      name,
-      line: lineOf(source, startOf(node, source)),
-      endLine: lineOf(source, node.end),
-      methods: methods.length,
-      lcom4: lcom4Of(methods)
-    }
+    const heritage = (node.heritageClauses ?? []).map((clause) => ({ node: clause, scope }))
+    next(...decoratorsOf(node, scope), ...heritage, () => {
+      const name = names.take([...scope.names, className(node, source)].join('.'))
+      const methods = methodsOf(node, source)
+      classes.push({
+        name,
+        line: lineOf(source, startOf(node, source)),
+        endLine: lineOf(source, node.end),
+        methods: methods.length,
+        lcom4: lcom4Of(methods)
+      })
+      const inner: Scope = { names: [name], counting: scope.counting }
+      next(...node.members.map((member) => ({ node: member, scope: inner })))
+    })
   }
 
-  ts.forEachChild(source, (child) => visit(child, { names: [], counting: undefined }))
+  nextChildren(source, { names: [], counting: undefined })
+  for (let task = stack.pop(); task !== undefined; task = stack.pop()) {
+    if (typeof task === 'function') task()
+    else visit(task.node, task.scope)
+  }
   return {
-    functions,
+    functions: functions.map(({ counting, ...measured }) => ({
+      ...measured,
+      complexity: counting.complexity
+    })),
     classes,
     declarations:
       component === undefined
@@ -407,9 +440,13 @@ export function measureTypeScript(source: ts.SourceFile, component?: string): Fi
 /** The members a method uses: `this.x`, `Class.x` for a static one, `const { x } = this`. */
 function usesOf(body: ts.Node, own: string | undefined): Set<string> {
   const used = new Set<string>()
-  const visit = (node: ts.Node, ownThis: boolean): void => {
+  // The walk keeps a stack of its own, as `measureTypeScript` does; each node with whether its
+  // `this` is the instance.
+  const stack: [ts.Node, boolean][] = [[body, true]]
+  for (let top = stack.pop(); top !== undefined; top = stack.pop()) {
+    const [node, ownThis] = top
     // A class inside has a `this` of its own; a function written with `function` too.
-    if (ts.isClassLike(node)) return
+    if (ts.isClassLike(node)) continue
     const keepsThis = !(ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node))
     const isSelf = (expression: ts.Expression): boolean =>
       (ownThis && expression.kind === ts.SyntaxKind.ThisKeyword) ||
@@ -434,9 +471,11 @@ function usesOf(body: ts.Node, own: string | undefined): Set<string> {
         if (name !== undefined) used.add(name)
       }
     }
-    ts.forEachChild(node, (child) => visit(child, ownThis && keepsThis))
+    // The order does not matter here: what is used is a set.
+    ts.forEachChild(node, (child) => {
+      stack.push([child, ownThis && keepsThis])
+    })
   }
-  visit(body, true)
   return used
 }
 

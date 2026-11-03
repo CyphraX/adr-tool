@@ -322,3 +322,25 @@ describe('the declarations abstractness counts (docs/structure-format.md, sectio
     ])
   })
 })
+
+describe('a file whose expressions run deep (docs/structure-format.md, section 5)', () => {
+  // The walks keep a stack of their own: the depth of a tree is no limit of the runtime's.
+  it('measures a long chain of `+`, of `&&`, and `if`s nested far', () => {
+    const plus = `export const total = ${Array.from({ length: 4000 }, (_, i) => `a${i}`).join(' + ')}\n`
+    expect(measured('plus.ts', plus).functions).toEqual([])
+
+    const and = `export function all(): boolean { return ${Array.from({ length: 2000 }, (_, i) => `a${i}`).join(' && ')} }\n`
+    expect(complexities('and.ts', and)).toEqual({ all: 2000 })
+
+    const nested = [
+      'export function deep(x: number): number {',
+      ...Array.from({ length: 1000 }, (_, i) => `${' '.repeat(i % 40)}if (x > ${i}) {`),
+      '  return x',
+      ...Array.from({ length: 1000 }, () => '}'),
+      '  return 0',
+      '}',
+      ''
+    ].join('\n')
+    expect(complexities('nested.ts', nested)).toEqual({ deep: 1001 })
+  })
+})

@@ -210,3 +210,24 @@ interface Priced {}`)
     ])
   })
 })
+
+describe('a Java file whose expressions run deep (docs/structure-format.md, section 5)', () => {
+  // The walks keep a stack of their own: the depth of a tree is no limit of the runtime's.
+  it('measures a constant concatenated over 2,000 lines', () => {
+    const text = [
+      'package a;',
+      'final class Text {',
+      '  static final String ALL =',
+      ...Array.from({ length: 2000 }, (_, i) => `    "${i}" +`),
+      '    "";',
+      '  boolean any(boolean a, boolean b) {',
+      `    return ${Array.from({ length: 2000 }, (_, i) => (i % 2 ? 'a' : 'b')).join(' && ')};`,
+      '  }',
+      '}',
+      ''
+    ].join('\n')
+    expect(measured(text).functions.map(({ name, complexity }) => [name, complexity])).toEqual([
+      ['Text.any(boolean,boolean)', 2000]
+    ])
+  })
+})
