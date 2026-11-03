@@ -97,7 +97,7 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     expect(dependencies.every((dependency) => !dependency.typeOnly)).toBe(true)
   })
 
-  it("lets an external test package see the test files of the package it tests: export_test.go", async () => {
+  it('lets an external test package see the test files of the package it tests: export_test.go', async () => {
     const { edges, unresolved } = await analyse({
       'go.mod': MODULE,
       'cart/cart.go': ['package cart', 'func total() int { return 1 }'],
@@ -269,7 +269,11 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
         'require example.com/shared v0.0.0',
         'replace example.com/shared => ../../patched/shared'
       ],
-      'services/api/main.go': ['package main', 'import "example.com/shared"', 'func main() { shared.Do() }'],
+      'services/api/main.go': [
+        'package main',
+        'import "example.com/shared"',
+        'func main() { shared.Do() }'
+      ],
       // Two copies of one module: the replacement says which one is meant.
       'libs/shared/go.mod': 'module example.com/shared\n',
       'libs/shared/do.go': ['package shared', 'func Do() {}'],

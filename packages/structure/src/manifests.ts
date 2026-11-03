@@ -115,6 +115,14 @@ interface Places {
   next: number
 }
 
+/** The line a string or a key of a `pyproject.toml` stands on, each taken once. */
+interface Lines {
+  /** A string of an array: a requirement as PEP 508 writes it. */
+  readonly string: (within: readonly string[], value: string) => number | undefined
+  /** A key of a table: a Library as Poetry names it. */
+  readonly key: (within: readonly string[], name: string) => number | undefined
+}
+
 /**
  * Finds the lines of a `pyproject.toml` that declare what its data holds: smol-toml gives the
  * data, not where it stands. One pass over the text notes every string and every key with its
@@ -122,10 +130,10 @@ interface Places {
  * twice gets the line of each. A string with an escape in it is not noted: its text is not
  * what it reads.
  */
-function linesOf(text: string) {
+function linesOf(text: string): Lines {
   const strings = new Map<string, Places>()
   const keys = new Map<string, Places>()
-  const note = (places: Map<string, Places>, value: string, line: number, table: string) => {
+  const note = (places: Map<string, Places>, value: string, line: number, table: string): void => {
     const place = { line, table, taken: false }
     const known = places.get(value)
     if (known) known.all.push(place)
@@ -197,7 +205,11 @@ function linesOf(text: string) {
     }
   })
   /** The first place of a value not yet taken, in one of the tables it may stand in. */
-  const take = (places: Map<string, Places>, value: string, within: readonly string[]) => {
+  const take = (
+    places: Map<string, Places>,
+    value: string,
+    within: readonly string[]
+  ): number | undefined => {
     const known = places.get(value)
     if (!known) return undefined
     for (let index = known.next; index < known.all.length; index++) {
@@ -211,12 +223,8 @@ function linesOf(text: string) {
     return undefined
   }
   return {
-    /** A string of an array: a requirement as PEP 508 writes it. */
-    string: (within: readonly string[], value: string): number | undefined =>
-      take(strings, value, within),
-    /** A key of a table: a Library as Poetry names it. */
-    key: (within: readonly string[], name: string): number | undefined =>
-      take(keys, name, within)
+    string: (within, value) => take(strings, value, within),
+    key: (within, name) => take(keys, name, within)
   }
 }
 
@@ -235,7 +243,7 @@ const listOf = (value: unknown): string[] =>
 function inPyproject(
   manifest: string,
   document: Record<string, unknown>,
-  lines: ReturnType<typeof linesOf>
+  lines: Lines
 ): ManifestLibrary[] {
   const found: ManifestLibrary[] = []
   // The tables a key may stand in: its own, or one above it with a dotted key or inline.

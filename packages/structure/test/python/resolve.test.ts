@@ -209,7 +209,8 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
 
   it("folds `..` in a project's configuration, and leaves out a root above the repository", async () => {
     const { edges, unresolved } = await analyse({
-      'services/api/pyproject.toml': '[tool.pytest.ini_options]\npythonpath = ["../../libs", "../../../outside"]\n',
+      'services/api/pyproject.toml':
+        '[tool.pytest.ini_options]\npythonpath = ["../../libs", "../../../outside"]\n',
       'services/api/app/__init__.py': '',
       'services/api/app/main.py': 'import common\n',
       'libs/common/__init__.py': ''

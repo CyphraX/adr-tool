@@ -171,7 +171,7 @@ export function resolvePython(
         // not above its top-level package, which Python refuses. A file outside of a package,
         // in a namespace package say, may go no further than its own directory.
         let packages = 0
-        for (let directory = directoryOf(path); isPackage(directory); ) {
+        for (let directory = directoryOf(path); isPackage(directory);) {
           packages++
           if (directory === '') break
           directory = directoryOf(directory)

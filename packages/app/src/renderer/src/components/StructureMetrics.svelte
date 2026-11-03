@@ -13,8 +13,7 @@
   const lowerBound = $derived(
     LOWER_BOUND.filter((language) =>
       view.components.some(
-        (component) =>
-          component.level === view.parent && component.lowerBound.includes(language)
+        (component) => component.level === view.parent && component.lowerBound.includes(language)
       )
     )
   )

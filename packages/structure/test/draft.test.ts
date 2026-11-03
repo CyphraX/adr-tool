@@ -177,9 +177,9 @@ describe('the Draft (docs/structure-format.md, section 1)', () => {
     expect(
       await draft({ ...workspace, 'pyproject.toml': '[tool.ruff]\nline-length = 100\n' })
     ).toEqual(members)
-    expect(
-      await draft({ ...workspace, 'setup.cfg': '[flake8]\nmax-line-length = 100\n' })
-    ).toEqual(members)
+    expect(await draft({ ...workspace, 'setup.cfg': '[flake8]\nmax-line-length = 100\n' })).toEqual(
+      members
+    )
     const maven = {
       'pom.xml': '<project><modules><module>api</module><module>core</module></modules></project>',
       'api/pom.xml': '<project/>',
