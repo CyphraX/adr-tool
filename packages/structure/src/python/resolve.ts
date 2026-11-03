@@ -80,7 +80,8 @@ export function resolvePython(
   const lookup = (root: string, dotted: string): Found | undefined => {
     // The empty name is the directory itself, for `from . import x`.
     const base = join(root, dotted.split('.').join('/'))
-    if (files.has(join(base, '__init__.py'))) return { kind: 'file', path: join(base, '__init__.py') }
+    if (files.has(join(base, '__init__.py')))
+      return { kind: 'file', path: join(base, '__init__.py') }
     if (dotted !== '' && files.has(`${base}.py`)) return { kind: 'file', path: `${base}.py` }
     return directories.has(base) ? { kind: 'namespace' } : undefined
   }

@@ -86,7 +86,8 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
     const { edges, unresolved } = await analyse({
       'shop/__init__.py': 'from . import cart\n',
       'shop/cart/__init__.py': '',
-      'shop/cart/cart.py': 'from .line import Line\nfrom ..catalog import product\nfrom .. import catalog\n',
+      'shop/cart/cart.py':
+        'from .line import Line\nfrom ..catalog import product\nfrom .. import catalog\n',
       'shop/cart/line.py': 'from . import cart\n',
       'shop/catalog/__init__.py': '',
       'shop/catalog/product.py': 'from ...outside import x\nfrom .gone import y\n'
@@ -136,7 +137,8 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
 
   it('finds a namespace package, which has no file and so is no Dependency', async () => {
     const { edges, unresolved, used } = await analyse({
-      'src/shop/cart/cart.py': 'import shop.cart\nfrom shop import cart\nfrom shop.cart import cart as c\nfrom shop import gone\n'
+      'src/shop/cart/cart.py':
+        'import shop.cart\nfrom shop import cart\nfrom shop.cart import cart as c\nfrom shop import gone\n'
     })
     expect(edges).toEqual([])
     expect(used).toEqual([])

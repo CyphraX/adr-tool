@@ -80,7 +80,11 @@ const lastSegment = (path: string): string => path.slice(path.lastIndexOf('/') +
  */
 function sourceRootOf(unit: string, sources: readonly string[], python?: string): string {
   const under = (directory: string): string => (unit === '' ? directory : `${unit}/${directory}`)
-  const candidates = [...(python === undefined ? [] : [python]), under('src/main/java'), under('src')]
+  const candidates = [
+    ...(python === undefined ? [] : [python]),
+    under('src/main/java'),
+    under('src')
+  ]
   for (const candidate of candidates) {
     if (sources.some((path) => isBeneath(path, candidate))) return candidate
   }

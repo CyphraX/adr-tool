@@ -74,8 +74,13 @@ describe('a Python file, read with tree-sitter-python as WebAssembly', () => {
 
   it('does not read an import in a string or a comment', () => {
     expect(
-      outlineOf(['# import commented', 'TEXT = "import in_a_string"', '"""', 'import in_a_docstring', '"""'])
-        .imports
+      outlineOf([
+        '# import commented',
+        'TEXT = "import in_a_string"',
+        '"""',
+        'import in_a_docstring',
+        '"""'
+      ]).imports
     ).toEqual([])
   })
 

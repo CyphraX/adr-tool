@@ -77,7 +77,10 @@ function requirementOf(
     written
   )
   if (!match) return undefined
-  const rest = match[2]!.trim().replace(/^\((.*)\)$/, '$1').trim()
+  const rest = match[2]!
+    .trim()
+    .replace(/^\((.*)\)$/, '$1')
+    .trim()
   // What follows the name is a version, a URL, or nothing; else it was a path, not a name.
   if (rest !== '' && !/^[<>=!~@]/.test(rest)) return undefined
   const version = rest === '' || rest.startsWith('@') ? undefined : rest

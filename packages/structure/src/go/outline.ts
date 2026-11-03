@@ -102,7 +102,8 @@ function outline(root: Node): GoOutline {
     if (!node) continue
     switch (node.type) {
       case 'package_clause':
-        packageName = node.namedChildren.find((child) => child?.type === 'package_identifier')?.text ?? ''
+        packageName =
+          node.namedChildren.find((child) => child?.type === 'package_identifier')?.text ?? ''
         break
       case 'import_declaration':
         for (const spec of node.descendantsOfType('import_spec')) {

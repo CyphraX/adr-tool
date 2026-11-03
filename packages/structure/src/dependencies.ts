@@ -207,7 +207,9 @@ export async function analyseDependencies(
   // Python and Go as well, against the source roots of the Python projects and the modules of
   // Go. What they read to know those is read only where there is code of theirs to resolve.
   if (python.size > 0) {
-    const sources = sourceFiles.filter((file) => file.language === 'python').map((file) => file.path)
+    const sources = sourceFiles
+      .filter((file) => file.language === 'python')
+      .map((file) => file.path)
     const fromPython = resolvePython(python, sources, await pythonProjects(fs, files, sources))
     for (const use of fromPython.uses) {
       if (known.has(use.to)) depend(use.from, use.to, use.typeOnly, use.line)

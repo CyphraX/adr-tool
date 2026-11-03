@@ -149,7 +149,9 @@ describe('a Python or a Go file that cannot be read', () => {
     const require = createRequire(import.meta.url)
     const read = await prepare({
       runtime: await readFile(require.resolve('web-tree-sitter/web-tree-sitter.wasm')),
-      grammar: await readFile(require.resolve(`tree-sitter-${language}/tree-sitter-${language}.wasm`))
+      grammar: await readFile(
+        require.resolve(`tree-sitter-${language}/tree-sitter-${language}.wasm`)
+      )
     })
     const broken = read(text)
     if (broken.analysed) throw new Error('analysed')

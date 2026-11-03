@@ -45,7 +45,10 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     const { edges, unresolved } = await analyse({
       'go.mod': MODULE,
       'catalog/product.go': ['package catalog', 'type Product struct{}'],
-      'catalog/search.go': ['package catalog', 'func Find(name string) Product { return Product{} }'],
+      'catalog/search.go': [
+        'package catalog',
+        'func Find(name string) Product { return Product{} }'
+      ],
       'cart/cart.go': [
         'package cart',
         'import (',
@@ -69,7 +72,11 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     const { edges, dependencies } = await analyse({
       'go.mod': MODULE,
       'cart/cart.go': ['package cart', 'type Cart struct{ Lines []Line }'],
-      'cart/line.go': ['package cart', 'type Line struct{}', 'func (l Line) In(c *Cart) bool { return helper() }'],
+      'cart/line.go': [
+        'package cart',
+        'type Line struct{}',
+        'func (l Line) In(c *Cart) bool { return helper() }'
+      ],
       'cart/helpers_test.go': ['package cart', 'func helper() bool { return true }'],
       'cart/cart_test.go': ['package cart', 'var _ = helper()', 'var _ = Cart{}'],
       'cart/external_test.go': [
