@@ -5,7 +5,8 @@
  */
 import { plan, type FileSystem, type Plan } from '@adr-tool/kernel'
 import { DECLARATION_PATH, type Structure } from '@adr-tool/structure/model'
-import { readDiagram } from './diagram'
+import { readDiagram, type Diagram } from './diagram'
+import type { DiagramProblem } from './problems'
 import { svgPathOf } from './location'
 import { refuse } from './sentences'
 import { drawDiagram } from './svg'
@@ -50,4 +51,24 @@ export async function planExport(
     }
   })
   return planned.ok ? { ...planned, svg } : planned
+}
+
+/**
+ * Whether the picture beside a Diagram is the Diagram as it is now: the Problem `stale-picture`
+ * where it is not, whose Repair is to export it again. Nothing is said where there is no
+ * picture — a Diagram need not be exported —, nor while the declaration cannot be read: then
+ * the picture cannot be drawn as the export would draw it.
+ */
+export async function checkPicture(
+  fs: FileSystem,
+  diagram: Diagram,
+  structure: ExportModel
+): Promise<DiagramProblem | undefined> {
+  if (structure.problems.some((problem) => problem.kind === 'unreadable-declaration')) {
+    return undefined
+  }
+  const picture = svgPathOf(diagram)
+  const current = await fs.readText(picture)
+  if (current === undefined || current === drawDiagram(diagram, structure)) return undefined
+  return { kind: 'stale-picture', path: diagram.path, line: 1, picture }
 }

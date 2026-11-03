@@ -335,6 +335,9 @@ export const DE: Wording<Codes> = {
   'repository-does-not-fit': (v) =>
     `Das Repository ${v.id} steht für jede Komponente, und nur ein Systemkontext zeigt es.`,
 
+  'stale-picture': (v) =>
+    `${v.picture} ist nicht das Bild des Diagramms, wie es jetzt ist: Das Diagramm oder seine Komponenten haben sich nach dem Export geändert. Es muss neu exportiert werden.`,
+
   // Why a Diagram cannot be read: the rest of a sentence about the file.
   'diagram-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
   'diagram-not-map': () => 'die oberste Ebene muss ein Mapping sein',
@@ -402,7 +405,17 @@ export const DE: Wording<Codes> = {
     `Ein Element benutzt sich nicht selbst: ${v.id} kann nicht mit ${v.id} verbunden werden.`,
   'already-connected': (v) => `Das Diagramm verbindet ${v.from} schon mit ${v.to}.`,
   'not-connected': (v) =>
-    `${v.path} verbindet ${v.from} nicht mit ${v.to}. Die Datei sollte neu angesehen werden.`
+    `${v.path} verbindet ${v.from} nicht mit ${v.to}. Die Datei sollte neu angesehen werden.`,
+
+  // Diagrams: a new Diagram, and the Rename of a Component in the Diagrams.
+  'invalid-diagram-id': (v) =>
+    `„${v.id}“ ist keine gültige Diagramm-ID. Eine Diagramm-ID besteht aus Kleinbuchstaben, Ziffern und Bindestrichen und beginnt und endet mit einem Buchstaben oder einer Ziffer.`,
+  'no-diagrams-directory': (v) =>
+    `${v.path} nennt kein Verzeichnis für die Diagramme, das sich verwenden lässt, darum kann kein Diagramm geschrieben werden. Das muss zuerst korrigiert werden.`,
+  'cannot-rename-in-diagram': (v) =>
+    `${v.path} nennt ${v.component} so, dass die Suite es nicht an seiner Stelle umschreiben kann, etwa als Textblock. Es muss dort zuerst in einem Editor umbenannt werden.`,
+  'diagram-not-renamed': (v) =>
+    `${v.path} kann nicht gelesen werden, darum schreibt die Umbenennung nicht um, was es über ${v.component} sagt.`
 }
 
 /** What a module said, in German; `undefined` for a code that has no German sentence. */

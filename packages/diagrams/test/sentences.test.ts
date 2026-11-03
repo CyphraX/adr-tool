@@ -84,6 +84,10 @@ const problems: [DiagramProblem, string][] = [
   [
     { ...at, kind: 'repository-does-not-fit', id: 'suite' },
     'The repository suite stands for every Component, and only a system context shows it.'
+  ],
+  [
+    { ...at, kind: 'stale-picture', picture: 'docs/architecture/diagrams/packages.svg' },
+    'docs/architecture/diagrams/packages.svg is not the picture of the Diagram as it is now: the Diagram or its Components changed after it was exported. Export it again.'
   ]
 ]
 

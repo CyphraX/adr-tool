@@ -82,6 +82,8 @@ export const SENTENCES = {
         : `${v.component} does not belong in the component view of ${v.scope}, which shows the parts of ${v.scope} and the Components beside it and beside what contains it.`,
   'repository-does-not-fit': (v: { id: string }): string =>
     `The repository ${v.id} stands for every Component, and only a system context shows it.`,
+  'stale-picture': (v: { picture: string }): string =>
+    `${v.picture} is not the picture of the Diagram as it is now: the Diagram or its Components changed after it was exported. Export it again.`,
 
   // Why a Diagram cannot be read: the rest of a sentence about the file.
   'diagram-not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
@@ -159,7 +161,17 @@ export const SENTENCES = {
     `An element does not use itself: ${v.id} cannot be connected to ${v.id}.`,
   'already-connected': (v: Ends): string => `The Diagram connects ${v.from} to ${v.to} already.`,
   'not-connected': (v: Ends & { path: string }): string =>
-    `${v.path} does not connect ${v.from} to ${v.to}. Look at the file again.`
+    `${v.path} does not connect ${v.from} to ${v.to}. Look at the file again.`,
+
+  // A new Diagram, and the Rename of a Component in the Diagrams.
+  'invalid-diagram-id': (v: { id: string }): string =>
+    `"${v.id}" is not a valid Diagram ID. A Diagram ID consists of lowercase letters, digits and dashes, and starts and ends with a letter or a digit.`,
+  'no-diagrams-directory': (v: { path: string }): string =>
+    `${v.path} names no directory for the Diagrams that can be used, so no Diagram can be written. Fix it first.`,
+  'cannot-rename-in-diagram': (v: { path: string; component: string }): string =>
+    `${v.path} names ${v.component} in a way the suite cannot rewrite where it stands: as a block of text, say. Rename it there in an editor first.`,
+  'diagram-not-renamed': (v: { path: string; component: string }): string =>
+    `${v.path} cannot be read, so the Rename does not rewrite what it says of ${v.component}.`
 } satisfies Sentences
 
 /** What `diagrams` may say: one of its codes, with the values of its sentence. */

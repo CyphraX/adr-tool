@@ -64,8 +64,18 @@ export {
   type NewConnection,
   type NewElement
 } from './edit'
-export { drawDiagram, textWidth } from './svg'
-export { planExport, type ExportModel, type ExportPlan } from './export'
+export {
+  drawDiagram,
+  geometryOf,
+  lineBetween,
+  textWidth,
+  type Geometry,
+  type PlacedBox,
+  type PlacedLine
+} from './svg'
+export { checkPicture, planExport, type ExportModel, type ExportPlan } from './export'
+export { newDiagramText, planNewDiagram, type NewDiagram } from './create'
+export { planRenameInDiagrams, renameInDiagram } from './rename'
 export {
   SENTENCES as DIAGRAMS_SENTENCES,
   englishOf as diagramsEnglishOf,

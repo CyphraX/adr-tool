@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { memoryFileSystem } from '@adr-tool/kernel'
 import { openStructure, readDeclaration } from '@adr-tool/structure/model'
 import {
+  checkPicture,
   drawDiagram,
+  geometryOf,
+  hasRepair,
   planExport,
   readDiagram,
   textWidth,
@@ -349,5 +352,68 @@ describe('the export', () => {
       ok: false,
       said: { code: 'no-longer-exists' }
     })
+  })
+})
+
+describe('whether the picture beside a Diagram is current', () => {
+  const SVG = 'docs/architecture/diagrams/shop.svg'
+
+  it('is a Problem where the picture is not the Diagram as it is now, with the export as Repair', async () => {
+    const stale = await checkPicture(
+      memoryFileSystem({ [SVG]: '<svg>old</svg>\n' }),
+      read(shop),
+      declared
+    )
+    expect(stale).toEqual({ kind: 'stale-picture', path: PATH, line: 1, picture: SVG })
+    expect(wordingOf(stale!)).toBe(
+      `${SVG} is not the picture of the Diagram as it is now: the Diagram or its Components changed after it was exported. Export it again.`
+    )
+    expect(hasRepair(stale!)).toBe(true)
+  })
+
+  it('says nothing where the picture is current, where there is none, or while the declaration cannot be read', async () => {
+    const current = drawDiagram(read(shop), declared)
+    expect(await checkPicture(memoryFileSystem({ [SVG]: current }), read(shop), declared)).toBe(
+      undefined
+    )
+    expect(await checkPicture(memoryFileSystem({}), read(shop), declared)).toBe(undefined)
+    const lost: ExportModel = {
+      origin: 'draft',
+      components: [],
+      problems: [{ kind: 'unreadable-declaration', detail: 'x' }]
+    }
+    expect(await checkPicture(memoryFileSystem({ [SVG]: '<svg/>' }), read(shop), lost)).toBe(
+      undefined
+    )
+  })
+})
+
+describe('the geometry of a Diagram, as the window draws it', () => {
+  it('has the boxes and lines of the picture, at the same places and sizes', () => {
+    const { boxes, lines } = geometryOf(read(shop), declared)
+    expect(
+      boxes.map(({ id, kind, x, y, width, height, name }) => ({
+        id,
+        kind,
+        x,
+        y,
+        width,
+        height,
+        name
+      }))
+    ).toEqual([
+      { id: 'billing', kind: 'component', x: 40, y: 40, width: 120, height: 48, name: 'billing' },
+      { id: 'web', kind: 'component', x: 400, y: 40, width: 240, height: 74, name: 'Web shop' },
+      { id: 'bank', kind: 'external', x: 40, y: 200, width: 150, height: 60, name: 'The bank' }
+    ])
+    expect(boxes[1]!.lines).toEqual(['The pages customers see, and the', 'forms they fill in.'])
+    const svg = drawDiagram(read(shop), declared)
+    for (const box of boxes) {
+      expect(svg).toContain(`x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}"`)
+    }
+    expect(lines.map(({ ends, label }) => `${ends.from}>${ends.to} ${label?.text ?? ''}`)).toEqual([
+      'web>billing shows invoices',
+      'billing>bank '
+    ])
   })
 })

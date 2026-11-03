@@ -112,7 +112,7 @@ function wrap(text: string, width: number, font: Font): string[] {
 const baseline = (top: number, font: Font): number =>
   top + (font.line - font.size) / 2 + font.size * 0.8
 
-interface Rect {
+export interface Rect {
   readonly x: number
   readonly y: number
   readonly width: number
@@ -161,14 +161,25 @@ const middleOf = (rect: Rect): Point => ({
   y: rect.y + rect.height / 2
 })
 
-interface Line {
+export interface Line {
+  /** Where the line leaves the border of the box of `from`. */
   readonly from: Point
+  /** Where it ends, short of the border of the other box by the length of the arrowhead. */
   readonly to: Point
   readonly label?: { readonly text: string; readonly ground: Rect }
 }
 
-/** The line of a connection, from the border of one box to the border of the other. */
-function lineOf(from: Box, to: Box, both: boolean, label: string | undefined): Line | undefined {
+/**
+ * The line of a connection, from the border of one box to the border of the other, with the
+ * ground of its label in its middle; `undefined` between two boxes with the same middle. The
+ * window draws a Dependency the Diagram leaves out the same way.
+ */
+export function lineBetween(
+  from: Rect,
+  to: Rect,
+  both: boolean,
+  label: string | undefined
+): Line | undefined {
   let start = middleOf(from)
   let end = middleOf(to)
   const direction = { x: end.x - start.x, y: end.y - start.y }
@@ -235,12 +246,57 @@ const STYLE = [
   '}'
 ]
 
+/** A box of the picture, where it stands, with its name and the lines of its description. */
+export interface PlacedBox extends Rect {
+  readonly id: string
+  readonly kind: ElementKind
+  readonly name: string
+  readonly lines: readonly string[]
+}
+
+/** The line of a connection of the picture, between the borders of its two boxes. */
+export interface PlacedLine extends Line {
+  /** The element IDs it joins, as the connection names them. */
+  readonly ends: { readonly from: string; readonly to: string }
+}
+
+/** Where the picture puts its boxes and lines: what the window draws, as the export does. */
+export interface Geometry {
+  /** In the order they are drawn: of `elements`, the first of each ID. */
+  readonly boxes: readonly PlacedBox[]
+  /** In the order of `connections`: those that are drawn. */
+  readonly lines: readonly PlacedLine[]
+}
+
 /**
- * The picture of a Diagram, as the text of an SVG file. The names and descriptions of
- * Components come from their declaration; a Component that is not declared is drawn under its
- * ID, and so is every Component of a Draft, whose names nobody wrote.
+ * The boxes and lines of a Diagram as its picture draws them — the same sizes, the same
+ * wrapping of descriptions, the same ends of lines —, for the window, which draws them itself.
  */
-export function drawDiagram(diagram: Diagram, structure: Declared): string {
+export function geometryOf(
+  diagram: Pick<Diagram, 'elements' | 'connections'>,
+  structure: Declared
+): Geometry {
+  const { boxes, lines } = layout(diagram, structure)
+  return {
+    boxes: boxes.map(({ element, name, lines: text, x, y, width, height }) => ({
+      id: element.id,
+      kind: element.kind,
+      name,
+      lines: text,
+      x,
+      y,
+      width,
+      height
+    })),
+    lines: lines.map(({ ends, line }) => ({ ...line, ends }))
+  }
+}
+
+/** The boxes, and the lines of the connections that are drawn, each with its connection. */
+function layout(
+  diagram: Pick<Diagram, 'elements' | 'connections'>,
+  structure: Declared
+): { boxes: Box[]; lines: { ends: { from: string; to: string }; line: Line }[] } {
   const declared = new Map(
     (structure.origin === 'declared' ? everyComponent(structure.components) : []).map(
       (component) => [component.id, component]
@@ -256,14 +312,27 @@ export function drawDiagram(diagram: Diagram, structure: Declared): string {
   const pairs = new Set(connections.map(({ from, to }) => `${from}\n${to}`))
   const lines = connections.flatMap((connection) => {
     const both = pairs.has(`${connection.to}\n${connection.from}`)
-    const line = lineOf(
+    const line = lineBetween(
       boxOfId.get(connection.from)!,
       boxOfId.get(connection.to)!,
       both,
       connection.label
     )
-    return line ? [line] : []
+    return line ? [{ ends: { from: connection.from, to: connection.to }, line }] : []
   })
+  return { boxes, lines }
+}
+
+/**
+ * The picture of a Diagram, as the text of an SVG file. The names and descriptions of
+ * Components come from their declaration; a Component that is not declared is drawn under its
+ * ID, and so is every Component of a Draft, whose names nobody wrote.
+ */
+export function drawDiagram(diagram: Diagram, structure: Declared): string {
+  const { boxes, lines: placed } = layout(diagram, structure)
+  const boxOfId = new Map(boxes.map((box) => [box.element.id, box]))
+  const connections = connectionsOf(diagram)
+  const lines = placed.map((one) => one.line)
 
   // What the picture holds: the boxes and the grounds of the labels.
   const rects: Rect[] = [
