@@ -245,12 +245,12 @@ For Priya and Aylin. What an Assessment becomes for those who never open the app
 
 For Lena and Aylin. Structure's Next tier, first half.
 
-- **Complexity per function**, cyclomatic, for TypeScript, JavaScript, Svelte and Java, from the parsers already there ([ADR-0008](adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)); the most complex functions of a Component on its page, each a click into the code.
+- **Complexity per function**, cyclomatic, for TypeScript, JavaScript, Svelte, Java, Python and Go, from the parsers already there ([ADR-0008](adr/0008-dependencies-come-from-parsers-alone-without-a-type-checker.md)); the most complex functions of a Component on its page, each a click into the code.
 - **Abstractness and distance from the main sequence** per Component, with the chart of instability over abstractness.
 - **LCOM4** per class, as a metric inside a file, and **propagation cost** of a level.
 - Every new metric can be the subject of a Rule's threshold — a function's complexity with a fingerprint of the Rule, the Source File and the function — and of a Snapshot, and the MCP server reads it.
 
-*Done when:* the numbers of the fixtures agree with a second, independent count in the tests, as the metrics of Structure's part 5 do; the main-sequence chart of the Java fixture shows its modules; a threshold on complexity fails `adr check` at the function.
+*Done when:* the numbers of the fixtures agree with a second, independent count in the tests, as the metrics of Structure's part 5 do, complexity in the fixtures of all six languages, `python-shop` and `go-shop` among them; the main-sequence chart of the Java fixture shows its modules; a threshold on complexity fails `adr check` at the function.
 
 ### Part 14 — History analysis
 
@@ -267,7 +267,7 @@ For Aylin and Lena. Structure's Next tier, second half: what git knows, read-onl
 
 For Lena and Aylin. Structure's Library inventory, Conformance's Rules about Libraries, and the declared licences.
 
-- **The inventory**: the third-party packages read from `package.json`, `pom.xml` and `build.gradle` — read, never run ([ADR-0007](adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)) —, with their declared versions, and which Component uses which Library, extending the uses of Libraries that Structure finds already (`LibraryUse`); on the Component page, in search and through the MCP server.
+- **The inventory**: the third-party packages read from `package.json`, `pom.xml` and `build.gradle`, beside the manifests of Python and Go that part 20 reads already (`pyproject.toml`, `requirements.txt`, `go.mod`) — read, never run ([ADR-0007](adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)) —, with their declared versions, and which Component uses which Library, extending the uses of Libraries that Structure finds already (`LibraryUse`) and mapping the name a distribution is installed by to the name it is imported by (`PyYAML` → `yaml`); on the Component page, in search and through the MCP server.
 - **Rules about Libraries**: "only `persistence` may use `pg`", in `.arch/rules.yml`, checked by `adr check`.
 - **Declared licences**, as far as the repository says them without network access: what an installed package declares, and nothing guessed.
 
