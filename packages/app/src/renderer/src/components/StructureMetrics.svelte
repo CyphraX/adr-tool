@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { StructureNode, StructureView } from '../../../shared/ipc'
+  import { LOWER_BOUND, type StructureNode, type StructureView } from '../../../shared/ipc'
   import { app } from '../lib/state.svelte'
   import { METRICS, t, type MetricKey } from '../lib/strings'
   import { nodeLabel, opens } from '../lib/structure'
@@ -9,9 +9,14 @@
   let { view }: { view: StructureView } = $props()
 
   const selection = $derived(app.active?.structure.selection)
-  // Where a Component of the level counts Java, its numbers are a lower bound.
-  const java = $derived(
-    view.components.some((component) => component.level === view.parent && component.java)
+  // Where a Component of the level counts Java, Python or Go, its numbers are a lower bound.
+  const lowerBound = $derived(
+    LOWER_BOUND.filter((language) =>
+      view.components.some(
+        (component) =>
+          component.level === view.parent && component.lowerBound.includes(language)
+      )
+    )
   )
 
   function valueOf(node: StructureNode, key: MetricKey): number | undefined {
@@ -67,9 +72,9 @@
 
   <footer>
     <p>{t.structure.metrics.howToRead}</p>
-    {#if java}
-      <p>{t.structure.metrics.javaLowerBound}</p>
-    {/if}
+    {#each lowerBound as language (language)}
+      <p>{t.structure.metrics.lowerBound[language]}</p>
+    {/each}
   </footer>
 </div>
 

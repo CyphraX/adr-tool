@@ -77,10 +77,10 @@ describe('the analysis of a repository, as the app runs it', () => {
     expect(Object.values(cache.files).every(({ extraction }) => 'java' in extraction)).toBe(true)
     // Its numbers are a lower bound, and its pages say so.
     const pages = viewOf('maven', analysis, undefined, false).components
-    expect(pages.map((page) => [page.id, page.java])).toEqual([
-      ['cart', true],
-      ['catalog', true],
-      ['web', true]
+    expect(pages.map((page) => [page.id, page.lowerBound])).toEqual([
+      ['cart', ['java']],
+      ['catalog', ['java']],
+      ['web', ['java']]
     ])
   })
 
@@ -97,9 +97,11 @@ describe('the analysis of a repository, as the app runs it', () => {
       expect(Object.values(cache.files).every(({ extraction }) => language in extraction)).toBe(
         true
       )
-      // Their imports name what they use: the note that Java's numbers are a lower bound is not theirs.
-      const pages = viewOf(name, analysis, undefined, false).components
-      expect(pages.every((page) => !page.java)).toBe(true)
+      // Their numbers are a lower bound too, each for what its parser cannot see, and the
+      // pages and the sidebar say so for their language alone.
+      const view = viewOf(name, analysis, undefined, false)
+      expect(view.lowerBound).toEqual([language])
+      expect(view.components.every((page) => page.lowerBound.join() === language)).toBe(true)
     }
   })
 
@@ -141,7 +143,7 @@ describe('a level as the window gets it', () => {
     expect(view.notResolved).toEqual([
       { file: 'src/billing/invoice.ts', specifier: './gone', line: 2 }
     ])
-    expect([view.sourceFiles, view.testFiles, view.javaFiles]).toEqual([4, 1, 0])
+    expect([view.sourceFiles, view.testFiles, view.lowerBound]).toEqual([4, 1, []])
   })
 
   it('goes down into a Component, with the way back up', () => {
@@ -219,7 +221,7 @@ describe('a level as the window gets it', () => {
       level: undefined,
       files: ['src/shop/cart/cart.ts', 'src/shop/index.ts'],
       testFiles: 0,
-      java: false,
+      lowerBound: [],
       dependsOn: [
         { kind: 'component', id: 'billing', name: 'billing', weight: 1, typeOnly: false }
       ],

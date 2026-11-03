@@ -222,7 +222,7 @@ Files are parsed with `tree-sitter-python` as WebAssembly, as Java is ([ADR-0008
 - An import in the block of `if TYPE_CHECKING:` (or `if typing.TYPE_CHECKING:`), at any depth, is **type-only**: that block runs for the type checker alone. Its `elif` and `else` run.
 - A module the repository does not have: where the top-level package it lies in is found from the importing file (`shop.missing` beside a package `shop`), it is not resolved. Otherwise, where its top-level name is the standard library's, it is skipped; where the repository has a module or package of that name that lies in no package, beneath a directory that is no source root, it is not resolved — the suite cannot tell where the interpreter would find it; otherwise it is a Library.
 - A use is on the line of its import.
-- **Not seen, by design:** imports made by calling something (`importlib.import_module('…')`, `__import__('…')`), and what a `.pth` file or a change of `sys.path` at run time adds. Stubs (`.pyi`) and compiled extensions are no Source Files. Where code imports by calling something, its Dependencies are a lower bound.
+- **Not seen, by design:** imports made by calling something (`importlib.import_module('…')`, `__import__('…')`), and what a `.pth` file or a change of `sys.path` at run time adds. Stubs (`.pyi`) and compiled extensions are no Source Files. Where code imports by calling something, its Dependencies are a lower bound, and the views say so.
 
 ### Go (vision, part 20)
 
@@ -241,7 +241,7 @@ Files are parsed with `tree-sitter-go` as WebAssembly. The go command never runs
 - Two files that both declare a name — one for each platform, behind build constraints — are each used: build constraints and file names for `GOOS` and `GOARCH` are not evaluated.
 - The syntax has no scopes: a name declared inside a function of the file — a parameter, a variable, a type — is never counted as a use of the package, anywhere in the file. A parameter or a variable that carries the name of an imported package hides it the same way: a selection from that name is neither a use nor listed, anywhere in the file, unless it stands in the position of a type (`func Handle(cart *cart.Cart)`), where only a package can.
 - Go has no type-only Dependencies.
-- **Not seen, by design:** `vendor/` and `testdata/` — an import is resolved into the repository's own modules, never into a copy in `vendor/` —, code generated at build time, and `GOPATH` mode: without a `go.mod` above it, every import of a file with a dot in its first element is a Library, by its import path. A method is reached through its type: calling it is a use of the file that declares the type only where the type is named.
+- **Not seen, by design:** `vendor/` and `testdata/` — an import is resolved into the repository's own modules, never into a copy in `vendor/` —, code generated at build time, and `GOPATH` mode: without a `go.mod` above it, every import of a file with a dot in its first element is a Library, by its import path. A method is reached through its type: calling it is a use of the file that declares the type only where the type is named. Metrics for Go are therefore a lower bound, and the views say so, as they do for Java and Python.
 
 ### Manifests (vision, part 20)
 
