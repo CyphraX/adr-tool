@@ -321,8 +321,9 @@ export interface PlannedImport {
  * `list_violations`): the Rules are checked with the import added to the Dependencies, and
  * what is found with it behind is returned — accepted by an Exception or not —, and a
  * threshold it would cross. A threshold crossed already is not its doing. An import that is
- * there already is checked as it is. `structure` has to know `from` as a Source File, a file
- * that is not written yet included: whoever calls lists it among the files of the repository.
+ * there already is checked as it is; an import of a value beside an `import type` is new.
+ * `structure` has to know `from` as a Source File, a file that is not written yet included:
+ * whoever calls lists it among the files of the repository.
  */
 export function checkPlannedImport(
   file: RulesFile,
@@ -332,13 +333,26 @@ export function checkPlannedImport(
   decisions?: Decisions
 ): ConformanceReport & { readonly exists: boolean } {
   const { from, to } = planned
-  const there = model.dependencies.find((one) => one.from === from && one.to === to)
+  const typeOnly = planned.typeOnly ?? false
+  const line = planned.line ?? 1
+  const found = model.dependencies.find((one) => one.from === from && one.to === to)
+  // Beside an `import type` between the same two files, an import of a value is new: from it on,
+  // the Dependency counts for a Rule that leaves type-only ones out.
+  const there = found && !(found.typeOnly && !typeOnly) ? found : undefined
   const dependencies = there
     ? model.dependencies
-    : [
-        ...model.dependencies,
-        { from, to, typeOnly: planned.typeOnly ?? false, lines: [planned.line ?? 1] }
-      ]
+    : found
+      ? model.dependencies.map((one) =>
+          one === found
+            ? {
+                ...one,
+                typeOnly: false,
+                lines: [...new Set([...one.lines, line])].sort((a, b) => a - b),
+                typeOnlyLines: one.lines.filter((other) => other !== line)
+              }
+            : one
+        )
+      : [...model.dependencies, { from, to, typeOnly, lines: [line] }]
   const before = there ? undefined : checkConformance(file, structure, model, decisions)
   const known = new Set(before?.violations.map((one) => fingerprintKey(one.fingerprint)))
   const report = checkConformance(file, structure, { ...model, dependencies }, decisions)

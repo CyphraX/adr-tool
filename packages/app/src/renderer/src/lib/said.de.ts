@@ -446,6 +446,10 @@ export const DE: Wording<Codes> = {
   'no-exception': (v) =>
     `${v.path} hat in Zeile ${v.line} keine Ausnahme ${v.fingerprint} mehr. Die Datei sollte neu angesehen werden.`,
   'no-such-exception': (v) => `${v.path} hat keine Ausnahme ${v.fingerprint}.`,
+  'narrow-outside': (v) =>
+    v.members.length < 2
+      ? `Die Ausnahme ${v.fingerprint} wird auf einen Zyklus eingeschränkt, und der hat mindestens zwei Mitglieder.`
+      : `Die Ausnahme ${v.fingerprint} kann nur auf Mitglieder ihres eigenen Zyklus eingeschränkt werden, und ${listed(v.members)} gehören nicht alle dazu.`,
   'top-in-braces': () => 'die oberste Ebene ist in geschweiften Klammern geschrieben',
   'list-in-brackets': (v) => `„${v.key}“ ist in eckigen Klammern geschrieben`,
   'item-in-braces': () => 'der Eintrag ist in geschweiften Klammern geschrieben',

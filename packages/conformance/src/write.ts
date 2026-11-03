@@ -198,12 +198,14 @@ const PATTERN_KEYS = new Set(['from', 'to', 'among', 'inside', 'of'])
 
 /**
  * A value as the reader takes it, to compare: `from: billing` and `from: [billing]` say the same,
- * as do a layer of one and that one alone. What says the same stays as it is written.
+ * as do a layer of one and that one alone, and a why with the line break a block scalar ends in
+ * and one without. What says the same stays as it is written.
  */
 function readAs(key: string, value: unknown): unknown {
   const list = (item: unknown): unknown => (typeof item === 'string' ? [item] : item)
   if (PATTERN_KEYS.has(key)) return list(value)
   if (key === 'layers' && Array.isArray(value)) return value.map(list)
+  if (key === 'why' && typeof value === 'string') return value.trim()
   return value
 }
 
@@ -250,14 +252,27 @@ function scalar(value: string, inFlow: boolean): string {
       : node
     return isScalar(item) && typeof item.value === 'string' && item.value === value
   }
-  // A control character is written as an escape, in double quotes.
-  // eslint-disable-next-line no-control-regex
-  if (value !== '' && !/[\0-\x1f]/.test(value) && readsBack(value)) return value
+  // What YAML does not print — a control character, DEL, C1, NEL, the separators of lines and
+  // paragraphs, half of a surrogate pair — is written as an escape, in double quotes.
+  if (value !== '' && !UNPRINTABLE.test(value) && readsBack(value)) return value
   // A pattern that begins with `*` would be an alias; it is quoted as the format shows it.
   const single = `'${value.replaceAll("'", "''")}'`
   if (value.startsWith('*') && readsBack(single)) return single
-  return JSON.stringify(value)
+  return doubleQuoted(value)
 }
+
+// eslint-disable-next-line no-control-regex
+const UNPRINTABLE = /[\0-\x1f\x7f-\x9f\u2028\u2029]|\p{Cs}/u
+
+/**
+ * A text in double quotes, every character YAML does not print escaped. JSON escapes the
+ * controls below a space and a lone surrogate; YAML's own `\u` escapes the rest.
+ */
+const doubleQuoted = (value: string): string =>
+  JSON.stringify(value).replace(
+    /[\x7f-\x9f\u2028\u2029]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
+  )
 
 /** A value on the line of its key. */
 function inline(value: Value, inFlow = false): string {
@@ -403,6 +418,48 @@ function itemsOf(top: YAMLMap | undefined, key: string, change: Change): readonl
   return value.items
 }
 
+/**
+ * Whether an item of a list at the top, in whatever style it is written, has `value` under
+ * `key`: a list in brackets is refused only where there is something in it to change.
+ */
+function namedIn(top: YAMLMap | undefined, list: string, key: string, value: string): boolean {
+  const seq = top && findPair(top, list)?.value
+  return (
+    isSeq(seq) &&
+    seq.items.some((item) => isMap(item) && scalarText(findPair(item, key)?.value) === value)
+  )
+}
+
+/** Whether a blank line stands above the line of `offset`, over the comment lines right above it. */
+function blankAbove(text: string, offset: number): boolean {
+  let start = lineStart(text, offset)
+  while (start > 0) {
+    const above = lineStart(text, start - 1)
+    const line = text.slice(above, start)
+    if (line.trim() === '') return true
+    if (!/^[ \t]*#/.test(line)) return false
+    start = above
+  }
+  return false
+}
+
+/**
+ * Whether the file spaces what stands at its top by blank lines: its keys, or, with one key,
+ * the items of its list. A key that is added follows it.
+ */
+function spacedAtTop(text: string, top: YAMLMap | undefined, change: Change): boolean {
+  if (!top || top.items.length === 0) return false
+  if (top.items.length > 1) {
+    return top.items.slice(1).some((pair) => blankAbove(text, rangeOf(pair.key, change)[0]))
+  }
+  const value = top.items[0]!.value
+  return (
+    isSeq(value) &&
+    !value.flow &&
+    value.items.slice(1).some((item) => blankAbove(text, dashOf(text, item, change)))
+  )
+}
+
 /** Where an item of a list in block style begins: its dash. */
 function dashOf(text: string, item: unknown, change: Change): number {
   const start = rangeOf(item, change)[0]
@@ -418,15 +475,27 @@ const itemEnd = (text: string, item: unknown, change: Change): number =>
   endOfLine(text, rangeOf(item, change)[1])
 
 /** What the file reads as, as a plain value to change the way the edits change the text. */
-function expectedOf(doc: Document.Parsed): Record<string, unknown> {
-  const value = doc.toJS() as unknown
+function expectedOf(doc: Document.Parsed, change: Change): Record<string, unknown> {
+  const value = plainOf(doc, change)
   return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+}
+
+/**
+ * What a document reads as. An alias whose anchor an edit took away, or that stands for too
+ * much, cannot be read: the change is refused for the anchor, never thrown at whoever asked.
+ */
+function plainOf(doc: Document.Parsed, change: Change): unknown {
+  try {
+    return doc.toJS()
+  } catch {
+    return cannot(change, { code: 'anchor-or-alias', values: {} })
+  }
 }
 
 /** The edits, once the text they lead to reads back as expected. */
 function checked(text: string, edits: TextEdit[], expected: unknown, change: Change): TextEdit[] {
   const after = parseDocument(applyEdits(text, edits), { uniqueKeys: false })
-  if (after.errors.length > 0 || readsAs(after.toJS()) !== readsAs(expected)) {
+  if (after.errors.length > 0 || readsAs(plainOf(after, change)) !== readsAs(expected)) {
     cannot(change, { code: 'reads-otherwise', values: {} })
   }
   return edits
@@ -443,14 +512,16 @@ function appendItem(
   change: Change
 ): TextEdit[] {
   const eol = eolOf(text)
-  const expected = expectedOf(doc)
+  const expected = expectedOf(doc, change)
   const list = Array.isArray(expected[key]) ? (expected[key] as unknown[]) : []
   expected[key] = [...list, itemValue(keys)]
 
   const pair = top && findPair(top, key)
   if (!pair) {
     const lead = text === '' || text.endsWith('\n') ? '' : eol
-    const insert = `${lead}${key}:${eol}${renderItem(keys, 2, 4, eol)}`
+    // Behind the rest with a blank line, where the file spaces its parts, and has none at its end.
+    const gap = spacedAtTop(text, top, change) && !/(^|\n)[ \t]*\r?\n$/.test(text) ? eol : ''
+    const insert = `${lead}${gap}${key}:${eol}${renderItem(keys, 2, 4, eol)}`
     return checked(text, [{ start: text.length, end: text.length, insert }], expected, change)
   }
 
@@ -474,15 +545,16 @@ function appendItem(
     return checked(text, [{ start: end, end, insert }], expected, change)
   }
 
-  // A list that is empty: `rules:`, `rules: []`, `rules: ~`. The key stays where it is, with
-  // what stands behind it on its line; the items follow on the lines below.
+  // A list that is empty: `rules:`, `rules: []`, `rules: ~`, `rules: # none yet`. The key
+  // stays where it is, with the comment behind it on its line; the items follow on the lines
+  // below. Nothing written stands for nothing at all, and there is nothing to take out.
   const edits: TextEdit[] = []
   const value = pair.value
   if (value !== null && (isScalar(value) || (isCollection(value) && value.flow))) {
     const [from, to] = rangeOf(value, change)
     let start = from
     while (text[start - 1] === ' ' || text[start - 1] === '\t') start--
-    edits.push({ start, end: to, insert: '' })
+    if (to > from) edits.push({ start, end: to, insert: '' })
   } else if (value !== null) {
     cannot(change, { code: 'reads-otherwise', values: {} })
   }
@@ -545,7 +617,7 @@ function removeItem(
 ): TextEdit[] {
   const items = itemsOf(top, key, change)
   const [start, end] = itemLines(text, items, index, change)
-  const expected = expectedOf(doc)
+  const expected = expectedOf(doc, change)
   const list = [...(expected[key] as unknown[])]
   list.splice(index, 1)
   expected[key] = list.length === 0 ? null : list
@@ -554,28 +626,56 @@ function removeItem(
 
 // Changing the keys of an item.
 
-/** Put a new value where the old one stands: a list in block style stays one. */
-function replaceValue(text: string, pair: Pair, want: Value, change: Change): TextEdit {
+/** A block scalar, `|` or `>`: its lines are its text, and hold no comment. */
+const isBlockScalar = (node: unknown): boolean =>
+  isScalar(node) && (node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED')
+
+/** Whether a node holds a comment: a block scalar only on the line of its `|` or `>`. */
+function commentIn(text: string, node: unknown, start: number, end: number): boolean {
+  const until = isBlockScalar(node) ? Math.min(end, lineEnd(text, start)) : end
+  return hasComment(text.slice(start, until))
+}
+
+/**
+ * Put a new value where the old one stands. A list in block style stays one, also of a single
+ * pattern, so that what stands between its key and its first dash — a comment — stays as well;
+ * emptied, it is `[]` on the line of its key, refused where a comment would go with its lines.
+ * A block scalar keeps the line breaks it ends in, which the line after it needs. With the edit
+ * comes what it writes, which a single pattern in a block list is a list of.
+ */
+function replaceValue(
+  text: string,
+  pair: Pair,
+  want: Value,
+  change: Change
+): { edit: TextEdit; value: Value } {
   const node = pair.value
   const eol = eolOf(text)
   if (hasAnchor(node)) cannot(change, { code: 'anchor-or-alias', values: {} })
   const keyEnd = rangeOf(pair.key, change)[1]
   const colon = text.indexOf(':', keyEnd)
   if (node === null || node === undefined) {
-    return { start: colon + 1, end: colon + 1, insert: ` ${inline(want)}` }
+    return { edit: { start: colon + 1, end: colon + 1, insert: ` ${inline(want)}` }, value: want }
   }
   if (isSeq(node) && !node.flow && node.items.length > 0) {
     const start = rangeOf(node, change)[0]
     const end = rangeOf(node.items.at(-1), change)[1]
     if (hasComment(text.slice(start, end))) cannot(change, { code: 'comment-lost', values: {} })
-    if (Array.isArray(want) && want.length > 0) {
-      return { start, end, insert: blockList(want, ' '.repeat(column(text, start)), eol) }
+    const patterns = PATTERN_KEYS.has(scalarText(pair.key) ?? '')
+    const items = Array.isArray(want) ? want : patterns ? [want] : undefined
+    if (items !== undefined && items.length > 0) {
+      const insert = blockList(items, ' '.repeat(column(text, start)), eol)
+      return { edit: { start, end, insert }, value: items }
     }
-    return { start: colon + 1, end, insert: ` ${inline(want)}` }
+    if (hasComment(text.slice(colon + 1, start))) {
+      cannot(change, { code: 'comment-lost', values: {} })
+    }
+    return { edit: { start: colon + 1, end, insert: ` ${inline(want)}` }, value: want }
   }
   const [start, end] = rangeOf(node, change)
-  if (hasComment(text.slice(start, end))) cannot(change, { code: 'comment-lost', values: {} })
-  return { start, end, insert: inline(want) }
+  if (commentIn(text, node, start, end)) cannot(change, { code: 'comment-lost', values: {} })
+  const tail = isBlockScalar(node) ? (/\r?\n\s*$/.exec(text.slice(start, end))?.[0] ?? '') : ''
+  return { edit: { start, end, insert: inline(want) + tail }, value: want }
 }
 
 /** A key leaves with its lines: the comment behind it on its line goes too, any other is kept. */
@@ -589,7 +689,8 @@ function removePair(text: string, pair: Pair, change: Change): TextEdit {
   }
   const node = pair.value as { range?: Range | null } | null
   const end = endOfLine(text, node?.range ? node.range[2] : rangeOf(pair.key, change)[2])
-  if (hasComment(text.slice(lineEnd(text, keyStart), end))) {
+  // The lines of a block scalar below its key are its text.
+  if (!isBlockScalar(node) && hasComment(text.slice(lineEnd(text, keyStart), end))) {
     cannot(change, { code: 'comment-lost', values: {} })
   }
   return { start, end, insert: '' }
@@ -644,7 +745,7 @@ export function changeRuleEdits(text: string, id: string, draft: RuleDraft): Tex
   if (!isMap(item) || item.flow) return cannot(change, { code: 'item-in-braces', values: {} })
   if (hasAnchor(item)) cannot(change, { code: 'anchor-or-alias', values: {} })
 
-  const expected = expectedOf(file.doc)
+  const expected = expectedOf(file.doc, change)
   const rules = [...(expected.rules as Record<string, unknown>[])]
   const object = { ...rules[index]! }
   rules[index] = object
@@ -667,8 +768,9 @@ export function changeRuleEdits(text: string, id: string, draft: RuleDraft): Tex
     }
     const written = pair.value === null ? null : (pair.value as { toJSON(): unknown }).toJSON()
     if (readsAs(readAs(key, written)) === readsAs(readAs(key, valueOf(want)))) return
-    edits.push(replaceValue(text, pair, want, change))
-    object[key] = valueOf(want)
+    const { edit, value } = replaceValue(text, pair, want, change)
+    edits.push(edit)
+    object[key] = valueOf(value)
   })
   if (wanted.size > 0) {
     const eol = eolOf(text)
@@ -686,15 +788,16 @@ export function changeRuleEdits(text: string, id: string, draft: RuleDraft): Tex
 export function renameRuleEdits(text: string, from: string, to: string): TextEdit[] {
   const change = 'change-exception'
   const file = parsed(text, change)
+  if (!namedIn(file.top, 'exceptions', 'rule', from)) return []
   const items = itemsOf(file.top, 'exceptions', change)
-  const expected = expectedOf(file.doc)
+  const expected = expectedOf(file.doc, change)
   const exceptions = [...((expected.exceptions as Record<string, unknown>[] | null) ?? [])]
   expected.exceptions = exceptions
   const edits: TextEdit[] = []
   items.forEach((item, index) => {
     const pair = isMap(item) ? findPair(item, 'rule') : undefined
     if (!pair || scalarText(pair.value) !== from) return
-    edits.push(replaceValue(text, pair, to, change))
+    edits.push(replaceValue(text, pair, to, change).edit)
     exceptions[index] = { ...exceptions[index], rule: to }
   })
   return edits.length === 0 ? [] : checked(text, edits, expected, change)
@@ -712,6 +815,7 @@ export function removeRuleEdits(text: string, id: string): TextEdit[] {
 /** The first Exception that names the Rule `id`, by its place in the list. */
 function exceptionOfRule(text: string, id: string): number | undefined {
   const file = parsed(text, 'remove-exception')
+  if (!namedIn(file.top, 'exceptions', 'rule', id)) return undefined
   return indexOf(itemsOf(file.top, 'exceptions', 'remove-exception'), 'rule', id)
 }
 
@@ -856,12 +960,20 @@ export function narrowExceptionEdits(
   const item = itemsOf(file.top, 'exceptions', change)[index]
   const pair = isMap(item) ? findPair(item, 'cycle') : undefined
   if (!pair) return cannot(change, { code: 'reads-otherwise', values: {} })
+  // Narrowed to a Cycle among the members it names, never wider or to something else.
   const members = membersOf(at.members)
-  const expected = expectedOf(file.doc)
+  const written = at.fingerprint.kind === 'cycle' ? new Set(at.fingerprint.cycle) : new Set()
+  if (members.length < 2 || members.some((member) => !written.has(member))) {
+    refuse({
+      code: 'narrow-outside',
+      values: { fingerprint: fingerprintText(at.fingerprint), members }
+    })
+  }
+  const expected = expectedOf(file.doc, change)
   const exceptions = [...(expected.exceptions as Record<string, unknown>[])]
   exceptions[index] = { ...exceptions[index], cycle: valueOf(members) }
   expected.exceptions = exceptions
-  return checked(text, [replaceValue(text, pair, members, change)], expected, change)
+  return checked(text, [replaceValue(text, pair, members, change).edit], expected, change)
 }
 
 // Plans: what the window and the server ask for. Each returns a change set and writes nothing.

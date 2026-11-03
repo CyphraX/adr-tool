@@ -203,6 +203,10 @@ export const SENTENCES = {
     `${v.path} has no Exception ${v.fingerprint} at line ${v.line} any more. Look at the file again.`,
   'no-such-exception': (v: Printed & { path: string }): string =>
     `${v.path} has no Exception ${v.fingerprint}.`,
+  'narrow-outside': (v: Printed & { members: readonly string[] }): string =>
+    v.members.length < 2
+      ? `The Exception ${v.fingerprint} is narrowed to a Cycle, which has two members at least.`
+      : `The Exception ${v.fingerprint} can be narrowed only to members of its own Cycle, and ${listed(v.members)} are not all among them.`,
   // Why the file cannot be written there: the rest of a sentence.
   'top-in-braces': (): string => 'its top level is written in braces',
   'list-in-brackets': (v: { key: string }): string => `"${v.key}" is written in brackets`,
