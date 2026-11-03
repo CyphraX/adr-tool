@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -167,6 +167,36 @@ describe('list_libraries (docs/mcp.md)', () => {
     await expect(list(shop, { component: 'billing' })).rejects.toThrow(
       new Refusal('There is no Component billing. list_components names the Components there are.')
     )
+  })
+
+  it('reads no licence through a link out of the repository, nor one larger than its limit', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'adr-mcp-outside-'))
+    scratch.push(outside)
+    writeFileSync(
+      join(outside, 'package.json'),
+      JSON.stringify({ name: 'react', version: '19.1.0', license: 'MIT' })
+    )
+    const root = repositoryOf({
+      'package.json': JSON.stringify({
+        name: 'shop',
+        dependencies: { react: '^19.0.0', big: '1' }
+      }),
+      'src/app.ts': "import 'react'\nimport 'big'\n",
+      'node_modules/big/package.json': JSON.stringify({
+        name: 'big',
+        license: 'MIT',
+        padding: 'x'.repeat(1024 * 1024)
+      })
+    })
+    symlinkSync(outside, join(root, 'node_modules/react'))
+    const libraries = (await list(root)).libraries as Record<string, unknown>[]
+    const react = libraries.find((library) => library.name === 'react')!
+    expect(react.installed).toBeUndefined()
+    expect(react.licence).toEqual({ kind: 'unknown', reason: 'not-installed' })
+    expect(libraries.find((library) => library.name === 'big')).toMatchObject({
+      installed: { path: 'node_modules/big' },
+      licence: { kind: 'unknown', reason: 'unreadable' }
+    })
   })
 
   it('names the Libraries of this repository that only the window uses, and their licences', async () => {
