@@ -26,6 +26,9 @@ import type { Repositories } from './repositories'
 import { t } from './strings'
 import { AnalysisDropped, type Structures } from './structures'
 
+/** What a Diagram that is being started is called while it is looked at: it has no file yet. */
+const NEW_DIAGRAM = 'new.yml'
+
 export function registerDiagrams(
   ipc: Pick<IpcMain, 'handle'>,
   repositories: Repositories,
@@ -69,15 +72,16 @@ export function registerDiagrams(
       const root = rootOf(repositoryId)
       if (root === undefined) return { ok: false, reason: t.repositoryClosed }
       const held = diagramTextRequest(text)
-      if (typeof path !== 'string' || held === undefined) {
+      if ((path !== undefined && typeof path !== 'string') || held === undefined) {
         return { ok: false, reason: t.notUnderstood }
       }
-      if (!(await isDiagram(nodeFileSystem(root), path))) {
+      // Without a path, a Diagram that is being started: nothing of the disk is named.
+      if (path !== undefined && !(await isDiagram(nodeFileSystem(root), path))) {
         return { ok: false, reason: t.notADiagram(path) }
       }
       try {
         const analysis = await structures.analysisOf(repositoryId as string, root)
-        return { ok: true, look: lookOf(path, held, analysis) }
+        return { ok: true, look: lookOf(path ?? NEW_DIAGRAM, held, analysis) }
       } catch (error) {
         return { ok: false, reason: t.analysisFailed(String(error)) }
       }

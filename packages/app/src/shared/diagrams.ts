@@ -100,8 +100,15 @@ export interface DiagramsApi {
    * Structure: `onStructureChanged` says when it changed.
    */
   diagrams(repositoryId: string, analysed: boolean): Promise<DiagramsResult>
-  /** What the code says of a Diagram as the window holds it: its Drift and suggested connections. */
-  diagramLook(repositoryId: string, path: string, text: string): Promise<DiagramLookResult>
+  /**
+   * What the code says of a Diagram as the window holds it: its Drift and suggested
+   * connections. Without a path, of a Diagram that is being started and has no file yet.
+   */
+  diagramLook(
+    repositoryId: string,
+    path: string | undefined,
+    text: string
+  ): Promise<DiagramLookResult>
   /** Plan the edits of the canvas, line by line. Nothing is written until the change is applied. */
   planDiagramEdit(request: DiagramEditRequest): Promise<PlanResult>
   /** Plan a new Diagram as its own file. Nothing is written until the change is applied. */
