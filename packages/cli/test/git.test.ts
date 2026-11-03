@@ -191,6 +191,89 @@ describe('git as the kernel’s port', () => {
   })
 })
 
+describe('what the configuration says about showing git', () => {
+  it('changes nothing of what the port reads', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'softarch-git-shown-')))
+    const service = join(scratch, 'service')
+    mkdirSync(service)
+    const git = (...args: string[]): string =>
+      execFileSync('git', args, { cwd: scratch, encoding: 'utf8' }).trim()
+    try {
+      git('init', '-q', '-b', 'trunk')
+      git('config', 'user.name', 'Jonas Weiß')
+      git('config', 'user.email', 'jonas@example.com')
+      git('config', 'commit.gpgsign', 'false')
+      writeFileSync(join(service, 'a.ts'), 'a\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Größe')
+      const first = git('rev-parse', 'HEAD')
+      writeFileSync(join(service, 'a.ts'), 'a\nb\n')
+      writeFileSync(join(scratch, 'outside.txt'), 'x\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Mehr')
+      const second = git('rev-parse', 'HEAD')
+
+      const read = async () => {
+        const port = gitIn(service)
+        return {
+          log: await port.log(),
+          follow: await port.log({ path: 'a.ts' }),
+          changes: await port.changes(first, second)
+        }
+      }
+      const plain = await read()
+      expect(plain.log!.map((entry) => [entry.author, entry.subject, entry.changes])).toEqual([
+        ['Jonas Weiß', 'Mehr', [{ kind: 'modified', path: 'a.ts' }]],
+        ['Jonas Weiß', 'Größe', [{ kind: 'added', path: 'a.ts' }]]
+      ])
+      git('config', 'diff.relative', 'true')
+      git('config', 'log.showRoot', 'false')
+      git('config', 'i18n.logOutputEncoding', 'ISO-8859-1')
+      // Read from the top of the repository, as the files are relative to the directory.
+      expect(await read()).toEqual(plain)
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a name or a subject with control characters in it as it is', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'softarch-git-fields-')))
+    const git = (...args: string[]): string =>
+      execFileSync('git', args, { cwd: scratch, encoding: 'utf8' }).trim()
+    try {
+      git('init', '-q', '-b', 'trunk')
+      git('config', 'user.email', 'aylin@example.com')
+      git('config', 'user.name', 'Aylin\x1fDemir')
+      git('config', 'commit.gpgsign', 'false')
+      writeFileSync(join(scratch, 'a.ts'), 'a\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', '\x1eA\x1fM')
+      const [entry] = (await gitIn(scratch).log())!
+      expect(entry).toMatchObject({
+        author: 'Aylin\x1fDemir',
+        subject: '\x1eA\x1fM',
+        changes: [{ kind: 'added', path: 'a.ts' }]
+      })
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('runs in the environment of its process: the tests see no configuration of the machine', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'softarch-git-environment-')))
+    try {
+      execFileSync('git', ['init', '-q', '-b', 'trunk'], { cwd: scratch })
+      expect(await gitIn(scratch).userName()).toBeUndefined()
+      writeFileSync(join(scratch, 'global'), '[user]\n\tname = Lena Becker\n')
+      vi.stubEnv('GIT_CONFIG_GLOBAL', join(scratch, 'global'))
+      expect(await gitIn(scratch).userName()).toBe('Lena Becker')
+    } finally {
+      vi.stubEnv('GIT_CONFIG_GLOBAL', devNull)
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('what the repository configures', () => {
   /** A scratch repository, and a script for each program its configuration may name. */
   function hostile() {

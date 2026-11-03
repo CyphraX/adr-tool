@@ -78,6 +78,12 @@ export const READ_ENVIRONMENT: Readonly<Record<string, string>> = { GIT_NO_LAZY_
  */
 const DIFF_OPTIONS = ['--no-color', '--no-ext-diff', '--no-textconv']
 
+/**
+ * What a log or a diff is read with whatever the configuration says about showing one: paths
+ * from the top of the repository, the files of the first commit, and text in UTF-8.
+ */
+const SHOWN_AS_IT_IS = ['-c', 'diff.relative=false', '-c', 'log.showRoot=true']
+
 /** What git says about the working tree below the directory that was opened. */
 export interface WorkingTree {
   /** The branch that is checked out; `undefined` on a detached HEAD. */
@@ -324,10 +330,12 @@ export function gitIn(root: string, executable = gitExecutable()): RepositoryGit
     const top = await folder()
     if (top === undefined) return undefined
     if ((await headCommit()) === undefined) return []
-    // The free texts come last: a name or a subject cannot shift the fields before them.
-    const format = ['%H', '%P', '%aI', '%an', '%s'].join(FIELD)
+    // Each field a token of its own: git prints a name or a subject only up to a NUL in it.
+    const format = ['%H', '%P', '%aI', '%an', '%s'].join('%x00')
     const log = await run([
+      ...SHOWN_AS_IT_IS,
       'log',
+      '--encoding=UTF-8',
       '-z',
       '--no-merges',
       '-M',
@@ -343,8 +351,10 @@ export function gitIn(root: string, executable = gitExecutable()): RepositoryGit
     ])
     if (log === undefined) return undefined
 
-    // NUL-separated: `<RECORD>header`, then its files. A commit message cannot hold a NUL, so
-    // it cannot forge any of this.
+    // NUL-separated: `<RECORD>commit`, parents, date, author, subject, then the files. A commit
+    // object may hold a NUL in its message, but git prints the message only up to it, so no
+    // name or subject can make a field or a file of its own. Every token is read where it
+    // stands: what a name, a subject or a path says is never taken for a header.
     const entries: LogEntry[] = []
     const tokens = log.split('\0')
     for (let position = 0; position < tokens.length;) {
@@ -353,15 +363,14 @@ export function gitIn(root: string, executable = gitExecutable()): RepositoryGit
         position++
         continue
       }
-      const [commit, parents, date, author, ...subject] = token.slice(1).split(FIELD)
-      const { changes, next } = filesOf(tokens, position + 1, top)
+      const commit = token.slice(RECORD.length)
+      const [parents, date, author, subject] = tokens.slice(position + 1, position + 5)
+      const { changes, next } = filesOf(tokens, position + 5, top)
       position = next
       const parent = parents?.split(' ')[0] || undefined
-      if (!commit || !isObjectName(commit) || date === undefined || author === undefined) {
-        continue
-      }
-      if (parent !== undefined && !isObjectName(parent)) continue
-      entries.push({ commit, parent, author, date, subject: subject.join(FIELD), changes })
+      if (!isObjectName(commit) || date === undefined || author === undefined) continue
+      if (subject === undefined || (parent !== undefined && !isObjectName(parent))) continue
+      entries.push({ commit, parent, author, date, subject, changes })
     }
     return entries
   }
@@ -384,6 +393,7 @@ export function gitIn(root: string, executable = gitExecutable()): RepositoryGit
       const top = await folder()
       if (top === undefined) return undefined
       const diff = await run([
+        ...SHOWN_AS_IT_IS,
         'diff-tree',
         '-r',
         '-z',
