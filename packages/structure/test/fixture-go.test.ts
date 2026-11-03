@@ -52,7 +52,8 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
       (dependency) => `${dependency.from} > ${dependency.to} ${dependency.lines.join(',')}`
     )
   ).toEqual([
-    // Within a package, and into the root module through `replace example.com/shop => ../`.
+    // Within a package, and into the root module through billing's `replace example.com/shop
+    // => ../`, folded to the root of the repository.
     'billing/invoice/invoice.go > billing/invoice/tax.go 13',
     'billing/invoice/invoice.go > cart/cart.go 12',
     'cart/cart.go > cart/line.go 8,18',

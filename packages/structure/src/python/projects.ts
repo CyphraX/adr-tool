@@ -5,7 +5,8 @@
  * read as text; nothing is run, and nothing is installed.
  */
 import { parse as parseToml } from 'smol-toml'
-import { normalizePath, type FileSystem } from '@adr-tool/kernel'
+import type { FileSystem } from '@adr-tool/kernel'
+import { withinRepository } from '../paths'
 import { matcherOf } from '../patterns'
 import { isNeverLookedAt } from '../source-files'
 
@@ -172,8 +173,8 @@ async function configuredRoots(
     roots.push(...rootsInSetupPy((await fs.readText(at('setup.py')).catch(() => '')) ?? ''))
   }
   return roots.flatMap((root) => {
-    // Inside the repository only, wherever the file points.
-    const path = normalizePath(join(directory, root))
+    // Inside the repository only: `../libs` is folded, a path above its root is left out.
+    const path = withinRepository(directory, root)
     return path === undefined ? [] : [path]
   })
 }

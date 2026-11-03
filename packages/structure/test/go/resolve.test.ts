@@ -239,6 +239,27 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     expect(manifests).toEqual([])
   })
 
+  it('follows a replacement up and over, where the module path alone would land elsewhere', async () => {
+    const { edges, unresolved } = await analyse({
+      'services/api/go.mod': [
+        'module example.com/api',
+        'require example.com/shared v0.0.0',
+        'replace example.com/shared => ../../patched/shared'
+      ],
+      'services/api/main.go': ['package main', 'import "example.com/shared"', 'func main() { shared.Do() }'],
+      // Two copies of one module: the replacement says which one is meant.
+      'libs/shared/go.mod': 'module example.com/shared\n',
+      'libs/shared/do.go': ['package shared', 'func Do() {}'],
+      'patched/shared/go.mod': 'module example.com/shared\n',
+      'patched/shared/do.go': ['package shared', 'func Do() {}'],
+      // Above the root of the repository is nowhere.
+      'tools/go.mod': 'module example.com/tools\n\nreplace example.com/far => ../../far\n',
+      'tools/main.go': ['package main', 'import "example.com/far/x"', 'func main() { x.Y() }']
+    })
+    expect(edges).toEqual(['services/api/main.go > patched/shared/do.go 3'])
+    expect(unresolved).toEqual([])
+  })
+
   it('applies the replacements of go.work before those of a module', async () => {
     const { edges } = await analyse({
       'go.work': 'go 1.22\n\nuse ./app\n\nreplace example.com/lib => ./lib\n',

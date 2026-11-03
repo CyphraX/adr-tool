@@ -4,7 +4,8 @@
  * repository, and the `replace` directives of a `go.work` at the root. Read as text; the go
  * command never runs, and nothing is downloaded.
  */
-import { normalizePath, type FileSystem } from '@adr-tool/kernel'
+import type { FileSystem } from '@adr-tool/kernel'
+import { withinRepository } from '../paths'
 import { isIgnoredByGo, isNeverLookedAt } from '../source-files'
 
 export interface GoRequirement {
@@ -81,7 +82,7 @@ function replacementOf(directory: string, args: readonly string[]): GoReplacemen
   if (arrow < 1 || path === undefined || target === undefined) return undefined
   // A local replacement is a path that begins with `./` or `../`, as the go command has it.
   if (!/^\.\.?(?:\/|$)/.test(target)) return undefined
-  const resolved = normalizePath(directory === '' ? target : `${directory}/${target}`)
+  const resolved = withinRepository(directory, target)
   return resolved === undefined ? undefined : { path, directory: resolved }
 }
 

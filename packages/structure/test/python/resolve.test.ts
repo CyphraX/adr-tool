@@ -193,6 +193,17 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
     ])
   })
 
+  it("folds `..` in a project's configuration, and leaves out a root above the repository", async () => {
+    const { edges, unresolved } = await analyse({
+      'services/api/pyproject.toml': '[tool.pytest.ini_options]\npythonpath = ["../../libs", "../../../outside"]\n',
+      'services/api/app/__init__.py': '',
+      'services/api/app/main.py': 'import common\n',
+      'libs/common/__init__.py': ''
+    })
+    expect(unresolved).toEqual([])
+    expect(edges).toEqual(['services/api/app/main.py > libs/common/__init__.py 1'])
+  })
+
   it('does not resolve a module that two other projects both have', async () => {
     const { edges, unresolved } = await analyse({
       'one/pyproject.toml': '',
