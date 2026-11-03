@@ -100,7 +100,8 @@ Whether a connection is type-only is not stored: a Diagram says that one part us
 
 - The **element ID** of a Component is its Component ID: `core`, `core/metadata`. That of an External System or of the repository is the text after `external` or `repository`, a segment as a Component ID has them — lowercase ASCII letters, digits and dashes, starting and ending with a letter or a digit — so that it can never be read as a Component below another.
 - Connections name elements by their element IDs. The elements of one Diagram have distinct IDs: an External System cannot share its ID with a Component the Diagram shows.
-- A Component ID is what a Rename of the Component rewrites (part 7), with the IDs below it — a Rename of `core` rewrites `core/metadata` too ([structure-format.md](structure-format.md), section 1): in `component` and `scope`, and in `from` and `to` where they name a Component element — not where they name an External System that has the same ID. Nowhere else.
+- A Component ID is what a Rename of the Component rewrites (part 7), with the IDs below it — a Rename of `core` rewrites `core/metadata` too ([structure-format.md](structure-format.md), section 1): in `component` and `scope`, and in `from` and `to` where they name a Component element — not where they name an External System that has the same ID. Nowhere else. Each ID is replaced where it stands, its quotes kept. A Diagram that cannot be read is not rewritten, and the Rename warns of it where its text names the Component; one whose ID stands where it cannot be replaced alone — in a block scalar — refuses the Rename with the reason. The picture beside a Diagram that was current before the Rename is drawn again in the same change, with the new names, so that the Rename leaves it current; one that was not current is left, and its Problem stays.
+- The **ID of a new Diagram** is a segment, as an element ID is one, and no Diagram of the repository has it yet. The window makes it from the title as it is typed — lowercase, accents taken off, every run of other characters one dash: "The containers of Softarch Suite" becomes `the-containers-of-softarch-suite` — until it is written by hand; an External System added in the window gets its ID from its name the same way, numbered `-2`, `-3` where the Diagram has it already.
 
 ### How the suite writes (part 7)
 
@@ -110,6 +111,21 @@ So that the suite can change one element or one connection without touching any 
 - one item per element and per connection, in block style, its first key on the line of its `-`, then its other keys in the order of the tables, one per line;
 - `at` and `size` as a flow list on one line, `[x, y]`, so that moving a box changes one line;
 - a new element at the end of `elements`, a new connection at the end of `connections`.
+
+**The edits** the window and agents make are these, each changing the lines named and no other, and each checked to read back as the Diagram it is meant to be — what does not is refused, with a sentence ([ADR-0002](adr/0002-never-reserialize-markdown.md)):
+
+| Edit | What changes |
+| ---- | ------------ |
+| Move an element | The line of its `at`. |
+| Add an element | A new item at the end of `elements`; `elements: []` becomes a block list. |
+| Take an element out | The lines of its item, and of every connection from or to its ID — as the Repair of section 5 takes them out. |
+| Name or describe an External System or the repository | The lines of its `name` and `description`; one left empty goes. |
+| Connect two elements | A new item at the end of `connections`. |
+| Take a connection out | The lines of its item. |
+| Label a connection | The line of its `label`, added after `to` where there is none; an empty label goes. |
+| A new Diagram | A new file, written whole in this style. |
+
+**The grid.** The window places and moves boxes on a grid of 20 px: a box dragged stands where the pointer leaves it, rounded to the nearest 20 px; the arrow keys move a selected box by 20 px, by 100 px with Shift. A file may hold any position; the grid is how the window writes them, not a rule of the format. A box the window adds stands at the first place on the grid, read top to bottom and left to right, that keeps 40 px from every box; a new Diagram of a container or component view starts with the Components of its level, placed in columns as Structure lays out its graph — what is used left of what uses it — and every connection the code has between them drawn, and a system context with the repository alone.
 
 A person may write any YAML that reads as the same Diagram. Where the suite cannot change what is asked without rewriting more — a list in flow style, an item with a comment on the line of its `-`, an anchor — it refuses, and says so.
 
@@ -209,7 +225,15 @@ A Repair is offered only where exactly one change is right. An element whose Com
 
 A comment inside an item, or behind it on its last line, goes with it; nothing else in the file changes, and comments above and below an item stay where they are. Where an item does not have its lines to itself — a list in flow style, a comment, a tag or an anchor on the line of its `-` in front of it, anything but a comment behind it — the Repair is refused with the advice to use an editor. Whatever the suite hands out has been checked to read back as the same Diagram without those items.
 
-Problems of Diagrams appear in the Problems view of the repository, grouped by module (part 7).
+### Of a Diagram's picture (part 7)
+
+| Problem | Code | Sentence | Repair |
+| ------- | ---- | -------- | ------ |
+| **A stale picture**: the SVG beside the Diagram is not what the export would write now — the Diagram, or the names and descriptions of its Components, changed after it was exported. | `stale-picture` | docs/architecture/diagrams/packages.svg is not the picture of the Diagram as it is now: the Diagram or its Components changed after it was exported. Export it again. | Export it again (previewed). |
+
+It is reported at the first line of the Diagram's file. The picture is drawn as section 6 draws it and compared with the file there, byte for byte. A Diagram without a picture has none to be stale — a Diagram need not be exported —, and nothing is said while `.arch/components.yml` is there but cannot be read: then the picture cannot be drawn as the export would draw it. Drift does not make a picture stale: the picture is the Diagram as it is meant, not the code.
+
+Problems of Diagrams appear in the Problems view of the repository, grouped by module, with their Repairs (part 7); `adr check` fails on them, and notes the Drift, which fails nothing ([cli.md](cli.md#adr-check-path---format-textjsongithub)).
 
 ## 6. The picture (part 6)
 
@@ -274,8 +298,8 @@ GitHub shows the SVG where the repository is browsed, and an ADR embeds it as an
 ![The packages of Softarch Suite: the app uses the command line and the cores of the modules, which stand on the kernel.](../architecture/diagrams/packages.svg)
 ```
 
-That it is committed although it is derived is recorded in [ADR-0018](adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md); nothing checks yet that it is current — export again after changing the Diagram.
+That it is committed although it is derived is recorded in [ADR-0018](adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md). That it is current is checked: a picture that is not is the Problem `stale-picture` (section 5), which fails `adr check`; export again after changing the Diagram. A Rename of a Component draws the pictures that were current again in its own change (section 2, "IDs").
 
 ## 7. What is not in the repository (part 6)
 
-Suggested connections and Drift are derived and never stored, nor cached in the repository. Of all this module computes, only the SVG of section 6 enters the repository, and only when a person exports it.
+Suggested connections and Drift are derived and never stored, nor cached in the repository. Of all this module computes, only the SVG of section 6 enters the repository, and only through a change a person sees first: an export, or a Rename that draws a current picture again.
