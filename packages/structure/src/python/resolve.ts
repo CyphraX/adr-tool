@@ -167,12 +167,20 @@ export function resolvePython(
       /** A module below the one imported from, by its name. */
       let below: (name: string) => Found | undefined
       if (entry.level > 0) {
-        // Relative: from the file's own directory, one level up for every further dot.
+        // Relative: from the file's own directory, one level up for every further dot — but
+        // not above its top-level package, which Python refuses. A file outside of a package,
+        // in a namespace package say, may go no further than its own directory.
+        let packages = 0
+        for (let directory = directoryOf(path); isPackage(directory); ) {
+          packages++
+          if (directory === '') break
+          directory = directoryOf(directory)
+        }
         let base: string | undefined = directoryOf(path)
         for (let level = 1; level < entry.level && base !== undefined; level++) {
           base = base === '' ? undefined : directoryOf(base)
         }
-        if (base === undefined) {
+        if (base === undefined || entry.level > Math.max(1, packages)) {
           notFound(written, entry)
           continue
         }

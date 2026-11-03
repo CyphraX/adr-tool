@@ -119,11 +119,25 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
       'shop/cart/cart.py > shop/catalog/product.py 2',
       'shop/cart/line.py > shop/cart/cart.py 1'
     ])
-    // Above the repository, and a module that is not there.
+    // Above the top-level package, and a module that is not there.
     expect(unresolved).toEqual([
       'shop/catalog/product.py:1 ...outside',
       'shop/catalog/product.py:2 .gone'
     ])
+  })
+
+  it('does not resolve a relative import that climbs above the top-level package of its file', async () => {
+    const { edges, unresolved } = await analyse({
+      'pkg/__init__.py': '',
+      'pkg/a.py': 'from .. import other\nfrom ..other import y\nfrom . import b\n',
+      'pkg/b.py': '',
+      'other.py': '',
+      // Outside of a package, a file goes no further than its own directory.
+      'scripts/tool.py': 'from . import helper\nfrom .. import other\n',
+      'scripts/helper.py': ''
+    })
+    expect(edges).toEqual(['pkg/a.py > pkg/b.py 3', 'scripts/tool.py > scripts/helper.py 1'])
+    expect(unresolved).toEqual(['pkg/a.py:1 ..', 'pkg/a.py:2 ..other', 'scripts/tool.py:2 ..'])
   })
 
   it('takes `from a import b` as a use of the module a.b where there is one, else of a', async () => {
