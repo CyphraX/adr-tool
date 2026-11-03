@@ -73,7 +73,7 @@ describe('the analysis of a repository, as the app runs it', () => {
     )
     const { analysis, cache } = await analyse(maven, undefined)
     expect(analysis.dependencies.notAnalysed).toEqual([])
-    expect(analysis.dependencies.dependencies).toHaveLength(11)
+    expect(analysis.dependencies.dependencies).toHaveLength(13)
     expect(Object.values(cache.files).every(({ extraction }) => 'java' in extraction)).toBe(true)
     // Its numbers are a lower bound, and its pages say so.
     const pages = viewOf('maven', analysis, undefined, false).components

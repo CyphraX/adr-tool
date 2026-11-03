@@ -3,13 +3,14 @@ package com.shop.catalog;
 import java.util.List;
 import java.util.Optional;
 
-public final class Search {
+public final class Search implements Catalog {
   private final List<Product> products;
 
   public Search(List<Product> products) {
     this.products = products;
   }
 
+  @Override
   public Optional<Product> find(String sku) {
     return products.stream().filter(product -> product.sku().equals(sku)).findFirst();
   }
