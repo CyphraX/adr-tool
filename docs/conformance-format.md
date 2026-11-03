@@ -191,7 +191,30 @@ A Rule has `among` or `inside`, not both.
 | `min`    | a number: the metric must not be below it |
 | `of`     | Component patterns, required: the Components whose metric is checked |
 
-A Rule has `max`, `min` or both. Each Component that `of` matches and that has the metric — a Component that contains no Source File has none, and instability and internal share are undefined where there is nothing to divide — breaks the Rule when its value lies outside. The values are Structure's, by its definitions (structure-format.md, section 5), test files left out unless `tests: included`. A Violation of a threshold has no Source File Dependencies behind it; it is reported at the Rule.
+A Rule has `max`, `min` or both. Each Component that `of` matches and that has the metric — a Component that contains no Source File has none, and instability and internal share are undefined where there is nothing to divide — breaks the Rule when its value lies outside. The values are Structure's, by its definitions (structure-format.md, section 5), test files left out unless `tests: included`. A Violation of a threshold has no Source File Dependencies behind it; it is reported at the Rule — of a function or a class, at its line.
+
+What the metric is of decides what breaks the Rule (part 13):
+
+- **Of a Component** — the metrics of part 3, abstractness and distance: each matched Component, as above. Abstractness is undefined where a Component declares nothing — no type, no function — and distance with it.
+- **Of a function** — complexity: each function in the Source Files that the matched Components contain, their children's included. `of: '*'` checks every function of the declared Components. Its Violation is reported at the function's line, where its name is.
+- **Of a class** — LCOM4: each class there, as for a function; a class without methods has no LCOM4 and breaks nothing.
+- **Of a level** — propagation cost: the level below each matched Component, as Structure draws it (structure-format.md, section 4) — its children, its own Source Files, and below a Component without children its directories. `'*'` in `of` names the top level, which lies below no Component; with propagation cost it matches no Component. A level of fewer than two nodes has no propagation cost.
+
+```yaml
+- id: functions-stay-simple
+  why: A function with more than fifteen ways through it cannot be tested path by path.
+  kind: threshold
+  metric: complexity
+  max: 15
+  of: '*'
+
+- id: modules-stay-loosely-coupled
+  why: A change in one module must not reach most of the others.
+  kind: threshold
+  metric: propagation-cost
+  max: 0.3
+  of: '*'
+```
 
 | Metric | Structure's name | Arrives with |
 | ------ | ---------------- | ------------ |
@@ -216,7 +239,7 @@ A metric is named in lowercase words joined by dashes. A metric has a subject �
 A **Violation** is one place where the code breaks a Rule. It is derived whenever the code is analysed and never stored. Each one has:
 
 - its **Rule**, and the sentence of its `why`;
-- what it is about: its **source** and **target** Components, the **members** of its Cycle, or its **Component** and the value of its metric;
+- what it is about: its **source** and **target** Components, the **members** of its Cycle, or its **Component** — its **function** or **class**, by its Source File, its line and its name; its **level** — and the value of its metric;
 - the **Source File Dependencies behind it** — each a pair of Source Files, the one that uses and the one it uses, with the lines of the imports that cause it — except for a threshold;
 - its **fingerprint**.
 
@@ -230,14 +253,15 @@ The **fingerprint** names a Violation without line numbers, so that it stays the
 | `no-cycles` | the Rule, and the members of the Cycle: Component IDs for `among`, the paths of Source Files for `inside`, in any order; an Exception may name more (section 4) | `rule`, `cycle` |
 | `threshold` | the Rule, and the Component | `rule`, `component` |
 | `threshold` on a metric per function or per class (part 13) | the Rule, the Source File, and the qualified name of the function or class | `rule`, `file`, `name` |
+| `threshold` on propagation cost (part 13) | the Rule, and the Component the level lies below — `'*'` for the top level | `rule`, `component` |
 
-The **name** of a function or class in a fingerprint is qualified by what contains it, joined by `.`: `Cart.total` for the method `total` of the class `Cart`, `Cart.Line` for a nested class, `formatDate` for a function at the top of its file. So two methods of one name in one file are told apart, and a method keeps its fingerprint when another one is added beside it.
+The **name** of a function or class in a fingerprint is qualified by what contains it, joined by `.`: `Cart.total` for the method `total` of the class `Cart`, `Cart.Line` for a nested class, `formatDate` for a function at the top of its file; a Java method carries the types of its parameters, `Cart.add(Product)`, so that overloads are told apart. Structure names them (structure-format.md, section 5, "Inside a Source File"). So two methods of one name in one file are told apart, and a method keeps its fingerprint when another one is added beside it or its lines move. A function that is renamed, or moved to another file, is another function: its Exception matches nothing any more, and says so.
 
-In the JSON of `adr check` a fingerprint carries its `kind` as well — `dependency`, `cycle` or `component` — so that one is never read as another. An Exception does not write it: the kind of its Rule says which keys it names.
+In the JSON of `adr check` a fingerprint carries its `kind` as well — `dependency`, `cycle`, `component`, `function` or `class` — so that one is never read as another. An Exception does not write it: the kind of its Rule says which keys it names.
 
-Two Violations never share a fingerprint: a Rule has one Violation per pair, per Cycle, per Component. Where lines move, nothing in a fingerprint changes; where a Component is renamed, Rename rewrites the IDs in the fingerprints of the Exceptions together with the Rules (section 7). A fingerprint that names Source Files — the Cycles found `inside` a Component — changes when one of them is moved: its Exception then matches nothing any more, and says so.
+Two Violations never share a fingerprint: a Rule has one Violation per pair, per Cycle, per Component, per function, per class, per level. Where lines move, nothing in a fingerprint changes; where a Component is renamed, Rename rewrites the IDs in the fingerprints of the Exceptions together with the Rules (section 7). A fingerprint that names Source Files — the Cycles found `inside` a Component — changes when one of them is moved: its Exception then matches nothing any more, and says so.
 
-In messages and in the JSON of `adr check` the fingerprint is also written on one line: `billing-not-web: billing -> web`, `no-cycles-in-the-kernel: packages/kernel/src/a.ts, packages/kernel/src/b.ts` (sorted), `kernel-stays-stable: kernel`. That line is for reading; the keys are what is matched.
+In messages and in the JSON of `adr check` the fingerprint is also written on one line: `billing-not-web: billing -> web`, `no-cycles-in-the-kernel: packages/kernel/src/a.ts, packages/kernel/src/b.ts` (sorted), `kernel-stays-stable: kernel`, `functions-stay-simple: Cart.discount(long) in cart/src/main/java/com/shop/cart/Cart.java`. That line is for reading; the keys are what is matched.
 
 ### What a Violation says
 
@@ -253,7 +277,7 @@ billing must not depend on web: packages/billing/src/invoice.ts:3 imports packag
 | `may-only-depend` | `<from>` may only depend on `<allowed>` (or: may depend on no other Component), and depends on `<to>` — or, where `<to>` is `(unassigned)`, on Source Files that belong to no Component |
 | `layers` | `<from>` must not depend on `<to>`, which lies in a layer above it (in `strict` mode also: which lies more than one layer below it) |
 | `no-cycles` | `<members>` depend on each other in a Cycle; with three or more members, for example `<a -> b -> c -> a>`, one round trip through them; among Components, with `<from -> to>` as its weakest Dependency |
-| `threshold` | The metric `<metric>` of `<component>` is `<value>`, above the maximum of `<max>` (or: below the minimum of `<min>`) |
+| `threshold` | The metric `<metric>` of `<component>` is `<value>`, above the maximum of `<max>` (or: below the minimum of `<min>`). Of a function or class: of the function (class) `<name>` at `<file>:<line>`; of a level: of the level below `<component>`, or of the top level |
 
 A list of more than five names — the members of a long Cycle of Source Files, the Components a Rule allows — names the first five and counts the rest: `a, b, c, d, e and 3 more`; a round trip of more than five steps ends in `… -> a`. One message stays one readable line; each import still has its own.
 
@@ -273,7 +297,7 @@ exceptions:
 | Key            | Value |
 | -------------- | ----- |
 | `rule`         | required: the ID of the Rule |
-| the fingerprint | required: `from` and `to`, `cycle`, or `component`, by the kind of the Rule (section 3) — Component IDs and paths as written, no patterns |
+| the fingerprint | required: `from` and `to`, `cycle`, `component`, or `file` and `name`, by the kind of the Rule and the subject of its metric (section 3) — Component IDs, paths and names as written, no patterns; no other of these keys |
 | `reason`       | required: why the Violation is accepted, in a sentence |
 | `justified-by` | optional: the ADR that justifies it — a Trace from the Exception to Decisions |
 
