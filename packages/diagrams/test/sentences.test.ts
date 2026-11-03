@@ -113,6 +113,16 @@ describe('the sentences of diagrams', () => {
       ],
       [
         {
+          kind: 'connection-not-in-code',
+          from: 'app',
+          to: 'core',
+          line: 4,
+          uncertain: { notResolved: 0, notAnalysed: 2 }
+        },
+        'The Diagram connects app to core. No Source File of app is known to depend on one of core, but that is not certain: 2 Source Files of app cannot be read.'
+      ],
+      [
+        {
           kind: 'dependency-not-in-diagram',
           from: 'app',
           to: 'core',
@@ -121,10 +131,36 @@ describe('the sentences of diagrams', () => {
           dependencies: []
         },
         'app depends on core in the code, through 12 Source File Dependencies, and the Diagram does not connect them.'
+      ],
+      [
+        {
+          kind: 'scope-dependency-not-in-diagram',
+          from: 'app',
+          to: 'core',
+          scope: 'core',
+          weight: 3,
+          typeOnly: false,
+          dependencies: []
+        },
+        "app depends on core's own files in the code, through 3 Source File Dependencies, and the Diagram connects app to no part of core."
+      ],
+      [
+        {
+          kind: 'scope-dependency-not-in-diagram',
+          from: 'core',
+          to: 'kernel',
+          scope: 'core',
+          weight: 1,
+          typeOnly: true,
+          dependencies: []
+        },
+        "core's own files depend on kernel in the code, through one Source File Dependency, and the Diagram connects no part of core to kernel."
       ]
     ]
     for (const [one, sentence] of drift) {
-      expect(saidOfDrift(one).code).toBe(one.kind)
+      expect(saidOfDrift(one).code).toBe(
+        'uncertain' in one ? 'connection-perhaps-not-in-code' : one.kind
+      )
       expect(diagramsEnglishOf(saidOfDrift(one))).toBe(sentence)
     }
   })

@@ -111,9 +111,21 @@ export const SENTENCES = {
   'connection-without-end': (v: { key: string; line: number }): string =>
     `the connection on line ${v.line} has no "${v.key}"`,
 
-  // Drift (docs/diagrams-format.md, section 4): a code is a Drift's kind.
+  // Drift (docs/diagrams-format.md, section 4): a code is a Drift's kind, and one more for a
+  // connection the code may have after all.
   'connection-not-in-code': (v: Ends): string =>
     `The Diagram connects ${v.from} to ${v.to}, but no Source File of ${v.from} depends on one of ${v.to}.`,
+  'connection-perhaps-not-in-code': (
+    v: Ends & { notResolved: number; notAnalysed: number }
+  ): string =>
+    `The Diagram connects ${v.from} to ${v.to}. No Source File of ${v.from} is known to depend on one of ${v.to}, but that is not certain: ${[
+      v.notResolved > 0 &&
+        `${v.notResolved === 1 ? 'one use' : `${v.notResolved} uses`} in ${v.from} cannot be resolved`,
+      v.notAnalysed > 0 &&
+        `${v.notAnalysed === 1 ? 'one Source File' : `${v.notAnalysed} Source Files`} of ${v.from} cannot be read`
+    ]
+      .filter((part) => part !== false)
+      .join(', and ')}.`,
   'dependency-not-in-diagram': (v: Ends & { count: number }): string =>
     `${v.from} depends on ${v.to} in the code, through ${dependenciesIn(v.count)}, and the Diagram does not connect them.`,
   'scope-dependency-not-in-diagram': (v: Ends & { scope: string; count: number }): string =>

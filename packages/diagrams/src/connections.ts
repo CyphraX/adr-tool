@@ -6,6 +6,7 @@
 import {
   edgesAmong,
   everyComponent,
+  type Dependencies,
   type Dependency,
   type Structure
 } from '@adr-tool/structure/model'
@@ -14,6 +15,12 @@ import { englishOf, type DiagramsSaid } from './sentences'
 
 /** What suggestions and Drift need of Structure: the declaration, and who owns which Source File. */
 export type Model = Pick<Structure, 'origin' | 'components' | 'sourceFiles'>
+
+/**
+ * What suggestions and Drift need of Structure's analysis: the Dependencies, and what it could
+ * not follow — the uses it could not resolve, and the files it could not read.
+ */
+export type Analysis = Pick<Dependencies, 'dependencies' | 'notResolved' | 'notAnalysed'>
 
 export interface ConnectionOptions {
   /** Count test files as well. Like Structure's views, Diagrams leave them out by default. */
@@ -50,6 +57,17 @@ export type Drift =
       readonly to: string
       /** The line of the connection in the Diagram's file, from 1. */
       readonly line: number
+      /**
+       * Present where it is not certain: the Source Files that count for `from` have uses that
+       * Structure could not resolve, or some of them could not be read, and the code may have
+       * the connection after all.
+       */
+      readonly uncertain?: {
+        /** How many uses in those files are not resolved. */
+        readonly notResolved: number
+        /** How many of those files could not be read. */
+        readonly notAnalysed: number
+      }
     }
   /** A Dependency between shown Components that the Diagram does not connect. */
   | {
@@ -132,7 +150,7 @@ function countingFor(diagram: Diagram, model: Model, options: ConnectionOptions)
 export function suggestConnections(
   diagram: Diagram,
   model: Model,
-  dependencies: readonly Dependency[],
+  analysis: Analysis,
   options: ConnectionOptions = {}
 ): SuggestedConnection[] {
   if (model.origin !== 'declared') return []
@@ -151,7 +169,7 @@ export function suggestConnections(
           ? connection.from === from && within(connection.to, boundary)
           : connection.from === from && connection.to === to
     )
-  return edgesAmong(nodes, dependencies).flatMap((edge) => {
+  return edgesAmong(nodes, analysis.dependencies).flatMap((edge) => {
     const throughScope = edge.from === boundary || edge.to === boundary
     // Within the scope, its own files and its parts are one: the view looks into it.
     if (throughScope && within(edge.from, boundary!) && within(edge.to, boundary!)) return []
@@ -167,16 +185,21 @@ export function suggestConnections(
 export function driftOf(
   diagram: Diagram,
   model: Model,
-  dependencies: readonly Dependency[],
+  analysis: Analysis,
   options: ConnectionOptions = {}
 ): Drift[] {
   if (model.origin !== 'declared') return []
   const declared = new Set(everyComponent(model.components).map((component) => component.id))
   const kinds = new Map(elementsOf(diagram).map((element) => [element.id, element.kind]))
   const isShown = (id: string): boolean => kinds.get(id) === 'component' && declared.has(id)
-  const suggested = suggestConnections(diagram, model, dependencies, options)
+  const suggested = suggestConnections(diagram, model, analysis, options)
   const inCode = new Set(suggested.map(({ from, to }) => `${from}\n${to}`))
-  const { boundary } = countingFor(diagram, model, options)
+  const { counts, boundary } = countingFor(diagram, model, options)
+  /** What Structure could not follow in the Source Files that count for a shown Component. */
+  const unknownOf = (id: string): { notResolved: number; notAnalysed: number } => ({
+    notResolved: analysis.notResolved.filter((use) => counts.get(use.file) === id).length,
+    notAnalysed: analysis.notAnalysed.filter((file) => counts.get(file.file) === id).length
+  })
 
   /**
    * Whether the code may have the connection through the scope's own files: it enters the
@@ -192,7 +215,14 @@ export function driftOf(
   for (const { from, to, line } of connectionsOf(diagram)) {
     if (!isShown(from) || !isShown(to) || inCode.has(`${from}\n${to}`)) continue
     if (throughScope(from, to)) continue
-    drift.push({ kind: 'connection-not-in-code', from, to, line })
+    const unknown = unknownOf(from)
+    drift.push({
+      kind: 'connection-not-in-code',
+      from,
+      to,
+      line,
+      ...((unknown.notResolved > 0 || unknown.notAnalysed > 0) && { uncertain: unknown })
+    })
   }
   for (const one of suggested) {
     if (one.drawn) continue
@@ -218,7 +248,12 @@ export function driftOf(
 export function saidOfDrift(drift: Drift): DiagramsSaid {
   switch (drift.kind) {
     case 'connection-not-in-code':
-      return { code: drift.kind, values: { from: drift.from, to: drift.to } }
+      return drift.uncertain === undefined
+        ? { code: drift.kind, values: { from: drift.from, to: drift.to } }
+        : {
+            code: 'connection-perhaps-not-in-code',
+            values: { from: drift.from, to: drift.to, ...drift.uncertain }
+          }
     case 'dependency-not-in-diagram':
       return { code: drift.kind, values: { from: drift.from, to: drift.to, count: drift.weight } }
     case 'scope-dependency-not-in-diagram': {

@@ -73,8 +73,8 @@ describe('the Diagram of this repository’s packages', () => {
   })
 
   it('suggests the connections the code has, and draws every one of them: it has no Drift', async () => {
-    const { structure, dependencies, packages } = await own()
-    const suggested = suggestConnections(packages, structure, dependencies)
+    const { structure, analysis, packages } = await own()
+    const suggested = suggestConnections(packages, structure, analysis)
     expect(pairs(suggested)).toEqual([
       'app > cli',
       'app > core',
@@ -94,26 +94,26 @@ describe('the Diagram of this repository’s packages', () => {
     expect(suggested.find((one) => one.from === 'app' && one.to === 'diagrams')).toMatchObject({
       typeOnly: true
     })
-    expect(driftOf(packages, structure, dependencies)).toEqual([])
+    expect(driftOf(packages, structure, analysis)).toEqual([])
   })
 
   it('reports a connection added on purpose as Drift', async () => {
-    const { fs, structure, dependencies, packages } = await own()
+    const { fs, structure, analysis, packages } = await own()
     const text = (await fs.readText(packages.path))!
     const added = withConnection(packages, text, 'kernel', 'core')
-    expect(driftOf(added, structure, dependencies).map(driftWording)).toEqual([
+    expect(driftOf(added, structure, analysis).map(driftWording)).toEqual([
       'The Diagram connects kernel to core, but no Source File of kernel depends on one of core.'
     ])
     // A connection to an External System has no Drift: no code stands behind it.
-    expect(
-      driftOf(withConnection(packages, text, 'kernel', 'git'), structure, dependencies)
-    ).toEqual([])
+    expect(driftOf(withConnection(packages, text, 'kernel', 'git'), structure, analysis)).toEqual(
+      []
+    )
   })
 
   // What the review of PR #51 found: app uses core through packages/core/src/index.ts, which is
   // core's own and none of its parts'.
   it('in the component view of core, takes what enters through core’s own files for core', async () => {
-    const { structure, dependencies } = await own()
+    const { structure, analysis } = await own()
     const parts = ['adr', 'export', 'foreign', 'lifecycle', 'log', 'metadata', 'problems']
     const text = [
       'level: component',
@@ -133,9 +133,7 @@ describe('the Diagram of this repository’s packages', () => {
     const view = readDiagram('docs/architecture/diagrams/core.yml', text)
     if (!view.readable) throw new Error(wordingOf(view.problems[0]))
     expect(problemsOf(view, structure)).toEqual([])
-    const through = suggestConnections(view, structure, dependencies).filter(
-      (one) => one.throughScope
-    )
+    const through = suggestConnections(view, structure, analysis).filter((one) => one.throughScope)
     expect(through.map((one) => `${one.from} > ${one.to}${one.drawn ? ' drawn' : ''}`)).toEqual(
       expect.arrayContaining(['app > core drawn', 'mcp > core drawn'])
     )
@@ -147,7 +145,7 @@ describe('the Diagram of this repository’s packages', () => {
     // Into core/adr and core/log through core's own files, perhaps: not Drift. kernel uses
     // nothing of core.
     expect(
-      driftOf(view, structure, dependencies)
+      driftOf(view, structure, analysis)
         .filter((one) => one.kind === 'connection-not-in-code')
         .map(driftWording)
     ).toEqual([

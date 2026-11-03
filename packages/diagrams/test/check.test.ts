@@ -6,6 +6,7 @@ import {
   driftOf,
   driftWording,
   problemsOf,
+  saidOfDrift,
   readDiagram,
   suggestConnections,
   wordingOf,
@@ -17,7 +18,8 @@ async function analysed(repository: Record<string, string>) {
   const fs = memoryFileSystem(repository)
   const files = Object.keys(repository)
   const structure = await openStructure(fs, files)
-  return { structure, ...(await analyseDependencies(fs, files, structure.sourceFiles)) }
+  const analysis = await analyseDependencies(fs, files, structure.sourceFiles)
+  return { structure, analysis, ...analysis }
 }
 
 const declaration = [
@@ -156,13 +158,13 @@ describe('the elements of a level', () => {
 
 describe('suggested connections', () => {
   it('count a Source File for the deepest shown Component that contains it, and never join one to itself', async () => {
-    const { structure, dependencies } = await analysed(repository)
+    const { structure, analysis } = await analysed(repository)
     const deep = diagramOf(
       ['level: component', 'scope: core'],
       ['app', 'core/metadata', 'core/lifecycle', 'kernel']
     )
     expect(
-      suggestConnections(deep, structure, dependencies).map(
+      suggestConnections(deep, structure, analysis).map(
         (one) => `${one.from} > ${one.to} ${one.weight}${one.typeOnly ? ' (type)' : ''}`
       )
     ).toEqual([
@@ -177,17 +179,17 @@ describe('suggested connections', () => {
     // Where core stands for all it contains, its own files and its parts are one.
     const top = diagramOf(['level: container'], ['app', 'core', 'kernel', 'external git'])
     expect(
-      suggestConnections(top, structure, dependencies).map(
+      suggestConnections(top, structure, analysis).map(
         (one) => `${one.from} > ${one.to} ${one.weight}`
       )
     ).toEqual(['app > core 2', 'core > kernel 2'])
     // A file that no shown Component contains counts for none.
     const part = diagramOf(['level: container'], ['app', 'kernel'])
-    expect(suggestConnections(part, structure, dependencies)).toEqual([])
+    expect(suggestConnections(part, structure, analysis)).toEqual([])
   })
 
   it('in a component view, count the scope’s own files for the scope, as the boundary of the view', async () => {
-    const { structure, dependencies } = await analysed(repository)
+    const { structure, analysis } = await analysed(repository)
     const view = (connections: [string, string][]) =>
       diagramOf(
         ['level: component', 'scope: core'],
@@ -195,10 +197,10 @@ describe('suggested connections', () => {
         connections
       )
     const through = (diagram: Diagram) =>
-      suggestConnections(diagram, structure, dependencies)
+      suggestConnections(diagram, structure, analysis)
         .filter((one) => one.throughScope)
         .map((one) => `${one.from} > ${one.to} ${one.weight}${one.drawn ? ' drawn' : ''}`)
-    const drift = (diagram: Diagram) => driftOf(diagram, structure, dependencies).map(driftWording)
+    const drift = (diagram: Diagram) => driftOf(diagram, structure, analysis).map(driftWording)
 
     // app uses core through src/core/index.ts, which leads on to core/lifecycle: the
     // Dependency of the one on the other stays inside the scope.
@@ -238,7 +240,7 @@ describe('suggested connections', () => {
       ['core/lifecycle', 'kernel'],
       ['core/metadata', 'kernel']
     ])
-    expect(driftOf(left, structure, dependencies).map((one) => one.kind)).toEqual([
+    expect(driftOf(left, structure, analysis).map((one) => one.kind)).toEqual([
       'scope-dependency-not-in-diagram',
       'dependency-not-in-diagram'
     ])
@@ -249,7 +251,7 @@ describe('suggested connections', () => {
   })
 
   it('in a component view, let a part of the scope use what the scope’s own files use', async () => {
-    const { structure, dependencies } = await analysed(repository)
+    const { structure, analysis } = await analysed(repository)
     // src/core/metadata/read.ts is core/metadata's own, and uses kernel; keys and values do not.
     const view = diagramOf(
       ['level: component', 'scope: core/metadata'],
@@ -264,11 +266,11 @@ describe('suggested connections', () => {
       ]
     )
     expect(
-      suggestConnections(view, structure, dependencies)
+      suggestConnections(view, structure, analysis)
         .filter((one) => one.throughScope)
         .map((one) => `${one.from} > ${one.to} ${one.weight}${one.drawn ? ' drawn' : ''}`)
     ).toEqual(['core/metadata > kernel 1 drawn'])
-    expect(driftOf(view, structure, dependencies).map(driftWording)).toEqual([
+    expect(driftOf(view, structure, analysis).map(driftWording)).toEqual([
       'The Diagram connects core/metadata/values to core/lifecycle, but no Source File of core/metadata/values depends on one of core/lifecycle.'
     ])
     const without = diagramOf(
@@ -279,13 +281,13 @@ describe('suggested connections', () => {
         ['core/metadata/values', 'core/metadata/keys']
       ]
     )
-    expect(driftOf(without, structure, dependencies).map(driftWording)).toEqual([
+    expect(driftOf(without, structure, analysis).map(driftWording)).toEqual([
       "core/metadata's own files depend on kernel in the code, through one Source File Dependency, and the Diagram connects no part of core/metadata to kernel."
     ])
   })
 
   it('leave test files out unless asked, and give External Systems none', async () => {
-    const { structure, dependencies } = await analysed(repository)
+    const { structure, analysis } = await analysed(repository)
     const diagram = diagramOf(
       ['level: container'],
       ['core', 'kernel', 'external git'],
@@ -296,10 +298,10 @@ describe('suggested connections', () => {
       ]
     )
     expect(
-      driftOf(diagram, structure, dependencies).map((one) => `${one.kind} ${one.from} > ${one.to}`)
+      driftOf(diagram, structure, analysis).map((one) => `${one.kind} ${one.from} > ${one.to}`)
     ).toEqual(['connection-not-in-code kernel > core', 'dependency-not-in-diagram core > kernel'])
     expect(
-      driftOf(diagram, structure, dependencies, { tests: true }).map(
+      driftOf(diagram, structure, analysis, { tests: true }).map(
         (one) => `${one.kind} ${one.from} > ${one.to}`
       )
     ).toEqual(['dependency-not-in-diagram core > kernel'])
@@ -309,20 +311,84 @@ describe('suggested connections', () => {
     const undeclared = Object.fromEntries(
       Object.entries(repository).filter(([path]) => path !== '.arch/components.yml')
     )
-    const { structure, dependencies } = await analysed(undeclared)
+    const { structure, analysis } = await analysed(undeclared)
     expect(structure.origin).toBe('draft')
     const diagram = diagramOf(['level: container'], ['app', 'gone'], [['gone', 'app']])
     expect(checkDiagram(diagram, structure)).toEqual([])
-    expect(suggestConnections(diagram, structure, dependencies)).toEqual([])
-    expect(driftOf(diagram, structure, dependencies)).toEqual([])
+    expect(suggestConnections(diagram, structure, analysis)).toEqual([])
+    expect(driftOf(diagram, structure, analysis)).toEqual([])
 
     const unreadable = await analysed({ ...repository, '.arch/components.yml': 'components: [x\n' })
     expect(unreadable.structure.origin).toBe('draft')
     expect(checkDiagram(diagram, unreadable.structure)).toEqual([])
   })
 
+  // What the review of PR #51 found: in a workspace whose packages lead to a `dist` that is not
+  // built, a's use of b cannot be resolved, and a connection from a to b is no certain Drift.
+  it('say where a connection the code does not have is not certain, and why', async () => {
+    const workspace = {
+      'package.json': '{ "name": "mono", "private": true, "workspaces": ["packages/*"] }\n',
+      '.arch/components.yml':
+        'components:\n  a:\n    paths: [packages/a/**]\n  b:\n    paths: [packages/b/**]\n',
+      ...Object.fromEntries(
+        ['a', 'b'].map((name) => [
+          `packages/${name}/package.json`,
+          `{ "name": "@x/${name}", "version": "1.0.0", "main": "dist/index.js", "types": "dist/index.d.ts" }\n`
+        ])
+      ),
+      'packages/a/src/index.ts': "import { b } from '@x/b'\nexport const a = b + 1\n",
+      'packages/b/src/index.ts': 'export const b = 1\n'
+    }
+    const { structure, analysis } = await analysed(workspace)
+    expect(analysis.dependencies).toEqual([])
+    expect(analysis.notResolved).toEqual([
+      { file: 'packages/a/src/index.ts', specifier: '@x/b', line: 1 }
+    ])
+    const diagram = diagramOf(
+      ['level: container'],
+      ['a', 'b'],
+      [
+        ['a', 'b'],
+        ['b', 'a']
+      ]
+    )
+    const drift = driftOf(diagram, structure, analysis)
+    expect(drift).toMatchObject([
+      {
+        kind: 'connection-not-in-code',
+        from: 'a',
+        to: 'b',
+        uncertain: { notResolved: 1, notAnalysed: 0 }
+      },
+      { kind: 'connection-not-in-code', from: 'b', to: 'a' }
+    ])
+    expect(drift[1]).not.toHaveProperty('uncertain')
+    expect(drift.map((one) => saidOfDrift(one).code)).toEqual([
+      'connection-perhaps-not-in-code',
+      'connection-not-in-code'
+    ])
+    expect(drift.map(driftWording)).toEqual([
+      'The Diagram connects a to b. No Source File of a is known to depend on one of b, but that is not certain: one use in a cannot be resolved.',
+      'The Diagram connects b to a, but no Source File of b depends on one of a.'
+    ])
+
+    // A file that cannot be read says nothing of what it uses either.
+    const unread = {
+      ...analysis,
+      notResolved: [
+        ...analysis.notResolved,
+        { file: 'packages/a/src/index.ts', specifier: '@x/c', line: 2 }
+      ],
+      notAnalysed: [{ file: 'packages/a/src/index.ts' }, { file: 'packages/b/src/index.ts' }]
+    }
+    expect(driftOf(diagram, structure, unread).map(driftWording)).toEqual([
+      'The Diagram connects a to b. No Source File of a is known to depend on one of b, but that is not certain: 2 uses in a cannot be resolved, and one Source File of a cannot be read.',
+      'The Diagram connects b to a. No Source File of b is known to depend on one of a, but that is not certain: one Source File of b cannot be read.'
+    ])
+  })
+
   it('give a connection to an element whose Component is gone no Drift: the Problem says it', async () => {
-    const { structure, dependencies } = await analysed(repository)
+    const { structure, analysis } = await analysed(repository)
     const diagram = diagramOf(
       ['level: container'],
       ['app', 'core', 'billing'],
@@ -331,7 +397,7 @@ describe('suggested connections', () => {
         ['billing', 'core']
       ]
     )
-    expect(driftOf(diagram, structure, dependencies)).toEqual([])
+    expect(driftOf(diagram, structure, analysis)).toEqual([])
     expect(problemsOf(diagram, structure).map((problem) => problem.kind)).toEqual([
       'component-gone'
     ])

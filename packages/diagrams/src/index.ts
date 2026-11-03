@@ -47,6 +47,7 @@ export {
   driftWording,
   saidOfDrift,
   suggestConnections,
+  type Analysis,
   type ConnectionOptions,
   type Drift,
   type Model,

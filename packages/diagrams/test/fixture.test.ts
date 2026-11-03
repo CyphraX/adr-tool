@@ -37,10 +37,10 @@ const pairs = (list: readonly { from: string; to: string }[]): string[] =>
 
 describe('the container view of the shop', () => {
   it('suggests the connections the code has between the Components it shows', async () => {
-    const { structure, dependencies, notResolved, diagram } = await shop()
+    const { structure, analysis, notResolved, diagram } = await shop()
     expect(structure.origin).toBe('declared')
     expect(notResolved).toEqual([])
-    const suggested = suggestConnections(diagram('containers'), structure, dependencies)
+    const suggested = suggestConnections(diagram('containers'), structure, analysis)
     expect(
       suggested.map(
         (one) =>
@@ -63,8 +63,8 @@ describe('the container view of the shop', () => {
   })
 
   it('reports the connection drawn on purpose, and the Dependency left out, as Drift', async () => {
-    const { structure, dependencies, diagram } = await shop()
-    const drift = driftOf(diagram('containers'), structure, dependencies)
+    const { structure, analysis, diagram } = await shop()
+    const drift = driftOf(diagram('containers'), structure, analysis)
     expect(drift.map((one) => `${one.kind}: ${one.from} > ${one.to}`)).toEqual([
       'connection-not-in-code: persistence > web',
       'dependency-not-in-diagram: web > persistence'
@@ -75,9 +75,9 @@ describe('the container view of the shop', () => {
     ])
     expect(drift[0]).toMatchObject({ line: 27 })
     // Only a test of persistence uses the web. Counted, the connection is in the code.
-    expect(pairs(driftOf(diagram('containers'), structure, dependencies, { tests: true }))).toEqual(
-      ['web > persistence']
-    )
+    expect(pairs(driftOf(diagram('containers'), structure, analysis, { tests: true }))).toEqual([
+      'web > persistence'
+    ])
   })
 
   it('reports the element whose Component is gone as a Problem, with its Repair', async () => {
@@ -128,23 +128,23 @@ describe('the container view of the shop', () => {
 
 describe('the other views of the shop', () => {
   it('look into billing with the Components beside it, and have no Drift', async () => {
-    const { structure, dependencies, diagram } = await shop()
+    const { structure, analysis, diagram } = await shop()
     const billing = diagram('billing')
     expect(problemsOf(billing, structure)).toEqual([])
     expect(
-      suggestConnections(billing, structure, dependencies).map(
+      suggestConnections(billing, structure, analysis).map(
         (one) => `${one.from} > ${one.to}${one.typeOnly ? ' (type)' : ''}`
       )
     ).toEqual(['billing/invoices > persistence', 'billing/payments > billing/invoices (type)'])
     // A type-only Dependency counts: the Diagram does not say whether a connection is one.
-    expect(driftOf(billing, structure, dependencies)).toEqual([])
+    expect(driftOf(billing, structure, analysis)).toEqual([])
   })
 
   it('show the shop as one box in its context, with no connection the code could have', async () => {
-    const { structure, dependencies, diagram } = await shop()
+    const { structure, analysis, diagram } = await shop()
     const context = diagram('context')
     expect(problemsOf(context, structure)).toEqual([])
-    expect(suggestConnections(context, structure, dependencies)).toEqual([])
-    expect(driftOf(context, structure, dependencies)).toEqual([])
+    expect(suggestConnections(context, structure, analysis)).toEqual([])
+    expect(driftOf(context, structure, analysis)).toEqual([])
   })
 })

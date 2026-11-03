@@ -61,5 +61,5 @@ export async function analysedAt(root: string, files?: readonly string[]) {
   const all = files ?? (await filesBelow(root))
   const structure = await openStructure(fs, all)
   const analysis = await analyseDependencies(fs, all, structure.sourceFiles)
-  return { fs, structure, ...analysis }
+  return { fs, structure, analysis, ...analysis }
 }

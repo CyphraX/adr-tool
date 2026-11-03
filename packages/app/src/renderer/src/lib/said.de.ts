@@ -355,6 +355,15 @@ export const DE: Wording<Codes> = {
   // Drift.
   'connection-not-in-code': (v) =>
     `Das Diagramm verbindet ${v.from} mit ${v.to}, aber keine Quelldatei von ${v.from} hängt von einer von ${v.to} ab.`,
+  'connection-perhaps-not-in-code': (v) =>
+    `Das Diagramm verbindet ${v.from} mit ${v.to}. Von keiner Quelldatei von ${v.from} ist bekannt, dass sie von einer von ${v.to} abhängt, aber sicher ist das nicht: ${[
+      v.notResolved > 0 &&
+        `${v.notResolved === 1 ? 'eine Verwendung' : `${v.notResolved} Verwendungen`} in ${v.from} ${v.notResolved === 1 ? 'kann' : 'können'} nicht aufgelöst werden`,
+      v.notAnalysed > 0 &&
+        `${v.notAnalysed === 1 ? 'eine Quelldatei' : `${v.notAnalysed} Quelldateien`} von ${v.from} ${v.notAnalysed === 1 ? 'kann' : 'können'} nicht gelesen werden`
+    ]
+      .filter((part) => part !== false)
+      .join(', und ')}.`,
   'dependency-not-in-diagram': (v) =>
     `${v.from} hängt im Code von ${v.to} ab, über ${dependenciesIn(v.count)}, und das Diagramm verbindet sie nicht.`,
   'scope-dependency-not-in-diagram': (v) =>
