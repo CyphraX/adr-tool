@@ -52,7 +52,14 @@ export async function openStructure(fs: FileSystem, files: RepositoryFiles): Pro
     components,
     sourceFiles: ownership.sourceFiles,
     problems: unreadable
-      ? [{ kind: 'unreadable-declaration', detail: declaration.detail, said: declaration.said }]
+      ? [
+          {
+            kind: 'unreadable-declaration',
+            detail: declaration.detail,
+            said: declaration.said,
+            ...(declaration.line !== undefined && { line: declaration.line })
+          }
+        ]
       : [],
     hints: ownership.problems,
     canAdopt: !unreadable && components.length > 0

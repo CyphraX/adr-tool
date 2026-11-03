@@ -4,12 +4,12 @@ created: 2026-09-20
 decision-makers: [Philipp Saal]
 tags: [architecture, packages]
 depends-on: [0001-electron-svelte-typescript-throughout, 0004-operations-return-change-sets]
-affects: [kernel, core, structure]
+affects: [kernel, core, structure, conformance]
 ---
 
 # One core package per module, on a shared kernel
 
-The ADR tool grows into a suite whose modules — Decisions, Structure, Conformance and those after them — each have a glossary of their own ([CONTEXT-MAP.md](../../CONTEXT-MAP.md)). Every module gets one UI-free core package that speaks its glossary and no other: `core` for Decisions, `structure` next. What all of them need and none of them owns lives in `packages/kernel`: the file-system port, the in-memory file system and change sets. Module cores depend on the kernel and never on each other. Where two modules meet — an ADR that names the Components it affects — their caller joins them: the app's main process, later the CLI.
+The ADR tool grows into a suite whose modules — Decisions, Structure, Conformance and those after them — each have a glossary of their own ([CONTEXT-MAP.md](../../CONTEXT-MAP.md)). Every module gets one UI-free core package that speaks its glossary and no other: `core` for Decisions, `structure` next. What all of them need and none of them owns lives in `packages/kernel`: the file-system port, the in-memory file system and change sets. Module cores depend on the kernel, and may depend on Structure's model: every other context refers to Components and Source Files ([CONTEXT-MAP.md](../../CONTEXT-MAP.md): "Structure → every other context"). Apart from that, they never depend on each other. Where two modules meet — an ADR that names the Components it affects — their caller joins them: the app's main process, later the CLI.
 
 ## Considered Options
 

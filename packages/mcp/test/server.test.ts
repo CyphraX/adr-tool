@@ -157,7 +157,9 @@ describe('the MCP server (docs/mcp.md)', () => {
     const planned = await call(client, 'plan_create_adr', {
       title: 'Agents reach the Decision Logs over MCP'
     })
-    const id = `${String(adrs.length + 1).padStart(4, '0')}-agents-reach-the-decision-logs-over-mcp`
+    // The next number follows the highest; a number may be left free for an ADR still in a branch.
+    const highest = Math.max(...adrs.map((one: { number: number }) => one.number))
+    const id = `${String(highest + 1).padStart(4, '0')}-agents-reach-the-decision-logs-over-mcp`
     expect(planned.created).toEqual({ log: 'docs/adr', id, path: `docs/adr/${id}.md` })
     expect(planned.files).toHaveLength(1)
     expect(planned.files[0]).toMatchObject({ path: `docs/adr/${id}.md`, creates: true })
@@ -435,8 +437,9 @@ describe('what the review found (PR #41)', () => {
   it('writes nothing through a symbolic link that leads nowhere, and says so', async () => {
     const outside = mkdtempSync(join(tmpdir(), 'adr-tool-mcp-outside-'))
     try {
-      const numbers = (await openRepository(repositoryFiles(root))).logs[0]!.adrs.length
-      const next = String(numbers + 1).padStart(4, '0')
+      const { adrs } = (await openRepository(repositoryFiles(root))).logs[0]!
+      const numbers = adrs.length
+      const next = String(Math.max(...adrs.map((one) => one.number ?? 0)) + 1).padStart(4, '0')
       symlinkSync(join(outside, 'pwned.md'), join(root, `docs/adr/${next}-use-kafka.md`))
       // A link to itself: a loop that is nothing to read.
       symlinkSync('loop.md', join(root, 'docs/adr/loop.md'))
@@ -505,8 +508,10 @@ describe('what the review found (PR #41)', () => {
 
   it('says that a rename is one, even when no line changes', async () => {
     const { client, close } = await connect(root)
-    const numbers = (await call(client, 'list_adrs')).adrs.length as number
-    const next = String(numbers + 1).padStart(4, '0')
+    const { adrs } = await call(client, 'list_adrs')
+    const next = String(
+      Math.max(...adrs.map((one: { number: number }) => one.number)) + 1
+    ).padStart(4, '0')
     // Two ADRs with one number: the Repair renumbers the newer one.
     for (const slug of ['first', 'second']) {
       writeFileSync(

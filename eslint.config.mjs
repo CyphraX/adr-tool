@@ -5,7 +5,14 @@ import eslintPluginSvelte from 'eslint-plugin-svelte'
 
 export default defineConfig(
   {
-    ignores: ['**/node_modules', '**/dist', '**/out', '**/coverage', 'packages/core/test/fixtures']
+    ignores: [
+      '**/node_modules',
+      '**/dist',
+      '**/out',
+      '**/coverage',
+      'packages/core/test/fixtures',
+      'packages/conformance/test/fixtures'
+    ]
   },
   tseslint.configs.recommended,
   eslintPluginSvelte.configs['flat/recommended'],
