@@ -384,7 +384,11 @@ export function appendBlockItem(
  * deeper than the dash is the item's own; a blank line, or a comment at the dash or before it,
  * belongs to what follows.
  */
-function itemEnd(region: Region, item: { range?: [number, number, number] }, column: number): number {
+function itemEnd(
+  region: Region,
+  item: { range?: [number, number, number] },
+  column: number
+): number {
   const text = region.text
   let end = nodeEnd(region, item)
   // A collection's range runs on over the comments and blank lines after it.

@@ -218,7 +218,8 @@ describe('reading an Assessment', () => {
   })
 
   it('reads a heading without its closing #s, and a long line in linear time', () => {
-    const titled = (line: string) => readAssessment('x', `${DIR}/x.md`, `${line}\n`).assessment.title
+    const titled = (line: string) =>
+      readAssessment('x', `${DIR}/x.md`, `${line}\n`).assessment.title
     expect(titled('# The shop ##')).toBe('The shop')
     expect(titled('# C#')).toBe('C#')
     expect(titled('# C# #')).toBe('C#')

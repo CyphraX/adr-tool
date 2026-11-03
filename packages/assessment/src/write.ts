@@ -47,7 +47,7 @@ import { isFileId, lastAssessment, openAssessments, readLocations } from './read
 import { ENTRY_KEYS, readRegisterEntry } from './register'
 import { refuse } from './sentences'
 import { slugOf } from './slug'
-import { snapshotPathOf, snapshotText } from './snapshot'
+import { readSnapshot, snapshotPathOf, snapshotText } from './snapshot'
 import {
   closingSequenceAt,
   eolOf,
@@ -214,24 +214,36 @@ function checkedAuthors(authors: readonly string[]): string[] {
 // ————————————————————————————————————————————————————————————————— Assessments
 
 /** An Assessment's file by its ID, which must be there and readable. */
-async function assessmentFile(
-  fs: FileSystem,
-  id: string
-): Promise<{ path: string; text: string; assessment: Assessment }> {
+interface AssessmentFile {
+  readonly path: string
+  readonly text: string
+  /** The Assessment, with its Snapshot where it has one that can be read. */
+  readonly assessment: Assessment
+  /** Whether a Snapshot is beside it that cannot be read: nothing is checked against it. */
+  readonly snapshotUnreadable: boolean
+}
+
+async function assessmentFile(fs: FileSystem, id: string): Promise<AssessmentFile> {
   const directory = await directoryOf(fs, 'assessments')
   const path = joinPath(directory, `${id}.md`)
   const text = isFileId(id) ? await fs.readText(path) : undefined
   if (text === undefined) refuse({ code: 'no-assessment', values: { id } })
   const { assessment } = readAssessment(id, path, text)
   if (!assessment.writable) refuse({ code: 'file-needs-fixing', values: { path } })
-  return { path, text, assessment }
+  const snapshotAt = snapshotPathOf(path)
+  const frozen = await fs.readText(snapshotAt)
+  if (frozen === undefined) return { path, text, assessment, snapshotUnreadable: false }
+  const { snapshot } = readSnapshot(snapshotAt, id, frozen)
+  return {
+    path,
+    text,
+    assessment: snapshot ? { ...assessment, snapshot } : assessment,
+    snapshotUnreadable: snapshot === undefined
+  }
 }
 
 /** An Assessment that takes new entries: one that is not final. */
-async function draftFile(
-  fs: FileSystem,
-  id: string
-): Promise<{ path: string; text: string; assessment: Assessment }> {
+async function draftFile(fs: FileSystem, id: string): Promise<AssessmentFile> {
   const file = await assessmentFile(fs, id)
   if (file.assessment.status === 'final') refuse({ code: 'assessment-final', values: { id } })
   return file
@@ -672,7 +684,7 @@ function isComplete(evidence: NewEvidence): boolean {
  */
 function checkEvidence(
   evidence: NewEvidence,
-  assessment: Assessment,
+  { assessment, snapshotUnreadable }: AssessmentFile,
   known: Known,
   registers: { readonly risks?: readonly Risk[]; readonly debt?: readonly TechnicalDebtItem[] }
 ): void {
@@ -693,6 +705,9 @@ function checkEvidence(
       }
       return
     case 'metric':
+      // With a Snapshot, its value is what the Finding cites, however the code moved on; one
+      // that cannot be read is a Problem of its own, and nothing is checked against it.
+      if (snapshotUnreadable) return
       if (
         (assessment.snapshot || known.metrics) &&
         metricValueOf(assessment, evidence, known.metrics) === undefined
@@ -747,7 +762,8 @@ export function planFinding(
   known: Known = {}
 ): Promise<Plan<{ readonly id: string }>> {
   return planning(fs, async (pending) => {
-    const { path, text, assessment: read } = await draftFile(fs, assessment)
+    const file = await draftFile(fs, assessment)
+    const { path, text, assessment: read } = file
     const outline = outlineAssessment(assessment, path, text)
     const title = titleOf(finding.title)
     const id = entryIdFor(outline, assessment, 'finding', finding.id)
@@ -763,7 +779,7 @@ export function planFinding(
       : {}
     const seen = new Set<string>()
     for (const one of evidence) {
-      checkEvidence(one, read, known, registers)
+      checkEvidence(one, file, known, registers)
       const key = evidenceKey(one)
       if (seen.has(key)) {
         refuse({
@@ -797,7 +813,8 @@ export function planEvidence(
   known: Known = {}
 ): Promise<Plan> {
   return planning(fs, async (pending) => {
-    const { path, text, assessment: read } = await draftFile(fs, assessment)
+    const file = await draftFile(fs, assessment)
+    const { path, text, assessment: read } = file
     entryIn(outlineAssessment(assessment, path, text), path, assessment, 'finding', finding)
     const now = read.findings.find((one) => one.id === finding)!
     if (now.evidence.some((one) => evidenceKey(one) === evidenceKey(evidence))) {
@@ -808,7 +825,7 @@ export function planEvidence(
     }
     const registers =
       evidence.kind === 'risk' || evidence.kind === 'debt' ? await registersOf(fs) : {}
-    checkEvidence(evidence, read, known, registers)
+    checkEvidence(evidence, file, known, registers)
     await pending.write(path, (view) => {
       const place = entryIn(
         outlineAssessment(assessment, path, view.text),

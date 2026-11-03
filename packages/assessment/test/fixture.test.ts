@@ -1,9 +1,11 @@
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { applyChangeSet, memoryFileSystem, type Plan } from '@adr-tool/kernel'
 import {
   assessmentsNaming,
   metricValueOf,
   openAssessments,
+  planEvidence,
   snapshotText,
   traceProblems,
   wordingOf,
@@ -176,6 +178,42 @@ describe('the Assessment of the shop', () => {
     // Without the Snapshot, a draft reads the value of the code now.
     const unfrozen = { ...assessment!, snapshot: undefined }
     expect(metricValueOf(unfrozen, metric, after.values)).toEqual({ value: 1, frozen: false })
+  })
+
+  it('takes metric evidence by what its Snapshot holds, however the code moved on', async () => {
+    const files = await inMemory(root)
+    const snapshot = PATH.replace(/\.md$/, '.snapshot.yml')
+    const unfrozen = Object.fromEntries(Object.entries(files).filter(([path]) => path !== snapshot))
+    const catalog = { kind: 'metric', metric: 'files', subject: { component: 'catalog' } } as const
+    const cost = {
+      kind: 'metric',
+      metric: 'propagation-cost',
+      subject: { component: 'cart' }
+    } as const
+    // The code now has no files of the catalog, and a propagation cost of the cart.
+    const now = { metrics: { components: { cart: { 'propagation-cost': 0.4 } } } }
+    const outcome = (plan: Plan): string => (plan.ok ? 'planned' : plan.reason)
+
+    // The Snapshot holds the files of the catalog, and no propagation cost.
+    const fs = memoryFileSystem(files)
+    const taken = await planEvidence(fs, ID, 'F3', catalog, now)
+    expect(outcome(taken)).toBe('planned')
+    expect(outcome(await planEvidence(fs, ID, 'F3', cost, now))).toBe(
+      'the metric propagation-cost of cart is not there, so a Finding cannot cite it.'
+    )
+    if (taken.ok) await applyChangeSet(fs, taken.changeSet)
+    expect(traceProblems(await openAssessments(fs), now)).toEqual([])
+
+    // Without the Snapshot, the values now are what a draft cites.
+    const draft = memoryFileSystem(unfrozen)
+    expect(outcome(await planEvidence(draft, ID, 'F3', catalog, now))).toBe(
+      'the metric files of catalog is not there, so a Finding cannot cite it.'
+    )
+    expect(outcome(await planEvidence(draft, ID, 'F3', cost, now))).toBe('planned')
+
+    // A Snapshot that cannot be read is a Problem of its own: nothing is checked against it.
+    const broken = memoryFileSystem({ ...files, [snapshot]: 'components: [\n' })
+    expect(outcome(await planEvidence(broken, ID, 'F3', cost, now))).toBe('planned')
   })
 
   it('reports nothing of the Violation once the Assessment is final: it is a record of its day', async () => {
