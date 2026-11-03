@@ -45,8 +45,20 @@ A set of Source Files, or of Components of one level, in which each depends on e
 _Avoid_: Circular dependency, loop, tangle
 
 **Library**:
-A third-party package the repository uses. Using a Library is not a Dependency.
+A third-party package that a Manifest of the repository declares or its code uses. Using a Library is not a Dependency. It is known by the name the code imports it by, which need not be the name it is declared by: `PyYAML` is imported as `yaml`.
 _Avoid_: External dependency, third-party dependency, package, artifact
+
+**Manifest**:
+A file in which a part of the repository declares the Libraries it needs, with their versions: `package.json`, `pom.xml`, `build.gradle`, `pyproject.toml`, a requirements file, `go.mod`. It is read as text and never run, and it belongs to the Component whose code lies below it.
+_Avoid_: Build file (that is what the Draft reads, a Manifest among others), lockfile (that says what was installed, not what was declared), dependency file
+
+**Library inventory**:
+The Libraries of a repository or of a Component, seen together: for each one the Manifests that declare it, its versions, the Components and Source Files that use it, and its declared licence. It says what is declared and not used, and what is used and not declared. It is derived, never stored.
+_Avoid_: SBOM or bill of materials (those are documents for exchange, with every package installed), dependency list, Libraries alone
+
+**Declared licence**:
+The licence that the copy of a Library installed in the repository says it has. It is read, never guessed from a licence's text or looked up elsewhere; where it cannot be told, the inventory says why.
+_Avoid_: Licence check, compliance (the suite judges no licence), detected licence
 
 **System**:
 Several repositories that together form one piece of software and are looked at as a whole.
