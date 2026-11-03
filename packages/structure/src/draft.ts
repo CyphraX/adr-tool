@@ -1,5 +1,6 @@
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import type { DeclaredComponent } from './declaration'
+import { childOf, parseXml } from './libraries/maven'
 import {
   configuredSourceRoot,
   declaresPythonProject,
@@ -214,13 +215,20 @@ async function mavenModules(fs: FileSystem, files: readonly string[]): Promise<s
     if (visited.has(pom) || !known.has(pom)) return
     visited.add(pom)
     if (directory !== '') modules.push(directory)
-    const text = ((await fs.readText(pom)) ?? '').replace(/<!--[\s\S]*?-->/g, '')
-    for (const block of text.matchAll(/<modules>([\s\S]*?)<\/modules>/g)) {
-      for (const module of block[1]!.matchAll(/<module>\s*([^<]*?)\s*<\/module>/g)) {
-        const written = module[1]!.replace(/\/?pom\.xml$/, '')
-        const path = normalizePath(directory === '' ? written : `${directory}/${written}`)
-        if (path !== undefined) await visit(path)
-      }
+    // Read by hand, in time linear in the length of the file (src/libraries/maven.ts): the
+    // modules of the project, and those of its profiles.
+    const project = parseXml((await fs.readText(pom)) ?? '')
+    const lists = [
+      childOf(project, 'modules'),
+      ...(childOf(project, 'profiles')?.children ?? []).map((profile) =>
+        childOf(profile, 'modules')
+      )
+    ]
+    for (const module of lists.flatMap((list) => list?.children ?? [])) {
+      if (module.name !== 'module' || module.text === '') continue
+      const written = module.text.replace(/\/?pom\.xml$/, '')
+      const path = normalizePath(directory === '' ? written : `${directory}/${written}`)
+      if (path !== undefined) await visit(path)
     }
   }
   await visit('')
