@@ -260,6 +260,9 @@ importers:
 
   packages/mcp:
     devDependencies:
+      '@adr-tool/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@adr-tool/core':
         specifier: workspace:*
         version: link:../core

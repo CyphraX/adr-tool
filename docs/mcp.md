@@ -59,6 +59,14 @@ Every call reads the repository afresh: what a person or git changed in between 
 | `list_templates` | — | `templates`: the repository's own under `.adr/templates`, then the built-in ones, each with `name` and `source`; `default`, the one a new ADR is made from when none is named. |
 | `list_components` | — | `components`: the Components `.arch/components.yml` declares, with `id`, `name` and `description` — what an ADR can name in `affects` ([structure-format.md](structure-format.md)). |
 
+### Measuring the code (part 13)
+
+| Tool | Takes | Answers |
+| --- | --- | --- |
+| `component_metrics` | `component`?, `tests`? | Structure's metrics ([structure-format.md, section 5](structure-format.md#5-metrics-parts-5-and-13)) of the Component, or of the whole repository when `component` is left out, as data: `metrics`, the Component's size, coupling, instability, abstractness and distance from the main sequence; `level`, the level below it — `below` is its ID, or `*` for the top level —, with its `propagationCost` and each node's `kind`, `id`, number of `files`, and the `abstractness`, `instability` and `distance` of each Component or directory; `functions`, its 20 most complex, each with `file`, `name`, `line`, `endLine` and `complexity`, and how many there are as `functionCount`; `classes`, the 10 whose methods fall into the most groups by LCOM4 — more than one —, each with `methods` and `lcom4`, and `classCount`. A metric that is undefined — nothing to divide by, nothing declared — is `null`. `origin` says whether the Components are declared or the Draft; `note`, that Java's numbers are a lower bound, where there is Java. Test files count when `tests` is `true`. |
+
+`component_metrics` analyses the code each time it is called, as `adr check` does — the files git lists, the Components, every import, TypeScript, JavaScript, Svelte and Java — and it takes a moment on a large repository. It reads; it runs nothing of the repository and writes nothing.
+
 ## Planning a change
 
 Each of these reads the repository, plans the operation with `core` exactly as the app plans it, and answers with the planned change. Nothing is written.
