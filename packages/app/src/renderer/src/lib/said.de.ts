@@ -1,12 +1,13 @@
 /**
- * What `core` and `structure` say, in German: one sentence for every code they have, taking the
- * values their English sentence takes (docs/plan-roadmap.md, part 12). The compiler asks for a
- * sentence for every code; a code without one does not build.
+ * What `core`, `structure` and `conformance` say, in German: one sentence for every code they
+ * have, taking the values their English sentence takes (docs/plan-roadmap.md, part 12). The
+ * compiler asks for a sentence for every code; a code without one does not build.
  *
  * The vocabulary of the tool stays as it is: ADR, Decision Log, Status, Relation, Problem,
  * Migration, Frontmatter; Metadaten, Rückverweis, Reparatur, Korrektur, Vorlage, Komponente,
- * Entwurf, Quelldatei. What names a value or a key of a file — proposed, accepted, supersedes,
- * affects — is written as the file writes it.
+ * Entwurf, Quelldatei; and of Conformance Regel, Verstoß, Ausnahme, Fingerabdruck, Schicht,
+ * Zyklus, Metrik, angewandtes Pattern. What names a value or a key of a file — proposed,
+ * accepted, supersedes, affects, must-not-depend, from — is written as the file writes it.
  */
 import {
   STATUSES,
@@ -14,13 +15,16 @@ import {
   type Said,
   type SENTENCES as CORE_SENTENCES
 } from '@adr-tool/core'
-import type { STRUCTURE_SENTENCES } from '@adr-tool/structure/model'
+import type { CONFORMANCE_SENTENCES, Change } from '@adr-tool/conformance'
+import { UNASSIGNED, type STRUCTURE_SENTENCES } from '@adr-tool/structure/model'
 
 /**
- * Every code of `core` and `structure`, with the values of its sentence. The kernel's codes are
- * in both; they are taken once.
+ * Every code of `core`, `structure` and `conformance`, with the values of its sentence. The
+ * kernel's codes are in all of them, its codes of YAML in the last two; they are taken once.
  */
-type Codes = typeof CORE_SENTENCES & Omit<typeof STRUCTURE_SENTENCES, keyof typeof CORE_SENTENCES>
+type Codes = typeof CORE_SENTENCES &
+  Omit<typeof STRUCTURE_SENTENCES, keyof typeof CORE_SENTENCES> &
+  Omit<typeof CONFORMANCE_SENTENCES, keyof typeof CORE_SENTENCES | keyof typeof STRUCTURE_SENTENCES>
 
 /** A sentence for every code, taking the values the English one takes. */
 type Wording<S> = { readonly [Code in keyof S]: S[Code] }
@@ -53,6 +57,49 @@ const quoted = (what: readonly string[]): string => what.map((one) => `„${one}
 const germanQuotes = (is: string): string => is.replace(/^"(.*)"$/s, '„$1“')
 const has = (v: { adr: string; is: string }): string =>
   `${v.adr} hat den Status ${germanQuotes(v.is)}.`
+
+const RULE_ID_RULE =
+  'Sie besteht aus Kleinbuchstaben, Ziffern und Bindestrichen und beginnt und endet mit einem Buchstaben oder einer Ziffer.'
+
+/** How many names one sentence lists before it counts the rest: as many as in English. */
+const LISTED_AT_MOST = 5
+
+/** A list of names as a German sentence has them: `a`, `a und b`, `a, b und c`, `… und 3 weitere`. */
+function listed(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  if (names.length > LISTED_AT_MOST) {
+    return `${names.slice(0, LISTED_AT_MOST).join(', ')} und ${names.length - LISTED_AT_MOST} weitere`
+  }
+  return `${names.slice(0, -1).join(', ')} und ${names.at(-1)}`
+}
+
+/** A round trip, back to where it starts, as the English sentence draws it. */
+const tripOf = (trip: readonly string[]): string =>
+  [...trip.slice(0, LISTED_AT_MOST), ...(trip.length > LISTED_AT_MOST ? ['…'] : []), trip[0]!].join(
+    ' -> '
+  )
+
+/** A number as a person reads it in German: whole numbers as they are, others to two places. */
+const formatNumber = (value: number): string =>
+  Number.isInteger(value) ? String(value) : (Math.round(value * 100) / 100).toLocaleString('de')
+
+/** A target of a Dependency in a sentence: a Component, or the files of none. */
+const target = (to: string): string =>
+  to === UNASSIGNED ? 'Quelldateien, die zu keiner Komponente gehören' : to
+
+/** Where a Component is named: by a Rule or by an applied Pattern. */
+const namedBy = (v: { by: 'rule' | 'applied-pattern'; owner: string }): string =>
+  v.by === 'rule' ? `Die Regel ${v.owner}` : `Das angewandte Pattern ${v.owner}`
+
+/** What the suite was asked to write into the Rules file, as a refusal names it. */
+const CHANGES: Record<Change, string> = {
+  'add-rule': 'keine Regel hinzufügen',
+  'change-rule': 'keine Regel darin ändern',
+  'remove-rule': 'keine Regel daraus entfernen',
+  'add-exception': 'keine Ausnahme hinzufügen',
+  'change-exception': 'keine Ausnahme darin ändern',
+  'remove-exception': 'keine Ausnahme daraus entfernen'
+}
 
 /** What another sentence said, inside this one; a plain text is passed on as it is. */
 const german = (said: Said | string): string =>
@@ -274,7 +321,105 @@ export const DE: Wording<Codes> = {
 
   // Why a Java file cannot be read.
   'java-missing': (v) => `Es fehlt: ${v.what}.`,
-  'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.'
+  'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
+
+  // The Problems of Conformance (docs/conformance-format.md, section 5).
+  'unreadable-rules': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'rules-without-declaration': (v) =>
+    `${v.path} enthält Regeln, aber ${v.declaration} deklariert keine Komponenten, die gelesen werden können. Deshalb wird keine Regel geprüft. Zuerst müssen die Komponenten deklariert oder der Entwurf übernommen werden.`,
+  'unknown-rule-kind': (v) =>
+    v.kind === ''
+      ? `Die Regel ${v.rule} hat keine Art. Die Art einer Regel ist eine von ${v.kinds.join(', ')}.`
+      : `Die Regel ${v.rule} hat die Art „${v.kind}“, die die Suite nicht kennt. Die Art einer Regel ist eine von ${v.kinds.join(', ')}.`,
+  'invalid-rule': (v) =>
+    `${v.rule === '' ? 'Eine Regel' : `Die Regel ${v.rule}`} kann nicht geprüft werden: ${german(v.detail)}.`,
+  'duplicate-rule': (v) =>
+    `Es gibt bereits eine Regel ${v.rule}. Geprüft wird die erste, diese nicht.`,
+  'unknown-component': (v) =>
+    `${namedBy(v)} nennt ${v.component} in ${v.key}, aber das ist keine deklarierte Komponente.`,
+  'no-component-matches': (v) =>
+    `${namedBy(v)} hat in ${v.key} das Muster „${v.pattern}“, das keine deklarierte Komponente trifft.`,
+  'invalid-exception': (v) =>
+    `Eine Ausnahme von ${v.rule === '' ? 'einer Regel' : `der Regel ${v.rule}`} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'exception-unknown-rule': (v) =>
+    `Eine Ausnahme nennt die Regel ${v.rule}, die nicht in dieser Datei steht.`,
+  'unmatched-exception': (v) =>
+    `Die Ausnahme ${v.fingerprint} trifft keinen Verstoß mehr. Sie kann entfernt werden, oder sie nennt den Verstoß so, wie er jetzt ist.`,
+  'duplicate-exception': (v) =>
+    `Es gibt bereits eine Ausnahme ${v.fingerprint}. Es zählt die erste.`,
+  'unknown-justification': (v) =>
+    `Die Ausnahme ${v.fingerprint} ist mit ${v.adr} begründet, aber das ist kein ADR dieses Repositorys. Ein ADR wird mit dem Verzeichnis seines Decision Logs und seiner ID genannt: docs/adr/0001-example.`,
+  'invalid-justification': (v) =>
+    `Die Ausnahme ${v.fingerprint} ist mit ${v.adr} begründet, aber das ist eine Webadresse, kein ADR. Ein ADR wird mit dem Verzeichnis seines Decision Logs und seiner ID genannt: docs/adr/0001-example.`,
+  'invalid-applied-pattern': (v) =>
+    `${v.pattern === '' ? 'Ein angewandtes Pattern' : `Das angewandte Pattern ${v.pattern}`} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'exception-can-shrink': (v) =>
+    `Die Ausnahme ${v.fingerprint} akzeptiert nur noch einen Zyklus aus ${listed(v.members)} und kann auf ${v.members.length > LISTED_AT_MOST ? 'diese' : 'sie'} eingeschränkt werden.`,
+
+  // Why the file, a Rule, an Exception or an applied Pattern cannot be read.
+  'key-not-list': (v) => `„${v.key}“ muss eine Liste sein`,
+  'key-twice': (v) => `„${v.key}“ steht zweimal da`,
+  'key-not-of-kind': (v) => `„${v.key}“ ist kein Schlüssel einer Regel der Art ${v.kind}`,
+  'item-not-map': () => 'der Eintrag muss ein Mapping seiner Schlüssel sein',
+  'missing-key': (v) => `„${v.key}“ fehlt`,
+  'not-text': (v) => `„${v.key}“ muss ein Text sein`,
+  'not-patterns': (v) =>
+    `„${v.key}“ muss eine Komponenten-ID oder ein Muster sein, oder eine Liste davon`,
+  'not-rule-id': (v) => `„${v.id}“ ist keine gültige Regel-ID. ${RULE_ID_RULE}`,
+  'not-number': (v) => `„${v.key}“ muss eine Zahl sein`,
+  'not-one-of': (v) =>
+    `„${v.key}“ ist „${v.value}“, und das ist keiner der Werte ${v.allowed.join(', ')}`,
+  'unknown-metric': (v) =>
+    `„${v.metric}“ ist keine Metrik, die die Suite kennt; eine Metrik ist eine von ${v.metrics.join(', ')}`,
+  'too-few-layers': () => '„layers“ muss mindestens zwei Schichten nennen',
+  'among-or-inside': () => 'sie braucht entweder „among“ oder „inside“',
+  'max-or-min': () => 'sie braucht „max“, „min“ oder beides',
+  'fingerprint-of-kind': (v) =>
+    `eine Ausnahme von einer Regel der Art ${v.kind} nennt ihren Verstoß mit ${v.keys}`,
+  'roles-not-map': () => '„roles“ muss ein Mapping von jeder Rolle auf Komponentenmuster sein',
+
+  // What a Violation is: the kind of its Rule.
+  'must-not-depend': (v) => `${v.from} darf nicht von ${v.to} abhängen`,
+  'may-only-depend': (v) =>
+    v.allowed.length === 0
+      ? `${v.from} darf von keiner anderen Komponente abhängen und hängt von ${target(v.to)} ab`
+      : `${v.from} darf nur von ${listed(v.allowed)} abhängen und hängt von ${target(v.to)} ab`,
+  layers: (v) =>
+    v.where === 'above'
+      ? `${v.from} darf nicht von ${v.to} abhängen, das in einer Schicht darüber liegt`
+      : `${v.from} darf nicht von ${v.to} abhängen, das mehr als eine Schicht darunter liegt`,
+  'no-cycles': (v) =>
+    `${listed(v.members)} hängen in einem Zyklus voneinander ab${v.members.length > 2 ? `, zum Beispiel ${tripOf(v.roundTrip)}` : ''}${v.weakest ? `, mit ${v.weakest.join(' -> ')} als schwächster Abhängigkeit` : ''}`,
+  threshold: (v) =>
+    `Die Metrik ${v.metric} von ${v.component} ist ${formatNumber(v.value)} und liegt ${v.bound === 'max' ? 'über dem Höchstwert' : 'unter dem Mindestwert'} von ${formatNumber(v.limit)}`,
+  'violation-at': (v) => `${german(v.violation)}: ${v.file}:${v.line} importiert ${v.imports}.`,
+  'violation-alone': (v) => `${german(v.violation)}.`,
+
+  // Writing a Rule or an Exception: why it is refused.
+  'write-unreadable-rules': (v) =>
+    `${v.path} kann nicht gelesen werden, deshalb kann die Suite nicht hineinschreiben. Zuerst muss die Datei korrigiert werden.`,
+  'cannot-write-rules': (v) =>
+    `${v.path} ist so geschrieben, dass die Suite ${CHANGES[v.change]} kann, ohne mehr davon neu zu schreiben: ${german(v.why)}. Das muss in einem Editor geändert werden.`,
+  'rule-exists': (v) =>
+    `Es gibt bereits eine Regel ${v.id}. Eine Regel-ID nennt eine einzige Regel in ${v.path}.`,
+  'no-rule': (v) => `${v.path} hat keine Regel ${v.id}. Die Datei sollte neu angesehen werden.`,
+  'rule-unchanged': (v) => `Die Regel ${v.id} sagt das bereits.`,
+  'exception-exists': (v) => `Es gibt bereits eine Ausnahme ${v.fingerprint}.`,
+  'no-exception': (v) =>
+    `${v.path} hat in Zeile ${v.line} keine Ausnahme ${v.fingerprint} mehr. Die Datei sollte neu angesehen werden.`,
+  'no-such-exception': (v) => `${v.path} hat keine Ausnahme ${v.fingerprint}.`,
+  'top-in-braces': () => 'die oberste Ebene ist in geschweiften Klammern geschrieben',
+  'list-in-brackets': (v) => `„${v.key}“ ist in eckigen Klammern geschrieben`,
+  'item-in-braces': () => 'der Eintrag ist in geschweiften Klammern geschrieben',
+  'anchor-or-alias': () => 'der Eintrag verwendet einen Anker oder einen Alias',
+  'comment-lost': () => 'ein Kommentar ginge verloren',
+  'reads-otherwise': () => 'was sie schreiben würde, liest sich nicht so, wie es gemeint war',
+
+  // Rename of a Component in the Rules.
+  'rename-unreadable-rules': (v) =>
+    `${v.path} kann nicht gelesen werden, deshalb können die Regeln, die die Komponente nennen, nicht mit ihr umbenannt werden. Zuerst muss die Datei korrigiert werden.`,
+  'cannot-rename-in-rules': (v) =>
+    `${v.path} ist so geschrieben, dass die Suite ${v.id} darin nicht umbenennen kann. Das muss in einem Editor geändert werden.`
 }
 
 /** What a module said, in German; `undefined` for a code that has no German sentence. */

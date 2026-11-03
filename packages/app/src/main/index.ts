@@ -4,6 +4,7 @@ import { stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { planConformanceRepair } from '@adr-tool/conformance'
 import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
   CHANNEL,
@@ -16,16 +17,20 @@ import {
 import { isLanguage } from '../shared/language'
 import { analysisHost } from './analysis-host'
 import { ASSET_SCHEME, assetHandler } from './assets'
+import { conformanceView, planException, planRule } from './conformance'
 import { exportPdf, writeExport } from './export'
 import { nodeFileSystem } from './node-file-system'
 import { Repositories, localDate } from './repositories'
 import {
+  conformanceRepairRequest,
   createRequest,
   diagramsRequest,
+  exceptionRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
   repairRequest,
+  ruleRequest,
   structureRepairRequest
 } from './requests'
 import { readSession, writeSession } from './session-store'
@@ -262,6 +267,62 @@ function registerIpc(): void {
       return repositories.hold(
         repositoryId as string,
         await planRepair(nodeFileSystem(root), repair)
+      )
+    }
+  )
+
+  ipcMain.handle(CHANNEL.conformanceView, async (_, repositoryId: unknown, watch: unknown) => {
+    if (typeof repositoryId !== 'string') return { ok: false, reason: t.notUnderstood }
+    const root = repositories.rootOf(repositoryId)
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    try {
+      const { analysis, current, analysedAt } = await structures.analysisOf(
+        repositoryId,
+        root,
+        watch === true
+      )
+      return {
+        ok: true,
+        view: await conformanceView(repositoryId, nodeFileSystem(root), analysis, {
+          current,
+          analysedAt
+        })
+      }
+    } catch (error) {
+      if (error instanceof AnalysisDropped) return { ok: false, dropped: true }
+      return { ok: false, reason: t.analysisFailed(String(error)) }
+    }
+  })
+
+  ipcMain.handle(CHANNEL.planRule, async (_, repositoryId: unknown, request: unknown) => {
+    const rule = ruleRequest(request)
+    if (!rule) return { ok: false, reason: t.notUnderstood }
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    return repositories.hold(repositoryId as string, await planRule(nodeFileSystem(root), rule))
+  })
+
+  ipcMain.handle(CHANNEL.planException, async (_, repositoryId: unknown, request: unknown) => {
+    const draft = exceptionRequest(request)
+    if (!draft) return { ok: false, reason: t.notUnderstood }
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    return repositories.hold(
+      repositoryId as string,
+      await planException(nodeFileSystem(root), draft)
+    )
+  })
+
+  ipcMain.handle(
+    CHANNEL.planConformanceRepair,
+    async (_, repositoryId: unknown, request: unknown) => {
+      const repair = conformanceRepairRequest(request)
+      if (!repair) return { ok: false, reason: t.notUnderstood }
+      const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+      if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+      return repositories.hold(
+        repositoryId as string,
+        await planConformanceRepair(nodeFileSystem(root), repair)
       )
     }
   )

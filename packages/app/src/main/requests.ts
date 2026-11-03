@@ -1,3 +1,11 @@
+import {
+  METRICS,
+  RULE_KIND_NAMES,
+  type ConformanceRepair,
+  type ExceptionDraft,
+  type Fingerprint,
+  type RuleDraft
+} from '@adr-tool/conformance'
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
 import type { StructureProblem } from '@adr-tool/structure/model'
 import { drawingRefused } from '../shared/drawing'
@@ -7,7 +15,8 @@ import type {
   MetadataEditRequest,
   MigrationRequest,
   RenameRequest,
-  RepairRequest
+  RepairRequest,
+  RuleRequest
 } from '../shared/ipc'
 
 /**
@@ -141,10 +150,120 @@ function repairOf(given: Record<string, unknown>): Repair | undefined {
   }
 }
 
+/**
+ * A Rule to add, change or remove. Whether its ID, its patterns and its keys make a Rule is
+ * `conformance`'s question; here only their types are looked at.
+ */
+export function ruleRequest(request: unknown): RuleRequest | undefined {
+  const { action, id, draft } = record(request)
+  if (action === 'remove') return typeof id === 'string' ? { action, id } : undefined
+  const rule = ruleDraft(draft)
+  if (rule === undefined) return undefined
+  if (action === 'add') return { action, draft: rule }
+  return action === 'change' && typeof id === 'string' ? { action, id, draft: rule } : undefined
+}
+
+function ruleDraft(value: unknown): RuleDraft | undefined {
+  const given = record(value)
+  const { id, why, kind, tests, ignoreTypeOnly } = given
+  if (typeof id !== 'string' || typeof why !== 'string') return undefined
+  if (typeof kind !== 'string' || !(RULE_KIND_NAMES as readonly string[]).includes(kind)) {
+    return undefined
+  }
+  if (tests !== undefined && typeof tests !== 'boolean') return undefined
+  if (ignoreTypeOnly !== undefined && typeof ignoreTypeOnly !== 'boolean') return undefined
+  const common = {
+    id,
+    why,
+    ...(tests === true && { tests }),
+    ...(ignoreTypeOnly === true && kind !== 'threshold' && { ignoreTypeOnly })
+  }
+  const isNumber = (item: unknown): item is number =>
+    typeof item === 'number' && Number.isFinite(item)
+  switch (kind) {
+    case 'must-not-depend':
+    case 'may-only-depend':
+      return isStrings(given['from']) && isStrings(given['to'])
+        ? ({ ...common, kind, from: given['from'], to: given['to'] } as RuleDraft)
+        : undefined
+    case 'layers': {
+      const { layers, mode } = given
+      const valid =
+        Array.isArray(layers) &&
+        layers.every(isStrings) &&
+        (mode === 'relaxed' || mode === 'strict')
+      return valid ? ({ ...common, kind, layers, mode } as RuleDraft) : undefined
+    }
+    case 'no-cycles': {
+      const { scope, components } = given
+      const valid = (scope === 'among' || scope === 'inside') && isStrings(components)
+      return valid ? ({ ...common, kind, scope, components } as RuleDraft) : undefined
+    }
+    case 'threshold': {
+      const { metric, max, min, of } = given
+      const valid =
+        typeof metric === 'string' &&
+        (METRICS as readonly string[]).includes(metric) &&
+        (max === undefined || isNumber(max)) &&
+        (min === undefined || isNumber(min)) &&
+        isStrings(of)
+      if (!valid) return undefined
+      return {
+        ...common,
+        kind,
+        metric,
+        ...(max !== undefined && { max }),
+        ...(min !== undefined && { min }),
+        of
+      } as RuleDraft
+    }
+    default:
+      return undefined
+  }
+}
+
+/** The Violation an Exception is to accept, why, and the ADR that justifies it. */
+export function exceptionRequest(request: unknown): ExceptionDraft | undefined {
+  const { fingerprint, reason, justifiedBy } = record(request)
+  const named = fingerprintOf(fingerprint)
+  if (named === undefined || typeof reason !== 'string') return undefined
+  if (justifiedBy !== undefined && typeof justifiedBy !== 'string') return undefined
+  return { fingerprint: named, reason, ...(justifiedBy !== undefined && { justifiedBy }) }
+}
+
+/** A Repair of the Rules file, as `repairOf` made it. */
+export function conformanceRepairRequest(request: unknown): ConformanceRepair | undefined {
+  const { kind, line, fingerprint, members } = record(request)
+  const named = fingerprintOf(fingerprint)
+  if (named === undefined || typeof line !== 'number' || !Number.isInteger(line)) return undefined
+  if (kind === 'remove-exception') return { kind, line, fingerprint: named }
+  if (kind === 'narrow-exception' && isStrings(members)) {
+    return { kind, line, fingerprint: named, members: members as string[] }
+  }
+  return undefined
+}
+
+function fingerprintOf(value: unknown): Fingerprint | undefined {
+  const { kind, rule, from, to, cycle, component } = record(value)
+  if (typeof rule !== 'string') return undefined
+  switch (kind) {
+    case 'dependency':
+      return typeof from === 'string' && typeof to === 'string'
+        ? { kind, rule, from, to }
+        : undefined
+    case 'cycle':
+      return isStrings(cycle) ? { kind, rule, cycle: cycle as string[] } : undefined
+    case 'component':
+      return typeof component === 'string' ? { kind, rule, component } : undefined
+    default:
+      return undefined
+  }
+}
+
 function record(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
 }
 
-function isStrings(value: unknown): boolean {
+function isStrings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
