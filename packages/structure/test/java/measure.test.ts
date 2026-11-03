@@ -226,7 +226,7 @@ final class Counter {
     ])
   })
 
-  it('takes no \`this\` of an anonymous class for the instance', () => {
+  it('takes no `this` of an anonymous class for the instance', () => {
     expect(
       groups(`package a;
 final class Outer {
