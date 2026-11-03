@@ -97,6 +97,8 @@ export const SENTENCES = {
   'reply-needs-author': (): string => 'A Reply needs the name of its author.',
   'reply-needs-text': (): string => 'A Reply needs a text.',
   'not-a-day': (v: { date: string }): string => `"${v.date}" is not a date of the form YYYY-MM-DD.`,
+  'not-a-time': (v: { time: string }): string =>
+    `"${v.time}" is not a moment of the form YYYY-MM-DDTHH:MM:SS with Z or an offset such as +01:00.`,
   'no-source-file': (v: { path: string }): string => `${v.path} is no file of this repository.`,
   'no-lines': (v: { lines: string }): string =>
     `${v.lines} are no lines: give the first and the last, counted from 1.`,

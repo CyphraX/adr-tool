@@ -236,29 +236,57 @@ export function planAnnotation(
 
 export interface NewReply {
   readonly author: string
-  /** `YYYY-MM-DD`. */
+  /** `YYYY-MM-DD`: the day it is written, as its `date`. */
   readonly date: string
+  /**
+   * The moment it is written, ISO 8601 with `Z` or an offset — `2026-11-03T14:15:02Z`, as
+   * `Date.prototype.toISOString` gives it. In UTC, to the second, it names the Reply's file.
+   */
+  readonly time: string
   /** Markdown. */
   readonly text: string
 }
 
-/** Plan a Reply to an Annotation: a file of its own beside it; the Annotation is not touched. */
+/** A moment as a Reply's file name starts with it: `20261103T141502Z`, in UTC. */
+function stampOf(time: string): string | undefined {
+  const match =
+    /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(
+      time
+    )
+  if (!match || !isDay(match[1]!)) return undefined
+  const utc = new Date(Date.parse(time))
+  if (Number.isNaN(utc.getTime()) || utc.getUTCFullYear() > 9999) return undefined
+  return utc
+    .toISOString()
+    .replace(/\.\d+Z$/, 'Z')
+    .replace(/[-:]/g, '')
+}
+
+/**
+ * Plan a Reply to an Annotation: a file of its own beside it, named by the moment it is written
+ * and its author, so that Replies written on two branches meet in a merge without a conflict.
+ * The Annotation is not touched.
+ */
 export function planReply(fs: FileSystem, id: string, reply: NewReply): Promise<Plan> {
   return planning(fs, async (pending) => {
     const author = reply.author.trim()
     if (author === '') refuse({ code: 'reply-needs-author', values: {} })
     if (reply.text.trim() === '') refuse({ code: 'reply-needs-text', values: {} })
     if (!isDay(reply.date)) refuse({ code: 'not-a-day', values: { date: reply.date } })
+    const stamp = stampOf(reply.time)
+    if (stamp === undefined) refuse({ code: 'not-a-time', values: { time: reply.time } })
     const { path, text } = await annotationFile(fs, id)
     const folder = path.slice(0, -'.md'.length)
-    const numbers = ((await fs.list(folder)) ?? []).map((entry) =>
-      Number(/^(\d+)-/.exec(entry.name)?.[1] ?? 0)
+    const taken = new Set(
+      ((await fs.list(folder)) ?? []).map((entry) => entry.name.replace(/\.md$/, '').toLowerCase())
     )
-    const number = String(Math.max(0, ...numbers) + 1).padStart(4, '0')
+    const stem = `${stamp}-${slugOf(author) || 'reply'}`
+    let name = stem
+    for (let count = 2; taken.has(name.toLowerCase()); count++) name = `${stem}-${count}`
     const eol = eolOf(text)
     const lines = ['---', `author: ${formatScalar(author)}`, `date: ${reply.date}`, '---', '']
     await pending.create(
-      joinPath(folder, `${number}-${slugOf(author) || 'reply'}.md`),
+      joinPath(folder, `${name}.md`),
       lines.map((line) => line + eol).join('') + inEol(reply.text, eol)
     )
     return {}

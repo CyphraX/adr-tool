@@ -29,8 +29,8 @@ In the directory:
 docs/architecture/annotations/
   20261102-why-is-the-total-computed-on-every-call.md     ← an Annotation
   20261102-why-is-the-total-computed-on-every-call/       ← its Replies, one file each
-    0001-lena-becker.md
-    0002-aylin-demir.md
+    20261103T141502Z-lena-becker.md
+    20261104T081930Z-aylin-demir.md
   20261103-this-bypasses-the-repository.md
 ```
 
@@ -45,7 +45,9 @@ docs/architecture/annotations/
 
 ### A new Reply's file name
 
-`NNNN-author.md`: the next number after the highest one among the Replies, four digits, and a slug of the author's name (`reply` when it leaves none). Two people who reply on two branches at the same time each add a file of their own, so their Replies meet in a merge without a conflict; that they carry the same number says that neither saw the other.
+`YYYYMMDDTHHMMSSZ-author.md`: the moment it is written, in UTC to the second, and a slug of the author's name (`reply` when it leaves none); where the name is taken, `-2`, `-3`, … is added. Two people who reply on two branches each add a file of their own, and so does one person who replies on two branches: their Replies meet in a merge without a conflict, in the order they were written. A Reply written by hand may have any name ending in `.md`.
+
+Two Annotations written on two branches on the same day, whose texts start with the same words, get the same ID: the suite sees only its own branch. git reports a conflict over the one file when the branches meet; one of the two is then renamed by hand, its directory of Replies with it, before anything cites it by its ID.
 
 ## 2. An Annotation file
 
@@ -126,7 +128,7 @@ We cache it per cart in the next sprint; ADR-0007 has the reasons.
 ```
 
 - `author` and `date` as in an Annotation; the text is the body, the author's own.
-- The Replies of an Annotation are in the order of their file names: by number, and where two share a number, by the author's slug.
+- The Replies of an Annotation are in the order of their file names: those the suite writes by the moment they were written, and where two share it, by the author's slug.
 - A Reply has no state of its own. Resolving an Annotation resolves the conversation; replying to a resolved one does not reopen it.
 
 ## 4. Finding the Anchor again
@@ -160,7 +162,7 @@ The **Component** of an Annotation is not stored: it is the Component that owns 
 | Operation | Writes |
 | --- | --- |
 | Create | a new file: `type`, `state: open`, `author`, `date`, `anchor` with the lines as they are on disk and HEAD's commit, `cites` when it cites ADRs, the quoted lines, the text |
-| Reply | a new file in the Annotation's directory of Replies: `author`, `date`, the text. The Annotation's file is not touched |
+| Reply | a new file in the Annotation's directory of Replies, named by the moment it is written (section 1): `author`, `date`, the text. The Annotation's file is not touched |
 | Resolve, Reopen | `state: resolved`, `state: open`, where the key stands; a missing `state` is inserted after `type` |
 | Update the Anchor | for a moved Annotation, the place it is found at: below |
 | Attach again | a new place selected by a person, as for Update the Anchor |
@@ -170,7 +172,7 @@ Update the Anchor and Attach again rewrite the values of `anchor.path`, `anchor.
 
 - Create, Attach again and Update the Anchor read the lines from the disk as it is when they are planned; whoever calls them names the file and the lines, never the quoted lines. They are refused when the Source File is not there or does not have the lines, and when one of the lines holds a carriage return that ends no line, which quoted lines cannot keep. Create is refused besides without an author, with a date that is not a day, with an ADR that does not exist or that several Decision Logs have, and while the directory cannot be used (section 1).
 - A write into a file whose frontmatter cannot be read, or whose Anchor cannot be found in it, is refused; so is one into an `anchor` or a `cites` written in a way that a splice cannot serve — a mapping in braces that a key would have to be added to, a comment between two items. A person changes it in an editor then.
-- Resolve is refused for a resolved Annotation and Reopen for an open one; a Reply without a text, or without an author, is refused.
+- Resolve is refused for a resolved Annotation and Reopen for an open one; a Reply without a text or an author, with a date that is not a day, or with a moment that is not a date and a time with `Z` or an offset, is refused.
 
 ## 6. Problems
 

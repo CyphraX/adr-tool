@@ -340,6 +340,8 @@ export const DE: Wording<Codes> = {
   'reply-needs-author': () => 'Eine Antwort braucht den Namen ihrer Autorin oder ihres Autors.',
   'reply-needs-text': () => 'Eine Antwort braucht einen Text.',
   'not-a-day': (v) => `„${v.date}“ ist kein Datum der Form YYYY-MM-DD.`,
+  'not-a-time': (v) =>
+    `„${v.time}“ ist kein Zeitpunkt der Form YYYY-MM-DDTHH:MM:SS mit Z oder einer Verschiebung wie +01:00.`,
   'no-source-file': (v) => `${v.path} ist keine Datei dieses Repositorys.`,
   'no-lines': (v) =>
     `${v.lines} sind keine Zeilen: Anzugeben sind die erste und die letzte, gezählt ab 1.`,

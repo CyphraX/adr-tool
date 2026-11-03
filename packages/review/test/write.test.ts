@@ -270,7 +270,7 @@ describe('replying, resolving and reopening', () => {
   const ID = 'why'
   const PATH = `${DIR}/${ID}.md`
 
-  it('adds a Reply as a file of its own, numbered after the highest, and leaves the Annotation alone', async () => {
+  it('adds a Reply as a file of its own, named by its moment and author, and leaves the Annotation alone', async () => {
     const fs = memoryFileSystem({
       [PATH]: BY_HAND,
       [`${DIR}/${ID}/0002-lena.md`]: '---\nauthor: Lena\n---\nYes.\n'
@@ -278,24 +278,71 @@ describe('replying, resolving and reopening', () => {
     const plan = await planReply(fs, ID, {
       author: 'Jonas Weiß',
       date: '2026-11-03',
+      time: '2026-11-03T15:15:02.481+01:00',
       text: 'Because the lines change.'
     })
     if (!plan.ok) throw new Error(plan.reason)
-    expect(plan.changeSet.files.map((file) => file.path)).toEqual([
-      `${DIR}/${ID}/0003-jonas-weiss.md`
-    ])
+    const name = `${DIR}/${ID}/20261103T141502Z-jonas-weiss.md`
+    expect(plan.changeSet.files.map((file) => file.path)).toEqual([name])
     await applied(fs, plan)
     expect(await fs.readText(PATH)).toBe(BY_HAND)
-    expect(await fs.readText(`${DIR}/${ID}/0003-jonas-weiss.md`)).toBe(
+    expect(await fs.readText(name)).toBe(
       '---\nauthor: Jonas Weiß\ndate: 2026-11-03\n---\n\nBecause the lines change.\n'
     )
     const { annotations } = await readAnnotations(fs)
     expect(annotations[0]?.replies.map((reply) => reply.author)).toEqual(['Lena', 'Jonas Weiß'])
   })
 
+  it('gives Replies of one author on two branches two files, which meet in a merge', async () => {
+    // Lena replies on her branch and on main, each of which has the Replies before: by
+    // number, both would be the third, one file twice with two texts.
+    const before = {
+      [PATH]: BY_HAND,
+      [`${DIR}/${ID}/20261102T090000Z-aylin-demir.md`]: '---\nauthor: Aylin Demir\n---\nWhy?\n'
+    }
+    const lena = { author: 'Lena Becker', date: '2026-11-03' }
+    const onBranch = await planReply(memoryFileSystem(before), ID, {
+      ...lena,
+      time: '2026-11-03T10:00:00Z',
+      text: 'On the branch.'
+    })
+    const onMain = await planReply(memoryFileSystem(before), ID, {
+      ...lena,
+      time: '2026-11-03T16:30:00Z',
+      text: 'On main.'
+    })
+    if (!onBranch.ok || !onMain.ok) throw new Error('refused')
+    const [branch, main] = [onBranch.changeSet.files[0]!.path, onMain.changeSet.files[0]!.path]
+    expect(branch).not.toBe(main)
+    const merged = memoryFileSystem(before)
+    await applied(merged, onBranch)
+    await applied(merged, onMain)
+    expect((await readAnnotations(merged)).annotations[0]?.replies.map((r) => r.text)).toEqual([
+      'Why?\n',
+      'On the branch.\n',
+      'On main.\n'
+    ])
+
+    // In the same second on the same branch, the second file is numbered.
+    const twice = memoryFileSystem(before)
+    await applied(twice, onBranch)
+    const again = await planReply(twice, ID, {
+      ...lena,
+      time: '2026-11-03T10:00:00.900Z',
+      text: 'And.'
+    })
+    if (!again.ok) throw new Error(again.reason)
+    expect(again.changeSet.files[0]!.path).toBe(`${DIR}/${ID}/20261103T100000Z-lena-becker-2.md`)
+  })
+
   it('refuses a Reply without a text, an author or an Annotation', async () => {
     const fs = memoryFileSystem({ [PATH]: BY_HAND })
-    const reply = { author: 'Lena', date: '2026-11-03', text: 'Yes.' }
+    const reply = { author: 'Lena', date: '2026-11-03', time: '2026-11-03T09:00:00Z', text: 'Yes.' }
+    for (const time of ['2026-11-03', '2026-11-03T09:00:00', '2026-02-30T09:00:00Z', 'now']) {
+      expect(await planReply(fs, ID, { ...reply, time })).toMatchObject({
+        said: { code: 'not-a-time', values: { time } }
+      })
+    }
     expect(await planReply(fs, ID, { ...reply, text: ' \n' })).toMatchObject({
       said: { code: 'reply-needs-text' }
     })
@@ -311,7 +358,7 @@ describe('replying, resolving and reopening', () => {
   it('takes no ID that is not one part of a path inside the directory, whatever is on the disk', async () => {
     // On Windows `\` parts a path as `/` does: `..\x` would be the file x.md above the
     // directory. The ID of `..md` is `.`, whose Replies would be Annotations of their own.
-    const reply = { author: 'Lena', date: '2026-11-03', text: 'Yes.' }
+    const reply = { author: 'Lena', date: '2026-11-03', time: '2026-11-03T09:00:00Z', text: 'Yes.' }
     const ids = ['..\\x', '.', '..', 'a\\b', 'x\u0000', 'trailing ', 'readme', 'README']
     const fs = memoryFileSystem({
       ...Object.fromEntries(ids.map((id) => [`${DIR}/${id}.md`, BY_HAND])),
