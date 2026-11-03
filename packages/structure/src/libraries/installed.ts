@@ -7,7 +7,7 @@
  * follows a link out of the repository. Nothing is run, nothing is looked up outside, and a
  * licence is what a package declares: nothing is guessed from a text.
  */
-import type { FileSystem } from '@adr-tool/kernel'
+import type { DirectoryEntry, FileSystem } from '@adr-tool/kernel'
 
 /** What a Library declares about its licence, or why it cannot be told. */
 export type Licence =
@@ -236,7 +236,8 @@ export async function pythonDistributions(
   directories: readonly string[]
 ): Promise<InstalledDistribution[]> {
   const found: InstalledDistribution[] = []
-  const list = (path: string) => fs.list(path).catch(() => undefined)
+  const list = (path: string): Promise<DirectoryEntry[] | undefined> =>
+    fs.list(path).catch(() => undefined)
   const sitePackages: string[] = []
   for (const directory of new Set(directories)) {
     for (const venv of ['.venv', 'venv'].map((name) => join(directory, name))) {
