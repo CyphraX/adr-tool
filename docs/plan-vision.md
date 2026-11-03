@@ -183,6 +183,56 @@ For Lena. The editor.
 
 *Done when:* Lena draws the container view of this repository from its Components, with GitHub and the file system as External Systems, saves it through its preview, exports it as SVG, embeds the SVG in an ADR whose preview shows it, adds a Dependency in the code and sees the Diagram's Drift; a Rename of a Component it shows rewrites the Diagram in the preview of the Rename.
 
+*Status (2026-11-03):* built. **Where it sits:** Diagrams is the module switcher's word after Structure. Its sidebar has Repository Problems under *Check*, then the Diagrams, each with the count of its Drift as a red badge and a dot while it has changes that are not saved, where they are kept, and **New Diagram**. The centre is the canvas: the title, then **Add Component**, **Add External System**, **Undo**, **Export SVG** and **Save**, the one primary button. Between the canvas and the detail, *What the Diagram says* lists every box and connection as a sentence, a button the keyboard reaches in reading order, with the Drift below them. At the foot, a line says how the canvas is used, above the legend. The detail is the selected element, its connections and its Drift, or the selected connection, or the Diagram with its Problems and their Repairs ([design.md](design.md), which now says how a Diagram is laid out and what its red and dashes mean). Screenshots of Lena's scenario: `docs/screenshots/vision-7-save.png`, `vision-7-adr.png`, `vision-7-problem.png`, and in German `vision-7-drift-de.png` and `vision-7-rename-de.png`; the README has `readme/diagrams.png`.
+
+**In the running app**, on a clone of this repository, in English and in German (Playwright on Electron), Lena:
+
+1. starts *The containers of Softarch Suite* from the container level: nine Components and their 25 connections, placed as Structure lays them out, previewed as one new file;
+2. adds GitHub and the file system as External Systems, which land at the first free spot on the grid and are brought into view;
+3. drags them, connects `cli` to GitHub and `kernel` to the file system, and labels one on the canvas and the other in the detail;
+4. saves through the preview, which holds those eight changes as the lines of the two new boxes, where they were dragged to, and of the two connections;
+5. exports `containers.svg` and embeds it in a new ADR, whose reading view shows the picture at the width of the page;
+6. adds `export { DIAGRAMS_KEY } from '../../diagrams/src/location'` to `packages/kernel/src/index.ts`, after which both Diagrams show `kernel` depending on `diagrams` as Drift, dotted on the canvas, with **Draw it**;
+7. renames `cli` to `command-line` in Structure: the preview holds 8 files, among them `containers.yml` and `packages.yml` with only their ID lines changed, and both pictures drawn again;
+8. moves a box and saves. Repository Problems then has the stale picture, with **Export the picture again** / **Das Bild neu exportieren**;
+9. finds the Diagram with <kbd>Ctrl</kbd> <kbd>K</kbd>.
+
+**The core grew** (`packages/diagrams`, 58 tests then 94):
+
+- `planDiagramEdit` makes the seven edits the window holds until **Save** — move, add, remove and describe an element; add, remove and label a connection — each as a splice of the lines it is about, read back and compared before it is planned. It refuses what it cannot write line by line, such as a position over several lines, an element in a flow list, or a label as a block. `spliceBetween` turns the result into one edit.
+- `planNewDiagram` and `newDiagramText` write a new Diagram, and `readEdits` and `readNewDiagram` read what the window or an agent hands in, field by field, with limits.
+- `planRenameInDiagrams` rewrites `component`, `from`, `to` and `scope` where they name the Component, quoting kept. It warns of a Diagram it cannot read, and draws again every picture that was current, against the declaration as the Rename leaves it.
+- `checkPicture` is the Problem `stale-picture`, whose Repair is `planExport`.
+
+The window holds no text of its own: the German is in `strings.diagrams.de.ts` and `said.de.ts`. The app has 30 new tests (`diagram-canvas`, `diagram-overview`, `diagram-requests`), and `traces.test.ts` checks the Rename of this repository with its picture.
+
+**What grows:**
+
+- *The Component page* lists the Diagrams that show it (`ComponentDiagrams.svelte`).
+- *Repository Problems* has a Diagrams section, with Repairs named by what they do.
+- *Search* finds a Diagram by title and ID.
+- *MCP:* six tools, each a plan until `apply_change` (`packages/mcp/src/diagrams.ts`, 7 tests): `list_diagrams`, and `read_diagram`, which reads the code as `adr check` does and answers the Drift, the suggestions and the Problems with their Repair. Then `plan_new_diagram`, `plan_diagram_change` (which says when the picture is left behind), `plan_diagram_export` and `plan_diagram_repair`. The code is read through `@adr-tool/cli/code`, and `packages/cli/bundle.ts` builds both programs as one file, so `adr-mcp.mjs` is now about 13 MB.
+- *`adr check`* reads `.arch/config.yml` and fails on its Problem. It checks the Diagrams (`src/check-diagrams.ts`, 4 tests): a Problem of a Diagram, a stale picture among them, fails it. A Drift is a note at the line of its connection, or of the element that uses, and fails nothing. The summary line reads "1 Diagram: no Problem, no Drift." on this repository ([cli.md](cli.md)).
+- *Rename* is the Diagrams' as above.
+
+**Fixed in the scenario:**
+
+- An added box landed outside the view.
+- The picture in an ADR was wider than its page.
+- A Rename left the pictures stale, which `adr check` now fails.
+- A label on the canvas was crossed by a line drawn after it.
+
+**Departures:**
+
+- The Drift of a Dependency the Diagram leaves out is dotted and faint rather than dashed red: since part 6, dashed red is a connection that is only perhaps not in the code.
+- The Diagram of this repository gained the connections that `cli` and `mcp` now have.
+
+**Open:**
+
+- The independent review.
+- Moving several boxes at once.
+- Choosing which suggested connections a new Diagram starts with: all of them are drawn.
+
 ### Part 8 — Review: Annotations and their Anchors
 
 For Aylin and Lena. The core of the fifth module: [review-format.md](review-format.md), written first, and `packages/review`.
