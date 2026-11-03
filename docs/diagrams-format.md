@@ -144,12 +144,19 @@ Both are derived from Structure's Dependencies ([structure-format.md](structure-
 
 A **suggested connection** from A to B is the set of Dependencies from the Source Files that count for A to those that count for B, for two different shown Components. Like a Dependency between Components, it has a **weight** — the number of pairs of Source Files behind it — and is type-only when every Dependency behind it is. A suggestion says whether the Diagram draws it already. External Systems and the repository have none: no code stands behind them.
 
+**The scope's own files.** In a component view, the Source Files the scope owns itself, and none of its parts — `packages/core/src/index.ts` is `core`'s own —, stand at the **boundary** of the view, as the own files of a parent stand beside its children in Structure's levels ([structure-format.md](structure-format.md), section 4). They count for the scope, as long as the Diagram does not show the scope itself:
+
+- A Dependency between them and a shown Component outside the scope suggests a connection between that Component and the scope, **through the scope**: `app` depends on `core` through `packages/core/src/index.ts`. The Diagram draws it with a connection the same way between that Component and any part of the scope it shows — `app` to `core/adr`, say.
+- A Dependency between them and a part of the scope suggests nothing: the view looks into the scope, and its own files and its parts are one.
+- Through the scope's own files, a Component outside may reach any part of the scope, and a part may reach what those files use. A connection between the two is therefore **not Drift** where a suggestion through the scope stands behind it the same way, although no Dependency between the two does: `app` may reach `core/adr` through `core`'s own files. Which part the files lead to, the suite cannot tell; it says neither that the code has the connection nor that it does not.
+
 **Drift** is a difference between the Diagram and the code. There are two kinds:
 
 | Drift                                                                                    | Code                         | Sentence                                                                                     |
 | ---------------------------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
 | A connection from one shown Component to another that no suggested connection stands behind | `connection-not-in-code`     | The Diagram connects `app` to `core`, but no Source File of `app` depends on one of `core`.     |
 | A suggested connection that the Diagram does not draw                                      | `dependency-not-in-diagram`  | `app` depends on `core` in the code, through 12 Source File Dependencies, and the Diagram does not connect them. |
+| A suggested connection through the scope that the Diagram does not draw                    | `scope-dependency-not-in-diagram` | `app` depends on `core`'s own files in the code, through 3 Source File Dependencies, and the Diagram connects `app` to no part of `core`. — or, the other way: `core`'s own files depend on `kernel` in the code, through 2 Source File Dependencies, and the Diagram connects no part of `core` to `kernel`. |
 
 - Direction counts: a connection from `core` to `kernel` stands for the Dependencies of `core` on `kernel`, and not for those the other way round.
 - A connection from or to an External System, the repository, an element whose Component is gone, or an ID that is no element has no Drift. The last two are Problems.

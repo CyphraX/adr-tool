@@ -38,6 +38,10 @@ const viewOf = (level: string): string => VIEW[level] ?? `a Diagram of the level
 // The values are types, not interfaces: a Said's values are a record of names, and only a type
 // is one without saying so.
 
+/** How many Source File Dependencies stand behind something. */
+const dependenciesIn = (count: number): string =>
+  count === 1 ? 'one Source File Dependency' : `${count} Source File Dependencies`
+
 /** The two ends of a connection. */
 type Ends = { readonly from: string; readonly to: string }
 
@@ -111,7 +115,11 @@ export const SENTENCES = {
   'connection-not-in-code': (v: Ends): string =>
     `The Diagram connects ${v.from} to ${v.to}, but no Source File of ${v.from} depends on one of ${v.to}.`,
   'dependency-not-in-diagram': (v: Ends & { count: number }): string =>
-    `${v.from} depends on ${v.to} in the code, through ${v.count === 1 ? 'one Source File Dependency' : `${v.count} Source File Dependencies`}, and the Diagram does not connect them.`,
+    `${v.from} depends on ${v.to} in the code, through ${dependenciesIn(v.count)}, and the Diagram does not connect them.`,
+  'scope-dependency-not-in-diagram': (v: Ends & { scope: string; count: number }): string =>
+    v.from === v.scope
+      ? `${v.scope}'s own files depend on ${v.to} in the code, through ${dependenciesIn(v.count)}, and the Diagram connects no part of ${v.scope} to ${v.to}.`
+      : `${v.from} depends on ${v.scope}'s own files in the code, through ${dependenciesIn(v.count)}, and the Diagram connects ${v.from} to no part of ${v.scope}.`,
 
   // The Repair and the export.
   'no-diagram-repair': (): string =>

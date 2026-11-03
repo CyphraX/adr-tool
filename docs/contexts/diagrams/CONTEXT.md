@@ -25,7 +25,7 @@ How deep a Diagram looks into the Component hierarchy, after the C4 model: a sys
 _Avoid_: Level on its own (that is a level of Structure's views), zoom, layer
 
 **Scope**:
-The Component a component view looks into. Its children are what the view shows; the Components beside it, and beside what contains it, may stand beside them.
+The Component a component view looks into. Its children are what the view shows; the Components beside it, and beside what contains it, may stand beside them. The Source Files it owns itself stand at the boundary of the view: what uses them, or what they use, is connected to the scope through them.
 _Avoid_: Parent, focus, boundary
 
 **Layout**:

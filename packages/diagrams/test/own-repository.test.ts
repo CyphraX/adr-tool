@@ -110,6 +110,51 @@ describe('the Diagram of this repository’s packages', () => {
     ).toEqual([])
   })
 
+  // What the review of PR #51 found: app uses core through packages/core/src/index.ts, which is
+  // core's own and none of its parts'.
+  it('in the component view of core, takes what enters through core’s own files for core', async () => {
+    const { structure, dependencies } = await own()
+    const parts = ['adr', 'export', 'foreign', 'lifecycle', 'log', 'metadata', 'problems']
+    const text = [
+      'level: component',
+      'scope: core',
+      'elements:',
+      ...['app', 'cli', 'mcp', 'kernel', ...parts.map((part) => `core/${part}`)].flatMap(
+        (id, index) => [`  - component: ${id}`, `    at: [${index * 160}, 0]`]
+      ),
+      'connections:',
+      ...[
+        ['app', 'core/adr'],
+        ['mcp', 'core/log'],
+        ['kernel', 'core/adr']
+      ].flatMap(([from, to]) => [`  - from: ${from}`, `    to: ${to}`]),
+      ''
+    ].join('\n')
+    const view = readDiagram('docs/architecture/diagrams/core.yml', text)
+    if (!view.readable) throw new Error(wordingOf(view.problems[0]))
+    expect(problemsOf(view, structure)).toEqual([])
+    const through = suggestConnections(view, structure, dependencies).filter(
+      (one) => one.throughScope
+    )
+    expect(through.map((one) => `${one.from} > ${one.to}${one.drawn ? ' drawn' : ''}`)).toEqual(
+      expect.arrayContaining(['app > core drawn', 'mcp > core drawn'])
+    )
+    expect(
+      through
+        .find((one) => one.from === 'app')!
+        .dependencies.every((dependency) => dependency.to === 'packages/core/src/index.ts')
+    ).toBe(true)
+    // Into core/adr and core/log through core's own files, perhaps: not Drift. kernel uses
+    // nothing of core.
+    expect(
+      driftOf(view, structure, dependencies)
+        .filter((one) => one.kind === 'connection-not-in-code')
+        .map(driftWording)
+    ).toEqual([
+      'The Diagram connects kernel to core/adr, but no Source File of kernel depends on one of core/adr.'
+    ])
+  })
+
   it('reports an element whose Component is removed as a Problem, whose Repair takes it out', async () => {
     const { fs, packages } = await own()
     const declaration = (await fs.readText(DECLARATION_PATH))!

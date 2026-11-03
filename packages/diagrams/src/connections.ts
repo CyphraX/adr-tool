@@ -30,7 +30,15 @@ export interface SuggestedConnection {
   readonly typeOnly: boolean
   /** The Source File Dependencies behind it, in the order Structure gives them: of `from`, then `to`. */
   readonly dependencies: readonly Dependency[]
-  /** The Diagram connects the two this way already. */
+  /**
+   * One end is the scope of a component view, not an element: the Dependencies are on the
+   * scope's own Source Files, or of them, which stand at the boundary of the view.
+   */
+  readonly throughScope: boolean
+  /**
+   * The Diagram connects the two this way already. Through the scope: it connects the other
+   * end, this way, with a part of the scope it shows.
+   */
   readonly drawn: boolean
 }
 
@@ -52,43 +60,73 @@ export type Drift =
       readonly typeOnly: boolean
       readonly dependencies: readonly Dependency[]
     }
+  /**
+   * A Dependency between the scope's own Source Files and a shown Component outside the scope,
+   * where the Diagram connects that Component, this way, with no part of the scope.
+   */
+  | {
+      readonly kind: 'scope-dependency-not-in-diagram'
+      /** The scope, or the Component outside it. */
+      readonly from: string
+      readonly to: string
+      readonly scope: string
+      readonly weight: number
+      readonly typeOnly: boolean
+      readonly dependencies: readonly Dependency[]
+    }
+
+const parentOf = (id: string): string => (id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : '')
+
+/** Whether `id` is the Component `scope` or one of its parts. */
+const within = (id: string, scope: string): boolean => id === scope || id.startsWith(`${scope}/`)
+
+interface Counting {
+  /** For each Source File that counts, the shown Component it counts for, or the boundary. */
+  readonly counts: ReadonlyMap<string, string>
+  /**
+   * The scope of a component view, declared and not shown itself: its own Source Files count
+   * for it, as the boundary of the view.
+   */
+  readonly boundary: string | undefined
+}
 
 /**
- * For each Source File, the shown Component it counts for: the deepest shown one that contains
- * it. Files no shown Component contains are not in the map.
+ * For each Source File, what it counts for: the deepest shown Component that contains it, or,
+ * for the scope's own files, the scope as the boundary of the view. Files that count for
+ * nothing are not in the map.
  */
-function countingFor(
-  diagram: Diagram,
-  model: Model,
-  options: ConnectionOptions
-): Map<string, string> {
+function countingFor(diagram: Diagram, model: Model, options: ConnectionOptions): Counting {
   const declared = new Set(everyComponent(model.components).map((component) => component.id))
   const shown = new Set(
     elementsOf(diagram)
       .filter((element) => element.kind === 'component' && declared.has(element.id))
       .map((element) => element.id)
   )
+  const scope = diagram.level === 'component' ? diagram.scope : undefined
+  const boundary =
+    scope !== undefined && declared.has(scope) && !shown.has(scope) ? scope : undefined
   const counts = new Map<string, string>()
   for (const file of model.sourceFiles) {
     if (file.component === undefined || (file.test && !options.tests)) continue
+    if (file.component === boundary) {
+      counts.set(file.path, boundary)
+      continue
+    }
     // The owner, or the nearest Component above it, that the Diagram shows.
-    for (
-      let id = file.component;
-      id !== '';
-      id = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : ''
-    ) {
+    for (let id = file.component; id !== ''; id = parentOf(id)) {
       if (shown.has(id)) {
         counts.set(file.path, id)
         break
       }
     }
   }
-  return counts
+  return { counts, boundary }
 }
 
 /**
  * Every connection the code has between two Components the Diagram shows, in the order of
- * `from`, then `to`, each saying whether the Diagram draws it. External Systems and the
+ * `from`, then `to`, each saying whether the Diagram draws it; in a component view also those
+ * between the scope's own files and the Components outside the scope. External Systems and the
  * repository have none. None on a Draft, nor while the declaration cannot be read.
  */
 export function suggestConnections(
@@ -98,18 +136,27 @@ export function suggestConnections(
   options: ConnectionOptions = {}
 ): SuggestedConnection[] {
   if (model.origin !== 'declared') return []
-  // Each shown Component stands for the Source Files that count for it, as a node of Structure's
-  // levels stands for its own.
+  const { counts, boundary } = countingFor(diagram, model, options)
+  // Each stands for the Source Files that count for it, as a node of Structure's levels does.
   const files = new Map<string, string[]>()
-  for (const [file, id] of countingFor(diagram, model, options)) {
-    files.set(id, [...(files.get(id) ?? []), file])
-  }
+  for (const [file, id] of counts) files.set(id, [...(files.get(id) ?? []), file])
   const nodes = [...files].map(([id, list]) => ({ id, files: list }))
-  const drawn = new Set(connectionsOf(diagram).map(({ from, to }) => `${from}\n${to}`))
-  return edgesAmong(nodes, dependencies).map((edge) => ({
-    ...edge,
-    drawn: drawn.has(`${edge.from}\n${edge.to}`)
-  }))
+
+  const drawn = connectionsOf(diagram)
+  const isDrawn = (from: string, to: string): boolean =>
+    drawn.some((connection) =>
+      from === boundary
+        ? within(connection.from, boundary) && connection.to === to
+        : to === boundary
+          ? connection.from === from && within(connection.to, boundary)
+          : connection.from === from && connection.to === to
+    )
+  return edgesAmong(nodes, dependencies).flatMap((edge) => {
+    const throughScope = edge.from === boundary || edge.to === boundary
+    // Within the scope, its own files and its parts are one: the view looks into it.
+    if (throughScope && within(edge.from, boundary!) && within(edge.to, boundary!)) return []
+    return [{ ...edge, throughScope, drawn: isDrawn(edge.from, edge.to) }]
+  })
 }
 
 /**
@@ -129,33 +176,56 @@ export function driftOf(
   const isShown = (id: string): boolean => kinds.get(id) === 'component' && declared.has(id)
   const suggested = suggestConnections(diagram, model, dependencies, options)
   const inCode = new Set(suggested.map(({ from, to }) => `${from}\n${to}`))
+  const { boundary } = countingFor(diagram, model, options)
+
+  /**
+   * Whether the code may have the connection through the scope's own files: it enters the
+   * scope from outside where the outside depends on them, or leaves it where they depend on
+   * the outside. Which part of the scope those files lead to, the suite cannot tell.
+   */
+  const throughScope = (from: string, to: string): boolean =>
+    boundary !== undefined &&
+    ((!within(from, boundary) && within(to, boundary) && inCode.has(`${from}\n${boundary}`)) ||
+      (within(from, boundary) && !within(to, boundary) && inCode.has(`${boundary}\n${to}`)))
 
   const drift: Drift[] = []
   for (const { from, to, line } of connectionsOf(diagram)) {
-    if (isShown(from) && isShown(to) && !inCode.has(`${from}\n${to}`)) {
-      drift.push({ kind: 'connection-not-in-code', from, to, line })
-    }
+    if (!isShown(from) || !isShown(to) || inCode.has(`${from}\n${to}`)) continue
+    if (throughScope(from, to)) continue
+    drift.push({ kind: 'connection-not-in-code', from, to, line })
   }
-  for (const { from, to, weight, typeOnly, dependencies: behind, drawn } of suggested) {
-    if (!drawn) {
-      drift.push({
-        kind: 'dependency-not-in-diagram',
-        from,
-        to,
-        weight,
-        typeOnly,
-        dependencies: behind
-      })
-    }
+  for (const one of suggested) {
+    if (one.drawn) continue
+    const { from, to, weight, typeOnly, dependencies: behind } = one
+    drift.push(
+      one.throughScope
+        ? {
+            kind: 'scope-dependency-not-in-diagram',
+            from,
+            to,
+            scope: boundary!,
+            weight,
+            typeOnly,
+            dependencies: behind
+          }
+        : { kind: 'dependency-not-in-diagram', from, to, weight, typeOnly, dependencies: behind }
+    )
   }
   return drift
 }
 
 /** What a Drift says, as a code: its kind, with the values of its sentence. */
 export function saidOfDrift(drift: Drift): DiagramsSaid {
-  return drift.kind === 'connection-not-in-code'
-    ? { code: drift.kind, values: { from: drift.from, to: drift.to } }
-    : { code: drift.kind, values: { from: drift.from, to: drift.to, count: drift.weight } }
+  switch (drift.kind) {
+    case 'connection-not-in-code':
+      return { code: drift.kind, values: { from: drift.from, to: drift.to } }
+    case 'dependency-not-in-diagram':
+      return { code: drift.kind, values: { from: drift.from, to: drift.to, count: drift.weight } }
+    case 'scope-dependency-not-in-diagram': {
+      const { from, to, scope, weight } = drift
+      return { code: drift.kind, values: { from, to, scope, count: weight } }
+    }
+  }
 }
 
 /** What a Drift says to a person, in English. */

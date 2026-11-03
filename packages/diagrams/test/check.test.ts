@@ -4,6 +4,7 @@ import { analyseDependencies, openStructure } from '@adr-tool/structure'
 import {
   checkDiagram,
   driftOf,
+  driftWording,
   problemsOf,
   readDiagram,
   suggestConnections,
@@ -165,6 +166,8 @@ describe('suggested connections', () => {
         (one) => `${one.from} > ${one.to} ${one.weight}${one.typeOnly ? ' (type)' : ''}`
       )
     ).toEqual([
+      // src/core/index.ts is core's own: the boundary of the view of core.
+      'app > core 1',
       'app > core/lifecycle 1',
       'core/lifecycle > core/metadata 1',
       'core/lifecycle > kernel 1',
@@ -181,6 +184,104 @@ describe('suggested connections', () => {
     // A file that no shown Component contains counts for none.
     const part = diagramOf(['level: container'], ['app', 'kernel'])
     expect(suggestConnections(part, structure, dependencies)).toEqual([])
+  })
+
+  it('in a component view, count the scope’s own files for the scope, as the boundary of the view', async () => {
+    const { structure, dependencies } = await analysed(repository)
+    const view = (connections: [string, string][]) =>
+      diagramOf(
+        ['level: component', 'scope: core'],
+        ['app', 'core/metadata', 'core/lifecycle', 'kernel'],
+        connections
+      )
+    const through = (diagram: Diagram) =>
+      suggestConnections(diagram, structure, dependencies)
+        .filter((one) => one.throughScope)
+        .map((one) => `${one.from} > ${one.to} ${one.weight}${one.drawn ? ' drawn' : ''}`)
+    const drift = (diagram: Diagram) => driftOf(diagram, structure, dependencies).map(driftWording)
+
+    // app uses core through src/core/index.ts, which leads on to core/lifecycle: the
+    // Dependency of the one on the other stays inside the scope.
+    expect(through(view([]))).toEqual(['app > core 1'])
+    expect(drift(view([['app', 'core/lifecycle']]))).toEqual([
+      'core/lifecycle depends on core/metadata in the code, through one Source File Dependency, and the Diagram does not connect them.',
+      'core/lifecycle depends on kernel in the code, through one Source File Dependency, and the Diagram does not connect them.',
+      'core/metadata depends on kernel in the code, through one Source File Dependency, and the Diagram does not connect them.'
+    ])
+    // Through core's own files, app may reach any part of core: drawn into core/metadata, the
+    // connection is not Drift, and it draws app's use of core.
+    const intoMetadata = view([
+      ['app', 'core/metadata'],
+      ['app', 'core/lifecycle'],
+      ['core/lifecycle', 'core/metadata'],
+      ['core/lifecycle', 'kernel'],
+      ['core/metadata', 'kernel']
+    ])
+    expect(through(intoMetadata)).toEqual(['app > core 1 drawn'])
+    expect(drift(intoMetadata)).toEqual([])
+    // Drawn into no part of core, app's use of core's own files is Drift; kernel uses none.
+    expect(
+      drift(
+        view([
+          ['kernel', 'core/metadata'],
+          ['app', 'core/lifecycle'],
+          ['core/lifecycle', 'core/metadata'],
+          ['core/lifecycle', 'kernel'],
+          ['core/metadata', 'kernel']
+        ])
+      )
+    ).toEqual([
+      'The Diagram connects kernel to core/metadata, but no Source File of kernel depends on one of core/metadata.'
+    ])
+    const left = view([
+      ['core/lifecycle', 'core/metadata'],
+      ['core/lifecycle', 'kernel'],
+      ['core/metadata', 'kernel']
+    ])
+    expect(driftOf(left, structure, dependencies).map((one) => one.kind)).toEqual([
+      'scope-dependency-not-in-diagram',
+      'dependency-not-in-diagram'
+    ])
+    expect(drift(left)).toEqual([
+      "app depends on core's own files in the code, through one Source File Dependency, and the Diagram connects app to no part of core.",
+      'app depends on core/lifecycle in the code, through one Source File Dependency, and the Diagram does not connect them.'
+    ])
+  })
+
+  it('in a component view, let a part of the scope use what the scope’s own files use', async () => {
+    const { structure, dependencies } = await analysed(repository)
+    // src/core/metadata/read.ts is core/metadata's own, and uses kernel; keys and values do not.
+    const view = diagramOf(
+      ['level: component', 'scope: core/metadata'],
+      ['core/metadata/keys', 'core/metadata/values', 'core/lifecycle', 'kernel'],
+      [
+        ['core/metadata/keys', 'kernel'],
+        ['core/metadata/values', 'core/lifecycle'],
+        ['core/lifecycle', 'core/metadata/keys'],
+        ['core/lifecycle', 'kernel'],
+        ['core/metadata/keys', 'core/metadata/values'],
+        ['core/metadata/values', 'core/metadata/keys']
+      ]
+    )
+    expect(
+      suggestConnections(view, structure, dependencies)
+        .filter((one) => one.throughScope)
+        .map((one) => `${one.from} > ${one.to} ${one.weight}${one.drawn ? ' drawn' : ''}`)
+    ).toEqual(['core/metadata > kernel 1 drawn'])
+    expect(driftOf(view, structure, dependencies).map(driftWording)).toEqual([
+      'The Diagram connects core/metadata/values to core/lifecycle, but no Source File of core/metadata/values depends on one of core/lifecycle.'
+    ])
+    const without = diagramOf(
+      ['level: component', 'scope: core/metadata'],
+      ['core/metadata/keys', 'core/metadata/values', 'kernel'],
+      [
+        ['core/metadata/keys', 'core/metadata/values'],
+        ['core/metadata/values', 'core/metadata/keys']
+      ]
+    )
+    expect(driftOf(without, structure, dependencies).map(driftWording)).toEqual([
+      "core/metadata's own files depend on kernel in the code, through one Source File Dependency, and the Diagram connects no part of core/metadata to kernel."
+    ])
   })
 
   it('leave test files out unless asked, and give External Systems none', async () => {

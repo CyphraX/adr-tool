@@ -58,6 +58,12 @@ const VIEW: Record<string, string> = {
 }
 const viewOf = (level: string): string => VIEW[level] ?? `ein Diagramm der Ebene „${level}“`
 
+/** How many Source File Dependencies stand behind something. */
+const dependenciesIn = (count: number): string =>
+  count === 1
+    ? 'eine Abhängigkeit zwischen Quelldateien'
+    : `${count} Abhängigkeiten zwischen Quelldateien`
+
 /** The start every refusal to write a foreign file shares. */
 const foreign = (v: { adr: string; format: ForeignFormat }): string =>
   `${v.adr} ist im Format von ${FORMAT[v.format]} geschrieben. Das Werkzeug liest dieses Format und schreibt es nie.`
@@ -350,7 +356,11 @@ export const DE: Wording<Codes> = {
   'connection-not-in-code': (v) =>
     `Das Diagramm verbindet ${v.from} mit ${v.to}, aber keine Quelldatei von ${v.from} hängt von einer von ${v.to} ab.`,
   'dependency-not-in-diagram': (v) =>
-    `${v.from} hängt im Code von ${v.to} ab, über ${v.count === 1 ? 'eine Abhängigkeit zwischen Quelldateien' : `${v.count} Abhängigkeiten zwischen Quelldateien`}, und das Diagramm verbindet sie nicht.`,
+    `${v.from} hängt im Code von ${v.to} ab, über ${dependenciesIn(v.count)}, und das Diagramm verbindet sie nicht.`,
+  'scope-dependency-not-in-diagram': (v) =>
+    v.from === v.scope
+      ? `Die eigenen Dateien von ${v.scope} hängen im Code von ${v.to} ab, über ${dependenciesIn(v.count)}, und das Diagramm verbindet keinen Teil von ${v.scope} mit ${v.to}.`
+      : `${v.from} hängt im Code von den eigenen Dateien von ${v.scope} ab, über ${dependenciesIn(v.count)}, und das Diagramm verbindet ${v.from} mit keinem Teil von ${v.scope}.`,
 
   // Diagrams: the Repair.
   'no-diagram-repair': () =>
