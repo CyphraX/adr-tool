@@ -3,13 +3,11 @@
  * Source File"): the cyclomatic complexity of each function, the LCOM4 of each class, and the
  * declarations that abstractness counts. Each language's adapter reads them from the tree its
  * parser already builds — TypeScript's for TypeScript, JavaScript and Svelte, tree-sitter's for
- * Java (ADR-0008) — and they are extracted and cached with the file's uses (section 7): what one
- * file yields depends on that file alone. A language whose adapter measures nothing yet has
- * none, and counts towards no metric of this file.
+ * Java, Python and Go (ADR-0008) — and they are extracted and cached with the file's uses
+ * (section 7): what one file yields depends on that file alone.
  *
- * Nothing here parses: the adapters do. What they share is here, so that another language's
- * adapter — Python's, Go's — names its functions, counts LCOM4 and lists its declarations the
- * same way.
+ * Nothing here parses: the adapters do. What they share is here, so that every adapter names
+ * its functions, counts LCOM4 and lists its declarations the same way.
  */
 
 /** A function and its cyclomatic complexity, McCabe's: 1 and one more for each decision point. */

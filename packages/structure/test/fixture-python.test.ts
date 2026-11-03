@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import {
@@ -10,6 +11,7 @@ import {
   openStructure,
   preparePython
 } from '../src'
+import { pythonBodyOf, pythonComplexityByWords } from './measures-by-definition'
 import { metricsByDefinition } from './metrics-by-definition'
 import { nodeFileSystem, repositoryFiles } from './repository-files'
 
@@ -101,6 +103,25 @@ it('drafts a src layout of Python packages, with their Dependencies and their Cy
   expect(metricsOf(structure, dependencies, lineCounts, { tests: true })).toEqual(
     metricsByDefinition(structure, dependencies, lineCounts, true)
   )
+  // What is measured inside its files (part 13): abstractness and distance by their definitions
+  // too, and the complexity of every function by its words, a second count.
+  const { measures } = analysis
+  expect(metricsOf(structure, dependencies, lineCounts, { tests: true }, measures)).toEqual(
+    metricsByDefinition(structure, dependencies, lineCounts, true, measures)
+  )
+  let functions = 0
+  for (const [path, measured] of measures) {
+    const text = await readFile(join(root, path), 'utf8')
+    for (const one of measured.functions) {
+      expect([path, one.name, pythonComplexityByWords(pythonBodyOf(text, one))]).toEqual([
+        path,
+        one.name,
+        one.complexity
+      ])
+      functions++
+    }
+  }
+  expect(functions).toBeGreaterThan(5)
 
   // What its manifests declare, for the Library inventory: the distribution, not the import.
   expect(analysis.manifests).toEqual([

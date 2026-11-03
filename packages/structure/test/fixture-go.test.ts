@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import {
@@ -10,6 +11,7 @@ import {
   openStructure,
   prepareGo
 } from '../src'
+import { goComplexityByWords } from './measures-by-definition'
 import { metricsByDefinition } from './metrics-by-definition'
 import { nodeFileSystem, repositoryFiles } from './repository-files'
 
@@ -89,6 +91,30 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
   expect(metricsOf(structure, dependencies, lineCounts, { tests: true })).toEqual(
     metricsByDefinition(structure, dependencies, lineCounts, true)
   )
+  // What is measured inside its files (part 13): abstractness and distance by their definitions
+  // too, and the complexity of every function by its words, a second count.
+  const { measures } = analysis
+  expect(metricsOf(structure, dependencies, lineCounts, { tests: true }, measures)).toEqual(
+    metricsByDefinition(structure, dependencies, lineCounts, true, measures)
+  )
+  let functions = 0
+  for (const [path, measured] of measures) {
+    const text = await readFile(join(root, path), 'utf8')
+    for (const one of measured.functions) {
+      expect([
+        path,
+        one.name,
+        goComplexityByWords(
+          text
+            .split('\n')
+            .slice(one.line - 1, one.endLine)
+            .join('\n')
+        )
+      ]).toEqual([path, one.name, one.complexity])
+      functions++
+    }
+  }
+  expect(functions).toBeGreaterThan(5)
 
   // What its go.mod files require, for the Library inventory.
   expect(analysis.manifests).toEqual([

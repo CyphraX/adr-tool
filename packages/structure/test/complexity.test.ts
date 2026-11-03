@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { extractUses, openStructure } from '../src'
+import { scriptOfSvelte } from '../src/typescript/svelte'
 import { complexityByEslint, type Counted } from './complexity-by-eslint'
 import { nodeFileSystem, repositoryFiles } from './repository-files'
 
@@ -10,15 +11,17 @@ const shop = fileURLToPath(new URL('fixtures/shop/', import.meta.url))
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
 
 /**
- * Each TypeScript and JavaScript Source File of a repository, with the complexity of its
- * functions as `structure` counts it and as ESLint counts it, each where the function ends.
+ * Each TypeScript, JavaScript and Svelte Source File of a repository, with the complexity of
+ * its functions as `structure` counts it and as ESLint counts it, each where the function ends.
+ * ESLint reads a component's script blocks as the suite takes them out of it, on their lines
+ * (`scriptOfSvelte`): what is shared is where the script is, not how it is counted.
  */
 async function bothCounts(root: string) {
   const files = repositoryFiles(root)
   const { sourceFiles } = await openStructure(nodeFileSystem(root), files)
   const counted: { path: string; ours: Counted; eslint: Counted }[] = []
   for (const { path, language } of sourceFiles) {
-    if (language !== 'typescript') continue
+    if (language !== 'typescript' && language !== 'svelte') continue
     const text = await readFile(join(root, path), 'utf8')
     const extraction = extractUses(path, text)
     // A file that cannot be parsed is not measured (section 2).
@@ -26,7 +29,11 @@ async function bothCounts(root: string) {
     const ours: Counted = extraction
       .measures!.functions.map(({ endLine, complexity }): [number, number] => [endLine, complexity])
       .sort((a, b) => a[0] - b[0] || a[1] - b[1])
-    counted.push({ path, ours, eslint: complexityByEslint(path, text) })
+    const eslint =
+      language === 'svelte'
+        ? complexityByEslint(`${path}.ts`, scriptOfSvelte(text))
+        : complexityByEslint(path, text)
+    counted.push({ path, ours, eslint })
   }
   return counted
 }
@@ -75,7 +82,42 @@ it('is what ESLint counts, for every function of this repository', async () => {
   expect(
     Object.fromEntries(differing.map(({ path, ours, eslint }) => [path, { ours, eslint }]))
   ).toEqual({})
-  // Enough to mean something: thousands of functions in hundreds of files.
+  // Enough to mean something: thousands of functions in hundreds of files, the components of
+  // the app among them.
   expect(counted.length).toBeGreaterThan(200)
+  expect(counted.filter(({ path }) => path.endsWith('.svelte')).length).toBeGreaterThan(30)
   expect(counted.reduce((sum, { ours }) => sum + ours.length, 0)).toBeGreaterThan(3000)
 }, 120_000)
+
+it('is what ESLint counts for a field whose value is an arrow function, and in a component', () => {
+  const ours = (path: string, text: string): Counted => {
+    const extraction = extractUses(path, text)
+    if (!extraction.analysed) throw new Error(`${path} was not parsed`)
+    return extraction
+      .measures!.functions.map(({ endLine, complexity }): [number, number] => [endLine, complexity])
+      .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  }
+  // ESLint reports the arrow twice, as a function and as the field's value.
+  const field = [
+    'export class A {',
+    '  limit = 1 || 2',
+    '  check = (x: number) => x > this.limit && x < 9',
+    '  static { if (A) console.log(A) }',
+    '}',
+    ''
+  ].join('\n')
+  expect(ours('a.ts', field)).toEqual([[3, 2]])
+  expect(complexityByEslint('a.ts', field)).toEqual(ours('a.ts', field))
+  const component = [
+    '<script lang="ts">',
+    '  let { items }: { items: number[] } = $props()',
+    '  const shown = $derived(items.filter((item) => item > 0 && item < 9))',
+    '</script>',
+    '{#each shown as item (item)}<p>{item}</p>{/each}',
+    ''
+  ].join('\n')
+  expect(ours('List.svelte', component)).toEqual([[3, 2]])
+  expect(complexityByEslint('List.svelte.ts', scriptOfSvelte(component))).toEqual(
+    ours('List.svelte', component)
+  )
+})

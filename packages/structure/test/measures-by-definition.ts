@@ -5,7 +5,7 @@
  * by the app.
  */
 import type { Level } from '../src/levels'
-import type { MethodUses } from '../src/measures'
+import type { FunctionMeasure, MethodUses } from '../src/measures'
 
 /**
  * The complexity of Java code from its words and operators: 1, and one for each `if`, `for`,
@@ -24,6 +24,126 @@ export function javaComplexityByWords(text: string): number {
   // A wildcard of a type argument is no `?:`.
   const conditionals = code.match(/(?<![<,]\s*)\?(?!\s*(?:[>,]|extends\b|super\b))/g) ?? []
   return 1 + words.length + operators.length + conditionals.length
+}
+
+/** Code without its comments and string literals, for counting its words: Python's and Go's. */
+function codeOf(text: string, comment: RegExp): string {
+  return text
+    .replace(/[rRbBuUfF]{0,2}("""|\'\'\')[\s\S]*?\1/g, '""')
+    .replace(/`[^`]*`/g, '""')
+    .replace(/[rRbBuUfF]{0,2}"(?:[^"\\\n]|\\.)*"/g, '""')
+    .replace(/[rRbBuUfF]{0,2}'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(comment, '')
+}
+
+/**
+ * The complexity of a Python function from its words, as radon counts it: 1, and one for each
+ * `if`, `elif`, `for`, `while`, `except`, `case`, `and`, `or` and `assert` of its body — not
+ * the `if` of a `case` guard, not what an `assert` tests, nothing of a `try` with `except*` —,
+ * one for each `else:` of a loop or a `try`, and one less for a `match` with an irrefutable
+ * `case`. `body` is the function's body, with the functions and classes inside it taken out.
+ */
+export function pythonComplexityByWords(body: string): number {
+  const lines = codeOf(body, /#[^\n]*/g).split('\n')
+  const indent = (line: string): number => line.length - line.trimStart().length
+  let complexity = 1
+  let grouped = false
+  for (const [at, line] of lines.entries()) {
+    const code = line.trim()
+    if (code === '') continue
+    if (/^try\s*:/.test(code)) {
+      // A `try` whose handlers are `except*` counts nothing, its `else` neither.
+      const own = indent(line)
+      const end = lines.findIndex(
+        (other, after) =>
+          after > at &&
+          other.trim() !== '' &&
+          indent(other) <= own &&
+          !/^(except|else|finally)\b/.test(other.trim())
+      )
+      grouped = lines
+        .slice(at + 1, end === -1 ? undefined : end)
+        .some((other) => indent(other) === own && /^except\s*\*/.test(other.trim()))
+    }
+    if (/^assert\b/.test(code)) {
+      complexity++
+      continue
+    }
+    if (/^else\s*:/.test(code)) {
+      const header = lines
+        .slice(0, at)
+        .reverse()
+        .find((other) => other.trim() !== '' && indent(other) === indent(line))
+        ?.trim()
+      if (header !== undefined && /^(?:async\s+)?(for|while)\b/.test(header)) complexity++
+      if (header !== undefined && /^except\b/.test(header) && !grouped) complexity++
+      continue
+    }
+    if (/^case\b/.test(code)) {
+      complexity++
+      // The `if` of a guard decides nothing of its own; what it tests does.
+      const guard = code.replace(/^case\b[^:]*?\bif\b/, '')
+      complexity += (guard.match(/\b(?:and|or)\b/g) ?? []).length
+      continue
+    }
+    if (/^match\b.*:$/.test(code)) {
+      const own = indent(line)
+      const cases = lines
+        .slice(at + 1)
+        .filter((other, after) =>
+          lines
+            .slice(at + 1, at + 1 + after)
+            .every((between) => between.trim() === '' || indent(between) > own)
+        )
+        .map((other) => other.trim())
+        .filter((other) => /^case\b/.test(other))
+      if (cases.some((one) => /^case\s+[A-Za-z_]\w*\s*(?:if\b.*)?:$/.test(one))) complexity--
+      continue
+    }
+    if (grouped && /^except\b/.test(code)) continue
+    complexity += (code.match(/\b(?:if|elif|for|while|except|and|or)\b/g) ?? []).length
+  }
+  return complexity
+}
+
+/**
+ * The body of a function as its lines say it, after a header of one line: without the
+ * functions and classes inside it, which are counted on their own.
+ */
+export function pythonBodyOf(text: string, { line, endLine }: FunctionMeasure): string {
+  const lines = text.split('\n').slice(line, endLine)
+  const indent = (code: string): number => code.length - code.trimStart().length
+  const kept: string[] = []
+  for (let at = 0; at < lines.length; at++) {
+    const code = lines[at]!
+    if (/^\s*(?:@|def |async def |class )/.test(code)) {
+      const own = indent(code)
+      while (
+        at + 1 < lines.length &&
+        (lines[at + 1]!.trim() === '' ||
+          indent(lines[at + 1]!) > own ||
+          /^\s*(?:def |async def )/.test(lines[at + 1]!))
+      ) {
+        at++
+        if (indent(lines[at]!) === own && !/^\s*(?:def |async def )/.test(lines[at]!)) break
+      }
+      continue
+    }
+    kept.push(code)
+  }
+  return kept.join('\n')
+}
+
+/**
+ * The complexity of a Go function from its words and operators, as gocyclo counts it: 1, and
+ * one for each `if`, `for`, `case`, `&&` and `||` written in it — the function literals inside
+ * it included —, comments and literals taken out first.
+ */
+export function goComplexityByWords(text: string): number {
+  const code = codeOf(text.replace(/\/\*[\s\S]*?\*\//g, ' '), /\/\/[^\n]*/g)
+  const words = code.match(/\b(?:if|for|case)\b/g) ?? []
+  const operators = code.match(/&&|\|\|/g) ?? []
+  return 1 + words.length + operators.length
 }
 
 /**

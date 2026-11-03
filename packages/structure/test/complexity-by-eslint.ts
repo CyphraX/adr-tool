@@ -6,13 +6,17 @@
  *
  * The rule reports a function above its maximum; at a maximum of 0 it reports every one. What
  * it counts as functions of their own and the suite does not — a class field's value, a static
- * block (docs/structure-format.md, section 5) — is left out.
+ * block (docs/structure-format.md, section 5) — is left out: by the name it reports them with,
+ * since the value of a field may be an arrow function, which it reports twice, as a function
+ * and as the value.
  */
 import tsParser from '@typescript-eslint/parser'
 import { Linter, type Rule } from 'eslint'
 import { builtinRules } from 'eslint/use-at-your-own-risk'
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'])
+/** What the rule counts as a unit of its own and names so, and the suite does not count. */
+const UNITS = new Set(['class field initializer', 'class static block'])
 
 /** Each function where it ends, and its complexity, sorted. */
 export type Counted = [endLine: number, complexity: number][]
@@ -30,9 +34,12 @@ export function complexityByEslint(path: string, text: string): Counted {
           report: {
             value: (descriptor: {
               node: { type: string; loc: { end: { line: number } } }
-              data: { complexity: number }
+              data: { complexity: number; name: string }
             }) => {
-              if (FUNCTIONS.has(descriptor.node.type)) {
+              if (
+                FUNCTIONS.has(descriptor.node.type) &&
+                !UNITS.has(descriptor.data.name.toLowerCase())
+              ) {
                 counted.push([descriptor.node.loc.end.line, Number(descriptor.data.complexity)])
               }
             }

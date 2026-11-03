@@ -8,9 +8,6 @@
  * own: 1 for the method, and 1 for each `if`, loop, `case` label (not `default`), `when` guard,
  * `catch`, `?:`, `&&` and `||`. A lambda counts towards the method it is written in; one in
  * the initializer of a field is a function of its own, named by the field.
- *
- * What another tree-sitter grammar needs — Python's, Go's — is a table of its own node types:
- * which are functions, and which decide.
  */
 import type { Node } from 'web-tree-sitter'
 import {
