@@ -64,7 +64,16 @@ const api: Api = {
     ipcRenderer.on(CHANNEL.closeRequested, handler)
     return () => ipcRenderer.removeListener(CHANNEL.closeRequested, handler)
   },
-  answerCloseRequest: (close) => ipcRenderer.invoke(CHANNEL.answerCloseRequest, close)
+  answerCloseRequest: (close) => ipcRenderer.invoke(CHANNEL.answerCloseRequest, close),
+  reviewOverview: (repositoryId) => ipcRenderer.invoke(CHANNEL.reviewOverview, repositoryId),
+  onReviewChanged: (listener) => {
+    const handler = (_: unknown, repositoryId: string): void => listener(repositoryId)
+    ipcRenderer.on(CHANNEL.reviewChanged, handler)
+    return () => ipcRenderer.removeListener(CHANNEL.reviewChanged, handler)
+  },
+  planReview: (repositoryId, request) =>
+    ipcRenderer.invoke(CHANNEL.planReview, repositoryId, request),
+  gitUserName: (repositoryId) => ipcRenderer.invoke(CHANNEL.gitUserName, repositoryId)
 }
 
 contextBridge.exposeInMainWorld('api', api)
