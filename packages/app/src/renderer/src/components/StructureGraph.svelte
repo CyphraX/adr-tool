@@ -78,13 +78,32 @@
     selection?.kind === 'node' && (edge.from === selection.id || edge.to === selection.id)
   /** Heavier Dependencies are drawn heavier, without drowning the light ones. */
   const strokeOf = (weight: number): number => 1.2 + Math.min(4, Math.log2(weight)) * 0.6
+
+  // On Conformance's drawing what breaks a Rule is drawn over the rest, never under it, and
+  // heavy enough to be seen however few imports stand behind it; the rest steps back.
+  const lines = $derived(
+    violations
+      ? layout.edges.toSorted((a, b) => Number(violating(a.edge)) - Number(violating(b.edge)))
+      : layout.edges
+  )
+  const widthOf = (edge: StructureEdge): number =>
+    violating(edge) ? Math.max(2.6, strokeOf(edge.weight)) : strokeOf(edge.weight)
+
+  // A level that is drawn anew shows what breaks a Rule on it, wherever it lies in the drawing.
+  let canvas = $state<HTMLDivElement>()
+  $effect(() => {
+    if (!violations || !canvas) return
+    void view
+    const first = canvas.querySelector('.line.violating, .node.violating')
+    first?.scrollIntoView({ block: 'center', inline: 'center' })
+  })
 </script>
 
 <div class="graph">
   {#if layout.nodes.length === 0}
     <p class="empty">{t.structure.graph.empty}</p>
   {:else}
-    <div class="canvas">
+    <div class="canvas" bind:this={canvas}>
       <div class="drawing" style:width="{layout.width}px" style:height="{layout.height}px">
         <svg width={layout.width} height={layout.height} aria-hidden="true">
           <defs>
@@ -100,16 +119,18 @@
               <path class="arrowhead" d="M0 0.5L7.5 4L0 7.5z" />
             </marker>
           </defs>
-          {#each layout.edges as line (`${line.edge.from}\n${line.edge.to}`)}
+          {#each lines as line (`${line.edge.from}\n${line.edge.to}`)}
             {@const edge = line.edge}
             {@const d = pathOf(line)}
             <path
               class="line"
               class:type-only={edge.typeOnly}
               class:in-cycle={inCycle(edge) || violating(edge)}
+              class:violating={violating(edge)}
+              class:quiet={violations && !violating(edge)}
               class:weakest={isWeakest(edge)}
               class:highlighted={isSelected(edge) || touchesSelected(edge) || onRoundTrip(edge)}
-              style:stroke-width={strokeOf(edge.weight)}
+              style:stroke-width={widthOf(edge)}
               {d}
               marker-end="url(#dependency-arrow)"
             />
@@ -256,6 +277,10 @@
 
   .in-cycle {
     stroke: var(--problem);
+  }
+
+  .quiet {
+    stroke: var(--line-strong);
   }
 
   .weakest {

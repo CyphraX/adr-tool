@@ -31,6 +31,22 @@
 
   const selectedKey = $derived(selection?.kind === 'violation' ? selection.key : undefined)
   const selectedLine = $derived(selection?.kind === 'exception' ? selection.line : undefined)
+  // What the drawing marks as selected: what was clicked in it, or the line or box of the
+  // Violation selected in the list or the details.
+  const graphSelection = $derived.by((): StructureSelection | undefined => {
+    if (conformance?.graphSelection) return conformance.graphSelection
+    if (!onLevel || selectedKey === undefined) return undefined
+    for (const [key, list] of onLevel.edges) {
+      if (list.some((violation) => violation.key === selectedKey)) {
+        const [from, to] = key.split('\n') as [string, string]
+        return { kind: 'edge', from, to }
+      }
+    }
+    for (const [id, list] of onLevel.nodes) {
+      if (list.some((violation) => violation.key === selectedKey)) return { kind: 'node', id }
+    }
+    return undefined
+  })
 
   const idOf = (key: string): string =>
     `violation-${Array.from(key, (character) => character.charCodeAt(0).toString(36)).join('')}`
@@ -197,7 +213,7 @@
     {#if graph && onLevel}
       <StructureGraph
         view={graph}
-        selection={conformance?.graphSelection}
+        selection={graphSelection}
         onselect={selectInGraph}
         onopen={(id) => app.openInConformanceGraph(id)}
         violations={onLevel}

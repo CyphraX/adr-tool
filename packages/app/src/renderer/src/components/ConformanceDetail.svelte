@@ -292,8 +292,8 @@
   <p>{rule.why}</p>
 
   <h3>{t.conformance.detail.kind}</h3>
-  <p><code>{rule.kind}</code> <span class="faint">{t.conformance.kinds[rule.kind].name}</span></p>
-  <p class="faint">{@render withCode(t.conformance.kinds[rule.kind].about)}</p>
+  <p><code>{rule.kind}</code></p>
+  <p>{@render withCode(t.conformance.kinds[rule.kind].about)}</p>
 
   {@render writtenAt(rule.line)}
 

@@ -557,7 +557,7 @@ export const en = {
         inCycle: boolean,
         violations: readonly string[]
       ): string =>
-        `${from} depends on ${to}: ${many(weight, 'one Source File Dependency', `${weight} Source File Dependencies`)}${typeOnly ? ', type-only' : ''}${inCycle ? ', in a Cycle' : ''}.${violations.map((violation) => ` Violation: ${violation}`).join('')}`,
+        `${from} depends on ${to}: ${many(weight, 'one Source File Dependency', `${weight} Source File Dependencies`)}${typeOnly ? ', type-only' : ''}${inCycle ? ', in a Cycle' : ''}.${violations.map((violation) => ` Violation: ${violation}.`).join('')}`,
       noLine: 'No Dependency between the nodes of this level.',
       /** In the legend of Conformance's drawing. */
       violation: 'breaks a Rule',

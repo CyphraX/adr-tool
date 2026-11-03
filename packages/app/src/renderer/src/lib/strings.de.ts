@@ -509,7 +509,7 @@ export const de: typeof en = {
         inCycle: boolean,
         violations: readonly string[]
       ): string =>
-        `${from} hängt von ${to} ab: ${many(weight, 'eine Abhängigkeit zwischen Quelldateien', `${weight} Abhängigkeiten zwischen Quelldateien`)}${typeOnly ? ', nur Typen' : ''}${inCycle ? ', in einem Zyklus' : ''}.${violations.map((violation) => ` Verstoß: ${violation}`).join('')}`,
+        `${from} hängt von ${to} ab: ${many(weight, 'eine Abhängigkeit zwischen Quelldateien', `${weight} Abhängigkeiten zwischen Quelldateien`)}${typeOnly ? ', nur Typen' : ''}${inCycle ? ', in einem Zyklus' : ''}.${violations.map((violation) => ` Verstoß: ${violation}.`).join('')}`,
       noLine: 'Keine Abhängigkeit zwischen den Knoten dieser Ebene.',
       violation: 'verstößt gegen eine Regel',
       thresholdViolation: 'außerhalb eines Schwellenwerts'
