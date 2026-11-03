@@ -97,6 +97,29 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     expect(dependencies.every((dependency) => !dependency.typeOnly)).toBe(true)
   })
 
+  it("lets an external test package see the test files of the package it tests: export_test.go", async () => {
+    const { edges, unresolved } = await analyse({
+      'go.mod': MODULE,
+      'cart/cart.go': ['package cart', 'func total() int { return 1 }'],
+      'cart/export_test.go': ['package cart', 'var Total = total'],
+      'cart/cart_test.go': [
+        'package cart_test',
+        'import (',
+        '  "testing"',
+        '  "example.com/shop/cart"',
+        ')',
+        'func TestTotal(t *testing.T) { _ = cart.Total() }'
+      ],
+      // Another package's tests do not see them.
+      'web/web_test.go': ['package web', 'import "example.com/shop/cart"', 'var _ = cart.Total']
+    })
+    expect(edges).toEqual([
+      'cart/cart_test.go > cart/export_test.go 6',
+      'cart/export_test.go > cart/cart.go 2'
+    ])
+    expect(unresolved).toEqual(['web/web_test.go:3 example.com/shop/cart.Total'])
+  })
+
   it('takes a blank import, and one whose use the syntax does not show, as a use of every file of its package', async () => {
     const { edges } = await analyse({
       'go.mod': MODULE,

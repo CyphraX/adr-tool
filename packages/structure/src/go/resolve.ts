@@ -183,7 +183,13 @@ export function resolveGo(
         libraryUsed.add(library)
         continue
       }
-      const pkg = directory === null ? undefined : packageAt(directory)
+      const imported = directory === null ? undefined : packageAt(directory)
+      // An external test package (`package cart_test`) is built with the test files of the
+      // package it tests, beside it: it sees what their `export_test.go` declares.
+      const pkg =
+        imported && directory === directoryOf(path) && isTest(path)
+          ? viewOf(directory, imported.name, true)
+          : imported
       if (pkg === undefined) {
         notResolved.push({ file: path, specifier: entry.path, line: entry.line })
       } else if (entry.name === '_') {
