@@ -334,6 +334,12 @@ importers:
       '@adr-tool/core':
         specifier: workspace:*
         version: link:../core
+      '@adr-tool/diagrams':
+        specifier: workspace:*
+        version: link:../diagrams
+      '@adr-tool/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@adr-tool/structure':
         specifier: workspace:*
         version: link:../structure

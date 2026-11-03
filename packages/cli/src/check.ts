@@ -7,17 +7,12 @@ import {
   type ConformanceReport,
   type Decisions
 } from '@adr-tool/conformance'
-import {
-  analyseDependencies,
-  extractorOf,
-  openStructure,
-  type NotAnalysed
-} from '@adr-tool/structure'
+import { openStructure, type Dependencies } from '@adr-tool/structure'
 import { DECLARATION_PATH, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
 import { openDiagrams } from '@adr-tool/diagrams'
 import { openConfig, type UnreadableConfig } from '@adr-tool/kernel'
 import { checkDiagrams, diagramsNeedModel, type DiagramsCheck } from './check-diagrams'
-import { goReader, javaReader, pythonReader } from './readers'
+import { notAnalysed, readCode } from './code'
 import { lintRepository, type LintReport } from './lint'
 
 /** A Problem of `.arch/components.yml`, as the command reports it. */
@@ -76,16 +71,9 @@ export async function check(
 
   // The code is analysed only for Rules that are checked, and for Drift where a Diagram can
   // have it: it takes a moment on a large repository.
-  let model: Awaited<ReturnType<typeof analyseDependencies>> | undefined
+  let model: Dependencies | undefined
   if (needsModel(rules, structure) || diagramsNeedModel(found, structure)) {
-    const has = (language: string): boolean =>
-      structure.sourceFiles.some((file) => file.language === language)
-    const extract = extractorOf({
-      java: has('java') ? await javaReader() : undefined,
-      python: has('python') ? await pythonReader() : undefined,
-      go: has('go') ? await goReader() : undefined
-    })
-    model = await analyseDependencies(fs, files, structure.sourceFiles, extract)
+    model = await readCode(fs, files, structure)
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
   }
 
@@ -112,14 +100,4 @@ export async function check(
     diagrams,
     notes
   }
-}
-
-/** The note about Source Files that cannot be parsed: they have no Dependencies of their own. */
-function notAnalysed(files: readonly NotAnalysed[]): string {
-  const shown = files
-    .slice(0, 3)
-    .map((file) => (file.line === undefined ? file.file : `${file.file}:${file.line}`))
-  const more = files.length > shown.length ? `, and ${files.length - shown.length} more` : ''
-  const count = files.length === 1 ? '1 Source File' : `${files.length} Source Files`
-  return `${count} cannot be parsed and ${files.length === 1 ? 'has' : 'have'} no Dependencies of ${files.length === 1 ? 'its' : 'their'} own: ${shown.join(', ')}${more}.`
 }
