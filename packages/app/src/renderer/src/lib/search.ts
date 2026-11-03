@@ -231,3 +231,145 @@ export function searchLogs(
     .flatMap((log) => search(log.adrs, query).map((hit) => ({ ...hit, logPath: log.path })))
     .sort((a, b) => b.score - a.score)
 }
+
+/** A Component the search found, by its ID or its name. */
+export interface ComponentHit {
+  readonly id: string
+  readonly name: string
+  readonly score: number
+}
+
+/** A Source File the search found, by its path. */
+export interface SourceFileHit {
+  readonly path: string
+  /** The Component that owns it; absent when it is Unassigned. */
+  readonly component?: string
+  readonly score: number
+}
+
+/** How much a word counts in a Component or a path, by where it is found. */
+const ARTEFACT_WEIGHT = {
+  whole: 100,
+  segment: 80,
+  segmentStart: 60,
+  inside: 40,
+  fileName: 50,
+  fileNameStart: 10,
+  fileNameWhole: 20,
+  directory: 30,
+  path: 20
+}
+
+const foldedComponents = new WeakMap<
+  readonly { id: string; name: string }[],
+  { id: string; segments: string[]; name: string; nameWords: string[] }[]
+>()
+
+/** Where a word of the query is in a text that is split at `/`, `-`, `_`, `.` and spaces. */
+const partsOf = (text: string): string[] => text.split(/[\s/._-]+/).filter(Boolean)
+
+/**
+ * The Components whose ID or name holds every word of the query (docs/plan-vision.md, part 2),
+ * best first: an ID that is the word, a segment of it or the name that is, one that starts with
+ * it, one that holds it. Components that match equally well keep the order of the declaration,
+ * which has each parent before its children.
+ */
+export function searchComponents(
+  components: readonly { readonly id: string; readonly name: string }[],
+  query: string
+): ComponentHit[] {
+  const words = wordsOf(query)
+  if (words.length === 0) return []
+  let folded = foldedComponents.get(components)
+  if (!folded) {
+    folded = components.map(({ id, name }) => ({
+      id: fold(id),
+      segments: id.split('/').map(fold),
+      name: fold(name),
+      nameWords: partsOf(fold(name))
+    }))
+    foldedComponents.set(components, folded)
+  }
+  const hits: ComponentHit[] = []
+  components.forEach((component, position) => {
+    const { id, segments, name, nameWords } = folded[position]!
+    let score = 0
+    for (const word of words) {
+      const found =
+        id === word || name === word
+          ? ARTEFACT_WEIGHT.whole
+          : segments.includes(word) || nameWords.includes(word)
+            ? ARTEFACT_WEIGHT.segment
+            : segments.some((segment) => segment.startsWith(word)) ||
+                nameWords.some((part) => part.startsWith(word))
+              ? ARTEFACT_WEIGHT.segmentStart
+              : id.includes(word) || name.includes(word)
+                ? ARTEFACT_WEIGHT.inside
+                : 0
+      if (found === 0) return
+      score += found
+    }
+    hits.push({ id: component.id, name: component.name, score })
+  })
+  return hits.sort((a, b) => b.score - a.score)
+}
+
+const foldedPaths = new WeakMap<readonly { path: string }[], string[]>()
+
+/**
+ * The Source Files whose path holds every word of the query, best first: where the file's name
+ * holds it, then where a directory is it, then anywhere in the path. Files that match equally
+ * well come shortest path first, then in the order of the paths.
+ */
+export function searchSourceFiles(
+  files: readonly { readonly path: string; readonly component?: string }[],
+  query: string
+): SourceFileHit[] {
+  const words = wordsOf(query)
+  if (words.length === 0) return []
+  let folded = foldedPaths.get(files)
+  if (!folded) {
+    folded = files.map(({ path }) => fold(path))
+    foldedPaths.set(files, folded)
+  }
+  const hits: { hit: SourceFileHit; position: number }[] = []
+  files.forEach((file, position) => {
+    const path = folded[position]!
+    const slash = path.lastIndexOf('/')
+    const fileName = path.slice(slash + 1)
+    const directories = slash === -1 ? [] : path.slice(0, slash).split('/')
+    let score = 0
+    for (const word of words) {
+      const at = fileName.indexOf(word)
+      const found =
+        at !== -1
+          ? ARTEFACT_WEIGHT.fileName +
+            (at === 0 || /[^\p{L}\p{N}]/u.test(fileName[at - 1]!)
+              ? ARTEFACT_WEIGHT.fileNameStart
+              : 0) +
+            // `kernel.ts` is the kernel's file more than `kernelize.mjs` is.
+            (fileName.split('.')[0] === word ? ARTEFACT_WEIGHT.fileNameWhole : 0)
+          : directories.includes(word)
+            ? ARTEFACT_WEIGHT.directory
+            : path.includes(word)
+              ? ARTEFACT_WEIGHT.path
+              : 0
+      if (found === 0) return
+      score += found
+    }
+    const hit = {
+      path: file.path,
+      ...(file.component !== undefined && { component: file.component }),
+      score
+    }
+    hits.push({ hit, position })
+  })
+  return hits
+    .sort(
+      (a, b) =>
+        b.hit.score - a.hit.score ||
+        a.hit.path.length - b.hit.path.length ||
+        a.position - b.position
+    )
+    .map(({ hit }) => hit)
+}

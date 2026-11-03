@@ -36,13 +36,25 @@ export function sentenceOf<S extends Sentences>(sentences: S, said: SaidBy<S>): 
   return (sentences[said.code] as (values: unknown) => string)(said.values)
 }
 
+/** What another sentence of the kernel said, inside this one; one it does not say, by its code. */
+const english = (said: Said): string =>
+  (KERNEL_SENTENCES as unknown as Record<string, ((values: unknown) => string) | undefined>)[
+    said.code
+  ]?.(said.values) ?? said.code
+
 /**
- * The sentences of the kernel: what `PendingFiles` refuses. Every module that plans with it
- * says these too, and takes them into its own sentences.
+ * The sentences of the kernel: what `PendingFiles` refuses, and why `.arch/config.yml` cannot
+ * be read. Every module says these too, and takes them into its own sentences.
  */
 export const KERNEL_SENTENCES = {
   'already-exists': (v: { path: string }): string => `${v.path} already exists.`,
-  'no-longer-exists': (v: { path: string }): string => `${v.path} no longer exists.`
+  'no-longer-exists': (v: { path: string }): string => `${v.path} no longer exists.`,
+
+  // The Problem of `.arch/config.yml` (docs/configuration.md), and why: the rest of a sentence.
+  'unreadable-config': (v: { path: string; detail: Said }): string =>
+    `${v.path} cannot be read: ${english(v.detail)}. What its settings decide is not done until it is fixed.`,
+  'config-not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
+  'config-not-map': (): string => 'its top level must be a map'
 } satisfies Sentences
 
 export type KernelSaid = SaidBy<typeof KERNEL_SENTENCES>

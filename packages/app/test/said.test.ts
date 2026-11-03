@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { SENTENCES, type CoreSaid, type Said } from '@adr-tool/core'
 import { REVIEW_SENTENCES } from '@adr-tool/review'
 import { STRUCTURE_SENTENCES, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
+import { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
 import { DE, inGerman } from '../src/renderer/src/lib/said.de'
 import { wordIn, wordOf, wordStructureProblem, wordWarnings } from '../src/renderer/src/lib/said'
 
-// The window in English: what `core` and `structure` say comes as they say it.
+// The window in English: what `core`, `structure` and `diagrams` say comes as they say it.
 vi.mock('../src/renderer/src/lib/language', () => ({ language: 'en' }))
 
 type Sentence = (values: unknown) => string
@@ -47,14 +48,19 @@ const MODULES = [
     detail: { code: 'top-not-map', values: {} }
   },
   {
+    name: 'diagrams',
+    sentences: DIAGRAMS_SENTENCES,
+    detail: { code: 'diagram-not-map', values: {} }
+  },
+  {
     name: 'review',
     sentences: REVIEW_SENTENCES,
-    detail: { code: 'config-not-yaml', values: { message: '‹detail-message›' } }
+    detail: { code: 'frontmatter-yaml', values: { message: '‹detail-message›' } }
   }
 ] as const
 
 describe('German', () => {
-  it('has a sentence for every code of core, structure and review', () => {
+  it('has a sentence for every code of core, structure, diagrams and review', () => {
     // The compiler asks for them (`DE` is typed by the tables); this says so where it runs.
     for (const { sentences } of MODULES) {
       for (const code of Object.keys(sentences)) expect(Object.keys(DE), code).toContain(code)
@@ -68,9 +74,13 @@ describe('German', () => {
       for (const other of MODULES) {
         if (one === other) continue
         const shared = Object.keys(one.sentences).filter((code) => code in other.sentences)
+        // What any operation may refuse, and why .arch/config.yml cannot be read.
         expect(shared.sort(), `${one.name} and ${other.name}`).toEqual([
           'already-exists',
-          'no-longer-exists'
+          'config-not-map',
+          'config-not-yaml',
+          'no-longer-exists',
+          'unreadable-config'
         ])
       }
     }

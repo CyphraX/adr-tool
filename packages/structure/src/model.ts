@@ -31,6 +31,7 @@ export {
 export { hasRepair, planAdopt, planRename, planRepair, type RenamePlan } from './operations'
 export type { Dependencies, Dependency, LibraryUse, NotAnalysed, NotResolved } from './dependencies'
 export {
+  edgesAmong,
   levelOf,
   UNASSIGNED,
   type Level,
