@@ -119,7 +119,11 @@ export const DIAGRAMS_EN = {
     `In the code: ${count} ${many(count, 'Dependency', 'Dependencies')} between their Source Files.`,
   noDependencies: 'The code has no Dependency behind it.',
   notAnalysedYet: 'What the code has behind it follows once the code is analysed.',
-  repair: 'Repair',
+  /** A Repair, as what it does: an element whose Component is gone, or a picture that is not current. */
+  repair: (problem: { kind: string; component?: string }): string =>
+    problem.kind === 'component-gone'
+      ? `Take ${problem.component ?? ''} out of the Diagram`
+      : 'Export the picture again',
   byHand: 'The suite cannot know what was meant here. Fix the file in an editor; the view follows.',
 
   /** The dialog of a new Diagram. */

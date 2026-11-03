@@ -66,7 +66,7 @@
           <p class="what">{@render withCode(wordDiagramProblem(problem))}</p>
           {#if repairable}
             <button class="repair" onclick={() => void app.diagrams.repair(problem)}>
-              {t.diagrams.repair}
+              {t.diagrams.repair(problem)}
             </button>
           {:else}
             <p class="by-hand">{t.diagrams.byHand}</p>

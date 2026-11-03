@@ -123,7 +123,10 @@ export const DIAGRAMS_DE: typeof DIAGRAMS_EN = {
     `Im Code: ${count} ${many(count, 'Abhängigkeit', 'Abhängigkeiten')} zwischen ihren Quelldateien.`,
   noDependencies: 'Im Code steht keine Abhängigkeit dahinter.',
   notAnalysedYet: 'Was im Code dahintersteht, folgt, sobald der Code analysiert ist.',
-  repair: 'Reparieren',
+  repair: (problem: { kind: string; component?: string }): string =>
+    problem.kind === 'component-gone'
+      ? `${problem.component ?? ''} aus dem Diagramm nehmen`
+      : 'Das Bild neu exportieren',
   byHand:
     'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie die Datei in einem Editor; die Ansicht folgt.',
 

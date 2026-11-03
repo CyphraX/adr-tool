@@ -114,7 +114,7 @@
             title={diagrams.unsaved > 0 ? t.diagrams.saveFirst : undefined}
             onclick={() => void app.diagrams.repair(problem)}
           >
-            {t.diagrams.repair}
+            {t.diagrams.repair(problem)}
           </button>
         {/if}
       </li>
