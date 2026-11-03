@@ -1,14 +1,22 @@
 import type { ChangedFile, Git, LogEntry } from './port'
 import { isDay } from './port'
 
-/** One commit of a scripted history: the whole tree it leaves, and who made it when. */
+/**
+ * One commit of a scripted history: the whole tree it leaves, and who made it when. It has one
+ * parent at most: a merge cannot be scripted, and the log leaves merges out as git's does.
+ */
 export interface ScriptedCommit {
   readonly commit: string
   /** The commit before it. Absent: the one before it in the list; `null`: none. */
   readonly parent?: string | null
   readonly author?: string
-  /** ISO 8601; when it was authored and committed alike. */
+  /** When it was authored, ISO 8601: the date of its log entry. */
   readonly date?: string
+  /**
+   * When it was committed, ISO 8601, which `since` goes by; absent: when it was authored. A
+   * rebased commit keeps the day it was authored and is committed anew.
+   */
+  readonly committed?: string
   readonly subject?: string
   /** Every file of the commit, by its path. */
   readonly files: Readonly<Record<string, string>>
@@ -20,23 +28,39 @@ export interface ScriptedHistory {
   readonly head?: string | null
 }
 
-/** The share of lines two texts have in common, from 0 to 1: how git's `-M` is approximated. */
+/**
+ * How much of a file another one is, from 0 to 1, as git's `-M` scores a rename: the bytes of
+ * `a` that are found again in `b`, line by line, over the size of the larger of the two. As in
+ * git, a pair whose sizes differ by more than half the larger one — a file that more than
+ * doubled — and an empty file are never a rename.
+ */
 function similarity(a: string, b: string): number {
-  if (a === b) return 1
-  const lines = (text: string): string[] => text.split('\n')
-  const left = lines(a)
-  const right = lines(b)
-  const counts = new Map<string, number>()
-  for (const line of left) counts.set(line, (counts.get(line) ?? 0) + 1)
-  let common = 0
-  for (const line of right) {
-    const count = counts.get(line) ?? 0
-    if (count > 0) {
-      common++
-      counts.set(line, count - 1)
+  // Bytes in UTF-8: a code point below U+0080 is one, below U+0800 two, a surrogate pair four.
+  const size = (text: string): number => {
+    let bytes = 0
+    for (const character of text) {
+      const code = character.codePointAt(0)!
+      bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4
     }
+    return bytes
   }
-  return (2 * common) / (left.length + right.length)
+  const [left, right] = [size(a), size(b)]
+  if (left === 0 || right === 0) return 0
+  if (a === b) return 1
+  const larger = Math.max(left, right)
+  if (2 * Math.min(left, right) < larger) return 0
+  // Each line with its line break, as git hashes a file in chunks that end at one.
+  const lines = (text: string): string[] => text.match(/[^\n]*\n|[^\n]+$/g) ?? []
+  const counts = new Map<string, number>()
+  for (const line of lines(b)) counts.set(line, (counts.get(line) ?? 0) + 1)
+  let copied = 0
+  for (const line of lines(a)) {
+    const count = counts.get(line) ?? 0
+    if (count === 0) continue
+    copied += size(line)
+    counts.set(line, count - 1)
+  }
+  return copied / larger
 }
 
 /** The differences of two trees, with a file that went and one that came paired as a rename. */
@@ -121,7 +145,9 @@ export function memoryGit(history: ScriptedHistory): Git {
       let followed = options.path
       for (let at = head ?? null; at !== null && commits.has(at); at = commits.get(at)!.parent) {
         const entry = entryOf(at)
-        if (Date.parse(entry.date) < since) continue
+        // As git's `--since`: the walk stops at the first commit committed before the day.
+        const scripted = commits.get(at)!
+        if (Date.parse(scripted.committed ?? entry.date) < since) break
         if (followed === undefined) {
           entries.push(entry)
         } else {

@@ -75,6 +75,58 @@ describe('a history in memory', () => {
     expect(await git.log({ since: 'yesterday' })).toBeUndefined()
   })
 
+  it('stops at the first commit committed before the day, as git does, and goes by when it was committed', async () => {
+    const walked = memoryGit({
+      commits: [
+        { commit: sha('5'), date: '2026-10-05T09:00:00Z', files: { 'a.ts': 'a\n' } },
+        // Rebased: authored before the day, committed after it.
+        {
+          commit: sha('6'),
+          date: '2026-10-01T09:00:00Z',
+          committed: '2026-10-07T09:00:00Z',
+          files: { 'a.ts': 'b\n' }
+        },
+        { commit: sha('7'), date: '2026-10-02T09:00:00Z', files: { 'a.ts': 'c\n' } },
+        { commit: sha('8'), date: '2026-10-08T09:00:00Z', files: { 'a.ts': 'd\n' } }
+      ]
+    })
+    const since = (await walked.log({ since: '2026-10-04' }))!
+    // sha 7 is older than the day: the walk ends there, though sha 5 is newer than the day.
+    expect(since.map((entry) => entry.commit)).toEqual([sha('8')])
+    const later = (await walked.log({ since: '2026-10-01' }))!
+    expect(later.map((entry) => [entry.commit, entry.date])).toEqual([
+      [sha('8'), '2026-10-08T09:00:00Z'],
+      [sha('7'), '2026-10-02T09:00:00Z'],
+      [sha('6'), '2026-10-01T09:00:00Z'],
+      [sha('5'), '2026-10-05T09:00:00Z']
+    ])
+  })
+
+  it('finds a rename only where git would: most of the bytes kept, the sizes not too far apart', async () => {
+    const changes = (before: string, after: string) =>
+      memoryGit({
+        commits: [
+          { commit: sha('1'), files: { 'a.ts': before } },
+          { commit: sha('2'), files: { 'b.ts': after } }
+        ]
+      }).changes(sha('1'), sha('2'))
+    const renamed = [{ kind: 'renamed', path: 'b.ts', from: 'a.ts' }]
+    const apart = [
+      { kind: 'deleted', path: 'a.ts' },
+      { kind: 'added', path: 'b.ts' }
+    ]
+    expect(await changes('one\ntwo\n', 'one\ntwo\n')).toEqual(renamed)
+    expect(await changes('one\ntwo\nthree\n', 'one\ntwo\nfour\n')).toEqual(renamed)
+    // Half the bytes of the larger file at least: a short line kept of two long ones is not.
+    expect(
+      await changes('a\nthe second line, a long one\n', 'a\nanother long line instead\n')
+    ).toEqual(apart)
+    // A file that more than doubled is not the same file, whatever it kept.
+    expect(await changes('one\ntwo\n', 'one\ntwo\nthree\nfour\nfive\n')).toEqual(apart)
+    // An empty file is never a rename.
+    expect(await changes('', '')).toEqual(apart)
+  })
+
   it('scripts a rebase as a history without the commits it replaced', async () => {
     const rebased = memoryGit({
       commits: [commits[0]!, { ...commits[2]!, commit: sha('4'), parent: sha('1') }]
