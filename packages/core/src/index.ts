@@ -85,3 +85,7 @@ export { planMigration } from './lifecycle/migrate'
 export { planRepair, repairsOf, type Repair } from './lifecycle/repair'
 export { nextPrefix } from './log/new-id'
 export { listTemplates, type TemplateInfo, type Templates } from './templates/templates'
+// The Mermaid blocks of an ADR's body, as the export finds them: what a window draws for it
+// (docs/adr/0016-…). The export itself is `@adr-tool/core/export`.
+export { mermaidSources } from './export/markdown'
+export { DIAGRAM_FONT } from './export/style'

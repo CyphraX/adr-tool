@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { Attachment } from 'svelte/attachments'
+  import { drawIn, windowTheme, type Theme } from '../lib/diagrams'
   import { renderMarkdown, type DocumentBase } from '../lib/markdown'
   import { app } from '../lib/state.svelte'
 
@@ -7,20 +9,50 @@
   let {
     markdown,
     base,
+    typing = false,
     onfile = (fileName: string) => app.selectByFileName(fileName)
   }: {
     markdown: string
     base?: DocumentBase | undefined
+    /**
+     * The text changes as it is typed, as in the preview beside the editor: a Mermaid block not
+     * drawn before is drawn once the typing pauses.
+     */
+    typing?: boolean
     /** A link to a file next to the ADR: by default, the ADR of this log it names is selected. */
     onfile?: (fileName: string) => void
   } = $props()
   const html = $derived(renderMarkdown(markdown, base))
+  const XLINK = 'http://www.w3.org/1999/xlink'
+  /** How long the typing pauses before a Mermaid block is drawn beside it. */
+  const DRAW_WHILE_TYPING_MS = 400
+
+  // A Mermaid block is drawn in place (docs/adr/0016-…). The document is set here rather than
+  // by Svelte, so that what takes a block's place is the document's and nobody else's.
+  let theme = $state<Theme>(windowTheme())
+  $effect(() => {
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)')
+    const follow = (): void => void (theme = windowTheme())
+    scheme.addEventListener('change', follow)
+    return () => scheme.removeEventListener('change', follow)
+  })
+  // The Mermaid sources shown below their drawing stay shown as the document is set again.
+  const open = new Set<string>()
+  function setDocument(html: string, theme: Theme): Attachment<HTMLElement> {
+    return (element) => {
+      // Sanitized in lib/markdown.ts.
+      element.innerHTML = html
+      // What waits to be drawn is not drawn once the document is set again.
+      return drawIn(element, theme, { open, delay: typing ? DRAW_WHILE_TYPING_MS : 0 })
+    }
+  }
 
   // Nothing navigates inside the app. A link to another ADR of this log selects it;
   // a web link opens in the system browser; everything else does nothing.
   function followLink(event: MouseEvent): void {
     const anchor = (event.target as Element).closest('a')
-    const href = anchor?.getAttribute('href')
+    // A link of a Mermaid drawing has its address in `xlink:href`.
+    const href = anchor?.getAttribute('href') ?? anchor?.getAttributeNS(XLINK, 'href')
     if (!href) return
     event.preventDefault()
     if (/^https?:\/\//i.test(href)) void window.api.openExternal(href)
@@ -29,10 +61,7 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="document" onclick={followLink}>
-  <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized in lib/markdown.ts -->
-  {@html html}
-</div>
+<div class="document" {@attach setDocument(html, theme)} onclick={followLink}></div>
 
 <style>
   .document {
@@ -143,5 +172,36 @@
 
   .document :global(input[type='checkbox']) {
     margin-right: 0.4em;
+  }
+
+  /* A drawn Mermaid block, and a block that cannot be drawn, with what Mermaid says beside it. */
+  .document :global(figure.diagram) {
+    margin: 0 0 1em;
+    overflow-x: auto;
+  }
+
+  .document :global(figure.diagram svg) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .document :global(.diagram-source summary) {
+    margin-top: 4px;
+    font-family: var(--ui);
+    font-size: 0.75em;
+    color: var(--ink-faint);
+    cursor: default;
+  }
+
+  .document :global(.diagram-source pre) {
+    margin-top: 6px;
+  }
+
+  .document :global(.diagram-error) {
+    margin-top: -0.6em;
+    font-family: var(--ui);
+    font-size: 0.8em;
+    color: var(--problem);
   }
 </style>

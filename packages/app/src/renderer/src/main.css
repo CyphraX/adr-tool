@@ -1,8 +1,12 @@
 /*
  * Two voices. The tool speaks in a quiet, cool sans; the ADR is a document and reads as
  * one, in a serif on paper. The only loud thing on screen is the Status.
+ *
+ * An element of the class `light-tokens` holds the light tokens in either theme: the export is
+ * printed on paper, and its diagrams are drawn in them (lib/diagrams.ts).
  */
-:root {
+:root,
+.light-tokens {
   color-scheme: light dark;
 
   --paper: #fcfcfd;
