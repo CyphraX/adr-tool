@@ -252,6 +252,7 @@ describe('this repository, as the window gets it', () => {
     expect(view.nodes.map((node) => node.id)).toEqual([
       'app',
       'cli',
+      'conformance',
       'core',
       'kernel',
       'mcp',

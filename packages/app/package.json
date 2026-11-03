@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@adr-tool/cli": "workspace:*",
+    "@adr-tool/conformance": "workspace:*",
     "@adr-tool/core": "workspace:*",
     "@adr-tool/review": "workspace:*",
     "@adr-tool/structure": "workspace:*",

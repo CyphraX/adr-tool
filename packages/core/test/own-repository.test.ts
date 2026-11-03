@@ -51,6 +51,7 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [13, '0013-agents-write-adrs-through-the-mcp-server-as-previewed-change', 'accepted'],
     [14, '0014-the-export-is-static-html-from-core-printed-to-pdf-by', 'accepted'],
     [15, '0015-a-change-set-is-written-beside-its-files-and-renamed-into', 'accepted'],
+    [17, '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint', 'accepted'],
     [19, '0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history', 'accepted'],
     [20, '0020-git-is-a-port-of-the-kernel-implemented-once-for-node', 'accepted']
   ])
@@ -116,6 +117,16 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       to: '0004-operations-return-change-sets',
       state: 'in-effect'
     },
+    ...[
+      '0002-never-reserialize-markdown',
+      '0007-the-analysis-never-executes-anything-from-the-analysed',
+      '0009-traces-are-recorded-on-the-source-only-unlike-back'
+    ].map((to) => ({
+      type: 'depends-on',
+      from: '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint',
+      to,
+      state: 'in-effect'
+    })),
     ...[
       '0004-operations-return-change-sets',
       '0020-git-is-a-port-of-the-kernel-implemented-once-for-node'

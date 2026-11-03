@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository, for CI; `adr export` writes them as HTML pages. It also holds the one way the suite runs git, which the app uses too",
+  "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository and `adr check` its Rules against the code, for CI; `adr export` writes the Decision Logs as HTML pages. It also holds the one way the suite runs git, which the app uses too",
   "type": "module",
   "bin": {
     "adr": "./dist/adr.mjs"
@@ -18,13 +18,17 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@adr-tool/conformance": "workspace:*",
     "@adr-tool/core": "workspace:*",
     "@adr-tool/kernel": "workspace:*",
     "@adr-tool/review": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@types/node": "^24.13.5",
+    "ignore": "^7.0.9",
+    "tree-sitter-java": "^0.23.5",
     "typescript": "^5.9.3",
     "vite": "^7.3.6",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "web-tree-sitter": "^0.27.0"
   }
 }
