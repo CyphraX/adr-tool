@@ -7,7 +7,8 @@ import type { CodeView } from './state.svelte'
  * The Review module of one tab (docs/plan-vision.md, part 9): what the main process last found
  * of the Annotations, and what the person looks at — the filter of the sidebar, the Annotation
  * that is selected, the Source File the middle shows instead of the list, the Problems of the
- * repository there, and the Annotation that is being attached again to new lines.
+ * repository or the Source Files to pick from there, and the Annotation that is being attached
+ * again to new lines.
  */
 export class ReviewTab {
   /** The last answer, kept while the next one is asked for; replaced as a whole. */
@@ -22,6 +23,8 @@ export class ReviewTab {
   code = $state<CodeView | undefined>(undefined)
   /** The middle shows the Problems of the repository instead of the list. */
   problems = $state(false)
+  /** The middle offers the Source Files to open one: to annotate it, or to attach again. */
+  picking = $state(false)
   /** The Annotation whose new lines are being selected in the code viewer: Attach again. */
   attaching = $state<string | undefined>(undefined)
 }

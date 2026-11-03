@@ -171,7 +171,10 @@ export function facetCounts(
     if (passes(annotation, filter, owners, 'state') && annotation.state)
       increment(states, annotation.state)
     const anchor = anchorStateOf(annotation)
-    if (passes(annotation, filter, owners, 'anchor') && (anchor === 'moved' || anchor === 'orphaned'))
+    if (
+      passes(annotation, filter, owners, 'anchor') &&
+      (anchor === 'moved' || anchor === 'orphaned')
+    )
       increment(anchors, anchor)
     if (passes(annotation, filter, owners, 'type') && annotation.type)
       increment(types, annotation.type)
@@ -199,9 +202,13 @@ export interface CitedLine {
 }
 
 /** The Traces of an Annotation, each with the ADR it names, if there is one. */
-export function citedBy(annotation: AnnotationView, repository: Repository): CitedLine[] {
+export const citedBy = (annotation: AnnotationView, repository: Repository): CitedLine[] =>
+  citedLines(annotation.cites, repository)
+
+/** Items of `cites`, each with the ADR it names, if there is one. */
+export function citedLines(cites: readonly string[], repository: Repository): CitedLine[] {
   const adrs = adrReferencesOf(repository)
-  return annotation.cites.map((item) => {
+  return cites.map((item) => {
     const found = citedAdr(item, adrs).found
     return found
       ? { item, found: { logPath: found.log === '.' ? '' : found.log, id: found.id } }
@@ -270,9 +277,11 @@ export function searchAnnotations(
   for (const annotation of annotations) {
     const head = fold(`${annotation.id} ${firstLine(annotation.text)}`)
     const rest = fold(
-      [annotation.text, sourceFileOf(annotation) ?? '', ...annotation.replies.map((one) => one.text)].join(
-        '\n'
-      )
+      [
+        annotation.text,
+        sourceFileOf(annotation) ?? '',
+        ...annotation.replies.map((one) => one.text)
+      ].join('\n')
     )
     let score = 0
     for (const word of words) {

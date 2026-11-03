@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { DecisionLog } from '@adr-tool/core'
   import { DECLARATION_PATH } from '@adr-tool/structure/model'
-  import { wordStructureProblem } from '../lib/said'
+  import { reviewing } from '../lib/reviewing.svelte'
+  import { wordReviewProblem, wordStructureProblem } from '../lib/said'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import type { Placed } from '../lib/together'
@@ -18,13 +19,15 @@
   import StatusMark from './StatusMark.svelte'
 
   // The Problems of the repository in front, of every module, in one list (docs/plan-vision.md,
-  // part 2). The same list stands in the middle of Decisions and of Structure; a click opens
-  // what a Problem is about in its module, and the list goes along.
+  // part 2). The same list stands in the middle of Decisions, of Structure and of Review; a
+  // click opens what a Problem is about in its module, and the list goes along.
 
   const tab = $derived(app.active)
   const problems = $derived(app.repositoryProblems)
   const logs = $derived(tab?.repository.repository.logs ?? [])
   const structure = $derived(problems?.structure)
+  const annotations = $derived(problems?.review)
+  const selectedAnnotation = $derived(tab?.module === 'review' ? tab.review.selectedId : undefined)
   const selectedComponent = $derived(
     tab?.module === 'structure' && tab.structure.selection?.kind === 'node'
       ? tab.structure.selection.id
@@ -71,6 +74,10 @@
         <button onclick={() => app.showInStructure(tab.structure.show)}>
           {t.repositoryProblems.backToStructure}
         </button>
+      {:else if tab?.module === 'review'}
+        <button onclick={() => reviewing.backToList()}>
+          {t.repositoryProblems.backToAnnotations}
+        </button>
       {:else}
         <button onclick={() => app.show('adrs')}>{t.backToAdrs}</button>
       {/if}
@@ -80,7 +87,7 @@
   {#if problems && structure}
     <div class="groups">
       <p class="lead">
-        {problems.count === 0 && structure.state === 'known'
+        {problems.count === 0 && structure.state === 'known' && annotations?.state === 'known'
           ? t.repositoryProblems.none
           : t.repositoryProblems.lead}
       </p>
@@ -240,6 +247,76 @@
           </ul>
         {/if}
       </section>
+
+      {#if annotations}
+        <section aria-label={t.modules.review}>
+          <h3>
+            {t.modules.review}
+            {#if annotations.state === 'known'}{@render count(
+                annotations.entries.length + (annotations.configUnreadable ? 1 : 0)
+              )}{/if}
+          </h3>
+          {#if annotations.state === 'reading'}
+            <p class="empty" role="status">{t.annotations.problems.reading}</p>
+          {:else if annotations.state === 'failed'}
+            <p class="empty">{t.annotations.problems.failed(annotations.reason)}</p>
+          {:else}
+            {#if annotations.again}
+              <p class="empty" role="status">{t.annotations.problems.again}</p>
+            {/if}
+            {#if annotations.entries.length === 0 && !annotations.configUnreadable}
+              <p class="empty">{t.repositoryProblems.noneHere}</p>
+            {/if}
+            <ul>
+              {#if annotations.configUnreadable}
+                <li class="group">
+                  <p class="what">{@render withCode(t.annotations.problems.configUnreadable)}</p>
+                </li>
+              {/if}
+              {#each annotations.entries as entry, position (position)}
+                {@const problem = entry.problem}
+                <li class="group">
+                  <div class="subject">
+                    {#if entry.annotation}
+                      {@const id = entry.annotation.id}
+                      <button
+                        class="artefact"
+                        class:selected={id === selectedAnnotation}
+                        onclick={() => reviewing.open(id, false, true)}
+                      >
+                        <span class="kind">{t.annotations.problems.annotation}</span>
+                        <code>{id}</code>
+                      </button>
+                    {:else}
+                      <span class="artefact">
+                        <span class="kind">{t.annotations.problems.file}</span>
+                        <code>{problem.path}</code>
+                      </span>
+                    {/if}
+                  </div>
+                  <p class="what">{@render withCode(wordReviewProblem(problem))}</p>
+                  {#if problem.kind === 'orphaned' && entry.annotation?.writable}
+                    {@const id = entry.annotation.id}
+                    <button class="repair only" onclick={() => reviewing.startAttaching(id)}>
+                      {t.annotations.attachAgain}
+                    </button>
+                  {:else if problem.kind === 'unknown-adr' && entry.annotation}
+                    {@const id = entry.annotation.id}
+                    <button
+                      class="repair only"
+                      onclick={() => void reviewing.repair(id, problem.adr)}
+                    >
+                      {t.structure.repair}
+                    </button>
+                  {:else if problem.kind !== 'orphaned'}
+                    <p class="by-hand">{@render withCode(t.annotations.problems.byHand)}</p>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+      {/if}
     </div>
   {/if}
 </div>

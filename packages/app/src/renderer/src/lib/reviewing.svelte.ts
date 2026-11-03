@@ -82,16 +82,28 @@ class Reviewing {
     if (value === undefined || filter[facet] === value) delete filter[facet]
     else filter[facet] = value
     review.filter = filter as ReviewFilter
-    review.problems = false
-    review.code = undefined
+    this.toList(review)
   }
 
   clearFilter(): void {
     const review = app.active?.review
     if (!review) return
     review.filter = {}
+    this.toList(review)
+  }
+
+  /** The middle shows the list again: no Source File, no Problems, nothing to pick. */
+  private toList(review: Tab['review']): void {
     review.problems = false
+    review.picking = false
     review.code = undefined
+    review.attaching = undefined
+  }
+
+  /** Back from the Problems of the repository, or from the Source Files to pick, to the list. */
+  backToList(): void {
+    const review = app.active?.review
+    if (review) this.toList(review)
   }
 
   select(id: string | undefined): void {
@@ -104,7 +116,7 @@ class Reviewing {
    * repository, an ADR, a Component page, the code viewer of Structure. With `code`, the middle
    * shows its lines in the code viewer.
    */
-  open(id: string, code = false): void {
+  open(id: string, code = false, fromProblems = false): void {
     const tab = app.active
     if (!tab) return
     app.searching = undefined
@@ -112,8 +124,34 @@ class Reviewing {
     if (tab.module !== 'review') app.showModule('review')
     if (tab.module !== 'review') return
     tab.review.selectedId = id
+    if (fromProblems) {
+      // The Problems stay in the middle, as they do in Structure.
+      tab.review.problems = true
+      tab.review.code = undefined
+      tab.review.picking = false
+    } else {
+      tab.review.problems = false
+      tab.review.picking = false
+      if (code) this.showCode(id)
+      // A Source File the Annotation is not on gives way to the list.
+      else if (tab.review.code && tab.review.code.path !== this.placeOfId(tab, id)?.path)
+        tab.review.code = undefined
+    }
+  }
+
+  private placeOfId(tab: Tab, id: string): Place | undefined {
+    const annotation = tab.review.known?.annotations.find((one) => one.id === id)
+    return annotation && placeOf(annotation)
+  }
+
+  /** The middle offers the Source Files Structure knows, to open one and annotate it. */
+  startPicking(): void {
+    const tab = app.active
+    if (!tab) return
+    tab.review.picking = true
     tab.review.problems = false
-    if (code) this.showCode(id)
+    tab.review.code = undefined
+    app.freshOutline(tab)
   }
 
   /** The middle shows the lines of an Annotation in the code viewer, where they are now. */
@@ -136,15 +174,14 @@ class Reviewing {
     const open = tab.review.code?.path === path ? tab.review.code.file : undefined
     tab.review.code = { path, marks, line: lines?.start, file: open, error: undefined }
     tab.review.problems = false
+    tab.review.picking = false
     if (!open) void this.readCode(tab)
   }
 
   /** Back from the code viewer to the list. Attaching again ends with it. */
   closeCode(): void {
     const review = app.active?.review
-    if (!review) return
-    review.code = undefined
-    review.attaching = undefined
+    if (review) this.toList(review)
   }
 
   private async readCode(tab: Tab): Promise<void> {
@@ -223,7 +260,8 @@ class Reviewing {
     const tab = app.active
     if (!tab) return
     const repositoryId = tab.repository.id
-    if (reviewForms.replying?.id === id && reviewForms.replying.repositoryId === repositoryId) return
+    if (reviewForms.replying?.id === id && reviewForms.replying.repositoryId === repositoryId)
+      return
     reviewForms.replying = { repositoryId, id, text: '', author: '' }
     void this.author(repositoryId).then((name) => {
       const replying = reviewForms.replying
@@ -298,12 +336,16 @@ class Reviewing {
     } else {
       // The file is gone: the middle offers the Source Files to pick the new one from.
       tab.review.code = undefined
+      tab.review.picking = true
+      app.freshOutline(tab)
     }
   }
 
   cancelAttaching(): void {
     const review = app.active?.review
-    if (review) review.attaching = undefined
+    if (!review) return
+    review.attaching = undefined
+    review.picking = false
   }
 
   async attach(id: string, lines: Place): Promise<void> {
@@ -341,6 +383,18 @@ class Reviewing {
     const tab = app.active
     if (!tab) return
     const texts = t.annotations.change.uncite
+    await this.plan(
+      tab.repository.id,
+      { kind: 'uncite', id, adr },
+      { title: texts.title(id, adr), action: texts.action, refused: texts.refused(id, adr) }
+    )
+  }
+
+  /** The Repair of a Trace to an ADR that is not there: the item is taken out of `cites`. */
+  async repair(id: string, adr: string): Promise<void> {
+    const tab = app.active
+    if (!tab) return
+    const texts = t.annotations.change.repair
     await this.plan(
       tab.repository.id,
       { kind: 'uncite', id, adr },

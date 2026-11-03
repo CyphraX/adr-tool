@@ -42,7 +42,11 @@ const SAME_IN_GERMAN = new Set([
   'I',
   'H',
   'Fan-in',
-  'Fan-out'
+  'Fan-out',
+  'Review',
+  'Annotation',
+  'Text',
+  'Markdown'
 ])
 
 /** Arguments to try a text that is a function with: a name or a count, a list, an object. */
@@ -69,7 +73,9 @@ const SAME_AT = new Set([
   'dashboard.adrCount',
   'structure.graph.directory',
   'structure.value',
-  'structure.page.filesIn'
+  'structure.page.filesIn',
+  'annotations.about',
+  'annotations.detail.written'
 ])
 
 /** Every text of `english` that `german` says the same, by where it stands. */

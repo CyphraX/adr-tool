@@ -3,7 +3,7 @@
   import type { AnnotationView } from '../../../shared/ipc'
   import type { CodeAnnotation, Lines } from '../lib/code-annotations'
   import { createCodeViewer, type CodeViewer } from '../lib/code-viewer'
-  import { firstLine, linesOf, onFile, placeOf } from '../lib/review'
+  import { firstLine, onFile, placeOf } from '../lib/review'
   import { reviewing } from '../lib/reviewing.svelte'
   import { app, type CodeView } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -64,12 +64,8 @@
           open: annotation.state !== 'resolved',
           type,
           text,
-          about: t.annotations.about(
-            annotation.author,
-            annotation.date,
-            annotation.replies.length
-          ),
-          label: t.annotations.card(type, linesOf(place), text)
+          about: t.annotations.about(annotation.author, annotation.date, annotation.replies.length),
+          label: t.annotations.card(type, place, text)
         }
       ]
     })
@@ -118,7 +114,7 @@
           onclick={() =>
             reviewing.compose(code.path, selection.start, selection.end, quoted(selection))}
         >
-          {t.annotations.annotate(linesOf(selection))}
+          {t.annotations.annotate(selection)}
         </button>
       {:else if !attaching && code.file}
         <span class="hint">{t.annotations.selectToAnnotate}</span>
@@ -138,7 +134,7 @@
           onclick={() =>
             selection && attaching.attach({ start: selection.start, end: selection.end })}
         >
-          {selection ? t.annotations.attachTo(linesOf(selection)) : t.annotations.attachAgain}
+          {selection ? t.annotations.attachTo(selection) : t.annotations.attachAgain}
         </button>
       </span>
     </div>

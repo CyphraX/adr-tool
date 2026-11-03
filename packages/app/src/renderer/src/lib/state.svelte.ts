@@ -569,7 +569,7 @@ class AppState {
    * The outline as of now, for a view that lists or searches it: analysed again where it may
    * be older than the files, which the cache of the analysis makes cheap.
    */
-  private freshOutline(tab: Tab | undefined): void {
+  freshOutline(tab: Tab | undefined): void {
     if (!tab) return
     const { known, reading } = tab.outline
     if (known && !known.current && !reading) void this.loadOutline(tab, true)
@@ -587,6 +587,8 @@ class AppState {
     } else if (tab.module === 'review') {
       tab.review.problems = true
       tab.review.code = undefined
+      tab.review.picking = false
+      tab.review.attaching = undefined
     } else {
       this.show('repository-problems')
     }
