@@ -141,11 +141,15 @@ The app runs locally: there is no backend, no account and no telemetry.
 
   ![Renaming a Component: one line in the declaration, one in the ADR that affects it](docs/screenshots/readme/structure-rename.png)
 
+- **Libraries.** The Libraries come from two places: what the manifests declare (`package.json`, `pom.xml`, `build.gradle`, requirements files, `pyproject.toml`, `go.mod`) and what the Source Files import. A table lists each Library with its versions, the Components that use it and its licence. Every column sorts. A filter shows what is declared and not used, or used and not declared. The page of a Component lists its own Libraries. The licence is what the installed package declares inside the repository. Nothing is looked up on the network. A licence that cannot be told is marked.
+
+  ![The Libraries of this repository, with electron and the Components that use it](docs/screenshots/readme/structure-libraries.png)
+
 The analysis runs in a worker thread and caches its results per file. It follows changes on disk once Structure is opened. Before that, a repository coming to the front is analysed once, for the count of Repository Problems, which then says when it was counted.
 
 ### Conformance
 
-- **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, and how far a metric may go. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request; the window follows ([plan-vision.md](docs/plan-vision.md), part 4).
+- **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, how far a metric may go, and which Components may use a Library. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request; the window follows ([plan-vision.md](docs/plan-vision.md), part 4).
 
 ## Install
 
@@ -230,6 +234,8 @@ $ pnpm build
 $ claude mcp add softarch -- node "$PWD/packages/mcp/dist/adr-mcp.mjs" .
 ```
 
+`list_libraries` gives the agent the Libraries of the repository or of one Component, each with its versions, the files that use it and its licence.
+
 Any client that starts a server as a process works the same way. The tools and what they answer are in [docs/mcp.md](docs/mcp.md).
 
 ### Sample repositories
@@ -292,7 +298,7 @@ components:
     paths: [packages/app/src/**]
 ```
 
-The patterns, test files, the Draft, the Dependencies of each language and the definitions of the metrics are in [docs/structure-format.md](docs/structure-format.md).
+The patterns, test files, the Draft, the Dependencies of each language, the definitions of the metrics and the Library inventory with its licences are in [docs/structure-format.md](docs/structure-format.md).
 
 ### Writing Rules
 
@@ -311,6 +317,17 @@ exceptions:
     to: web
     reason: The invoice formats its date like the web until it has a format of its own.
     justified-by: docs/adr/0012-invoices-format-dates-like-the-web
+```
+
+A Rule about Libraries names the Components that may use a Library, or those that must not:
+
+```yaml
+rules:
+  - id: only-persistence-uses-pg
+    why: The database is reached through persistence alone, so that it can be replaced in one place.
+    kind: library
+    library: pg
+    only-in: persistence
 ```
 
 The kinds of Rules, the fingerprint an Exception names and the Problems of the file are in [docs/conformance-format.md](docs/conformance-format.md).
@@ -368,7 +385,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [docs/personas.md](docs/personas.md) | The people the suite is built for, and the scenario each part is checked against |
 | [docs/design.md](docs/design.md) | How the window looks and behaves, for every module |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
-| [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
+| [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics, Libraries |
 | [docs/conformance-format.md](docs/conformance-format.md) | The contract of the Conformance module: Rules, Violations and their fingerprint, Exceptions, the Problems of `.arch/rules.yml` |
 | [docs/review-format.md](docs/review-format.md) | The contract of the Review module: Annotations, their Anchors and Replies, how an Anchor is found again, and the Problems |
 | [docs/diagrams-format.md](docs/diagrams-format.md) | The contract of the Diagrams module: the file of a Diagram, its view levels, suggested connections and Drift, its Problems, and the SVG |
@@ -394,7 +411,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
   - timeline, board and dashboard, and tables in the live editor (built);
   - the window in German (built);
   - the repositories in the window seen together (built).
-- **The other modules** are being built part by part ([plan-vision.md](docs/plan-vision.md)): Conformance — Rules, Patterns, Violations and `adr check` —, Diagrams bound to the code, Review with Annotations that survive change, Assessment with reports, the Next tiers of Structure — more metrics, history analysis, Libraries —, Documentation as arc42, the System across repositories, and more languages.
+- **The other modules** are being built part by part ([plan-vision.md](docs/plan-vision.md)): Conformance — Rules, Patterns, Violations and `adr check` —, Diagrams bound to the code, Review with Annotations that survive change, Assessment with reports, the Next tiers of Structure — more metrics, history analysis, Libraries (built) —, Documentation as arc42, the System across repositories, and more languages.
 - **Deferred:** distribution — installers, code signing and auto-update.
 
 The details are in [docs/roadmap.md](docs/roadmap.md).
