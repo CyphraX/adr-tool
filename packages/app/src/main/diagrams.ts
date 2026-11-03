@@ -7,6 +7,7 @@ import { openConfig, type FileSystem } from '@adr-tool/kernel'
 import {
   checkPicture,
   driftOf,
+  exportModelOf,
   openDiagrams,
   problemsOf,
   readDiagram,
@@ -14,12 +15,7 @@ import {
   svgPathOf,
   type ExportModel
 } from '@adr-tool/diagrams'
-import {
-  DECLARATION_PATH,
-  readDeclaration,
-  type Structure,
-  type StructureProblem
-} from '@adr-tool/structure/model'
+import { DECLARATION_PATH, type Structure } from '@adr-tool/structure/model'
 import type {
   DiagramEntry,
   DiagramLook,
@@ -40,17 +36,7 @@ export async function declaredOnDisk(fs: FileSystem): Promise<Declared> {
 }
 
 /** The declaration of Components as a text of `.arch/components.yml` says it. */
-export function declaredIn(text: string | undefined): Declared {
-  const declaration = readDeclaration(text)
-  if (declaration.kind === 'declared') {
-    return { origin: 'declared', components: declaration.components, problems: [] }
-  }
-  const problems: StructureProblem[] =
-    declaration.kind === 'unreadable'
-      ? [{ kind: 'unreadable-declaration', detail: declaration.detail, said: declaration.said }]
-      : []
-  return { origin: 'draft', components: [], problems }
-}
+export const declaredIn = (text: string | undefined): Declared => exportModelOf(text)
 
 /** The declaration as the window is told it. */
 const declarationOf = (declared: Declared): DiagramsDeclaration => ({

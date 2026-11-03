@@ -4,7 +4,12 @@
  * (ADR-0018).
  */
 import { plan, type FileSystem, type Plan } from '@adr-tool/kernel'
-import { DECLARATION_PATH, type Structure } from '@adr-tool/structure/model'
+import {
+  DECLARATION_PATH,
+  readDeclaration,
+  type Structure,
+  type StructureProblem
+} from '@adr-tool/structure/model'
 import { readDiagram, type Diagram } from './diagram'
 import type { DiagramProblem } from './problems'
 import { svgPathOf } from './location'
@@ -18,6 +23,23 @@ const asText = (text: string): string => text
 
 /** What the export needs of Structure: the declaration, and whether it can be read. */
 export type ExportModel = Pick<Structure, 'origin' | 'components' | 'problems'>
+
+/**
+ * The declaration as a text of `.arch/components.yml` says it — `undefined` where there is no
+ * such file —, for the export and the Problems of a Diagram, without analysing the code: the
+ * declared Components, or the Draft, with the Problem of a file that cannot be read.
+ */
+export function exportModelOf(text: string | undefined): ExportModel {
+  const declaration = readDeclaration(text)
+  if (declaration.kind === 'declared') {
+    return { origin: 'declared', components: declaration.components, problems: [] }
+  }
+  const problems: StructureProblem[] =
+    declaration.kind === 'unreadable'
+      ? [{ kind: 'unreadable-declaration', detail: declaration.detail, said: declaration.said }]
+      : []
+  return { origin: 'draft', components: [], problems }
+}
 
 /**
  * Plan writing the picture of the Diagram at `path` beside it, as the file is on disk now.

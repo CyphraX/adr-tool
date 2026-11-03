@@ -58,7 +58,13 @@ connections:
     to: structure
   - from: mcp
     to: cli
-    label: runs git
+    label: runs git, reads code
+  - from: mcp
+    to: diagrams
+    label: plans Diagrams
+  - from: mcp
+    to: kernel
+    label: the settings
   - from: cli
     to: core
     label: lints and exports

@@ -97,6 +97,8 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
       'diagrams > structure',
       'mcp > cli',
       'mcp > core',
+      'mcp > diagrams',
+      'mcp > kernel',
       'mcp > structure',
       'review > kernel',
       'review > structure',
