@@ -33,6 +33,8 @@ const below = (directory: string, importPath: string, modulePath: string): strin
   const rest = importPath.slice(modulePath.length + 1)
   return directory === '' ? rest : rest === '' ? directory : `${directory}/${rest}`
 }
+/** A name other packages can use: it begins with a capital letter, as Go has it. */
+const isExported = (name: string): boolean => /^\p{Lu}/u.test(name)
 /** A test file is not part of the package others import, as the go command has it. */
 const isTest = (path: string): boolean => path.endsWith('_test.go')
 
@@ -194,8 +196,11 @@ export function resolveGo(
       }
     }
 
-    // `cart.New`: the file of the package that declares `New`.
-    for (const { qualifier, name, line } of outline.selections) {
+    // `cart.New`: the file of the package that declares `New`. Another package can be
+    // selected from for an exported name alone, so `cart.items` selects from a value; so may
+    // a selection whose qualifier the file declares inside as well. Neither is ever listed.
+    for (const { qualifier, name, line, local } of outline.selections) {
+      if (local || !isExported(name)) continue
       const imported = bound.get(qualifier)
       if (!imported) continue
       imported.used = true

@@ -57,13 +57,30 @@ describe('a Go file, read with tree-sitter-go as WebAssembly', () => {
     ])
     expect([...outline.declares].sort()).toEqual(['Cart', 'ID', 'Max', 'New', 'count', 'found'])
     expect(outline.selections).toEqual([
-      // `c.Lines` too: the syntax cannot tell a variable from an import.
-      { qualifier: 'c', name: 'Lines', line: 13 },
+      // `c.Lines` too: the syntax cannot tell a variable from an import. As the file declares
+      // `c` inside, it is marked as possibly a value.
+      { qualifier: 'c', name: 'Lines', line: 13, local: true },
       { qualifier: 'catalog', name: 'Find', line: 15 },
       { qualifier: 'catalog', name: 'Product', line: 13 }
     ])
     expect(outline.names.map((name) => name.name)).toContain('NewLine')
     expect(outline.names.map((name) => name.name)).toContain('Line')
+  })
+
+  it('marks a selection from a name the file declares inside, but not one in the position of a type', () => {
+    const outline = outlineOf([
+      'package web',
+      'import "example.com/s/cart"',
+      'func Handle(cart *cart.Cart) {',
+      '  cart.Add(1)',
+      '}',
+      'func Other() { _ = cart.New() }'
+    ])
+    expect(outline.selections).toEqual([
+      { qualifier: 'cart', name: 'Add', line: 4, local: true },
+      { qualifier: 'cart', name: 'New', line: 6, local: true },
+      { qualifier: 'cart', name: 'Cart', line: 3 }
+    ])
   })
 
   it('leaves out of its names what a function declares, and the keys of a composite literal', () => {

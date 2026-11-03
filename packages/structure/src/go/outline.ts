@@ -30,6 +30,13 @@ export interface GoName {
 /** `cart.New`: a name selected from an identifier, which may be an import. */
 export interface GoSelection extends GoName {
   readonly qualifier: string
+  /**
+   * The file declares the qualifier inside as well — a parameter, a variable —, and the
+   * selection stands where a value may: `cart.Add(1)`, with a parameter `cart`, may select from
+   * that value. A selection in the position of a type never is one: `cart.Cart` there is the
+   * package's.
+   */
+  readonly local?: true
 }
 
 export interface GoOutline {
@@ -173,19 +180,32 @@ function outline(root: Node): GoOutline {
   }
 
   const selections = new Map<string, GoSelection>()
-  const select = (qualifier: Node | null | undefined, name: Node | null | undefined): void => {
+  const select = (
+    qualifier: Node | null | undefined,
+    name: Node | null | undefined,
+    value: boolean
+  ): void => {
     if (!qualifier || !name) return
     const key = `${qualifier.text}.${name.text}`
-    if (!selections.has(key)) {
-      selections.set(key, { qualifier: qualifier.text, name: name.text, line: lineOf(name) })
-    }
+    const inside = value && local.has(qualifier.text)
+    const line = lineOf(name)
+    const known = selections.get(key)
+    // A use that may be of a value never stands for one that is the package's: the first line
+    // of those counts.
+    if (known && (inside || (known.local === undefined && known.line <= line))) return
+    selections.set(key, {
+      qualifier: qualifier.text,
+      name: name.text,
+      line,
+      ...(inside ? { local: true as const } : {})
+    })
   }
   for (const node of root.descendantsOfType('selector_expression')) {
     const operand = node?.childForFieldName('operand')
-    if (operand?.type === 'identifier') select(operand, node?.childForFieldName('field'))
+    if (operand?.type === 'identifier') select(operand, node?.childForFieldName('field'), true)
   }
   for (const node of root.descendantsOfType('qualified_type')) {
-    select(node?.childForFieldName('package'), node?.childForFieldName('name'))
+    select(node?.childForFieldName('package'), node?.childForFieldName('name'), false)
   }
 
   return {

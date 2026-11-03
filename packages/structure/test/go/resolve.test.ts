@@ -133,6 +133,27 @@ describe('Dependencies in Go (docs/structure-format.md, section 3, "Go")', () =>
     expect(edges).toEqual(['p/c.go > p/b.go 2'])
   })
 
+  it('never lists a selection from what may be a value: a name not exported, or a qualifier declared inside', async () => {
+    const { edges, unresolved } = await analyse({
+      'go.mod': MODULE,
+      'cart/cart.go': [
+        'package cart',
+        'type Cart struct{ items []int }',
+        'func (c *Cart) Add(i int) { c.items = append(c.items, i) }'
+      ],
+      'web/server.go': [
+        'package web',
+        'import "example.com/shop/cart"',
+        'func Handle(cart *cart.Cart) {',
+        '  cart.Add(1)',
+        '  _ = cart.items',
+        '}'
+      ]
+    })
+    expect(edges).toEqual(['web/server.go > cart/cart.go 3'])
+    expect(unresolved).toEqual([])
+  })
+
   it('counts a name that files for different platforms both declare as a use of each', async () => {
     const { edges } = await analyse({
       'go.mod': MODULE,
