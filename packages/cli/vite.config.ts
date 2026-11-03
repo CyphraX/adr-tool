@@ -8,8 +8,9 @@ const require = createRequire(import.meta.url)
 
 /**
  * The WebAssembly of tree-sitter goes into the command as base64 text (ADR-0017), so that the
- * one file reads Java wherever it is copied to: `src/tree-sitter-wasm.ts`, which reads both
- * files from the installed packages, is replaced by them. The tests read the same module.
+ * one file reads Java, Python and Go wherever it is copied to: `src/tree-sitter-wasm.ts`, which
+ * reads the files from the installed packages, is replaced by them. The tests read the same
+ * module.
  */
 function treeSitterWasm(): Plugin {
   const file = fileURLToPath(new URL('src/tree-sitter-wasm.ts', import.meta.url))
@@ -23,7 +24,9 @@ function treeSitterWasm(): Plugin {
       normalize(id.split('?')[0]!) === file
         ? [
             constant('runtime', 'web-tree-sitter/web-tree-sitter.wasm'),
-            constant('grammar', 'tree-sitter-java/tree-sitter-java.wasm')
+            constant('javaGrammar', 'tree-sitter-java/tree-sitter-java.wasm'),
+            constant('pythonGrammar', 'tree-sitter-python/tree-sitter-python.wasm'),
+            constant('goGrammar', 'tree-sitter-go/tree-sitter-go.wasm')
           ].join('\n')
         : undefined
   }
@@ -59,7 +62,7 @@ export default defineConfig({
     rollupOptions: {
       onwarn(warning, warn) {
         // Emscripten's loader in web-tree-sitter evaluates the JavaScript a WebAssembly module
-        // carries. It only ever loads the two bundled here, never a file of the analysed repository.
+        // carries. It only ever loads those bundled here, never a file of the analysed repository.
         if (warning.code === 'EVAL' && warning.id?.includes('web-tree-sitter')) return
         warn(warning)
       },

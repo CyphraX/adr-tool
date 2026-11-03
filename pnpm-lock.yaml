@@ -183,9 +183,15 @@ importers:
       ignore:
         specifier: ^7.0.9
         version: 7.0.9
+      tree-sitter-go:
+        specifier: 0.25.0
+        version: 0.25.0
       tree-sitter-java:
         specifier: ^0.23.5
         version: 0.23.5
+      tree-sitter-python:
+        specifier: 0.25.0
+        version: 0.25.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

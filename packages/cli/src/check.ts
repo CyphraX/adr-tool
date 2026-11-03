@@ -14,7 +14,7 @@ import {
   type NotAnalysed
 } from '@adr-tool/structure'
 import { DECLARATION_PATH, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
-import { javaReader } from './java'
+import { goReader, javaReader, pythonReader } from './readers'
 import { lintRepository, type LintReport } from './lint'
 
 /** A Problem of `.arch/components.yml`, as the command reports it. */
@@ -60,8 +60,13 @@ export async function check(
   // The code is analysed only for Rules that are checked: it takes a moment on a large repository.
   let model: Awaited<ReturnType<typeof analyseDependencies>> | undefined
   if (needsModel(rules, structure)) {
-    const hasJava = structure.sourceFiles.some((file) => file.language === 'java')
-    const extract = extractorOf({ java: hasJava ? await javaReader() : undefined })
+    const has = (language: string): boolean =>
+      structure.sourceFiles.some((file) => file.language === language)
+    const extract = extractorOf({
+      java: has('java') ? await javaReader() : undefined,
+      python: has('python') ? await pythonReader() : undefined,
+      go: has('go') ? await goReader() : undefined
+    })
     model = await analyseDependencies(fs, files, structure.sourceFiles, extract)
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
   }
