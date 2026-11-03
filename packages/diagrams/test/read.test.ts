@@ -179,6 +179,51 @@ describe('a Diagram', () => {
     )
   })
 
+  // What the review of PR #51 found: of two `to`, the second was silently ignored.
+  it('cannot be read when a key it owns is written twice in one map, and says where the second is', () => {
+    expect(unreadable('level: container\ntitle: a\nlevel: component\n')).toBe(
+      `${PATH} cannot be read: "level" is written a second time on line 3.`
+    )
+    expect(unreadable('elements:\n  - component: core\n    at: [0, 0]\n    at: [10, 10]\n')).toBe(
+      `${PATH} cannot be read: "at" is written a second time on line 4.`
+    )
+    expect(
+      unreadable('elements:\n  - component: core\n    component: kernel\n    at: [0, 0]\n')
+    ).toBe(`${PATH} cannot be read: "component" is written a second time on line 3.`)
+    expect(
+      unreadable(
+        [
+          'elements:',
+          '  - component: core',
+          '    at: [0, 0]',
+          '  - component: kernel',
+          '    at: [200, 0]',
+          'connections:',
+          '  - from: core',
+          '    to: kernel',
+          '    label: a',
+          '    "to": core',
+          ''
+        ].join('\n')
+      )
+    ).toBe(`${PATH} cannot be read: "to" is written a second time on line 10.`)
+    // Twice at the top, and in an item later: the top is read first.
+    const twice = readDiagram(
+      PATH,
+      'elements:\n  - external: a\n    name: x\n    name: y\n    at: [0, 0]\nelements:\n'
+    )
+    expect(twice.readable).toBe(false)
+    expect(twice.problems[0]).toMatchObject({
+      line: 6,
+      detail: { code: 'key-twice', values: { key: 'elements', line: 6 } }
+    })
+    // Keys it does not know may repeat: they are not read.
+    expect(read('level: container\nowner: a\nowner: b\n').problems).toEqual([])
+    expect(
+      read('elements:\n  - component: core\n    note: a\n    note: b\n    at: [0, 0]\n').elements
+    ).toHaveLength(1)
+  })
+
   it('has the Problems of its file, each at its line', () => {
     const diagram = read(
       [

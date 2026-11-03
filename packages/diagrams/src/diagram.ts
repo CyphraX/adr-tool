@@ -99,6 +99,11 @@ export function diagramIdOf(path: string): string {
 /** The key of an element that says which kind it is. */
 const KINDS: readonly ElementKind[] = ['component', 'external', 'repository']
 
+/** The keys the suite owns, at the top and in an item (docs/diagrams-format.md, section 2). */
+const TOP_KEYS = ['title', 'description', 'level', 'scope', 'elements', 'connections']
+const ELEMENT_KEYS = [...KINDS, 'name', 'description', 'at', 'size']
+const CONNECTION_KEYS = ['from', 'to', 'label']
+
 /** The value of a key the suite owns is not of the form the specification gives it. */
 class WrongForm extends Error {
   constructor(readonly said: DiagramsSaid) {
@@ -154,6 +159,19 @@ function readContents(
   const at = (pair: Pair | undefined): number => lineOf(pair?.key ?? pair?.value)
   const pairOf = (map: YAMLMap | null, key: string): Pair | undefined =>
     map?.items.find((pair) => keyText(pair.key) === key)
+  /**
+   * A key the suite owns is written once in a map: which of two it is to read, nobody can
+   * tell. Keys it does not know may repeat; they are not read.
+   */
+  const once = (map: YAMLMap | null, keys: readonly string[]): void => {
+    const seen = new Set<string>()
+    for (const pair of map?.items ?? []) {
+      const key = keyText(pair.key)
+      if (!keys.includes(key)) continue
+      if (seen.has(key)) throw new WrongForm({ code: 'key-twice', values: { key, line: at(pair) } })
+      seen.add(key)
+    }
+  }
   const textOf = (map: YAMLMap | null, key: string): string | undefined => {
     const pair = pairOf(map, key)
     const value = emptyToNull(pair?.value)
@@ -175,10 +193,12 @@ function readContents(
       if (!isMap(item)) {
         throw new WrongForm({ code: 'diagram-item-not-map', values: { key, line: lineOf(item) } })
       }
+      once(item, key === 'elements' ? ELEMENT_KEYS : CONNECTION_KEYS)
       return item
     })
   }
 
+  once(top, TOP_KEYS)
   const problems: DiagramProblem[] = []
   const title = textOf(top, 'title')
   const description = textOf(top, 'description')

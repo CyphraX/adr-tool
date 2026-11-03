@@ -96,6 +96,8 @@ export const SENTENCES = {
     `"${v.key}" on line ${v.line} must be a text`,
   'diagram-key-not-list': (v: { key: string; line: number }): string =>
     `"${v.key}" on line ${v.line} must be a list`,
+  'key-twice': (v: { key: string; line: number }): string =>
+    `"${v.key}" is written a second time on line ${v.line}`,
   'diagram-item-not-map': (v: { key: string; line: number }): string =>
     `the item of "${v.key}" on line ${v.line} must be a map`,
   'element-without-kind': (v: { line: number }): string =>

@@ -340,6 +340,7 @@ export const DE: Wording<Codes> = {
   'diagram-not-map': () => 'die oberste Ebene muss ein Mapping sein',
   'diagram-key-not-text': (v) => `„${v.key}“ in Zeile ${v.line} muss ein Text sein`,
   'diagram-key-not-list': (v) => `„${v.key}“ in Zeile ${v.line} muss eine Liste sein`,
+  'key-twice': (v) => `„${v.key}“ steht in Zeile ${v.line} ein zweites Mal`,
   'diagram-item-not-map': (v) =>
     `der Eintrag von „${v.key}“ in Zeile ${v.line} muss ein Mapping sein`,
   'element-without-kind': (v) =>
