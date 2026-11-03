@@ -387,7 +387,7 @@ export class DiagramsModule {
     Object.assign(creating, change)
     if (change.id !== undefined) creating.idWritten = change.id !== ''
     if (change.title !== undefined && !creating.idWritten) {
-      creating.id = change.title.trim() === '' ? '' : idFromName(change.title, new Set())
+      creating.id = change.title.trim() === '' ? '' : idFromName(change.title)
     }
     if (looks) void this.lookForNew()
   }
@@ -449,7 +449,7 @@ export class DiagramsModule {
       title: creating.title,
       level: creating.level,
       scope: creating.scope,
-      repository: { id: idFromName(repository.name, new Set()), name: repository.name },
+      repository: { id: idFromName(repository.name), name: repository.name },
       declared: overview.declared.components,
       suggestions: creating.suggestions ?? []
     })

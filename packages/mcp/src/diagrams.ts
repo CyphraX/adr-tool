@@ -5,7 +5,13 @@
  * of one, its export and the Repair of an element whose Component is gone. Each plan is a
  * change set, held as every plan is until apply_change writes it; nothing here writes.
  */
-import { CONFIG_PATH, KERNEL_SENTENCES, openConfig, sentenceOf } from '@adr-tool/kernel'
+import {
+  CONFIG_PATH,
+  KERNEL_SENTENCES,
+  openConfig,
+  sentenceOf,
+  type Config
+} from '@adr-tool/kernel'
 import type { WritableFileSystem } from '@adr-tool/core'
 import {
   VIEW_LEVELS,
@@ -48,6 +54,13 @@ export interface DiagramToolsContext {
   readonly hold: Hold
 }
 
+/** The Diagrams, the declaration they are read against, and the settings, as read now. */
+interface Opened {
+  readonly config: Config
+  readonly found: RepositoryDiagrams
+  readonly declared: ExportModel
+}
+
 /** How many Source File Dependencies a Drift shows at most: enough to find where it comes from. */
 const DEPENDENCIES_SHOWN = 10
 
@@ -87,7 +100,7 @@ const CONNECTION_FIELDS = {
 /** The Diagrams' tools, beside the ADRs' (`toolsFor`). */
 export function diagramToolsFor({ root, fs, hold }: DiagramToolsContext): Tool[] {
   /** The Diagrams, with the declaration they are read against, and the settings. */
-  const open = async () => {
+  const open = async (): Promise<Opened> => {
     const config = await openConfig(fs)
     const found = await openDiagrams(fs, config)
     const declared = exportModelOf(await fs.readText(DECLARATION_PATH))

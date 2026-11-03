@@ -118,11 +118,13 @@ export function placed(
   return { ...element, at: freeSpot(boxes, size!) }
 }
 
+const NONE_TAKEN: ReadonlySet<string> = new Set()
+
 /**
  * An element ID made from a name, as an External System is given one: lowercase, words joined
  * by dashes, and another number where the Diagram has the ID already.
  */
-export function idFromName(name: string, taken: ReadonlySet<string>): string {
+export function idFromName(name: string, taken: ReadonlySet<string> = NONE_TAKEN): string {
   const base =
     fold(name)
       .replace(/[^a-z0-9]+/g, '-')
