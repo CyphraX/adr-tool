@@ -125,6 +125,15 @@ describe('the MCP server (docs/mcp.md)', () => {
       'plan_edit_metadata',
       'plan_repair',
       'plan_migration',
+      'list_annotations',
+      'read_annotation',
+      'plan_annotation',
+      'plan_reply',
+      'plan_annotation_state',
+      'plan_update_anchor',
+      'plan_attach',
+      'plan_cite',
+      'plan_uncite',
       'apply_change',
       'discard_change'
     ])
@@ -393,6 +402,210 @@ describe('the protocol, line by line', () => {
       '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2099-01-01"}}'
     ])) as { result: { protocolVersion: string } }[]
     expect(reply!.result.protocolVersion).toBe(PROTOCOL_VERSIONS[0])
+  })
+})
+
+describe('the Annotations of Review (docs/plan-vision.md, part 9)', () => {
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1' }
+  const git = (...args: string[]): string =>
+    execFileSync('git', args, { cwd: root, env, encoding: 'utf8' })
+  const CART = 'cart/src/Cart.java'
+  const SEARCH = 'catalog/src/Search.java'
+  const cart = (extra = ''): string =>
+    `package cart;\n\npublic final class Cart {\n${extra}  public long total() {\n    return 0;\n  }\n}\n`
+
+  beforeEach(() => {
+    mkdirSync(join(root, 'cart/src'), { recursive: true })
+    mkdirSync(join(root, 'catalog/src'), { recursive: true })
+    writeFileSync(join(root, CART), cart())
+    writeFileSync(
+      join(root, SEARCH),
+      'package catalog;\n\npublic final class Search {\n  public Product find(String sku) {\n    return null;\n  }\n}\n'
+    )
+    git('init', '-q', '-b', 'trunk')
+    git('config', 'user.name', 'Aylin Demir')
+    git('config', 'user.email', 'aylin@example.com')
+    git('add', '-A')
+    git('commit', '-q', '-m', 'The shop')
+  })
+
+  /** Plan, apply, and say what the plan said. */
+  async function write(client: Client, name: string, args: Record<string, unknown>) {
+    const planned = await call(client, name, args)
+    const applied = await call(client, 'apply_change', { changeId: planned.changeId })
+    return { planned, applied }
+  }
+
+  it('annotates lines, replies, resolves and cites as the app does, each previewed', async () => {
+    const tools = toolsFor({
+      root,
+      today: () => TODAY,
+      now: () => new Date('2026-11-02T10:11:12Z'),
+      author: async () => 'Aylin Demir'
+    })
+    const { client, close } = await connect(root, tools)
+    expect(await call(client, 'list_annotations')).toEqual({
+      directory: 'docs/architecture/annotations',
+      annotations: [],
+      problems: []
+    })
+
+    const planned = await call(client, 'plan_annotation', {
+      path: CART,
+      start: 4,
+      end: 6,
+      type: 'concern',
+      text: 'Why is the total computed on every call?',
+      cites: ['0004-operations-return-change-sets']
+    })
+    const id = '20261102-why-is-the-total-computed-on-every-call'
+    expect(planned.annotation).toEqual({ id })
+    expect(planned.files).toHaveLength(1)
+    expect(planned.files[0]).toMatchObject({
+      path: `docs/architecture/annotations/${id}.md`,
+      creates: true
+    })
+    expect(planned.files[0].diff).toContain('+author: Aylin Demir')
+    expect(planned.files[0].diff).toContain('+  lines: 4-6')
+    expect(planned.files[0].diff).toContain('+cites: [0004-operations-return-change-sets]')
+    expect(existsSync(join(root, 'docs/architecture/annotations'))).toBe(false)
+    const applied = await call(client, 'apply_change', { changeId: planned.changeId })
+    expect(applied).toMatchObject({ applied: true, annotation: { id } })
+
+    await write(client, 'plan_reply', { id, text: 'We cache it per cart.', author: 'Lena Becker' })
+    await write(client, 'plan_annotation_state', { id, state: 'resolved' })
+
+    const read = await call(client, 'read_annotation', { id })
+    expect(read).toMatchObject({
+      id,
+      type: 'concern',
+      state: 'resolved',
+      author: 'Aylin Demir',
+      date: TODAY,
+      firstLine: 'Why is the total computed on every call?',
+      anchor: { state: 'unchanged', path: CART, lines: '4-6' },
+      quote: ['  public long total() {', '    return 0;', '  }'],
+      replies: [{ author: 'Lena Becker', date: TODAY, text: 'We cache it per cart.\n' }],
+      cited: [
+        {
+          item: '0004-operations-return-change-sets',
+          adr: 'docs/adr/0004-operations-return-change-sets'
+        }
+      ],
+      writable: true,
+      problems: []
+    })
+    expect(read.replies[0].path).toBe(
+      `docs/architecture/annotations/${id}/20261102T101112Z-lena-becker.md`
+    )
+
+    await write(client, 'plan_uncite', { id, adr: '0004-operations-return-change-sets' })
+    await write(client, 'plan_cite', {
+      id,
+      adr: 'docs/adr/0001-electron-svelte-typescript-throughout'
+    })
+    const listed = await call(client, 'list_annotations', {
+      adr: '0001-electron-svelte-typescript-throughout'
+    })
+    expect(listed.annotations.map((one: { id: string }) => one.id)).toEqual([id])
+    expect((await call(client, 'list_annotations', { state: 'open' })).annotations).toEqual([])
+    await close()
+  })
+
+  it('finds an Anchor again after a commit, and updates or attaches it, previewed', async () => {
+    const { client, close } = await connect(root)
+    const moved = (
+      await write(client, 'plan_annotation', {
+        path: CART,
+        start: 4,
+        end: 6,
+        type: 'note',
+        text: 'The total.'
+      })
+    ).applied.annotation.id
+    const gone = (
+      await write(client, 'plan_annotation', {
+        path: SEARCH,
+        start: 4,
+        end: 6,
+        type: 'question',
+        text: 'A missing SKU?',
+        author: 'Lena Becker'
+      })
+    ).applied.annotation.id
+    git('add', '-A')
+    git('commit', '-q', '-m', 'Annotated')
+    writeFileSync(join(root, CART), cart('  public void clear() {\n  }\n\n'))
+    writeFileSync(join(root, SEARCH), 'package catalog;\n\npublic final class Search {\n}\n')
+    git('commit', '-q', '-am', 'Clear the cart, and drop the search')
+
+    const listed = await call(client, 'list_annotations')
+    const byId = new Map(
+      listed.annotations.map((one: { id: string; anchor: unknown }) => [one.id, one.anchor])
+    )
+    expect(byId.get(moved)).toMatchObject({
+      state: 'moved',
+      lines: '4-6',
+      now: { path: CART, lines: '7-9', similarity: 1 }
+    })
+    expect(byId.get(gone)).toMatchObject({ state: 'orphaned', file: 'there' })
+    expect(listed.problems).toEqual([
+      expect.objectContaining({ code: 'orphaned', annotation: gone })
+    ])
+    expect(
+      (await call(client, 'list_annotations', { anchor: 'orphaned' })).annotations.map(
+        (one: { id: string }) => one.id
+      )
+    ).toEqual([gone])
+    expect(
+      (await call(client, 'list_annotations', { author: 'Lena Becker', path: 'catalog' }))
+        .annotations
+    ).toHaveLength(1)
+
+    const updated = await call(client, 'plan_update_anchor', { id: moved })
+    expect(updated.files[0].diff).toContain('+  lines: 7-9')
+    await call(client, 'apply_change', { changeId: updated.changeId })
+    expect(await refusal(client, 'plan_update_anchor', { id: moved })).toContain(
+      'nothing to update'
+    )
+
+    const attached = await call(client, 'plan_attach', { id: gone, path: SEARCH, start: 3 })
+    expect(attached.files[0].diff).toContain('+  lines: 3')
+    await call(client, 'apply_change', { changeId: attached.changeId })
+    expect((await call(client, 'list_annotations')).problems).toEqual([])
+    await close()
+  })
+
+  it('refuses what it cannot do, in words the agent can act on', async () => {
+    const { client, close } = await connect(root)
+    expect(await refusal(client, 'read_annotation', { id: '20261102-none' })).toBe(
+      'There is no Annotation 20261102-none.'
+    )
+    expect(
+      await refusal(client, 'plan_annotation', {
+        path: CART,
+        start: 6,
+        end: 4,
+        type: 'note',
+        text: 'Backwards.'
+      })
+    ).toBe('The last line, 4, comes before the first, 6.')
+    expect(
+      await refusal(client, 'plan_annotation', { path: CART, start: 0, type: 'note', text: 'x' })
+    ).toContain('must be 1 or more')
+    expect(
+      await refusal(client, 'plan_annotation', {
+        path: CART,
+        start: 4,
+        type: 'note',
+        text: 'x',
+        cites: ['0999-none']
+      })
+    ).toContain('0999-none')
+    expect(await refusal(client, 'list_annotations', { component: 'nowhere' })).toContain(
+      'There is no Component nowhere'
+    )
+    await close()
   })
 })
 

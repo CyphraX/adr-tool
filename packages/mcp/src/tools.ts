@@ -35,8 +35,10 @@ import {
 } from '@adr-tool/core'
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
 import { gitIn } from '@adr-tool/cli/git'
+import type { Plan as KernelPlan } from '@adr-tool/kernel'
 import { repositoryFiles } from './files'
 import { Refusal, type Tool } from './protocol'
+import { adrReferences, reviewTools } from './review-tools'
 import type { Schema } from './schema'
 
 /** How many planned changes wait at most; the oldest is forgotten first. */
@@ -47,15 +49,20 @@ export interface ToolOptions {
   readonly root: string
   /** Today's date, `YYYY-MM-DD`, as the person sees it. */
   readonly today?: () => string
-  /** Who a Correction is recorded for when the agent names nobody: git's `user.name`. */
+  /** Who a Correction, an Annotation or a Reply is recorded for when the agent names nobody: git's `user.name`. */
   readonly author?: () => Promise<string | undefined>
+  /** The moment a Reply is written at. */
+  readonly now?: () => Date
 }
 
 interface Planned {
   readonly changeSet: ChangeSet
   readonly created?: { readonly id: string; readonly path: string }
   readonly renamed?: { readonly from: string; readonly to: string }
-  readonly log: string
+  /** The Decision Log the change is in; none for a change of another module. */
+  readonly log?: string
+  /** What else the plan said, and the applied change says again: a new Annotation's ID. */
+  readonly outcome?: Record<string, unknown>
 }
 
 const text = (description: string): Schema => ({ type: 'string', description })
@@ -186,26 +193,38 @@ export function toolsFor(options: ToolOptions): Tool[] {
     return adr
   }
 
-  /** Hold a plan, and show it: what each file becomes, as a diff, and what to look out for. */
-  const preview = (log: DecisionLog, plan: Plan): Record<string, unknown> => {
+  /**
+   * Hold a plan, and show it: what each file becomes, as a diff, and what to look out for. A
+   * plan of Decisions is in a log; one of another module says what else it found in `outcome`.
+   */
+  const hold = (
+    log: DecisionLog | undefined,
+    plan: Plan | KernelPlan,
+    outcome?: Record<string, unknown>
+  ): Record<string, unknown> => {
     if (!plan.ok) throw new Refusal(plan.reason)
+    const created = 'created' in plan ? plan.created : undefined
+    const renamed = 'renamed' in plan ? plan.renamed : undefined
     const changeId = randomUUID()
     planned.set(changeId, {
       changeSet: plan.changeSet,
-      log: log.path,
-      ...(plan.created && { created: plan.created }),
-      ...(plan.renamed && { renamed: plan.renamed })
+      ...(log && { log: log.path }),
+      ...(created && { created }),
+      ...(renamed && { renamed }),
+      ...(outcome && { outcome })
     })
     while (planned.size > MAX_PLANNED) planned.delete(planned.keys().next().value!)
     return {
       changeId,
       files: plan.changeSet.files.map(fileOf),
       warnings: plan.warnings ?? [],
-      ...(plan.created && { created: { log: shown(log.path), ...plan.created } }),
-      ...(plan.renamed && { renamed: plan.renamed }),
+      ...(created && log && { created: { log: shown(log.path), ...created } }),
+      ...(renamed && { renamed }),
+      ...outcome,
       next: 'Nothing is written yet. Show the person the files and the warnings; apply_change with this changeId writes them, discard_change drops them.'
     }
   }
+  const preview = (log: DecisionLog, plan: Plan): Record<string, unknown> => hold(log, plan)
 
   return [
     {
@@ -601,6 +620,15 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return preview(log, await planMigration(fs, log, id))
       }
     },
+    ...reviewTools({
+      fs,
+      root: options.root,
+      today,
+      now: options.now ?? (() => new Date()),
+      author,
+      adrs: async () => adrReferences((await open()).repository),
+      hold: (plan, outcome) => hold(undefined, plan, outcome)
+    }),
     {
       name: 'apply_change',
       title: 'Apply a planned change',
@@ -654,8 +682,10 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return {
           applied: true,
           files: held.changeSet.files.map((file) => file.renameTo ?? file.path),
-          ...(held.created && { created: { log: shown(held.log), ...held.created } }),
-          ...(held.renamed && { renamed: held.renamed })
+          ...(held.created &&
+            held.log !== undefined && { created: { log: shown(held.log), ...held.created } }),
+          ...(held.renamed && { renamed: held.renamed }),
+          ...held.outcome
         }
       }
     },

@@ -8,11 +8,10 @@
  */
 import { dirname, join } from 'node:path'
 import { watch } from 'chokidar'
+import { lookAtAnnotations } from '@adr-tool/cli/annotations'
 import { openRepository, type Plan, type Repository } from '@adr-tool/core'
 import {
   findAnchor,
-  findAnchors,
-  findingCache,
   planAnnotation,
   planAttach,
   planCite,
@@ -21,7 +20,6 @@ import {
   planUncite,
   planUpdateAnchor,
   readAnnotations,
-  traceProblems,
   type AdrReference,
   type Found
 } from '@adr-tool/review'
@@ -66,19 +64,16 @@ export function adrReferences(repository: Repository): AdrReference[] {
  */
 export async function lookAt(root: string, git: Git = gitIn(root)): Promise<Looked> {
   const fs = nodeFileSystem(root)
-  const [reading, repository] = await Promise.all([readAnnotations(fs), openRepository(fs)])
-  const cache = findingCache()
-  const found = await findAnchors(reading.annotations, { fs, git, cache })
-  const head = await (cache.head ??= git.headCommit())
-  const directory = reading.directory
+  const looked = await lookAtAnnotations(fs, git, adrReferences(await openRepository(fs)))
+  const { directory } = looked
 
   // What is watched: the settings, the Annotations and their Replies, the files the Anchors
   // name and where they are found — a directory each, so that a rename is seen —, and what
   // git changes when somebody commits or checks out.
   const sources = new Set<string>()
-  for (const annotation of reading.annotations) {
+  for (const annotation of looked.annotations) {
     if (annotation.anchor) sources.add(dirname(annotation.anchor.path))
-    const now = found.found.get(annotation.id)
+    const now = annotation.found
     if (now && now.kind !== 'orphaned') sources.add(dirname(now.anchor.path))
   }
   const replies = directory
@@ -98,17 +93,10 @@ export async function lookAt(root: string, git: Git = gitIn(root)): Promise<Look
     overview: {
       directory,
       // Neither a directory nor a Problem of Review: the file of the settings cannot be read.
-      configUnreadable: directory === undefined && reading.problems.length === 0,
-      annotations: reading.annotations.map((annotation) => {
-        const now = found.found.get(annotation.id)
-        return now ? { ...annotation, found: now } : annotation
-      }),
-      problems: [
-        ...reading.problems,
-        ...traceProblems(reading.annotations, adrReferences(repository)),
-        ...found.problems
-      ],
-      head,
+      configUnreadable: looked.unreadableConfig !== undefined,
+      annotations: looked.annotations,
+      problems: looked.problems,
+      head: looked.head,
       foundAt: Date.now()
     },
     watch: [...new Set(paths)].sort()

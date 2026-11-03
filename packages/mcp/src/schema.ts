@@ -22,6 +22,7 @@ export type Schema =
       readonly minLength?: number
     }
   | { readonly type: 'boolean'; readonly description?: string }
+  | { readonly type: 'integer'; readonly description?: string; readonly minimum?: number }
 
 /** What is wrong with `value`, said of `where`; `undefined` when it fits. */
 export function validate(schema: Schema, value: unknown, where: string): string | undefined {
@@ -72,5 +73,14 @@ export function validate(schema: Schema, value: unknown, where: string): string 
     }
     case 'boolean':
       return typeof value === 'boolean' ? undefined : `${where} must be true or false.`
+    case 'integer': {
+      if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
+        return `${where} must be a whole number.`
+      }
+      if (schema.minimum !== undefined && value < schema.minimum) {
+        return `${where} must be ${schema.minimum} or more.`
+      }
+      return undefined
+    }
   }
 }

@@ -9,8 +9,10 @@
     "adr": "./dist/adr.mjs"
   },
   "exports": {
+    "./annotations": "./src/annotations.ts",
     "./export": "./src/export.ts",
-    "./git": "./src/git.ts"
+    "./git": "./src/git.ts",
+    "./listing": "./src/listing.ts"
   },
   "scripts": {
     "build": "vite build",
