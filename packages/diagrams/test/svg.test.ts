@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem } from '@adr-tool/kernel'
-import { readDeclaration, type DeclaredComponent } from '@adr-tool/structure/model'
-import { drawDiagram, planExport, readDiagram, textWidth, wordingOf, type Diagram } from '../src'
+import { openStructure, readDeclaration } from '@adr-tool/structure/model'
+import {
+  drawDiagram,
+  planExport,
+  readDiagram,
+  textWidth,
+  wordingOf,
+  type Diagram,
+  type ExportModel
+} from '../src'
 
 const PATH = 'docs/architecture/diagrams/shop.yml'
 
@@ -18,7 +26,14 @@ const declaration = readDeclaration(
   ].join('\n')
 )
 if (declaration.kind !== 'declared') throw new Error(declaration.kind)
-const components: readonly DeclaredComponent[] = declaration.components
+/** The Components of the shop, as declared. */
+const declared: ExportModel = {
+  origin: 'declared',
+  components: declaration.components,
+  problems: []
+}
+/** A declaration of no Component. */
+const none: ExportModel = { origin: 'declared', components: [], problems: [] }
 
 const shop = [
   'title: The shop',
@@ -57,16 +72,16 @@ function attributesOf(svg: string, element: string, matching = ''): Record<strin
 
 describe('the picture of a Diagram', () => {
   it('is the same bytes for the same Diagram, every time', () => {
-    const first = drawDiagram(read(shop), components)
-    expect(drawDiagram(read(shop), components)).toBe(first)
-    expect(drawDiagram(read(`# a comment changes nothing\n${shop}`), components)).toBe(first)
+    const first = drawDiagram(read(shop), declared)
+    expect(drawDiagram(read(shop), declared)).toBe(first)
+    expect(drawDiagram(read(`# a comment changes nothing\n${shop}`), declared)).toBe(first)
     expect(first.startsWith('<svg xmlns="http://www.w3.org/2000/svg" ')).toBe(true)
     expect(first.endsWith('</svg>\n')).toBe(true)
     expect(first).not.toMatch(/\r/)
   })
 
   it('stands each box where its file puts it, at its size or as large as its text', () => {
-    const svg = drawDiagram(read(shop), components)
+    const svg = drawDiagram(read(shop), declared)
     const billing = attributesOf(svg, 'rect', 'x="40" y="40"')
     expect(billing).toMatchObject({ class: 'box', width: '120', height: '48' })
     const bank = attributesOf(svg, 'rect', 'x="40" y="200"')
@@ -81,7 +96,7 @@ describe('the picture of a Diagram', () => {
   })
 
   it('draws an External System with a dashed border, and says so in the legend at the foot', () => {
-    const svg = drawDiagram(read(shop), components)
+    const svg = drawDiagram(read(shop), declared)
     expect(svg).toContain('<g class="element external">')
     expect(svg).toContain('.external .box { stroke-dasharray: 6 4; }')
     const legend = svg.slice(svg.indexOf('<g class="legend">'))
@@ -101,7 +116,7 @@ describe('the picture of a Diagram', () => {
     .replace(/from: web/g, 'from: billing-two')
 
   it('points each arrow at what is used, from border to border, with its label on the line', () => {
-    const svg = drawDiagram(read(plain), [])
+    const svg = drawDiagram(read(plain), none)
     const paths = [
       ...svg.matchAll(/<path class="line" d="M([\d.-]+) ([\d.-]+)L([\d.-]+) ([\d.-]+)"/g)
     ]
@@ -112,7 +127,7 @@ describe('the picture of a Diagram', () => {
     expect(svg).toContain('marker-end="url(#arrow)"')
     expect(svg).toContain('text-anchor="middle">shows invoices</text>')
     expect(attributesOf(svg, 'rect', 'class="ground"')).toMatchObject({ y: '56', height: '16' })
-    expect(drawDiagram(read(shop), components)).toContain(
+    expect(drawDiagram(read(shop), declared)).toContain(
       '<desc>Its parts, and what each of them uses. Web shop uses billing: shows invoices. billing uses The bank.</desc>'
     )
   })
@@ -122,7 +137,7 @@ describe('the picture of a Diagram', () => {
       'connections:\n',
       'connections:\n  - from: billing\n    to: billing-two\n'
     )
-    const svg = drawDiagram(read(both), [])
+    const svg = drawDiagram(read(both), none)
     const ys = [...svg.matchAll(/<path class="line" d="M[\d.-]+ ([\d.-]+)L/g)].map((m) =>
       Number(m[1])
     )
@@ -149,7 +164,7 @@ describe('the picture of a Diagram', () => {
       '    label: "</text><script>x</script>"',
       ''
     ].join('\n')
-    const svg = drawDiagram(read(hostile), components)
+    const svg = drawDiagram(read(hostile), declared)
     // Every element and every attribute the picture has is one of these, and only the arrow is referred to.
     const tags = [...svg.matchAll(/<([a-zA-Z]+)((?:\s+[\w-]+="[^"<>]*")*)\s*\/?>/g)]
     const names = new Set(tags.map((tag) => tag[1]))
@@ -192,7 +207,7 @@ describe('the picture of a Diagram', () => {
         'connections:\n',
         'connections:\n  - from: web\n    to: web\n  - from: web\n    to: nowhere\n  - from: billing\n    to: gone\n'
       )
-    const svg = drawDiagram(read(odd), components)
+    const svg = drawDiagram(read(odd), declared)
     // A Component that is gone is drawn under its ID; a second web is not drawn.
     expect(svg).toContain('>gone</text>')
     expect(svg.match(/>Web shop</g)).toHaveLength(1)
@@ -202,7 +217,7 @@ describe('the picture of a Diagram', () => {
   })
 
   it('reads in light and in dark, on a ground of its own', () => {
-    const svg = drawDiagram(read(shop), components)
+    const svg = drawDiagram(read(shop), declared)
     expect(svg).toContain('@media (prefers-color-scheme: dark)')
     const view = attributesOf(svg, 'svg').viewBox!.split(' ').map(Number)
     expect(attributesOf(svg, 'rect', 'class="background"')).toEqual({
@@ -219,7 +234,7 @@ describe('the picture of a Diagram', () => {
   })
 
   it('of an empty Diagram is a small picture with its ID as its title', () => {
-    const svg = drawDiagram(read('level: container\n'), [])
+    const svg = drawDiagram(read('level: container\n'), none)
     expect(svg).toContain('<title>shop</title>')
     expect(attributesOf(svg, 'svg')).toMatchObject({ width: '48', height: '48' })
   })
@@ -243,34 +258,63 @@ describe('the export', () => {
   const SVG = 'docs/architecture/diagrams/shop.svg'
 
   it('writes the picture beside the Diagram as a new file, previewed', async () => {
-    const planned = await planExport(fs(), PATH, components)
+    const planned = await planExport(fs(), PATH, declared)
     if (!planned.ok) throw new Error(planned.reason)
     expect(planned.svg).toBe(SVG)
     expect(planned.changeSet.files).toEqual([
-      { path: SVG, before: '', after: drawDiagram(read(shop), components), creates: true }
+      { path: SVG, before: '', after: drawDiagram(read(shop), declared), creates: true }
     ])
   })
 
   it('replaces a picture that is not the Diagram any more, and changes nothing when it is', async () => {
-    const replaced = await planExport(fs({ [SVG]: '<svg>old</svg>\n' }), PATH, components)
+    const replaced = await planExport(fs({ [SVG]: '<svg>old</svg>\n' }), PATH, declared)
     if (!replaced.ok) throw new Error(replaced.reason)
     expect(replaced.changeSet.files).toEqual([
-      { path: SVG, before: '<svg>old</svg>\n', after: drawDiagram(read(shop), components) }
+      { path: SVG, before: '<svg>old</svg>\n', after: drawDiagram(read(shop), declared) }
     ])
     const current = await planExport(
-      fs({ [SVG]: drawDiagram(read(shop), components) }),
+      fs({ [SVG]: drawDiagram(read(shop), declared) }),
       PATH,
-      components
+      declared
     )
     expect(current).toMatchObject({ ok: true, changeSet: { files: [] } })
   })
 
+  // What the review of PR #51 found: a declaration that cannot be read drew the IDs, and a
+  // Draft drew the names of its directories.
+  it('draws the IDs on a Draft, and is refused while the declaration cannot be read', async () => {
+    const draft = await openStructure(memoryFileSystem({ [PATH]: shop }), ['src/web/page.ts'])
+    expect(draft.origin).toBe('draft')
+    const ids = drawDiagram(read(shop), draft)
+    expect(ids).toContain('>web</text>')
+    expect(ids).not.toContain('Web shop')
+    expect(drawDiagram(read(shop), declared)).toContain('>Web shop</text>')
+    const planned = await planExport(fs(), PATH, draft)
+    if (!planned.ok) throw new Error(planned.reason)
+    expect(planned.changeSet.files[0]!.after).toBe(ids)
+
+    const lost = await openStructure(
+      memoryFileSystem({ [PATH]: shop, '.arch/components.yml': 'components: [x\n' }),
+      ['src/web/page.ts']
+    )
+    expect(lost.problems.map((problem) => problem.kind)).toEqual(['unreadable-declaration'])
+    const refused = await planExport(fs(), PATH, lost)
+    expect(refused).toMatchObject({
+      ok: false,
+      said: { code: 'no-export-without-declaration', values: { path: '.arch/components.yml' } }
+    })
+    if (refused.ok) throw new Error('planned')
+    expect(refused.reason).toBe(
+      '.arch/components.yml cannot be read, so the picture would not have the names of its Components. Fix it, then export.'
+    )
+  })
+
   it('is refused for a Diagram that cannot be read or is not there', async () => {
-    const broken = await planExport(memoryFileSystem({ [PATH]: 'elements: 3\n' }), PATH, components)
+    const broken = await planExport(memoryFileSystem({ [PATH]: 'elements: 3\n' }), PATH, declared)
     expect(broken).toMatchObject({ ok: false, said: { code: 'unreadable-diagram' } })
     if (broken.ok) throw new Error('planned')
     expect(broken.reason).toBe(`${PATH} cannot be read: "elements" on line 1 must be a list.`)
-    expect(await planExport(memoryFileSystem({}), PATH, components)).toMatchObject({
+    expect(await planExport(memoryFileSystem({}), PATH, declared)).toMatchObject({
       ok: false,
       said: { code: 'no-longer-exists' }
     })

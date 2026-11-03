@@ -55,7 +55,7 @@ export {
 } from './connections'
 export { planRepair, removeComponent } from './repair'
 export { drawDiagram, textWidth } from './svg'
-export { planExport, type ExportPlan } from './export'
+export { planExport, type ExportModel, type ExportPlan } from './export'
 export {
   SENTENCES as DIAGRAMS_SENTENCES,
   englishOf as diagramsEnglishOf,

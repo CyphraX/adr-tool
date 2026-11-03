@@ -7,7 +7,8 @@
  * to anything outside the file. Every text in it is escaped. Drift is not drawn: the picture is
  * the Diagram as it is meant.
  */
-import { everyComponent, type DeclaredComponent } from '@adr-tool/structure/model'
+import { everyComponent } from '@adr-tool/structure/model'
+import type { Declared } from './check'
 import { connectionsOf, elementsOf, type Diagram, type Element, type ElementKind } from './diagram'
 
 /** A font as the picture uses it: its size and the height of one of its lines, in px. */
@@ -228,12 +229,16 @@ const STYLE = [
 ]
 
 /**
- * The picture of a Diagram, as the text of an SVG file. `components` is the declaration the
- * names and descriptions of Components come from; a Component that is not in it is drawn under
- * its ID.
+ * The picture of a Diagram, as the text of an SVG file. The names and descriptions of
+ * Components come from their declaration; a Component that is not declared is drawn under its
+ * ID, and so is every Component of a Draft, whose names nobody wrote.
  */
-export function drawDiagram(diagram: Diagram, components: readonly DeclaredComponent[]): string {
-  const declared = new Map(everyComponent(components).map((component) => [component.id, component]))
+export function drawDiagram(diagram: Diagram, structure: Declared): string {
+  const declared = new Map(
+    (structure.origin === 'declared' ? everyComponent(structure.components) : []).map(
+      (component) => [component.id, component]
+    )
+  )
   const boxes = elementsOf(diagram).map((element) => {
     if (element.kind !== 'component') return boxOf(element, element.name, element.description)
     const component = declared.get(element.id)

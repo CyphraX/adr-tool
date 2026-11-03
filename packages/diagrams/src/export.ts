@@ -4,7 +4,7 @@
  * (ADR-0018).
  */
 import { plan, type FileSystem, type Plan } from '@adr-tool/kernel'
-import type { DeclaredComponent } from '@adr-tool/structure/model'
+import { DECLARATION_PATH, type Structure } from '@adr-tool/structure/model'
 import { readDiagram } from './diagram'
 import { svgPathOf } from './location'
 import { refuse } from './sentences'
@@ -15,25 +15,33 @@ export type ExportPlan = Plan<{ readonly svg: string }>
 
 const asText = (text: string): string => text
 
+/** What the export needs of Structure: the declaration, and whether it can be read. */
+export type ExportModel = Pick<Structure, 'origin' | 'components' | 'problems'>
+
 /**
  * Plan writing the picture of the Diagram at `path` beside it, as the file is on disk now.
- * `components` is the declaration the Components' names and descriptions come from. When the
- * picture there is the same already, the change set is empty.
+ * The Components' names and descriptions come from their declaration; on a Draft, their IDs
+ * stand in the boxes. While the declaration cannot be read, the export is refused: the picture
+ * would lose the names until it is fixed. When the picture there is the same already, the
+ * change set is empty.
  */
 export async function planExport(
   fs: FileSystem,
   path: string,
-  components: readonly DeclaredComponent[]
+  structure: ExportModel
 ): Promise<ExportPlan> {
   const svg = svgPathOf({ path })
   const planned = await plan(fs, asText, async (pending) => {
+    if (structure.problems.some((problem) => problem.kind === 'unreadable-declaration')) {
+      refuse({ code: 'no-export-without-declaration', values: { path: DECLARATION_PATH } })
+    }
     const text = await fs.readText(path)
     if (text === undefined) refuse({ code: 'no-longer-exists', values: { path } })
     const diagram = readDiagram(path, text)
     if (!diagram.readable) {
       refuse({ code: 'unreadable-diagram', values: { path, detail: diagram.problems[0].detail } })
     }
-    const picture = drawDiagram(diagram, components)
+    const picture = drawDiagram(diagram, structure)
     const current = await fs.readText(svg)
     if (current === undefined) await pending.create(svg, picture)
     else if (current !== picture) {

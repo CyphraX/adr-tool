@@ -377,6 +377,8 @@ export const DE: Wording<Codes> = {
     'Dieses Problem hat keine Reparatur: Die Suite kann nicht wissen, was gemeint war.',
   'no-longer-shows': (v) =>
     `${v.path} zeigt ${v.component} nicht mehr. Die Datei sollte neu angesehen werden.`,
+  'no-export-without-declaration': (v) =>
+    `${v.path} kann nicht gelesen werden, darum hätte das Bild nicht die Namen seiner Komponenten. Vor dem Export muss die Datei korrigiert werden.`,
   'cannot-remove-element': (v) =>
     `${v.path} ist so geschrieben, dass die Suite ${v.component} nicht herausnehmen kann. Es muss mit seinen Verbindungen in einem Editor entfernt werden.`
 }

@@ -217,7 +217,7 @@ The `diagrams` package draws a Diagram as SVG itself, without a browser, so that
 
 ### What it draws
 
-- **A box per element**, at its `at`, in the order of `elements`; a later element of an ID that is there already is not drawn. A box has rounded corners and a solid border; an External System's border is dashed, because it is from elsewhere ([design.md](design.md), "Look"), and the repository's is drawn heavier. In the box stand its name and, below, its description. A Component whose declaration is gone is drawn under its ID.
+- **A box per element**, at its `at`, in the order of `elements`; a later element of an ID that is there already is not drawn. A box has rounded corners and a solid border; an External System's border is dashed, because it is from elsewhere ([design.md](design.md), "Look"), and the repository's is drawn heavier. In the box stand its name and, below, its description. A Component whose declaration is gone is drawn under its ID; so is every Component while the repository has no declaration at all, only the Draft, whose names nobody wrote (section 4).
 - **An arrow per connection**, in the order of `connections`: a straight line from the middle of one box towards the middle of the other, starting and ending at their borders, its head at the element that is used. Where two elements are connected both ways, each line is moved 6 px to its own right, so that both show. A connection that section 5 says is not drawn is left out, and so is one between two boxes with the same middle.
 - **A label** in the middle of each line, on a ground of the background's colour, so that it stays legible across a line.
 - **The title and the description** above the boxes; the Diagram ID in the picture's `<title>` where there is no title.
@@ -266,7 +266,7 @@ Text in bold is 5 % wider. The figures are on the wide side of the common sans s
 
 ### The export
 
-The export writes the picture beside its Diagram, `<Diagram ID>.svg` in the same directory, as a previewed change set ([ADR-0004](adr/0004-operations-return-change-sets.md)): a new file, or the whole of the file that is there. The SVG beside a Diagram belongs to the suite, and is not edited by hand. When the file is there already with the same bytes, the change set is empty. A Diagram that cannot be read is not exported.
+The export writes the picture beside its Diagram, `<Diagram ID>.svg` in the same directory, as a previewed change set ([ADR-0004](adr/0004-operations-return-change-sets.md)): a new file, or the whole of the file that is there. The SVG beside a Diagram belongs to the suite, and is not edited by hand. When the file is there already with the same bytes, the change set is empty. A Diagram that cannot be read is not exported, and no Diagram is while `.arch/components.yml` is there but cannot be read: the picture would lose the names of its Components until the declaration is fixed.
 
 GitHub shows the SVG where the repository is browsed, and an ADR embeds it as an image: `![The packages](../architecture/diagrams/packages.svg)`. That it is committed although it is derived is recorded in [ADR-0018](adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md); nothing checks yet that it is current — export again after changing the Diagram.
 

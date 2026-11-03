@@ -190,7 +190,7 @@ describe('the Diagram of this repository’s packages', () => {
 
   it('draws to the SVG committed beside it', async () => {
     const { fs, structure, packages } = await own()
-    const planned = await planExport(fs, packages.path, structure.components)
+    const planned = await planExport(fs, packages.path, structure)
     if (!planned.ok) throw new Error(planned.reason)
     expect(planned.svg).toBe('docs/architecture/diagrams/packages.svg')
     if (exporting) {

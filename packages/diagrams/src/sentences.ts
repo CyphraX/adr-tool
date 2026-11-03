@@ -134,6 +134,8 @@ export const SENTENCES = {
     'This Problem has no Repair: the suite cannot know what was meant.',
   'no-longer-shows': (v: { path: string; component: string }): string =>
     `${v.path} no longer shows ${v.component}. Look at the file again.`,
+  'no-export-without-declaration': (v: { path: string }): string =>
+    `${v.path} cannot be read, so the picture would not have the names of its Components. Fix it, then export.`,
   'cannot-remove-element': (v: { path: string; component: string }): string =>
     `${v.path} is written in a way the suite cannot take ${v.component} out of. Remove it and its connections in an editor.`
 } satisfies Sentences
