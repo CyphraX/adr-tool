@@ -1,0 +1,25 @@
+{
+  "name": "@adr-tool/assessment",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "The UI-free core of the Assessment module: Assessments with their Quality Scenarios, Findings and Snapshots, and the registers of Risks and Technical Debt Items. No Electron, no DOM, no disk access of its own",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@adr-tool/kernel": "workspace:*",
+    "@adr-tool/structure": "workspace:*",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
