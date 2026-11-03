@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1208" height="672" viewBox="16 20 1208 672" role="img">
   <title>The packages of Softarch Suite</title>
-  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. mcp uses core: serves ADRs. mcp uses structure. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
+  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: analyses the code. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
   <style>
     svg { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
     .background, .ground { fill: #eef1f5; }
@@ -38,6 +38,7 @@
     <path class="line" d="M521.14 580L341.33 351.15" marker-end="url(#arrow)"/>
     <path class="line" d="M700 141.27L384 126.91" marker-end="url(#arrow)"/>
     <path class="line" d="M701.33 168L382.37 298.49" marker-end="url(#arrow)"/>
+    <path class="line" d="M760 168L760 196" marker-end="url(#arrow)"/>
     <path class="line" d="M700 210.36L383.9 138.52" marker-end="url(#arrow)"/>
     <path class="line" d="M700 237.64L383.9 309.48" marker-end="url(#arrow)"/>
     <path class="line" d="M736 248L606.83 377.17" marker-end="url(#arrow)"/>
@@ -101,6 +102,8 @@
     <text class="label" x="430" y="467.6" text-anchor="middle">Components, Dependencies</text>
     <rect class="ground" x="497.5" y="126" width="85" height="16"/>
     <text class="label" x="540" y="137.6" text-anchor="middle">serves ADRs</text>
+    <rect class="ground" x="701" y="176" width="118" height="16"/>
+    <text class="label" x="760" y="187.6" text-anchor="middle">analyses the code</text>
     <rect class="ground" x="485.5" y="166" width="109" height="16"/>
     <text class="label" x="540" y="177.6" text-anchor="middle">lints and exports</text>
     <rect class="ground" x="614" y="306" width="112" height="16"/>

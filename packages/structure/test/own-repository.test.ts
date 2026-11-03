@@ -190,4 +190,5 @@ it('computes the metrics of this repository as their definitions say', async () 
   // It uses the cores of Decisions, Structure and Conformance, the export of the command line,
   // and the sentences of Diagrams for its German, and reaches the kernel only through them.
   expect(metrics.get('app')).toMatchObject({ fanOut: 5, fanIn: 0 })
-})
+  // The whole repository is analysed and measured, beside the tests of the other packages.
+}, 30_000)

@@ -89,6 +89,7 @@ describe('the Diagram of this repository’s packages', () => {
       'core > kernel',
       'diagrams > kernel',
       'diagrams > structure',
+      'mcp > cli',
       'mcp > core',
       'mcp > structure',
       'structure > kernel'

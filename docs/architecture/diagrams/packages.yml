@@ -49,6 +49,9 @@ connections:
     label: serves ADRs
   - from: mcp
     to: structure
+  - from: mcp
+    to: cli
+    label: analyses the code
   - from: cli
     to: core
     label: lints and exports
