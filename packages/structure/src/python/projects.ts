@@ -81,7 +81,10 @@ function rootsInPyproject(document: Record<string, unknown>, pytest: boolean): s
   }
   // Hatch: `packages = ["src/shop"]` names the package, which lies in its root.
   for (const path of strings(tableAt(tool, 'hatch', 'build', 'targets', 'wheel')?.['packages'])) {
-    const at = path.replace(/\/+$/, '').lastIndexOf('/')
+    // Without its trailing slashes, counted rather than matched: the text is the repository's.
+    let end = path.length
+    while (end > 0 && path[end - 1] === '/') end--
+    const at = end === 0 ? -1 : path.lastIndexOf('/', end - 1)
     if (at > 0) roots.push(path.slice(0, at))
   }
   // PDM and uv's build backend.
@@ -123,9 +126,13 @@ function rootsInSetupCfg(text: string, pytest: boolean): string[] {
       // A value continued on the next, indented line.
       take(line)
     } else {
-      const entry = /^([^=:]+?)\s*[=:]\s*(.*)$/.exec(line)
-      key = entry ? entry[1]!.trim() : ''
-      if (entry) take(entry[2]!)
+      // `key = value` or `key: value`, split at the first `=` or `:` that follows a key. Found
+      // with indexOf, not with a pattern, so that a long line takes as long as it is long.
+      const equals = line.indexOf('=')
+      const colon = line.indexOf(':')
+      const at = equals === -1 ? colon : colon === -1 ? equals : Math.min(equals, colon)
+      key = at > 0 ? line.slice(0, at).trim() : ''
+      if (at > 0) take(line.slice(at + 1))
     }
   }
   return roots
