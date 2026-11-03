@@ -159,12 +159,18 @@ it('computes the metrics of this repository as their definitions say', async () 
   const fs = nodeFileSystem(root)
   const files = repositoryFiles(root)
   const structure = await openStructure(fs, files)
-  const { dependencies, lineCounts } = await analyseDependencies(fs, files, structure.sourceFiles)
+  const { dependencies, lineCounts, measures } = await analyseDependencies(
+    fs,
+    files,
+    structure.sourceFiles
+  )
 
-  const metrics = metricsOf(structure, dependencies, lineCounts)
-  // The directories below a Component without children are checked by the same definitions.
+  const metrics = metricsOf(structure, dependencies, lineCounts, {}, measures)
+  // The directories below a Component without children are checked by the same definitions,
+  // abstractness and distance (part 13) too.
   const explored = withDirectories(structure)
-  expect(metrics).toEqual(metricsByDefinition(explored, dependencies, lineCounts, false))
+  expect(metrics).toEqual(metricsByDefinition(explored, dependencies, lineCounts, false, measures))
+  expect(metrics.get('kernel')!.abstractness).toBeGreaterThan(0)
   expect([...metrics.keys()]).toContain('app/renderer/lib')
   // The kernel depends on nothing else here, and nothing here depends on the app: the two ends
   // of the scale.
