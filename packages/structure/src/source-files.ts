@@ -1,6 +1,6 @@
 /** Which files of a repository are Source Files (docs/structure-format.md, section 2). */
 
-export type Language = 'typescript' | 'svelte' | 'java'
+export type Language = 'typescript' | 'svelte' | 'java' | 'python' | 'go'
 
 export interface SourceFile {
   /** Relative to the repository root, with forward slashes. */
@@ -14,7 +14,9 @@ export interface SourceFile {
 const LANGUAGES: readonly (readonly [RegExp, Language])[] = [
   [/\.(?:[cm]?[tj]s|[tj]sx)$/, 'typescript'],
   [/\.svelte$/, 'svelte'],
-  [/\.java$/, 'java']
+  [/\.java$/, 'java'],
+  [/\.py$/, 'python'],
+  [/\.go$/, 'go']
 ]
 
 /** Never looked at, at any depth, whatever git says. */
@@ -38,6 +40,8 @@ export function isTestByConvention(path: string): boolean {
     segments.some((segment) => TEST_DIRECTORIES.has(segment)) ||
     // `cart.test.ts`, and `cart.test.d.ts` as well.
     /\.(?:test|spec)\./.test(name) ||
+    // Python's tests as pytest finds them, and Go's.
+    /^test_.*\.py$|_test\.py$|^conftest\.py$|_test\.go$/.test(name) ||
     `/${path}`.includes('/src/test/')
   )
 }

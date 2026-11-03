@@ -7,10 +7,13 @@ import {
   analyseDependencies,
   extractorOf,
   openStructure,
+  prepareGo,
   prepareJava,
+  preparePython,
   type Dependencies,
   type Extraction,
-  type JavaReader,
+  type Language,
+  type Readers,
   type Structure
 } from '@adr-tool/structure'
 import { nodeFileSystem } from './node-file-system'
@@ -36,27 +39,38 @@ export interface ExtractionCache {
   >
 }
 
-let java: Promise<JavaReader | undefined> | undefined
+/** The languages read with tree-sitter, how each is prepared, and the package of its grammar. */
+const TREE_SITTER = {
+  java: { prepare: prepareJava, grammar: 'tree-sitter-java/tree-sitter-java.wasm' },
+  python: { prepare: preparePython, grammar: 'tree-sitter-python/tree-sitter-python.wasm' },
+  go: { prepare: prepareGo, grammar: 'tree-sitter-go/tree-sitter-go.wasm' }
+} as const
+type TreeSitterLanguage = keyof typeof TREE_SITTER
+
+const readers = new Map<TreeSitterLanguage, Promise<Readers[TreeSitterLanguage]>>()
 
 /**
- * The reader for Java, prepared once per thread and only for a repository that has Java. The
- * two `.wasm` files lie next to their packages; where they lie in a packaged app is decided
- * with distribution. Without them, Java files are not read.
+ * The reader of a language read with tree-sitter, prepared once per thread and only for a
+ * repository that has the language. The `.wasm` files lie next to their packages; where they
+ * lie in a packaged app is decided with distribution. Without them, the language is not read.
  */
-function javaReader(): Promise<JavaReader | undefined> {
-  java ??= (async () => {
-    const require = createRequire(import.meta.url)
-    try {
-      return await prepareJava({
-        runtime: await readFile(require.resolve('web-tree-sitter/web-tree-sitter.wasm')),
-        grammar: await readFile(require.resolve('tree-sitter-java/tree-sitter-java.wasm'))
-      })
-    } catch (error) {
-      console.error(error)
-      return undefined
-    }
-  })()
-  return java
+function readerOf(language: TreeSitterLanguage): Promise<Readers[TreeSitterLanguage]> {
+  const prepared =
+    readers.get(language) ??
+    (async () => {
+      const require = createRequire(import.meta.url)
+      try {
+        return await TREE_SITTER[language].prepare({
+          runtime: await readFile(require.resolve('web-tree-sitter/web-tree-sitter.wasm')),
+          grammar: await readFile(require.resolve(TREE_SITTER[language].grammar))
+        })
+      } catch (error) {
+        console.error(error)
+        return undefined
+      }
+    })()
+  readers.set(language, prepared)
+  return prepared
 }
 
 /**
@@ -72,8 +86,13 @@ export async function analyse(
   const files = await repositoryFiles(root)
   const structure = await openStructure(fs, files)
 
-  const hasJava = structure.sourceFiles.some((file) => file.language === 'java')
-  const read = extractorOf(hasJava ? await javaReader() : undefined)
+  const has = (language: Language): boolean =>
+    structure.sourceFiles.some((file) => file.language === language)
+  const read = extractorOf({
+    java: has('java') ? await readerOf('java') : undefined,
+    python: has('python') ? await readerOf('python') : undefined,
+    go: has('go') ? await readerOf('go') : undefined
+  })
 
   const previous = cache?.version === EXTRACTION_VERSION ? cache.files : {}
   const next: Record<string, { hash: string; extraction: Extraction }> = {}

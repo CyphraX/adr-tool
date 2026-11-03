@@ -1,5 +1,6 @@
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import type { DeclaredComponent } from './declaration'
+import { configuredSourceRoot, PYTHON_PROJECT_FILES, uvWorkspaceMembers } from './python/projects'
 import { isNeverLookedAt, type SourceFile } from './source-files'
 import { workspacePackages } from './workspace'
 
@@ -17,8 +18,13 @@ export async function draftComponents(
   const found = new Set([
     ...(await workspacePackages(fs, files)),
     ...(await mavenModules(fs, files)),
-    ...(await gradleProjects(fs, files))
+    ...(await gradleProjects(fs, files)),
+    ...(await uvWorkspaceMembers(fs, files)),
+    ...goModuleDirectories(files)
   ])
+  // A go.mod or a Python project at the root makes the root a unit of code of its own, whose
+  // directories are drafted beside the units it holds.
+  const rootHoldsCode = ['go.mod', ...PYTHON_PROJECT_FILES].some((name) => files.includes(name))
 
   // The Source Files beneath each unit, found once: everything below works on these few.
   const beneath = new Map<string, string[]>()
@@ -28,6 +34,12 @@ export async function draftComponents(
     if (own.length > 0) beneath.set(unit, own)
   }
   const units = [...beneath.keys()].sort()
+  // The source root a Python project names for itself, where it names one.
+  const pythonRoots = new Map<string, string>()
+  for (const unit of ['', ...units]) {
+    const root = await configuredSourceRoot(fs, files, unit)
+    if (root !== undefined) pythonRoots.set(unit, root)
+  }
 
   const build = (unit: string): DeclaredComponent[] => {
     const inside = units.filter((other) => other !== unit && isBeneath(other, unit))
@@ -40,10 +52,10 @@ export async function draftComponents(
     // Where build files name units, they are the top level; directories beside them are not drafted.
     const directories =
       unit === ''
-        ? units.length > 0
+        ? units.length > 0 && !rootHoldsCode
           ? []
-          : childDirectories('', sources, isTaken)
-        : childDirectories(unit, beneath.get(unit) ?? [], isTaken)
+          : childDirectories('', sources, isTaken, pythonRoots.get(''))
+        : childDirectories(unit, beneath.get(unit) ?? [], isTaken, pythonRoots.get(unit))
     return named([
       ...nested.map((other) => ({ directory: other, children: build(other) })),
       ...directories.map((directory) => ({ directory, children: [] }))
@@ -53,7 +65,7 @@ export async function draftComponents(
   const top = build('')
   if (top.length > 0 || sources.length === 0) return top
   // Nothing to tell apart: the one directory that holds the code is the one Component.
-  return named([{ directory: sourceRootOf('', sources), children: [] }])
+  return named([{ directory: sourceRootOf('', sources, pythonRoots.get('')), children: [] }])
 }
 
 /** A path lies beneath a directory; everything lies beneath the root. */
@@ -62,10 +74,14 @@ const isBeneath = (path: string, directory: string): boolean =>
 
 const lastSegment = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 
-/** `src/main/java` where it holds Source Files, otherwise `src`, otherwise the unit itself. */
-function sourceRootOf(unit: string, sources: readonly string[]): string {
+/**
+ * The directory a Python project names as its source root, `src/main/java`, `src`, in this
+ * order where it holds Source Files, otherwise the unit itself.
+ */
+function sourceRootOf(unit: string, sources: readonly string[], python?: string): string {
   const under = (directory: string): string => (unit === '' ? directory : `${unit}/${directory}`)
-  for (const candidate of [under('src/main/java'), under('src')]) {
+  const candidates = [...(python === undefined ? [] : [python]), under('src/main/java'), under('src')]
+  for (const candidate of candidates) {
     if (sources.some((path) => isBeneath(path, candidate))) return candidate
   }
   return unit
@@ -76,14 +92,16 @@ function sourceRootOf(unit: string, sources: readonly string[]): string {
  * going down for as long as a directory holds exactly one directory and no Source File —
  * which passes over a common base package such as `com/example/shop`.
  *
- * `sources` are the Source Files beneath the unit.
+ * `sources` are the Source Files beneath the unit; `python` the source root its Python project
+ * names, if it names one.
  */
 function childDirectories(
   unit: string,
   sources: readonly string[],
-  isTaken: (directory: string) => boolean
+  isTaken: (directory: string) => boolean,
+  python?: string
 ): string[] {
-  let directory = sourceRootOf(unit, sources)
+  let directory = sourceRootOf(unit, sources, python)
   let inside = sources.filter((path) => isBeneath(path, directory))
   for (;;) {
     const at = directory
@@ -145,6 +163,17 @@ export function segmentOf(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   return segment === '' ? 'unit' : segment
+}
+
+/**
+ * The directories below the root that hold a `go.mod`, where the root holds a `go.mod` or a
+ * `go.work`: to Go a nested module is a module of its own, whether anything names it or not.
+ */
+function goModuleDirectories(files: readonly string[]): string[] {
+  if (!files.includes('go.mod') && !files.includes('go.work')) return []
+  return files
+    .filter((path) => path.endsWith('/go.mod'))
+    .map((path) => path.slice(0, -'/go.mod'.length))
 }
 
 async function mavenModules(fs: FileSystem, files: readonly string[]): Promise<string[]> {

@@ -26,7 +26,7 @@ it('shows the Dependencies of a multi-module Maven project, within a package and
   const fs = nodeFileSystem(root)
   const files = repositoryFiles(root)
   const structure = await openStructure(fs, files)
-  const analysis = await analyseDependencies(fs, files, structure.sourceFiles, extractorOf(java))
+  const analysis = await analyseDependencies(fs, files, structure.sourceFiles, extractorOf({ java }))
 
   // The Draft takes the Maven modules, and below web the two packages it holds.
   expect(structure.components.map((component) => component.id)).toEqual(['cart', 'catalog', 'web'])

@@ -63,7 +63,9 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
   )
   // `structure` keeps most of its files directly under src, beside the adapters of its languages.
   expect(ids(structure.components).filter((id) => id.startsWith('structure/'))).toEqual([
+    'structure/go',
     'structure/java',
+    'structure/python',
     'structure/typescript'
   ])
 

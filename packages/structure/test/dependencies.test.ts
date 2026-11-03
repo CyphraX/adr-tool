@@ -98,15 +98,26 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
     ])
   })
 
-  it('do not read Java without a reader for it, which needs the WebAssembly of tree-sitter', async () => {
-    const result = await analyse({ 'src/main/java/a/A.java': 'package a; import b.B;' })
+  it('do not read Java, Python or Go without a reader for it, which needs the WebAssembly of tree-sitter', async () => {
+    const result = await analyse({
+      'src/main/java/a/A.java': 'package a; import b.B;',
+      'shop/cart.py': 'import requests\nfrom . import line\n',
+      'shop/line.py': '',
+      'cart/cart.go': 'package cart\n\nimport "github.com/google/uuid"\n'
+    })
     expect(result).toEqual({
       dependencies: [],
       notResolved: [],
       libraries: [],
+      manifests: [],
       notAnalysed: [],
-      // Its lines are counted all the same.
-      lineCounts: new Map([['src/main/java/a/A.java', 1]])
+      // Their lines are counted all the same.
+      lineCounts: new Map([
+        ['cart/cart.go', 3],
+        ['shop/cart.py', 2],
+        ['shop/line.py', 0],
+        ['src/main/java/a/A.java', 1]
+      ])
     })
   })
 

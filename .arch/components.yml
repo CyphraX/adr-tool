@@ -49,7 +49,11 @@ components:
   structure:
     paths: [packages/structure/**]
     components:
+      go:
+        paths: [packages/structure/src/go/**]
       java:
         paths: [packages/structure/src/java/**]
+      python:
+        paths: [packages/structure/src/python/**]
       typescript:
         paths: [packages/structure/src/typescript/**]
