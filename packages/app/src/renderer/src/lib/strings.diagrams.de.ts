@@ -141,7 +141,7 @@ export const DIAGRAMS_DE: typeof DIAGRAMS_EN = {
     idHint: 'Der Name seiner Datei: Kleinbuchstaben, Ziffern und Bindestriche.',
     looking: 'Der Code wird nach den Verbindungen zwischen ihnen gefragt …',
     shows: (components: number, connections: number): string =>
-      `Es zeigt ${components} ${many(components, 'Komponente', 'Komponenten')} und zeichnet ${connections === 1 ? 'die eine Verbindung' : `die ${connections} Verbindungen`}, die der Code zwischen ihnen hat, angeordnet, wie Structure sie anordnet.`,
+      `Es zeigt ${components} ${many(components, 'Komponente', 'Komponenten')} und zeichnet ${connections === 1 ? 'die eine Verbindung' : `die ${connections} Verbindungen`}, die der Code zwischen ihnen hat, angeordnet, wie die Struktur sie anordnet.`,
     showsRepository:
       'Es zeigt dieses Repository als einen Kasten. Fügen Sie die Externen Systeme hinzu, die es benutzt.',
     noComponents:
