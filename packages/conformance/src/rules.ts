@@ -76,7 +76,19 @@ export type ThresholdRule = CommonRule & {
   readonly min?: number
   readonly of: readonly string[]
 }
-export type Rule = DependencyRule | LayersRule | CyclesRule | ThresholdRule
+/**
+ * `library`: which Components may use a Library, or must not (docs/conformance-format.md,
+ * section 2, "library"). Libraries are named as the code uses them, by Library patterns.
+ */
+export type LibraryRule = CommonRule & {
+  readonly kind: 'library'
+  /** Library patterns: `pg`, `@codemirror/*`, `org.apache.**`. */
+  readonly libraries: readonly string[]
+  /** `only-in`: only the Components the patterns match may use them; `not-in`: those must not. */
+  readonly scope: 'only-in' | 'not-in'
+  readonly components: readonly string[]
+}
+export type Rule = DependencyRule | LayersRule | CyclesRule | ThresholdRule | LibraryRule
 
 /** An Exception as the file writes it; whether its fingerprint fits its Rule is checked later. */
 export interface WrittenException {
@@ -86,6 +98,7 @@ export interface WrittenException {
   readonly to?: string
   readonly cycle?: readonly string[]
   readonly component?: string
+  readonly library?: string
   readonly reason: string
   readonly justifiedBy?: { readonly adr: string; readonly line: number }
 }
@@ -367,7 +380,38 @@ function readRule(
         }
       }
     }
+    case 'library': {
+      const node = valueOf(map, 'library')
+      if (node === undefined || node === null) {
+        throw new Wrong({ code: 'missing-key', values: { key: 'library' } }, at('library'))
+      }
+      const libraries = libraryPatterns(node, lineOf)
+      const onlyIn = patternsAt('only-in', false)
+      const notIn = patternsAt('not-in', false)
+      if ((onlyIn === undefined) === (notIn === undefined)) {
+        throw new Wrong({ code: 'only-in-or-not-in', values: {} }, line)
+      }
+      const scope = onlyIn !== undefined ? 'only-in' : 'not-in'
+      return {
+        rule: { ...common, kind: 'library', libraries, scope, components: (onlyIn ?? notIn)! }
+      }
+    }
   }
+}
+
+/** A Library pattern or a list of them: names as the code uses them, with `*` and `**`. */
+function libraryPatterns(node: unknown, lineOf: LineOf): string[] {
+  const items = isSeq(node) ? node.items : [node]
+  if (items.length === 0) {
+    throw new Wrong({ code: 'not-library-patterns', values: {} }, lineOf(node))
+  }
+  return items.map((item) => {
+    const value = scalarText(item)
+    if (value === undefined || value.trim() === '' || /\s/.test(value)) {
+      throw new Wrong({ code: 'not-library-patterns', values: {} }, lineOf(item, lineOf(node)))
+    }
+    return value
+  })
 }
 
 function readException(map: YAMLMap, line: number, lineOf: LineOf): WrittenException {
@@ -377,6 +421,7 @@ function readException(map: YAMLMap, line: number, lineOf: LineOf): WrittenExcep
   const from = text(map, 'from', lineOf)
   const to = text(map, 'to', lineOf)
   const component = text(map, 'component', lineOf)
+  const library = text(map, 'library', lineOf)
   const cycleNode = valueOf(map, 'cycle')
   let cycle: string[] | undefined
   if (cycleNode !== undefined && cycleNode !== null) {
@@ -397,6 +442,7 @@ function readException(map: YAMLMap, line: number, lineOf: LineOf): WrittenExcep
     ...(to !== undefined && { to }),
     ...(cycle !== undefined && { cycle }),
     ...(component !== undefined && { component }),
+    ...(library !== undefined && { library }),
     reason,
     ...(adr !== undefined && {
       justifiedBy: { adr, line: lineOf(keyNodeOf(map, 'justified-by'), line) }

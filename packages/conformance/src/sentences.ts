@@ -133,6 +133,9 @@ export const SENTENCES = {
   'fingerprint-of-kind': (v: { kind: string; keys: string }): string =>
     `an Exception from a Rule of the kind ${v.kind} names its Violation by ${v.keys}`,
   'roles-not-map': (): string => '"roles" must be a map from each role to Component patterns',
+  'not-library-patterns': (): string =>
+    '"library" must be the name of a Library as the code uses it, or a pattern, or a list of them',
+  'only-in-or-not-in': (): string => 'it must have either "only-in" or "not-in"',
 
   // What a Violation is (docs/conformance-format.md, section 3): a code is the kind of its Rule.
   'must-not-depend': (v: { from: string; to: string }): string =>
@@ -163,6 +166,18 @@ export const SENTENCES = {
     limit: number
   }): string =>
     `The metric ${v.metric} of ${v.component} is ${formatNumber(v.value)}, ${v.bound === 'max' ? 'above the maximum' : 'below the minimum'} of ${formatNumber(v.limit)}`,
+  // `component` is `(unassigned)` for the Source Files of no Component; the sentence words it.
+  library: (v: {
+    component: string
+    library: string
+    scope: 'only-in' | 'not-in'
+    allowed?: readonly string[]
+  }): string =>
+    v.scope === 'not-in'
+      ? `${v.component} must not use ${v.library}`
+      : v.component === UNASSIGNED
+        ? `Source Files that belong to no Component use ${v.library}, which only ${listed(v.allowed ?? [])} may use`
+        : `${v.component} uses ${v.library}, which only ${listed(v.allowed ?? [])} may use`,
   // A Violation at one of its imports: what Jonas reads on his pull request.
   'violation-at': (v: { violation: Said; file: string; line: number; imports: string }): string =>
     `${english(v.violation)}: ${v.file}:${v.line} imports ${v.imports}.`,

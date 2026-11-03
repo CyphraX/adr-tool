@@ -17,6 +17,13 @@ export type Fingerprint =
   | { readonly kind: 'cycle'; readonly rule: string; readonly cycle: readonly string[] }
   /** `threshold`: the Component whose metric is outside. */
   | { readonly kind: 'component'; readonly rule: string; readonly component: string }
+  /** `library`: the Component that uses the Library, and the Library as the code names it. */
+  | {
+      readonly kind: 'library'
+      readonly rule: string
+      readonly component: string
+      readonly library: string
+    }
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -32,6 +39,8 @@ export function fingerprintText(fingerprint: Fingerprint): string {
       return `${fingerprint.rule}: ${membersOf(fingerprint.cycle).join(', ')}`
     case 'component':
       return `${fingerprint.rule}: ${fingerprint.component}`
+    case 'library':
+      return `${fingerprint.rule}: ${fingerprint.component} uses ${fingerprint.library}`
   }
 }
 
@@ -44,5 +53,9 @@ export function fingerprintKey(fingerprint: Fingerprint): string {
       return [fingerprint.kind, fingerprint.rule, ...membersOf(fingerprint.cycle)].join('\n')
     case 'component':
       return [fingerprint.kind, fingerprint.rule, fingerprint.component].join('\n')
+    case 'library':
+      return [fingerprint.kind, fingerprint.rule, fingerprint.component, fingerprint.library].join(
+        '\n'
+      )
   }
 }

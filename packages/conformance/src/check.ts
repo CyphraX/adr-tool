@@ -223,12 +223,13 @@ const FINGERPRINT_KEYS: Record<Rule['kind'], string> = {
   'may-only-depend': '"from" and "to"',
   layers: '"from" and "to"',
   'no-cycles': '"cycle", the list of its members',
-  threshold: '"component"'
+  threshold: '"component"',
+  library: '"component" and "library"'
 }
 
 /** The fingerprint an Exception names, when its keys fit the kind of its Rule. */
 function fingerprintOf(exception: WrittenException, rule: Rule): Fingerprint | undefined {
-  const { from, to, cycle, component } = exception
+  const { from, to, cycle, component, library } = exception
   switch (rule.kind) {
     case 'must-not-depend':
     case 'may-only-depend':
@@ -236,19 +237,33 @@ function fingerprintOf(exception: WrittenException, rule: Rule): Fingerprint | u
       return from !== undefined &&
         to !== undefined &&
         cycle === undefined &&
-        component === undefined
+        component === undefined &&
+        library === undefined
         ? { kind: 'dependency', rule: rule.id, from, to }
         : undefined
     case 'no-cycles':
-      return cycle !== undefined && cycle.length > 1 && from === undefined && to === undefined
+      return cycle !== undefined &&
+        cycle.length > 1 &&
+        from === undefined &&
+        to === undefined &&
+        library === undefined
         ? { kind: 'cycle', rule: rule.id, cycle }
         : undefined
     case 'threshold':
       return component !== undefined &&
         from === undefined &&
         to === undefined &&
-        cycle === undefined
+        cycle === undefined &&
+        library === undefined
         ? { kind: 'component', rule: rule.id, component }
+        : undefined
+    case 'library':
+      return component !== undefined &&
+        library !== undefined &&
+        from === undefined &&
+        to === undefined &&
+        cycle === undefined
+        ? { kind: 'library', rule: rule.id, component, library }
         : undefined
   }
 }

@@ -11,11 +11,13 @@ import {
   type Cycle,
   type DeclaredComponent,
   type Dependency,
+  type LibraryUse,
   type Metrics,
   type Structure
 } from '@adr-tool/structure/model'
 import { matcherOf } from './component-patterns'
 import type { Fingerprint } from './fingerprint'
+import { libraryViolations } from './libraries'
 import type {
   CyclesRule,
   DependencyRule,
@@ -32,6 +34,8 @@ export interface Model {
   readonly dependencies: readonly Dependency[]
   /** How many lines each Source File has (Structure's Size). */
   readonly lineCounts: ReadonlyMap<string, number>
+  /** The Source Files that use each Library, with the lines of their imports. */
+  readonly libraries: readonly LibraryUse[]
 }
 
 /** One place where the code breaks a Rule. */
@@ -53,9 +57,12 @@ export interface Violation {
     readonly weakest?: { readonly from: string; readonly to: string }
     readonly typeOnly: boolean
   }
-  /** Of a threshold: the Component and its value. */
+  /** Of a threshold: the Component and its value; of a Rule about Libraries, the Component. */
   readonly component?: string
   readonly value?: number
+  /** Of a Rule about Libraries: the Library as the code names it, and its uses in the Component. */
+  readonly library?: string
+  readonly uses?: readonly LibraryUse[]
   /**
    * The Source File Dependencies behind the Violation, with the lines of their imports: of a
    * Dependency, all of them; of a Cycle, every one among its members — each lies on the Cycle,
@@ -67,7 +74,7 @@ export interface Violation {
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /** The chains of Components that contain each Source File, top down, and which files are tests. */
-interface Chains {
+export interface Chains {
   /** Per Source File: the Components that contain it, top down; empty for an Unassigned one. */
   readonly ofFile: ReadonlyMap<string, readonly string[]>
   readonly test: ReadonlySet<string>
@@ -76,7 +83,7 @@ interface Chains {
 
 const chainsOf = new WeakMap<object, Chains>()
 
-function chains(structure: Model['structure']): Chains {
+export function chains(structure: Model['structure']): Chains {
   const known = chainsOf.get(structure)
   if (known) return known
   const ofComponent = new Map<string, readonly string[]>()
@@ -191,6 +198,8 @@ export function evaluate(rule: Rule, model: Model): Violation[] {
       return rule.scope === 'among' ? cyclesAmong(rule, model) : cyclesInside(rule, model)
     case 'threshold':
       return thresholdViolations(rule, model)
+    case 'library':
+      return libraryViolations(rule, model)
   }
 }
 

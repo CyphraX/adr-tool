@@ -267,7 +267,7 @@ describe('adr check (docs/cli.md)', () => {
     const { code, out } = await adrIn(root, 'check')
     expect(code).toBe(1)
     expect(lines(out)).toContain(
-      ".arch/rules.yml:14: unknown-rule-kind: The Rule no-kind has no kind. A Rule's kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold."
+      ".arch/rules.yml:14: unknown-rule-kind: The Rule no-kind has no kind. A Rule's kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold, library."
     )
     expect(lines(out).at(-1)).toBe('2 Violations of 2 Rules; 1 Problem in .arch/rules.yml.')
   })
