@@ -20,7 +20,7 @@ import {
 import type { REVIEW_SENTENCES } from '@adr-tool/review'
 import type { STRUCTURE_SENTENCES } from '@adr-tool/structure/model'
 import type { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
-import type { ASSESSMENT_SENTENCES } from '@adr-tool/assessment'
+import type { ASSESSMENT_SENTENCES, EvidenceKind } from '@adr-tool/assessment'
 
 /**
  * Every code of `core`, `structure`, `diagrams`, `review` and `assessment`, with the values of
@@ -98,8 +98,11 @@ const KEPT: Record<string, string> = {
 }
 const kept = (key: string): string => (Object.hasOwn(KEPT, key) ? KEPT[key]! : `nichts aus ${key}`)
 
-/** What kind a piece of evidence is, as a noun without its article. */
-const KIND: Record<string, string> = {
+/**
+ * What kind a piece of evidence is, as a noun without its article, by the key the file writes:
+ * a kind a later part adds needs its German here, or the window does not build.
+ */
+const KIND: Record<EvidenceKind, string> = {
   violation: 'Verstoß',
   metric: 'Metrik',
   annotation: 'Annotation',
@@ -108,7 +111,7 @@ const KIND: Record<string, string> = {
   debt: 'Schuldposten'
 }
 /** A piece of evidence before its name in the accusative: after „stützt sich auf“ and „es gibt“. */
-const ACCUSATIVE: Record<string, string> = {
+const ACCUSATIVE: Record<EvidenceKind, string> = {
   violation: 'den Verstoß',
   metric: 'die Metrik',
   annotation: 'die Annotation',
@@ -591,9 +594,8 @@ export const DE: Wording<Codes> = {
 
   // What is wrong with a piece of evidence: the rest of a sentence about it.
   'evidence-not-a-mapping': () => 'ist kein Mapping',
-  'evidence-of-no-kind': () => 'nennt keines von violation, metric, annotation, adr, risk und debt',
-  'evidence-of-two-kinds': () =>
-    'nennt mehr als eines von violation, metric, annotation, adr, risk und debt',
+  'evidence-of-no-kind': () => `nennt keines von ${listed(Object.keys(KIND))}`,
+  'evidence-of-two-kinds': () => `nennt mehr als eines von ${listed(Object.keys(KIND))}`,
   'evidence-needs-key': (v) => `braucht „${v.key}“ als Text`,
   'evidence-needs-members': () =>
     'braucht „cycle“ als Liste der Mitglieder des Zyklus, mindestens zwei',

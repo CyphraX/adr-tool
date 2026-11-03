@@ -13,6 +13,7 @@ import {
   type SaidBy,
   type Sentences
 } from '@adr-tool/kernel'
+import { EVIDENCE_KINDS, type EvidenceKind } from './model'
 
 /** What another sentence said, inside this one; a plain text is passed on as it is. */
 const english = (said: Said | string): string =>
@@ -35,7 +36,9 @@ const KEPT: Record<string, string> = {
 const kept = (key: string): string => (Object.hasOwn(KEPT, key) ? KEPT[key]! : key)
 
 /** What a piece of evidence is, as a sentence names it before its name. */
-const EVIDENCE: Record<string, string> = {
+// A kind of evidence that a later part adds (part 14's hotspot and coupling) is named here;
+// the compiler asks for it.
+const EVIDENCE: Record<EvidenceKind, string> = {
   violation: 'the Violation',
   metric: 'the metric',
   annotation: 'the Annotation',
@@ -44,7 +47,7 @@ const EVIDENCE: Record<string, string> = {
   debt: 'the Technical Debt Item'
 }
 const evidenceTerm = (kind: string): string =>
-  Object.hasOwn(EVIDENCE, kind) ? EVIDENCE[kind]! : kind
+  Object.hasOwn(EVIDENCE, kind) ? EVIDENCE[kind as EvidenceKind] : kind
 const evidence = (kind: string, name: string): string => `${evidenceTerm(kind)} ${name}`
 
 // The values are types, not interfaces: a Said's values are a record of names, and only a type
@@ -158,10 +161,8 @@ export const SENTENCES = {
 
   // What is wrong with a piece of evidence: the rest of a sentence about it.
   'evidence-not-a-mapping': (): string => 'is no mapping',
-  'evidence-of-no-kind': (): string =>
-    'names none of violation, metric, annotation, adr, risk and debt',
-  'evidence-of-two-kinds': (): string =>
-    'names more than one of violation, metric, annotation, adr, risk and debt',
+  'evidence-of-no-kind': (): string => `names none of ${listed(EVIDENCE_KINDS)}`,
+  'evidence-of-two-kinds': (): string => `names more than one of ${listed(EVIDENCE_KINDS)}`,
   'evidence-needs-key': (v: { key: string }): string => `needs "${v.key}" as a text`,
   'evidence-needs-members': (): string =>
     'needs "cycle" as a list of the members of the Cycle, two at least',
