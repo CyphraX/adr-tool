@@ -188,6 +188,15 @@ const liveTheme = EditorView.theme({
     whiteSpace: 'pre-wrap',
     backgroundColor: 'var(--panel)'
   },
+  // The source below a drawing, a click away, as quiet as in the preview.
+  '.cm-live-diagram .diagram-source summary': {
+    marginTop: '4px',
+    fontFamily: 'var(--ui)',
+    fontSize: '12px',
+    color: 'var(--ink-faint)',
+    cursor: 'default'
+  },
+  '.cm-live-diagram .diagram-source pre': { marginTop: '6px', padding: '8px 12px' },
   '.cm-live-diagram .diagram-error': {
     fontFamily: 'var(--ui)',
     fontSize: '12.5px',
