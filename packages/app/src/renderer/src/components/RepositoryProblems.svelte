@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { RULES_PATH } from '@adr-tool/conformance'
   import type { DecisionLog } from '@adr-tool/core'
   import { DECLARATION_PATH } from '@adr-tool/structure/model'
-  import { wordStructureProblem } from '../lib/said'
+  import { wordConformanceProblem, wordStructureProblem } from '../lib/said'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import type { Placed } from '../lib/together'
@@ -18,13 +19,17 @@
   import StatusMark from './StatusMark.svelte'
 
   // The Problems of the repository in front, of every module, in one list (docs/plan-vision.md,
-  // part 2). The same list stands in the middle of Decisions and of Structure; a click opens
-  // what a Problem is about in its module, and the list goes along.
+  // part 2). The same list stands in the middle of Decisions, Structure and Conformance; a click
+  // opens what a Problem is about in its module, and the list goes along.
 
   const tab = $derived(app.active)
   const problems = $derived(app.repositoryProblems)
   const logs = $derived(tab?.repository.repository.logs ?? [])
   const structure = $derived(problems?.structure)
+  const rules = $derived(problems?.conformance)
+  const rulesCount = $derived(
+    rules?.state === 'known' ? rules.entries.filter((entry) => !entry.note).length : 0
+  )
   const selectedComponent = $derived(
     tab?.module === 'structure' && tab.structure.selection?.kind === 'node'
       ? tab.structure.selection.id
@@ -71,16 +76,20 @@
         <button onclick={() => app.showInStructure(tab.structure.show)}>
           {t.repositoryProblems.backToStructure}
         </button>
+      {:else if tab?.module === 'conformance'}
+        <button onclick={() => app.showInConformance(tab.conformance.show)}>
+          {t.repositoryProblems.backToConformance}
+        </button>
       {:else}
         <button onclick={() => app.show('adrs')}>{t.backToAdrs}</button>
       {/if}
     </span>
   </div>
 
-  {#if problems && structure}
+  {#if problems && structure && rules}
     <div class="groups">
       <p class="lead">
-        {problems.count === 0 && structure.state === 'known'
+        {problems.count === 0 && structure.state === 'known' && rules.state === 'known'
           ? t.repositoryProblems.none
           : t.repositoryProblems.lead}
       </p>
@@ -240,6 +249,53 @@
           </ul>
         {/if}
       </section>
+
+      <section aria-label={t.modules.conformance}>
+        <h3>
+          {t.modules.conformance}
+          {#if rules.state === 'known'}{@render count(rulesCount)}{/if}
+        </h3>
+        {#if rules.state === 'reading'}
+          <p class="empty" role="status">{t.repositoryProblems.rulesReading}</p>
+        {:else if rules.state === 'failed'}
+          <p class="empty">{t.repositoryProblems.rulesFailed(rules.reason)}</p>
+        {:else}
+          {#if rules.again}
+            <p class="empty" role="status">{t.repositoryProblems.rulesAgain}</p>
+          {/if}
+          {#if rules.entries.length === 0}
+            <p class="empty">{t.repositoryProblems.noneHere}</p>
+          {/if}
+          <ul>
+            {#each rules.entries as entry, position (position)}
+              <li class="group" class:note={entry.note}>
+                <div class="subject">
+                  <button class="artefact" onclick={() => app.showInRulesFile(entry.found.line)}>
+                    <span class="kind"
+                      >{entry.note
+                        ? t.repositoryProblems.note
+                        : t.repositoryProblems.rulesFile}</span
+                    >
+                    <code>{RULES_PATH}</code>
+                    <span class="kind">{t.repositoryProblems.atLine(entry.found.line)}</span>
+                  </button>
+                </div>
+                <p class="what">{@render withCode(wordConformanceProblem(entry.found))}</p>
+                {#if entry.repair}
+                  {@const repair = entry.repair}
+                  <button class="repair only" onclick={() => app.repairConformance(repair)}>
+                    {repair.kind === 'remove-exception'
+                      ? t.review.removeException.action
+                      : t.review.narrowException.action}
+                  </button>
+                {:else if !entry.note}
+                  <p class="by-hand">{@render withCode(t.repositoryProblems.rulesByHand)}</p>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
     </div>
   {/if}
 </div>
@@ -333,6 +389,11 @@
     border-left: 3px solid var(--problem);
     border-bottom: 1px solid var(--line);
     background: var(--paper);
+  }
+
+  /* A note fails nothing: it is not red. */
+  .group.note {
+    border-left-color: var(--line-strong);
   }
 
   .subject {

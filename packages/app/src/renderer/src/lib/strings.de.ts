@@ -1,3 +1,4 @@
+import type { Rule } from '@adr-tool/conformance'
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 import type { MetricKey, MetricWording, ReviewWording, en } from './strings.en'
@@ -12,6 +13,13 @@ import type { Refusal } from './views'
  */
 
 const many = (count: number, one: string, more: string): string => (count === 1 ? one : more)
+
+/** Komponentenmuster, wie ein Satz sie schreibt: `a`, `a und b`, `a, b und c`. */
+const listed = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} und ${items.at(-1)}`
+
+/** A number of a threshold as German writes it: 0,5. */
+const decimal = (value: number | undefined): string => (value ?? 0).toLocaleString('de')
 
 /** A count as the window writes it: 9.115. */
 const count = (value: number): string => value.toLocaleString('de')
@@ -56,7 +64,8 @@ export const de: typeof en = {
   modules: {
     label: 'Module',
     decisions: 'Entscheidungen',
-    structure: 'Struktur'
+    structure: 'Struktur',
+    conformance: 'Konformität'
   },
 
   tabs: {
@@ -124,7 +133,7 @@ export const de: typeof en = {
   repositoryProblems: {
     entry: 'Repository-Probleme',
     entryHint:
-      'Alle Probleme dieses Repositorys in einer Liste: seiner Decision Logs, der Deklaration seiner Komponenten und der Traces dazwischen',
+      'Alle Probleme dieses Repositorys in einer Liste: seiner Decision Logs, der Deklaration seiner Komponenten, der Traces dazwischen und seiner Regeln',
     counting:
       'Die Struktur analysiert den Code noch; ihre Probleme werden gezählt, sobald sie fertig ist.',
     asOf: (at: number): string =>
@@ -147,7 +156,16 @@ export const de: typeof en = {
     draft:
       'Noch ist nichts deklariert: Was die Prüfungen am Entwurf finden, sind Hinweise, die die Struktur neben ihm zeigt.',
     byHand:
-      'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie `.arch/components.yml` in einem Editor; die Ansicht folgt.'
+      'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie `.arch/components.yml` in einem Editor; die Ansicht folgt.',
+    backToConformance: 'Zurück zu den Verstößen',
+    rulesFile: 'Die Regeldatei',
+    atLine: (line: number): string => `Zeile ${line}`,
+    note: 'Hinweis',
+    rulesReading: 'Konformität prüft die Regeln. Ihre Probleme folgen, sobald sie fertig ist.',
+    rulesAgain: 'Die Regeln werden erneut geprüft: Dies sind die Probleme der letzten Prüfung.',
+    rulesFailed: (reason: string): string => `Die Regeln konnten nicht geprüft werden: ${reason}`,
+    rulesByHand:
+      'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie `.arch/rules.yml` in einem Editor; die Ansicht folgt.'
   },
 
   diagram: {
@@ -477,7 +495,20 @@ export const de: typeof en = {
           count,
           'Eine Abhängigkeit zwischen Quelldateien',
           `${count} Abhängigkeiten zwischen Quelldateien`
-        )
+        ),
+      spoken: 'Die Abhängigkeiten in der Zeichnung',
+      line: (
+        from: string,
+        to: string,
+        weight: number,
+        typeOnly: boolean,
+        inCycle: boolean,
+        violations: readonly string[]
+      ): string =>
+        `${from} hängt von ${to} ab: ${many(weight, 'eine Abhängigkeit zwischen Quelldateien', `${weight} Abhängigkeiten zwischen Quelldateien`)}${typeOnly ? ', nur Typen' : ''}${inCycle ? ', in einem Zyklus' : ''}.${violations.map((violation) => ` Verstoß: ${violation}`).join('')}`,
+      noLine: 'Keine Abhängigkeit zwischen den Knoten dieser Ebene.',
+      violation: 'verstößt gegen eine Regel',
+      thresholdViolation: 'außerhalb eines Schwellenwerts'
     },
 
     views: {
@@ -661,6 +692,205 @@ export const de: typeof en = {
     }
   },
 
+  conformance: {
+    label: 'Regeln, Ausnahmen und was die Prüfung gefunden hat',
+    rules: 'Regeln',
+    all: 'Alle Verstöße',
+    allHint: 'Die Verstöße aller Regeln',
+    exceptions: 'Ausnahmen',
+    exceptionsHint: 'Die Verstöße, die akzeptiert sind, jeder mit seiner Begründung',
+    file: 'Die Regeldatei',
+    open: '.arch/rules.yml öffnen',
+    newRule: 'Neue Regel',
+    newRuleHint:
+      'Eine Regel in .arch/rules.yml schreiben. Sie sehen die Änderung, bevor sie geschrieben wird.',
+    noFile:
+      'Es gibt noch keine `.arch/rules.yml`. Die erste Regel, die Sie hier schreiben, legt sie an.',
+    draft:
+      'Die Komponenten sind ein Entwurf, deshalb werden die Regeln nicht geprüft. Sie werden es, sobald die Komponenten deklariert sind: Übernehmen Sie den Entwurf in der Struktur.',
+    notEvaluated:
+      'Die Regeln werden nicht geprüft, solange `.arch/rules.yml` nicht gelesen werden kann. Das Problem steht in der Liste des Repositorys.',
+    analysing: 'Die Regeln werden gegen den Code geprüft …',
+    again: 'Die Regeln werden erneut geprüft. Dies ist das letzte Ergebnis.',
+    asOf: (at: number): string =>
+      `Stand der Analyse des Codes um ${new Date(at).toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })} Uhr.`,
+    failed: 'Die Regeln konnten nicht geprüft werden',
+    problems: 'Probleme der Regeldatei',
+    notes: 'Hinweise zur Regeldatei',
+
+    center: {
+      all: 'Alle Verstöße',
+      ofRule: (id: string): string => `Verstöße gegen ${id}`,
+      exceptions: 'Ausnahmen',
+      show: 'Die Verstöße zeigen als',
+      list: 'Liste',
+      graph: 'Graph',
+      accepted: 'Als Ausnahmen akzeptiert',
+      none: 'Kein Verstoß: Der Code hält sich an jede Regel.',
+      noneOfRule: 'Kein Verstoß: Der Code hält sich an diese Regel.',
+      allAccepted: 'Jeder Verstoß ist als Ausnahme akzeptiert.',
+      noRules:
+        'Noch keine Regel. Eine Regel sagt, welche Komponenten von welchen abhängen dürfen, dass es keinen Zyklus gibt oder wie weit eine Metrik gehen darf. Schreiben Sie die erste mit „Neue Regel“.',
+      noExceptions:
+        'Keine Ausnahme. Ein Verstoß, der mit einer Begründung akzeptiert wird, wird zu einer: Wählen Sie ihn aus und dann „Als Ausnahme akzeptieren“.',
+      howToRead:
+        'Die Zeichnung der Struktur für diese Ebene, von links nach rechts zu lesen. Rot ist, was gegen eine Regel verstößt, die keine Ausnahme akzeptiert. Ein Doppelklick auf eine Komponente oder ein Verzeichnis zeigt seine Teile.',
+      back: (show: 'list' | 'graph' | 'exceptions'): string =>
+        ({
+          list: 'Zurück zu den Verstößen',
+          graph: 'Zurück zum Graphen',
+          exceptions: 'Zurück zu den Ausnahmen'
+        })[show]
+    },
+
+    detail: {
+      label: 'Details',
+      violation: 'Verstoß',
+      rule: 'Regel',
+      exception: 'Ausnahme',
+      hint: 'Wählen Sie einen Verstoß, um die Importe dahinter zu sehen, oder eine Regel, um zu sehen, was sie sagt und wo sie steht.',
+      graphHint:
+        'Wählen Sie eine rote Linie oder einen roten Kasten, um den Verstoß dahinter zu sehen.',
+      breaksNothing: 'Dies verstößt gegen keine Regel.',
+      accept: 'Als Ausnahme akzeptieren',
+      acceptHint:
+        'In .arch/rules.yml festhalten, dass dieser Verstoß akzeptiert ist, und warum. Sie sehen die Änderung, bevor sie geschrieben wird.',
+      acceptedBy: 'Akzeptiert durch eine Ausnahme',
+      reason: 'Begründung',
+      reasonPlaceholder: 'Warum dieser Verstoß akzeptiert wird',
+      justifiedBy: 'Begründet durch',
+      justifiedByOptional: 'Begründet durch ein ADR – optional',
+      adrPlaceholder: 'Ein ADR: Nummer oder Titel',
+      noAdrLeft: 'Kein ADR zum Zitieren',
+      notAnAdr: (reference: string): string => `${reference} – kein ADR dieses Repositorys`,
+      preview: 'Vorschau',
+      imports: 'Abhängigkeiten zwischen Quelldateien',
+      noImports:
+        'Hinter einem Schwellenwert steht kein Import: Gemessen wird die Komponente als Ganzes.',
+      roundTrip: 'Zum Beispiel',
+      weakest: 'Schwächste Abhängigkeit',
+      value: 'Wert',
+      why: 'Warum',
+      says: 'Was sie sagt',
+      kind: 'Art',
+      written: 'Wo sie steht',
+      options: 'Optionen',
+      testsIncluded: 'Testdateien zählen mit.',
+      typeOnlyIgnored: 'Abhängigkeiten nur über Typen zählen nicht.',
+      violations: 'Ihre Verstöße',
+      noViolations: 'Keine: Der Code hält sich an sie.',
+      exceptions: 'Ihre Ausnahmen',
+      accepts: 'Akzeptiert',
+      acceptsNothing: 'Keinen Verstoß: Sie steht in den Problemen des Repositorys.',
+      change: 'Ändern',
+      remove: 'Entfernen',
+      showViolations: 'Ihre Verstöße zeigen',
+      removeException: 'Entfernen'
+    },
+
+    kinds: {
+      'must-not-depend': {
+        name: 'darf nicht abhängen von',
+        about:
+          'Eine Abhängigkeit von einer der Komponenten in `from` zu einer der Komponenten in `to` ist ein Verstoß.'
+      },
+      'may-only-depend': {
+        name: 'darf nur abhängen von',
+        about:
+          'Die Komponenten in `from` dürfen von denen in `to` abhängen und von nichts anderem; jede andere Abhängigkeit ist ein Verstoß.'
+      },
+      layers: {
+        name: 'Schichten',
+        about:
+          'Eine Schicht darf von den Schichten unter ihr abhängen, nicht von denen über ihr; strikt nur von der direkt darunter.'
+      },
+      'no-cycles': {
+        name: 'keine Zyklen',
+        about:
+          'Ein Zyklus zwischen den Komponenten, die sie nennt, oder zwischen den Quelldateien in jeder von ihnen ist ein Verstoß.'
+      },
+      threshold: {
+        name: 'Schwellenwert',
+        about:
+          'Eine Komponente, die sie nennt und deren Metrik außerhalb der Grenzen liegt, ist ein Verstoß.'
+      }
+    },
+
+    says: (rule: Rule, metric: string): string => {
+      switch (rule.kind) {
+        case 'must-not-depend':
+          return `${listed(rule.from)} ${rule.from.length > 1 ? 'dürfen' : 'darf'} nicht von ${listed(rule.to)} abhängen`
+        case 'may-only-depend':
+          return rule.to.length === 0
+            ? `${listed(rule.from)} ${rule.from.length > 1 ? 'dürfen' : 'darf'} von keiner anderen Komponente abhängen`
+            : `${listed(rule.from)} ${rule.from.length > 1 ? 'dürfen' : 'darf'} nur von ${listed(rule.to)} abhängen`
+        case 'layers':
+          return `${rule.mode === 'strict' ? 'Strikte Schichten' : 'Schichten'}, von oben nach unten: ${rule.layers.map((layer) => layer.join(', ')).join(' › ')}`
+        case 'no-cycles':
+          return `Kein Zyklus ${rule.scope === 'among' ? 'zwischen' : 'innerhalb von'} ${listed(rule.components)}`
+        case 'threshold':
+          return `${metric} von ${listed(rule.of)} ${
+            rule.max !== undefined && rule.min !== undefined
+              ? `zwischen ${decimal(rule.min)} und ${decimal(rule.max)}`
+              : rule.max !== undefined
+                ? `höchstens ${decimal(rule.max)}`
+                : `mindestens ${decimal(rule.min)}`
+          }`
+      }
+    },
+
+    component: {
+      rules: 'Regeln',
+      noRule: 'Keine Regel nennt sie.',
+      violations: 'Verstöße',
+      noViolation: 'Keine.',
+      checking: 'Die Regeln werden geprüft …'
+    },
+    adr: {
+      exceptions: 'Ausnahmen, die es begründet',
+      justifies: 'Begründet',
+      exception: (rule: string, names: string): string => `die Ausnahme von ${rule}: ${names}`
+    },
+
+    form: {
+      newTitle: 'Neue Regel',
+      changeTitle: 'Regel ändern',
+      id: 'ID',
+      idHint:
+        'Kleinbuchstaben, Ziffern und Bindestriche. Ausnahmen und adr check nennen die Regel damit.',
+      why: 'Warum',
+      whyPlaceholder: 'Warum sich der Code daran halten muss, als Satz',
+      kind: 'Art',
+      from: 'Von',
+      fromAbout: 'Die Komponenten, deren Abhängigkeiten sie einschränkt.',
+      to: 'Zu',
+      toAbout: 'Die Komponenten, von denen sie nicht abhängen dürfen.',
+      allowed: 'Darf abhängen von',
+      allowedAbout: 'Nichts hier: von keiner anderen Komponente.',
+      layers: 'Schichten, von oben nach unten',
+      layer: (position: number): string => `Schicht ${position}`,
+      addLayer: 'Schicht hinzufügen',
+      removeLayer: (position: number): string => `Schicht ${position} entfernen`,
+      strict: 'Strikt: Eine Schicht darf nur von der direkt darunter abhängen',
+      scope: 'Wo',
+      among: 'Zwischen den Komponenten',
+      inside: 'Innerhalb jeder Komponente, zwischen ihren Quelldateien',
+      components: 'Komponenten',
+      metric: 'Metrik',
+      max: 'Höchstens',
+      min: 'Mindestens',
+      of: 'Der Komponenten',
+      tests: 'Testdateien zählen mit',
+      ignoreTypeOnly: 'Abhängigkeiten nur über Typen zählen nicht',
+      patternPlaceholder: 'Eine Komponenten-ID oder ein Muster, dann Enter',
+      patterns:
+        'Komponenten über ihre ID, wie deklariert; `*` steht für ein Segment, `**` für beliebig viele: `ui/**`, `features/*`.',
+      missing: (keys: readonly string[]): string => `Es fehlt noch: ${keys.join(', ')}.`,
+      notANumber: 'Keine Zahl.',
+      preview: 'Vorschau'
+    }
+  },
+
   graph: {
     heading: 'Relationen',
     empty:
@@ -811,6 +1041,32 @@ export const de: typeof en = {
         advice:
           'Wenn es ändert, was entschieden wurde, brechen Sie ab und schreiben Sie ein neues ADR, das dieses ergänzt oder ersetzt. Wenn nicht, speichern Sie.'
       }
+    },
+    rule: {
+      add: 'Hinzufügen',
+      addTitle: (id: string): string => `Regel ${id} hinzufügen`,
+      addRefused: (id: string): string => `Regel ${id} kann nicht hinzugefügt werden`,
+      change: 'Ändern',
+      changeTitle: (id: string): string => `Regel ${id} ändern`,
+      changeRefused: (id: string): string => `Regel ${id} kann nicht geändert werden`,
+      remove: 'Entfernen',
+      removeTitle: (id: string): string => `Regel ${id} entfernen`,
+      removeRefused: (id: string): string => `Regel ${id} kann nicht entfernt werden`
+    },
+    exception: {
+      action: 'Akzeptieren',
+      title: (rule: string): string => `Einen Verstoß gegen ${rule} als Ausnahme akzeptieren`,
+      refused: (rule: string): string => `Der Verstoß gegen ${rule} kann nicht akzeptiert werden`
+    },
+    removeException: {
+      action: 'Entfernen',
+      title: (rule: string): string => `Eine Ausnahme von ${rule} entfernen`,
+      refused: (rule: string): string => `Die Ausnahme von ${rule} kann nicht entfernt werden`
+    },
+    narrowException: {
+      action: 'Eingrenzen',
+      title: (rule: string): string => `Eine Ausnahme von ${rule} auf ihre Zyklen eingrenzen`,
+      refused: (rule: string): string => `Die Ausnahme von ${rule} kann nicht eingegrenzt werden`
     },
     notWritten: 'Die Änderung wurde nicht geschrieben',
     writtenInPart: 'Einige Dateien sind nicht, wie sie waren',

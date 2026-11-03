@@ -1,3 +1,4 @@
+import type { Rule, RuleKind } from '@adr-tool/conformance'
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 import type { Refusal } from './views'
@@ -44,6 +45,10 @@ const LINE_VERB: Record<RelationType, string> = {
   'depends-on': 'depends on',
   'relates-to': 'relates to'
 }
+
+/** Component patterns as a sentence writes them: `a`, `a and b`, `a, b and c`. */
+const listed = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
 
 /** The metrics of section 5 of the Structure format, as the window names and shows them. */
 export const METRICS = [
@@ -103,7 +108,8 @@ export const en = {
   modules: {
     label: 'Modules',
     decisions: 'Decisions',
-    structure: 'Structure'
+    structure: 'Structure',
+    conformance: 'Conformance'
   },
 
   tabs: {
@@ -175,7 +181,7 @@ export const en = {
     /** The row in the sidebar of every module that leads there. */
     entry: 'Repository Problems',
     entryHint:
-      'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, and of the Traces between them',
+      'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, of the Traces between them, and of its Rules',
     counting: 'Structure is still analysing the code: its Problems are counted once it is done.',
     /** Structure is not open, so its files are not watched: the count may be older than they are. */
     asOf: (at: number): string =>
@@ -197,7 +203,18 @@ export const en = {
     draft:
       'Nothing is declared yet: what the checks find on the Draft are hints, which Structure shows beside it.',
     byHand:
-      'The suite cannot know what was meant here. Fix `.arch/components.yml` in an editor; the view follows.'
+      'The suite cannot know what was meant here. Fix `.arch/components.yml` in an editor; the view follows.',
+    backToConformance: 'Back to the Violations',
+    rulesFile: 'The Rules file',
+    /** Of a Problem or a note of the Rules file: where it stands, a click away. */
+    atLine: (line: number): string => `line ${line}`,
+    /** A note fails nothing: it says what could be better. */
+    note: 'Note',
+    rulesReading: 'Conformance is checking the Rules. Its Problems follow once it is done.',
+    rulesAgain: 'The Rules are checked again: these are the Problems of the last check.',
+    rulesFailed: (reason: string): string => `The Rules could not be checked: ${reason}`,
+    rulesByHand:
+      'The suite cannot know what was meant here. Fix `.arch/rules.yml` in an editor; the view follows.'
   },
 
   /** A Mermaid block of an ADR, drawn in the preview and in the live mode. */
@@ -525,7 +542,22 @@ export const en = {
       inCycle: 'in a Cycle',
       weakest: 'weakest Dependency of a Cycle',
       weight: (count: number): string =>
-        many(count, 'One Source File Dependency', `${count} Source File Dependencies`)
+        many(count, 'One Source File Dependency', `${count} Source File Dependencies`),
+      /** The lines, read out: a list a screen reader finds beside the drawing. */
+      spoken: 'The Dependencies in the drawing',
+      line: (
+        from: string,
+        to: string,
+        weight: number,
+        typeOnly: boolean,
+        inCycle: boolean,
+        violations: readonly string[]
+      ): string =>
+        `${from} depends on ${to}: ${many(weight, 'one Source File Dependency', `${weight} Source File Dependencies`)}${typeOnly ? ', type-only' : ''}${inCycle ? ', in a Cycle' : ''}.${violations.map((violation) => ` Violation: ${violation}`).join('')}`,
+      noLine: 'No Dependency between the nodes of this level.',
+      /** In the legend of Conformance's drawing. */
+      violation: 'breaks a Rule',
+      thresholdViolation: 'outside a threshold'
     },
 
     views: {
@@ -705,6 +737,204 @@ export const en = {
     }
   },
 
+  /** The Rules of the repository and where the code breaks them (docs/plan-vision.md, part 4). */
+  conformance: {
+    label: 'Rules, Exceptions and what the check found',
+    rules: 'Rules',
+    all: 'All Violations',
+    allHint: 'The Violations of every Rule',
+    exceptions: 'Exceptions',
+    exceptionsHint: 'The Violations that are accepted, each with its reason',
+    file: 'The Rules file',
+    open: 'Open .arch/rules.yml',
+    newRule: 'New Rule',
+    newRuleHint: 'Write a Rule into .arch/rules.yml. You see the change before it is written.',
+    noFile: 'There is no `.arch/rules.yml` yet. The first Rule written here creates it.',
+    draft:
+      'The Components are a Draft, so the Rules are not checked. They are once the Components are declared: adopt the Draft in Structure.',
+    notEvaluated:
+      'The Rules are not checked while `.arch/rules.yml` cannot be read. Its Problem is in the list of the repository.',
+    analysing: 'Checking the Rules against the code …',
+    again: 'Checking the Rules again. This is the last result.',
+    asOf: (at: number): string =>
+      `As of the analysis of the code at ${new Date(at).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}.`,
+    failed: 'The Rules could not be checked',
+    problems: 'Problems of the Rules file',
+    notes: 'Notes on the Rules file',
+
+    center: {
+      all: 'All Violations',
+      ofRule: (id: string): string => `Violations of ${id}`,
+      exceptions: 'Exceptions',
+      show: 'Show the Violations as',
+      list: 'List',
+      graph: 'Graph',
+      accepted: 'Accepted as Exceptions',
+      none: 'No Violation: the code keeps to every Rule.',
+      noneOfRule: 'No Violation: the code keeps to this Rule.',
+      allAccepted: 'Every Violation is accepted as an Exception.',
+      noRules:
+        'No Rule yet. A Rule says which Components may depend on which, that there is no Cycle, or how far a metric may go. Write the first one with New Rule.',
+      noExceptions:
+        'No Exception. A Violation accepted with a reason becomes one: select it and choose Accept as Exception.',
+      howToRead:
+        'Structure’s drawing of this level, read from left to right. Red marks what breaks a Rule that no Exception accepts. Double-click a Component or a directory to see its parts.',
+      back: (show: 'list' | 'graph' | 'exceptions'): string =>
+        ({
+          list: 'Back to the Violations',
+          graph: 'Back to the graph',
+          exceptions: 'Back to the Exceptions'
+        })[show]
+    },
+
+    detail: {
+      label: 'Details',
+      violation: 'Violation',
+      rule: 'Rule',
+      exception: 'Exception',
+      hint: 'Select a Violation to see the imports behind it, or a Rule to see what it says and where it is written.',
+      graphHint: 'Select a red line or box to see the Violation behind it.',
+      breaksNothing: 'This breaks no Rule.',
+      accept: 'Accept as Exception',
+      acceptHint:
+        'Record in .arch/rules.yml that this Violation is accepted, and why. You see the change before it is written.',
+      acceptedBy: 'Accepted by an Exception',
+      reason: 'Reason',
+      reasonPlaceholder: 'Why this Violation is accepted',
+      justifiedBy: 'Justified by',
+      justifiedByOptional: 'Justified by an ADR — optional',
+      adrPlaceholder: 'An ADR: number or title',
+      noAdrLeft: 'No ADR to cite',
+      notAnAdr: (reference: string): string => `${reference} — not an ADR of this repository`,
+      preview: 'Preview',
+      imports: 'Source File Dependencies',
+      noImports: 'A threshold has no import behind it: the Component as a whole is measured.',
+      roundTrip: 'For example',
+      weakest: 'Weakest Dependency',
+      value: 'Value',
+      why: 'Why',
+      says: 'What it says',
+      kind: 'Kind',
+      written: 'Where it is written',
+      options: 'Options',
+      testsIncluded: 'Test files count.',
+      typeOnlyIgnored: 'Type-only Dependencies do not count.',
+      violations: 'Its Violations',
+      noViolations: 'None: the code keeps to it.',
+      exceptions: 'Its Exceptions',
+      accepts: 'Accepts',
+      acceptsNothing: 'No Violation: it is in the Problems of the repository.',
+      change: 'Change',
+      remove: 'Remove',
+      showViolations: 'Show its Violations',
+      removeException: 'Remove'
+    },
+
+    /** Each kind of Rule: its name, short, and what it says, as a sentence. */
+    kinds: {
+      'must-not-depend': {
+        name: 'must not depend on',
+        about:
+          'A Dependency from one of the Components in `from` on one of those in `to` is a Violation.'
+      },
+      'may-only-depend': {
+        name: 'may only depend on',
+        about:
+          'The Components in `from` may depend on those in `to` and on nothing else; any other Dependency is a Violation.'
+      },
+      layers: {
+        name: 'layers',
+        about:
+          'A layer may depend on the layers below it and not on those above; strict, only on the one right below.'
+      },
+      'no-cycles': {
+        name: 'no Cycles',
+        about:
+          'A Cycle among the Components it names, or among the Source Files inside each of them, is a Violation.'
+      },
+      threshold: {
+        name: 'threshold',
+        about: 'A Component it names whose metric is outside the limits is a Violation.'
+      }
+    } satisfies Record<RuleKind, { name: string; about: string }>,
+
+    /** What a Rule says, in words; `metric` is the long name of its metric. */
+    says: (rule: Rule, metric: string): string => {
+      switch (rule.kind) {
+        case 'must-not-depend':
+          return `${listed(rule.from)} must not depend on ${listed(rule.to)}`
+        case 'may-only-depend':
+          return rule.to.length === 0
+            ? `${listed(rule.from)} may depend on no other Component`
+            : `${listed(rule.from)} may only depend on ${listed(rule.to)}`
+        case 'layers':
+          return `${rule.mode === 'strict' ? 'Strict layers' : 'Layers'}, top down: ${rule.layers.map((layer) => layer.join(', ')).join(' › ')}`
+        case 'no-cycles':
+          return `No Cycle ${rule.scope === 'among' ? 'among' : 'inside'} ${listed(rule.components)}`
+        case 'threshold':
+          return `${metric} of ${listed(rule.of)} ${
+            rule.max !== undefined && rule.min !== undefined
+              ? `between ${rule.min} and ${rule.max}`
+              : rule.max !== undefined
+                ? `at most ${rule.max}`
+                : `at least ${rule.min}`
+          }`
+      }
+    },
+
+    /** On the Component page in Structure, and on an ADR. */
+    component: {
+      rules: 'Rules',
+      noRule: 'No Rule names it.',
+      violations: 'Violations',
+      noViolation: 'None.',
+      checking: 'Checking the Rules …'
+    },
+    adr: {
+      exceptions: 'Exceptions it justifies',
+      /** In the column of what an ADR says about others. */
+      justifies: 'Justifies',
+      exception: (rule: string, names: string): string => `the Exception of ${rule}: ${names}`
+    },
+
+    form: {
+      newTitle: 'New Rule',
+      changeTitle: 'Change the Rule',
+      id: 'ID',
+      idHint: 'Lowercase letters, digits and dashes. Exceptions and adr check name the Rule by it.',
+      why: 'Why',
+      whyPlaceholder: 'Why the code has to keep to it, as a sentence',
+      kind: 'Kind',
+      from: 'From',
+      fromAbout: 'The Components whose Dependencies it constrains.',
+      to: 'To',
+      toAbout: 'The Components they must not depend on.',
+      allowed: 'May depend on',
+      allowedAbout: 'Nothing here: on no other Component.',
+      layers: 'Layers, top down',
+      layer: (position: number): string => `Layer ${position}`,
+      addLayer: 'Add a layer',
+      removeLayer: (position: number): string => `Remove layer ${position}`,
+      strict: 'Strict: a layer may depend only on the one right below it',
+      scope: 'Where',
+      among: 'Among the Components',
+      inside: 'Inside each Component, among its Source Files',
+      components: 'Components',
+      metric: 'Metric',
+      max: 'At most',
+      min: 'At least',
+      of: 'Of the Components',
+      tests: 'Test files count',
+      ignoreTypeOnly: 'Type-only Dependencies do not count',
+      patternPlaceholder: 'A Component ID or pattern, then Enter',
+      patterns:
+        'Components by ID, as declared; `*` stands for one segment and `**` for any number: `ui/**`, `features/*`.',
+      missing: (keys: readonly string[]): string => `Still missing: ${keys.join(', ')}.`,
+      notANumber: 'Not a number.',
+      preview: 'Preview'
+    }
+  },
+
   graph: {
     heading: 'Relations',
     empty:
@@ -856,6 +1086,32 @@ export const en = {
         advice:
           'If it changes what was decided, cancel and write a new ADR that amends or supersedes this one. If it does not, save.'
       }
+    },
+    rule: {
+      add: 'Add',
+      addTitle: (id: string): string => `Add the Rule ${id}`,
+      addRefused: (id: string): string => `Cannot add the Rule ${id}`,
+      change: 'Change',
+      changeTitle: (id: string): string => `Change the Rule ${id}`,
+      changeRefused: (id: string): string => `Cannot change the Rule ${id}`,
+      remove: 'Remove',
+      removeTitle: (id: string): string => `Remove the Rule ${id}`,
+      removeRefused: (id: string): string => `Cannot remove the Rule ${id}`
+    },
+    exception: {
+      action: 'Accept',
+      title: (rule: string): string => `Accept a Violation of ${rule} as an Exception`,
+      refused: (rule: string): string => `Cannot accept the Violation of ${rule}`
+    },
+    removeException: {
+      action: 'Remove',
+      title: (rule: string): string => `Remove an Exception of ${rule}`,
+      refused: (rule: string): string => `Cannot remove the Exception of ${rule}`
+    },
+    narrowException: {
+      action: 'Narrow',
+      title: (rule: string): string => `Narrow an Exception of ${rule} to its Cycles`,
+      refused: (rule: string): string => `Cannot narrow the Exception of ${rule}`
     },
     notWritten: 'The change was not written',
     writtenInPart: 'Some files are not as they were',

@@ -14,6 +14,26 @@
     view.components.some((component) => component.level === view.parent && component.java)
   )
 
+  // The rows are a list the arrows move through, as every list of the window: the focus goes
+  // to the next row's node, which is selected; Enter opens a Component, as a double click does.
+  function onkeydown(event: KeyboardEvent): void {
+    const by = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+    if (by === 0) return
+    const rows = [...(event.currentTarget as HTMLElement).querySelectorAll('button')]
+    const position = rows.indexOf(event.target as HTMLButtonElement)
+    const next = view.nodes[Math.max(0, Math.min(view.nodes.length - 1, position + by))]
+    if (!next) return
+    event.preventDefault()
+    rows[view.nodes.indexOf(next)]?.focus()
+    app.selectInStructure({ kind: 'node', id: next.id })
+  }
+
+  function onopen(event: KeyboardEvent, node: StructureNode): void {
+    if (event.key !== 'Enter' || !opens(node)) return
+    event.preventDefault()
+    app.openComponent(node.id)
+  }
+
   function valueOf(node: StructureNode, key: MetricKey): number | undefined {
     if (key === 'files') return node.files
     if (key === 'lines') return node.lines
@@ -34,7 +54,9 @@
           {/each}
         </tr>
       </thead>
-      <tbody>
+      <!-- The keys come from the buttons of the rows, which hold the focus. -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <tbody {onkeydown}>
         {#each view.nodes as node (node.id)}
           {@const selected = selection?.kind === 'node' && selection.id === node.id}
           <tr class:selected class={node.kind}>
@@ -44,7 +66,7 @@
                 title={node.kind === 'source-file' ? node.id : nodeLabel(node)}
                 onclick={() => app.selectInStructure({ kind: 'node', id: node.id })}
                 ondblclick={() => opens(node) && app.openComponent(node.id)}
-                >{nodeLabel(node)}</button
+                onkeydown={(event) => onopen(event, node)}>{nodeLabel(node)}</button
               >
             </th>
             {#each METRICS as key (key)}

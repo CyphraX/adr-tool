@@ -58,7 +58,12 @@
   {:else if show === 'metrics'}
     <StructureMetrics {view} />
   {:else}
-    <StructureGraph {view} />
+    <StructureGraph
+      {view}
+      selection={app.active?.structure.selection}
+      onselect={(selection) => app.selectInStructure(selection)}
+      onopen={(id) => app.openComponent(id)}
+    />
   {/if}
 </div>
 

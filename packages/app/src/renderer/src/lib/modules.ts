@@ -11,7 +11,9 @@ export const MODULES = [
   /** The ADRs of the Decision Logs (CONTEXT.md). */
   { id: 'decisions' },
   /** The Components of the code and their Dependencies (docs/contexts/structure/CONTEXT.md). */
-  { id: 'structure' }
+  { id: 'structure' },
+  /** The Rules of the architecture and where the code breaks them (docs/contexts/conformance/CONTEXT.md). */
+  { id: 'conformance' }
 ] as const satisfies readonly { readonly id: string }[]
 
 /** A module of the suite, by its ID. */
