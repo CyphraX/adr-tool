@@ -122,6 +122,21 @@ it('drafts a src layout of Python packages, with their Dependencies and their Cy
     }
   }
   expect(functions).toBeGreaterThan(5)
+  // And as radon 6.0.1 counted them, `radon cc -s -j` over the fixture, run outside the tests.
+  expect(
+    [...measures].flatMap(([path, measured]) =>
+      measured.functions.map((one) => [path, one.name, one.line, one.complexity])
+    )
+  ).toEqual([
+    ['src/shop/cart/cart.py', 'Cart.__init__', 10, 1],
+    ['src/shop/cart/cart.py', 'Cart.add', 13, 1],
+    ['src/shop/cart/cart.py', 'Cart.total', 16, 2],
+    ['src/shop/cart/line.py', 'Line.__init__', 13, 1],
+    ['src/shop/catalog/search.py', 'search', 8, 2],
+    ['src/shop/pricing/rules.py', 'price', 11, 2],
+    ['tests/test_cart.py', 'cart', 8, 1],
+    ['tests/test_cart.py', 'test_total', 12, 2]
+  ])
 
   // What its manifests declare, for the Library inventory: the distribution, not the import.
   expect(analysis.manifests).toEqual([

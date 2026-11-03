@@ -115,6 +115,30 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
     }
   }
   expect(functions).toBeGreaterThan(5)
+  // And as gocyclo 0.6.0 counted them, `gocyclo .` in the fixture, run outside the tests; it
+  // writes a method `(*Cart).Add`.
+  expect(
+    [...measures]
+      .flatMap(([path, measured]) =>
+        measured.functions.map((one) => [path, one.name, one.line, one.complexity])
+      )
+      .toSorted()
+  ).toEqual(
+    [
+      ['billing/invoice/invoice.go', 'For', 12, 1],
+      ['billing/invoice/tax.go', 'withTax', 6, 1],
+      ['cart/cart.go', 'Cart.Add', 17, 1],
+      ['cart/cart.go', 'Cart.Total', 22, 2],
+      ['cart/cart.go', 'New', 12, 1],
+      ['cart/cart_test.go', 'TestTotal', 9, 2],
+      ['cart/line.go', 'Line.In', 21, 3],
+      ['cart/line.go', 'NewLine', 16, 1],
+      ['catalog/product.go', 'Normalize', 14, 1],
+      ['catalog/search.go', 'Search', 4, 3],
+      ['cmd/shop/main.go', 'main', 11, 1],
+      ['web/server.go', 'Checkout', 15, 1]
+    ].toSorted()
+  )
 
   // What its go.mod files require, for the Library inventory.
   expect(analysis.manifests).toEqual([
