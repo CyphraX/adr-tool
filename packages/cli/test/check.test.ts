@@ -396,6 +396,88 @@ describe('adr check (docs/cli.md)', () => {
     ])
   })
 
+  it('prints a Violation of a Rule about a Library at each line that imports it', async () => {
+    const page = readFileSync(join(shop, 'src/web/page.ts'), 'utf8')
+    const root = shopWith(
+      [
+        '',
+        '  - id: only-persistence-uses-pg',
+        '    why: The database is the business of persistence.',
+        '    kind: library',
+        '    library: pg',
+        '    only-in: persistence',
+        EXCEPTIONS
+      ].join('\n'),
+      {
+        'src/web/page.ts': page.replace(
+          "from '../billing/invoice'\n",
+          "from '../billing/invoice'\nimport type { Pool } from 'pg'\nimport { Client } from 'pg'\n"
+        ),
+        'src/persistence/store.ts': "import { Pool } from 'pg'\n\nexport const pool = new Pool()\n"
+      }
+    )
+    const said = (line: number): string =>
+      `web uses pg, which only persistence may use: src/web/page.ts:${line} imports pg. The database is the business of persistence.`
+    const { code, out } = await adrIn(root, 'check')
+    expect(code).toBe(1)
+    expect(lines(out)).toEqual([
+      `src/web/page.ts:2: only-persistence-uses-pg: ${said(2)}`,
+      `src/web/page.ts:3: only-persistence-uses-pg: ${said(3)}`,
+      '',
+      'No Problems in 1 Decision Log.',
+      '1 Violation of 3 Rules, and 2 accepted as Exceptions.'
+    ])
+    expect(lines((await adrIn(root, 'check', '--format', 'github')).out)[1]).toBe(
+      `::error file=src/web/page.ts,line=3,title=only-persistence-uses-pg::${said(3)}`
+    )
+    const report = JSON.parse((await adrIn(root, 'check', '--format', 'json')).out)
+    expect(
+      report.violations.find((violation: { code: string }) => violation.code === 'library')
+    ).toEqual({
+      code: 'library',
+      rule: 'only-persistence-uses-pg',
+      message: 'web uses pg, which only persistence may use.',
+      why: 'The database is the business of persistence.',
+      fingerprint: {
+        kind: 'library',
+        rule: 'only-persistence-uses-pg',
+        component: 'web',
+        library: 'pg'
+      },
+      fingerprintText: 'only-persistence-uses-pg: web uses pg',
+      path: 'src/web/page.ts',
+      line: 2,
+      dependencies: [],
+      uses: [
+        {
+          file: 'src/web/page.ts',
+          library: 'pg',
+          lines: [2, 3],
+          typeOnly: false,
+          typeOnlyLines: [2]
+        }
+      ]
+    })
+  })
+
+  it('fails on a copy of this repository whose core imports Electron, at the import', async () => {
+    const root = copyOf(undefined)
+    for (const path of ['.arch', 'package.json', 'pnpm-workspace.yaml', 'tsconfig.base.json']) {
+      cpSync(join(repository, path), join(root, path), { recursive: true })
+    }
+    cpSync(join(repository, 'packages'), join(root, 'packages'), {
+      recursive: true,
+      filter: (path) => !/[/\\](?:node_modules|dist|out|\.vite)$/.test(path)
+    })
+    writeFileSync(join(root, 'packages/core/src/window.ts'), "import { app } from 'electron'\n")
+    const { code, out, err } = await adrIn(root, 'check', '--format', 'github')
+    expect([code, err]).toEqual([1, ''])
+    expect(lines(out)[0]).toBe(
+      '::error file=packages/core/src/window.ts,line=1,title=only-the-window-uses-electron::core uses electron, which only app may use: packages/core/src/window.ts:1 imports electron. Only the window runs in Electron; the cores, the command line and the MCP server run in Node.js alone, wherever they are copied to.'
+    )
+    expect(lines(out).at(-1)).toMatch(/^1 Violation of \d+ Rules\.$/)
+  }, 30_000)
+
   it('leaves adr lint as it was: it reads no Rules', async () => {
     expect(await adrIn(shop, 'lint')).toEqual({
       code: 0,

@@ -4,6 +4,7 @@ import {
   RULES_PATH,
   saidAt,
   sentenceAt,
+  sentenceAtUse,
   wordingOf,
   type CheckedViolation
 } from '@adr-tool/conformance'
@@ -98,6 +99,17 @@ function entries(report: CheckReport): Entry[] {
  */
 function violationEntries(violation: CheckedViolation): Entry[] {
   const { rule } = violation
+  // A Rule about Libraries: at each line of each import of the Library.
+  if (violation.uses !== undefined && violation.uses.length > 0) {
+    return violation.uses.flatMap((use) =>
+      use.lines.map((line) => ({
+        path: use.file,
+        line,
+        code: rule.id,
+        message: `${sentenceAtUse(violation, use, line)} ${rule.why}`
+      }))
+    )
+  }
   if (violation.dependencies.length === 0) {
     const message = `${sentenceAt(violation)} ${rule.why}`
     return [{ path: RULES_PATH, line: rule.line, code: rule.id, message }]
@@ -201,6 +213,7 @@ function json(report: CheckReport): object {
     })),
     violations: conformance.violations.map((violation) => {
       const first = violation.dependencies[0]
+      const use = violation.uses?.[0]
       const { exception } = violation
       return {
         code: violation.rule.kind,
@@ -209,9 +222,10 @@ function json(report: CheckReport): object {
         why: violation.rule.why,
         fingerprint: violation.fingerprint,
         fingerprintText: fingerprintText(violation.fingerprint),
-        path: first?.from ?? RULES_PATH,
-        line: first ? first.lines[0] : violation.rule.line,
+        path: first?.from ?? use?.file ?? RULES_PATH,
+        line: first ? first.lines[0] : use ? use.lines[0] : violation.rule.line,
         dependencies: violation.dependencies,
+        ...(violation.uses && { uses: violation.uses }),
         ...(exception && {
           exception: {
             reason: exception.reason,
