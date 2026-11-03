@@ -1,4 +1,4 @@
-import { constants } from 'node:fs'
+import { constants, type Stats } from 'node:fs'
 import {
   copyFile,
   link,
@@ -49,7 +49,7 @@ export function repositoryFiles(root: string): WritableFileSystem {
     const target = await realpath(full).catch(missing)
     return target !== undefined && within(await baseReally(), target) ? target : undefined
   }
-  const infoOf = async (path: string) => {
+  const infoOf = async (path: string): Promise<Stats | undefined> => {
     const target = await real(path)
     return target === undefined ? undefined : await stat(target).catch(missing)
   }

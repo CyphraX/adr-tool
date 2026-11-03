@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs'
 import { readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import type { FileSystem } from '@adr-tool/core'
@@ -35,7 +36,7 @@ export function repositoryFiles(root: string, warn: (text: string) => void = () 
     const target = await realpath(full).catch(failed(path))
     return target !== undefined && within(await realBase, target) ? target : undefined
   }
-  const infoOf = async (path: string) => {
+  const infoOf = async (path: string): Promise<Stats | undefined> => {
     const target = await real(path)
     return target === undefined ? undefined : await stat(target).catch(failed(path))
   }
