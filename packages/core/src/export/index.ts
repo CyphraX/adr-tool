@@ -7,4 +7,4 @@ export {
   type ExportOptions,
   type ExportedFile
 } from './site'
-export { isImage, repositoryPath } from './markdown'
+export { isImage, mermaidSources, repositoryPath } from './markdown'
