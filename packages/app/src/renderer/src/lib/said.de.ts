@@ -7,7 +7,8 @@
  * Migration, Frontmatter, Drift, Annotation, Assessment, Snapshot; Metadaten, Rückverweis,
  * Reparatur, Korrektur, Vorlage, Komponente, Entwurf, Quelldatei, Diagramm, Element, Verbindung,
  * Antwort, Anker, zitierte Zeilen, verwaist, neu anheften, Qualitätsszenario, Qualitätsmerkmal,
- * Befund, Beleg, Bewertung, Eintrag, Risiko, Schuldposten, Verletzung. What names a value or a key of a file — proposed,
+ * Befund, Beleg, Bewertung, Eintrag, Risiko, Schuldposten, Verstoß — a Violation, as Conformance
+ * says it; a Finding that cites something „stützt sich auf“ it. What names a value or a key of a file — proposed,
  * accepted, supersedes, affects, container, scope, resolved — is written as the file writes it.
  */
 import {
@@ -95,18 +96,29 @@ const KEPT: Record<string, string> = {
   risks: 'kein Risiko',
   debt: 'kein Schuldposten'
 }
-const kept = (key: string): string => KEPT[key] ?? `nichts aus ${key}`
+const kept = (key: string): string => (Object.hasOwn(KEPT, key) ? KEPT[key]! : `nichts aus ${key}`)
 
-/** What a piece of evidence is, as a sentence names it before its name. */
-const EVIDENCE: Record<string, string> = {
-  violation: 'die Verletzung',
+/** What kind a piece of evidence is, as a noun without its article. */
+const KIND: Record<string, string> = {
+  violation: 'Verstoß',
+  metric: 'Metrik',
+  annotation: 'Annotation',
+  adr: 'ADR',
+  risk: 'Risiko',
+  debt: 'Schuldposten'
+}
+/** A piece of evidence before its name in the accusative: after „stützt sich auf“ and „es gibt“. */
+const ACCUSATIVE: Record<string, string> = {
+  violation: 'den Verstoß',
   metric: 'die Metrik',
   annotation: 'die Annotation',
   adr: 'das ADR',
   risk: 'das Risiko',
-  debt: 'der Schuldposten'
+  debt: 'den Schuldposten'
 }
-const evidence = (kind: string, name: string): string => `${EVIDENCE[kind] ?? kind} ${name}`
+const lookUp = (table: Record<string, string>, kind: string): string =>
+  Object.hasOwn(table, kind) ? table[kind]! : kind
+const evidence = (kind: string, name: string): string => `${lookUp(ACCUSATIVE, kind)} ${name}`
 /** The same, at the start of a sentence. */
 const Evidence = (kind: string, name: string): string => {
   const said = evidence(kind, name)
@@ -518,36 +530,36 @@ export const DE: Wording<Codes> = {
     `${v.path}: ${v.entry} hat kein „${v.key}“, das ein Qualitätsszenario braucht.`,
   'invalid-entry-value': (v) => `${v.path}: ${v.entry}: „${v.key}“ ${german(v.detail)}.`,
   'unknown-quality-attribute': (v) =>
-    `${v.path}: ${v.entry} handelt von „${v.value}“, das weder ein Qualitätsmerkmal der ISO/IEC 25010 ist noch eines seiner Teilmerkmale.`,
+    `${v.path}: ${v.entry} handelt von „${v.value}“, doch das ist weder ein Qualitätsmerkmal noch ein Teilmerkmal der ISO/IEC 25010.`,
   'invalid-evidence': (v) =>
     `${v.path}, Zeile ${v.line}: Ein Beleg von ${v.entry} ${german(v.detail)}.`,
   'unreadable-snapshot': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
   'snapshot-without-assessment': (v) =>
     `${v.path} ist der Snapshot von ${v.assessment}, und es gibt kein Assessment ${v.assessment}.`,
   'names-no-component': (v) =>
-    `${v.path} nennt ${v.component} in „${v.key}“, das keine deklarierte Komponente ist.`,
+    `${v.path} nennt in „${v.key}“ die Komponente ${v.component}, die nicht deklariert ist.`,
   'unknown-previous-assessment': (v) =>
-    `${v.path} folgt auf ${v.previous}, das kein Assessment dieses Repositorys ist.`,
+    `${v.path} folgt auf das Assessment ${v.previous}, das es in diesem Repository nicht gibt.`,
   'finding-unknown-scenario': (v) =>
-    `${v.path}: ${v.finding} betrifft ${v.scenario}, das kein Qualitätsszenario dieses Assessments ist.`,
+    `${v.path}: ${v.finding} betrifft das Qualitätsszenario ${v.scenario}, das es in diesem Assessment nicht gibt.`,
   'violation-gone': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit der Verletzung ${v.violation}, die der Code nicht mehr hat. Der Befund sollte neu angesehen werden: Vielleicht ist er erledigt.`,
+    `${v.path}: ${v.finding} stützt sich auf den Verstoß ${v.violation}, den der Code nicht mehr hat. Der Befund sollte neu angesehen werden: Vielleicht ist er erledigt.`,
   'metric-not-in-snapshot': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit ${v.metric} von ${v.subject}, das sein Snapshot nicht enthält.`,
+    `${v.path}: ${v.finding} stützt sich auf die Metrik ${v.metric} von ${v.subject}, die der Snapshot des Assessments nicht enthält.`,
   'metric-not-measured': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit ${v.metric} von ${v.subject}, das der Code nicht hat.`,
+    `${v.path}: ${v.finding} stützt sich auf die Metrik ${v.metric} von ${v.subject}, die der Code nicht hat.`,
   'final-without-snapshot': (v) =>
-    `${v.path} ist final und belegt sich mit Metriken, hat aber keinen Snapshot, der sie festhält: Mit jedem Commit lesen sie sich anders.`,
+    `${v.path} ist final und stützt sich auf Metriken, hat aber keinen Snapshot, der sie festhält: Mit jedem Commit ergeben sie andere Werte.`,
   'finding-unknown-annotation': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit ${v.target}, das keine Annotation dieses Repositorys ist.`,
+    `${v.path}: ${v.finding} stützt sich auf die Annotation ${v.target}, die es in diesem Repository nicht gibt.`,
   'finding-unknown-adr': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit ${v.target}, das kein ADR dieses Repositorys ist.`,
+    `${v.path}: ${v.finding} stützt sich auf das ADR ${v.target}, das es in diesem Repository nicht gibt.`,
   'finding-ambiguous-adr': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit ${v.target}, das es in mehreren Decision Logs gibt: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
+    `${v.path}: ${v.finding} stützt sich auf das ADR ${v.target}, das es in mehreren Decision Logs gibt: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
   'finding-unknown-risk': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit ${v.target}, das kein Risiko dieses Repositorys ist.`,
+    `${v.path}: ${v.finding} stützt sich auf das Risiko ${v.target}, das es in diesem Repository nicht gibt.`,
   'finding-unknown-debt-item': (v) =>
-    `${v.path}: ${v.finding} belegt sich mit ${v.target}, das kein Schuldposten dieses Repositorys ist.`,
+    `${v.path}: ${v.finding} stützt sich auf den Schuldposten ${v.target}, den es in diesem Repository nicht gibt.`,
 
   // Why a file or a block of Assessment cannot be read: the rest of a sentence about it.
   'frontmatter-left-open': () => 'sein Frontmatter wird nie geschlossen',
@@ -556,7 +568,7 @@ export const DE: Wording<Codes> = {
   'block-not-valid-yaml': (v) => `er ist kein gültiges YAML: ${v.message}`,
   'block-never-closed': () => 'sein Codeblock wird nie geschlossen',
   'in-comment-never-closed': () => 'er steht in einem HTML-Kommentar, der nie geschlossen wird',
-  'snapshot-not-valid-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
+  'snapshot-not-valid-yaml': (v) => `er ist kein gültiges YAML: ${v.message}`,
   'snapshot-no-mapping': () => 'seine oberste Ebene muss ein Mapping sein',
   'snapshot-commit-name': () =>
     'sein „commit“ muss den Commit mit dessen vollem Namen aus 40 oder 64 Hexadezimalziffern nennen',
@@ -620,18 +632,18 @@ export const DE: Wording<Codes> = {
   'entry-needs-title': () => 'Ein Eintrag braucht einen Titel, seine Überschrift.',
   'scenario-needs-key': (v) => `Ein Qualitätsszenario braucht „${v.key}“.`,
   'not-a-quality-attribute': (v) =>
-    `„${v.value}“ ist weder ein Qualitätsmerkmal der ISO/IEC 25010 noch eines seiner Teilmerkmale.`,
+    `„${v.value}“ ist weder ein Qualitätsmerkmal noch ein Teilmerkmal der ISO/IEC 25010.`,
   'not-a-level': (v) => `„${v.value}“ ist keines von H, M und L.`,
   'not-a-rating': (v) => `„${v.value}“ ist keines von met, partly-met und not-met.`,
   'rating-unchanged': (v) => `${v.id} ist bereits so bewertet: Es gibt nichts zu ändern.`,
   'evidence-there-already': (v) =>
-    `${v.finding} belegt sich bereits mit ${evidence(v.kind, v.name)}.`,
+    `${v.finding} stützt sich bereits auf ${evidence(v.kind, v.name)}.`,
   'evidence-not-there': (v) =>
-    `${Evidence(v.kind, v.name)} gibt es nicht, darum kann kein Befund sich damit belegen.`,
+    `${Evidence(v.kind, v.name)} gibt es nicht, darum kann sich kein Befund darauf stützen.`,
   'evidence-ambiguous-adr': (v) =>
-    `${v.adr} gibt es in mehreren Decision Logs: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
+    `Das ADR ${v.adr} gibt es in mehreren Decision Logs: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
   'evidence-incomplete': (v) =>
-    `Der Beleg ist nicht vollständig: Als ${v.kind} braucht er jeden Schlüssel, den diese Art nennt.`,
+    `Der Beleg ist nicht vollständig: Ein Beleg der Art ${lookUp(KIND, v.kind)} braucht jeden Schlüssel, den diese Art nennt.`,
   'snapshot-without-values': () =>
     'Es gibt keine Metriken festzuhalten: Die Komponenten müssen deklariert sein und Quelldateien enthalten.',
   'state-unchanged': (v) => `${v.id} hat bereits den Zustand ${v.state}.`,
