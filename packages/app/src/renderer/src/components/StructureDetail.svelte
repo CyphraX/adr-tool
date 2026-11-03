@@ -14,6 +14,7 @@
   import { commonDirectory, nodeLabel, opens } from '../lib/structure'
   import { codeSpans, prefixOf } from '../lib/wording'
   import StatusMark from './StatusMark.svelte'
+  import StructureFunctions from './StructureFunctions.svelte'
 
   // What the selection in the Structure view stands for: a Component with its page — the
   // declaration, the ADRs that affect it, the metrics, the Dependencies at its level, its
@@ -339,6 +340,7 @@
       {/each}
     </dl>
     {#if page.java}<p class="faint note">{t.structure.metrics.javaLowerBound}</p>{/if}
+    <StructureFunctions {page} />
   {/if}
 
   <p class="faint note">

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { metricsOf } from '@adr-tool/structure/model'
+import { levelOf, metricsOf, propagationCostOf } from '@adr-tool/structure/model'
 import { analyse, readCache, writeCache, type Analysis } from '../src/main/analysis'
 import { readSourceFile, Structures, viewOf } from '../src/main/structures'
 
@@ -76,12 +76,32 @@ describe('the analysis of a repository, as the app runs it', () => {
     expect(analysis.dependencies.dependencies).toHaveLength(13)
     expect(Object.values(cache.files).every(({ extraction }) => 'java' in extraction)).toBe(true)
     // Its numbers are a lower bound, and its pages say so.
-    const pages = viewOf('maven', analysis, undefined, false).components
+    const view = viewOf('maven', analysis, undefined, false)
+    const pages = view.components
     expect(pages.map((page) => [page.id, page.java])).toEqual([
       ['cart', true],
       ['catalog', true],
       ['web', true]
     ])
+    // The main sequence of its modules, and the functions of the cart, the most complex first.
+    expect(
+      view.nodes.map(({ id, metrics }) => [id, metrics?.abstractness, metrics?.instability])
+    ).toEqual([
+      ['cart', 0, 0.5],
+      ['catalog', 1 / 3, 0],
+      ['web', 0, 1]
+    ])
+    expect(view.propagationCost).toBe(0.5)
+    const cart = pages.find((page) => page.id === 'cart')!
+    expect(cart.functionCount).toBe(4)
+    expect(cart.functions.map(({ name, line, complexity }) => [name, line, complexity])).toEqual([
+      ['Cart.discount(long)', 19, 5],
+      ['Cart.add(Product)', 10, 1],
+      ['Cart.total()', 14, 1],
+      ['Line.cents()', 7, 1]
+    ])
+    expect(cart.functions[0]!.file).toBe('cart/src/main/java/com/shop/cart/Cart.java')
+    expect(cart.classes).toEqual([])
   })
 
   it('keeps its cache in a file that a crash cannot leave half written', async () => {
@@ -149,7 +169,13 @@ describe('a level as the window gets it', () => {
 
   it('gives each Component of the level the metrics structure computes, and other nodes a size', () => {
     const { structure, dependencies } = analysis
-    const metrics = metricsOf(structure, dependencies.dependencies, dependencies.lineCounts)
+    const metrics = metricsOf(
+      structure,
+      dependencies.dependencies,
+      dependencies.lineCounts,
+      {},
+      dependencies.measures
+    )
     const view = viewOf('repo', analysis, undefined, false)
     expect(view.nodes.map((node) => node.metrics)).toEqual([
       metrics.get('shop'),
@@ -247,7 +273,13 @@ describe('this repository, as the window gets it', () => {
 
   it('shows the metrics structure computes for each Component', () => {
     const { structure, dependencies } = analysis
-    const metrics = metricsOf(structure, dependencies.dependencies, dependencies.lineCounts)
+    const metrics = metricsOf(
+      structure,
+      dependencies.dependencies,
+      dependencies.lineCounts,
+      {},
+      dependencies.measures
+    )
     const view = viewOf('repo', analysis, undefined, false)
     expect(view.nodes.map((node) => node.id)).toEqual([
       'app',
@@ -263,6 +295,9 @@ describe('this repository, as the window gets it', () => {
       expect(node.metrics).toEqual(metrics.get(node.id))
     }
     expect(view.nodes.find((node) => node.id === 'kernel')!.metrics!.instability).toBe(0)
+    expect(view.propagationCost).toBe(
+      propagationCostOf(levelOf(structure, dependencies.dependencies)!)
+    )
     // Nothing above the diagonal: this repository has no Cycle.
     const rows = view.matrix.rows.map((row) => row.id)
     expect(

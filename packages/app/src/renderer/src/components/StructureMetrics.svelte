@@ -66,6 +66,9 @@
   </div>
 
   <footer>
+    <p title={t.structure.metrics.propagationCostDefinition}>
+      {t.structure.metrics.propagationCost(view.propagationCost)}
+    </p>
     <p>{t.structure.metrics.howToRead}</p>
     {#if java}
       <p>{t.structure.metrics.javaLowerBound}</p>
