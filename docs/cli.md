@@ -138,7 +138,7 @@ First what `adr lint` prints, without its count; then the Problems of `.arch/com
 src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
 ```
 
-- **The file and the line** are those of the import — where the person who wrote it reads the message. A Violation with no import behind it, a `threshold`, is printed at the line of its Rule in `.arch/rules.yml`.
+- **The file and the line** are those of the import — where the person who wrote it reads the message. A Violation of a Rule about Libraries stands at each import of the Library by its Component's files: `packages/core/src/window.ts:1: only-the-window-uses-electron: core uses electron, which only app may use: packages/core/src/window.ts:1 imports electron. …`. A Violation with no import behind it, a `threshold`, is printed at the line of its Rule in `.arch/rules.yml`.
 - **The code** is the ID of the Rule, which the architect chose and which stays as long as the Rule does. A Problem has its code, as in `adr lint`.
 - **The message** is the sentence of the Violation ([conformance-format.md, section 3](conformance-format.md#3-violations-and-their-fingerprint-part-3)), the import that causes it, and the reason the Rule gives, in the architect's words.
 
@@ -185,7 +185,7 @@ Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem i
 
 - **`notes`** holds the notes of `.arch/rules.yml`, each with `module`, `code`, `message`, `path`, `line` and `note` as Conformance reports it; they fail nothing.
 - **`problems`** holds the Problems of every module, each with `module`: `decisions` (as `adr lint` writes them), `structure` (of `.arch/components.yml`) or `conformance` (of `.arch/rules.yml`), with `code`, `message`, `path`, `line` where there is one, and `problem` as the module reports it.
-- **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, or of the Rule when there is none; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
+- **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, or of the Rule when there is none; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `uses`, for a Rule about Libraries alone, the uses of the Library behind it — each with `file`, `library`, `lines`, `typeOnly`, and `typeOnlyLines` where some of its lines are type-only —, whose first import gives `path` and `line`; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
 
 `--format github` prints one `::error` [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message) for each line of the text format, so that a pull request shows each Violation on the line of its import, titled with the ID of the Rule, and each Problem titled with its code — a note as a `::notice`; the Problems of the Decision Logs are written as `adr lint` writes them. The counts come last, as lines of their own. The files are named from the directory the command runs in, as with `adr lint`:
 
@@ -211,7 +211,7 @@ The Problems of the Decision Logs have the codes of `adr lint`, above. The other
 | `unreadable-rules`, `rules-without-declaration`, `unknown-rule-kind`, `invalid-rule`, `duplicate-rule`, `unknown-component`, `no-component-matches`, `invalid-exception`, `exception-unknown-rule`, `unmatched-exception`, `duplicate-exception`, `unknown-justification`, `invalid-justification`, `invalid-applied-pattern` | The Problems of `.arch/rules.yml` ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)) |
 | `exception-can-shrink` | A note of `.arch/rules.yml`, which fails nothing (the same section) |
 
-A Violation is named by the ID of its Rule, and in JSON its `code` is the kind of the Rule: `must-not-depend`, `may-only-depend`, `layers`, `no-cycles`, `threshold`. The same rule for new codes holds as for `adr lint`.
+A Violation is named by the ID of its Rule, and in JSON its `code` is the kind of the Rule: `must-not-depend`, `may-only-depend`, `layers`, `no-cycles`, `threshold`, `library`. The same rule for new codes holds as for `adr lint`.
 
 ## `adr export [path] --out <directory> [--log <directory>]...`
 

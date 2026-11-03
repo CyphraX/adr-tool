@@ -24,7 +24,9 @@ export interface ManifestLibrary {
   /** As written: `>=2.31`, `^2.0`, `v1.6.0`. Missing where none is. */
   readonly version?: string
   /**
-   * Where the manifest does not count it among what the code needs to run: the optional or
+   * Where the manifest does not count it among what the code needs to run: the key of a
+   * `package.json` it is under (`dev`, `peer`, `optional`), the scope of Maven (`test`,
+   * `provided`) or the configuration of Gradle (`testImplementation`), the optional or
    * development group of Python it is in (`dev`), or `indirect` for a requirement go.mod marks so.
    */
   readonly group?: string

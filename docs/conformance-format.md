@@ -2,7 +2,7 @@
 
 The contract of the Conformance module: what the Rules of a repository look like on disk, what each kind of Rule means, how a Violation is found and named, and how an Exception accepts one. The `conformance` package and `adr check` implement exactly this document, and an agent or a person who follows it can write Rules without the app.
 
-Vocabulary follows the [Conformance glossary](contexts/conformance/CONTEXT.md), the [Structure glossary](contexts/structure/CONTEXT.md) and the shared language in [CONTEXT-MAP.md](../CONTEXT-MAP.md). Where the module sits in the suite is in [vision.md](vision.md); how it gets built is in [plan-vision.md](plan-vision.md), parts 3 to 5. Every section names the part it arrives with, so that this document never promises more than the code does. The shape of the file, where Exceptions live and the fingerprint are recorded in [ADR-0017](adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md).
+Vocabulary follows the [Conformance glossary](contexts/conformance/CONTEXT.md), the [Structure glossary](contexts/structure/CONTEXT.md) and the shared language in [CONTEXT-MAP.md](../CONTEXT-MAP.md). Where the module sits in the suite is in [vision.md](vision.md); how it gets built is in [plan-vision.md](plan-vision.md), parts 3 to 5, with Rules about Libraries from part 15. Every section names the part it arrives with, so that this document never promises more than the code does. The shape of the file, where Exceptions live and the fingerprint are recorded in [ADR-0017](adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md).
 
 Three rules stand above everything else, as for the declaration of Components ([structure-format.md](structure-format.md)):
 
@@ -64,7 +64,7 @@ A file without any of them, or an empty file, has no Rules. A repository without
 | `tests` | `excluded` (default) or `included` | Whether test files count (structure-format.md, section 2, "Tests"). As in Structure's views, Cycles and metrics, they are left out unless the Rule takes them in. |
 | `type-only` | `counted` (default) or `ignored` | Whether type-only Dependencies count (structure-format.md, section 3). They count, as in Structure's metrics: a type couples code at compile time too. A Rule that is only about run time ignores them: then a Dependency that is type-only as a whole is not counted, and of one that is not, the lines whose every use is type-only are not pointed at. Not for `threshold`, whose metric says what it counts: there it is a Problem of the Rule. |
 
-`tests` and `type-only` are read for every kind that counts Dependencies: `must-not-depend`, `may-only-depend`, `layers` and `no-cycles`. `tests` is read for `threshold` too.
+`tests` and `type-only` are read for every kind that counts Dependencies — `must-not-depend`, `may-only-depend`, `layers` and `no-cycles` — and for `library`, which counts the uses of Libraries, type-only ones as Structure marks them. `tests` is read for `threshold` too.
 
 ### Naming Components
 
@@ -211,13 +211,42 @@ A Rule has `max`, `min` or both. Each Component that `of` matches and that has t
 
 A metric is named in lowercase words joined by dashes. A metric has a subject — a Component, a function, a class, a level —, and its Violations are named by it (section 3). A metric the suite does not know is a Problem of the Rule: a name that a later version knows is read by that version.
 
+### `library` (part 15)
+
+```yaml
+- id: only-the-window-uses-electron
+  why: Only the window runs in Electron; the cores, the command line and the MCP server run in Node.js alone.
+  kind: library
+  library: electron
+  only-in: app
+
+- id: no-database-in-the-web
+  why: The web shows what the domain decides; it stores nothing itself.
+  kind: library
+  library: [pg, 'mysql*', 'org.hibernate.**']
+  not-in: [web, 'web/**']
+```
+
+| Key       | Value |
+| --------- | ----- |
+| `library` | Library patterns, required |
+| `only-in` | Component patterns: only these may use the Libraries |
+| `not-in`  | Component patterns: these must not use the Libraries |
+
+A Rule has `only-in` or `not-in`, not both. It is about the uses of Libraries that Structure records ([structure-format.md](structure-format.md), section 3): each Source File that uses a Library, with the lines of its imports.
+
+- **Library patterns** are matched against the name the code uses a Library by — an npm package (`@codemirror/state`), a Java package (`org.slf4j`), a Python top-level package (`yaml`, not the distribution `PyYAML`), a Go module (`github.com/google/uuid`) —, segment by segment, where `/` and `.` both separate. A pattern without a wildcard is a name, matched exactly: `pg` is not `pg-cursor`. `*` matches within one segment — `@codemirror/*`, `lodash*` —, `**` as a whole segment any number of segments, none included: `org.apache.**` matches `org.apache` and every package below it. They are matched without regular expressions, in time no more than the product of the pattern's length and the name's, whatever the pattern.
+- **`only-in`**: a use breaks the Rule when no Component that contains its file is matched. Its Component in the Violation is the outermost Component of the file's chain that holds no matched Component; where each of the chain holds one — the file lies in the own files of a parent of the Component that is allowed —, the Component that owns the file; and `(unassigned)` for a file of no Component. **An Unassigned file breaks this Rule**, as it breaks `may-only-depend`: what no Component claims cannot have been allowed.
+- **`not-in`**: a use breaks the Rule when a Component that contains its file is matched; its Component in the Violation is the outermost one matched. An Unassigned file never breaks it.
+- A Violation is one Component and one Library: every use of the Library by the files of that Component is behind it, each file with the lines of its imports, which `adr check` reports one by one. A pattern that matches no Library the code uses is no Problem: a Rule may forbid what is not there yet.
+
 ## 3. Violations and their fingerprint (part 3)
 
 A **Violation** is one place where the code breaks a Rule. It is derived whenever the code is analysed and never stored. Each one has:
 
 - its **Rule**, and the sentence of its `why`;
-- what it is about: its **source** and **target** Components, the **members** of its Cycle, or its **Component** and the value of its metric;
-- the **Source File Dependencies behind it** — each a pair of Source Files, the one that uses and the one it uses, with the lines of the imports that cause it — except for a threshold;
+- what it is about: its **source** and **target** Components, the **members** of its Cycle, its **Component** and the value of its metric, or its **Component** and the **Library** it uses;
+- the **Source File Dependencies behind it** — each a pair of Source Files, the one that uses and the one it uses, with the lines of the imports that cause it — except for a threshold; for a Rule about Libraries, the **uses** behind it — each Source File with the lines of its imports of the Library;
 - its **fingerprint**.
 
 ### The fingerprint
@@ -230,14 +259,15 @@ The **fingerprint** names a Violation without line numbers, so that it stays the
 | `no-cycles` | the Rule, and the members of the Cycle: Component IDs for `among`, the paths of Source Files for `inside`, in any order; an Exception may name more (section 4) | `rule`, `cycle` |
 | `threshold` | the Rule, and the Component | `rule`, `component` |
 | `threshold` on a metric per function or per class (part 13) | the Rule, the Source File, and the qualified name of the function or class | `rule`, `file`, `name` |
+| `library` (part 15) | the Rule, the Component, and the Library by the name the code uses | `rule`, `component`, `library` |
 
 The **name** of a function or class in a fingerprint is qualified by what contains it, joined by `.`: `Cart.total` for the method `total` of the class `Cart`, `Cart.Line` for a nested class, `formatDate` for a function at the top of its file. So two methods of one name in one file are told apart, and a method keeps its fingerprint when another one is added beside it.
 
-In the JSON of `adr check` a fingerprint carries its `kind` as well — `dependency`, `cycle` or `component` — so that one is never read as another. An Exception does not write it: the kind of its Rule says which keys it names.
+In the JSON of `adr check` a fingerprint carries its `kind` as well — `dependency`, `cycle`, `component` or `library` — so that one is never read as another. An Exception does not write it: the kind of its Rule says which keys it names.
 
-Two Violations never share a fingerprint: a Rule has one Violation per pair, per Cycle, per Component. Where lines move, nothing in a fingerprint changes; where a Component is renamed, Rename rewrites the IDs in the fingerprints of the Exceptions together with the Rules (section 7). A fingerprint that names Source Files — the Cycles found `inside` a Component — changes when one of them is moved: its Exception then matches nothing any more, and says so.
+Two Violations never share a fingerprint: a Rule has one Violation per pair, per Cycle, per Component, per Component and Library. Where lines move, nothing in a fingerprint changes; where a Component is renamed, Rename rewrites the IDs in the fingerprints of the Exceptions together with the Rules (section 7). A fingerprint that names Source Files — the Cycles found `inside` a Component — changes when one of them is moved: its Exception then matches nothing any more, and says so.
 
-In messages and in the JSON of `adr check` the fingerprint is also written on one line: `billing-not-web: billing -> web`, `no-cycles-in-the-kernel: packages/kernel/src/a.ts, packages/kernel/src/b.ts` (sorted), `kernel-stays-stable: kernel`. That line is for reading; the keys are what is matched.
+In messages and in the JSON of `adr check` the fingerprint is also written on one line: `billing-not-web: billing -> web`, `no-cycles-in-the-kernel: packages/kernel/src/a.ts, packages/kernel/src/b.ts` (sorted), `kernel-stays-stable: kernel`, `only-the-window-uses-electron: core uses electron`. That line is for reading; the keys are what is matched.
 
 ### What a Violation says
 
@@ -254,6 +284,7 @@ billing must not depend on web: packages/billing/src/invoice.ts:3 imports packag
 | `layers` | `<from>` must not depend on `<to>`, which lies in a layer above it (in `strict` mode also: which lies more than one layer below it) |
 | `no-cycles` | `<members>` depend on each other in a Cycle; with three or more members, for example `<a -> b -> c -> a>`, one round trip through them; among Components, with `<from -> to>` as its weakest Dependency |
 | `threshold` | The metric `<metric>` of `<component>` is `<value>`, above the maximum of `<max>` (or: below the minimum of `<min>`) |
+| `library` | `<component>` uses `<library>`, which only `<allowed>` may use — or, where `<component>` is `(unassigned)`, Source Files that belong to no Component use it; with `not-in`: `<component>` must not use `<library>`. At an import: `… : packages/core/src/window.ts:1 imports electron.` |
 
 A list of more than five names — the members of a long Cycle of Source Files, the Components a Rule allows — names the first five and counts the rest: `a, b, c, d, e and 3 more`; a round trip of more than five steps ends in `… -> a`. One message stays one readable line; each import still has its own.
 
@@ -273,7 +304,7 @@ exceptions:
 | Key            | Value |
 | -------------- | ----- |
 | `rule`         | required: the ID of the Rule |
-| the fingerprint | required: `from` and `to`, `cycle`, or `component`, by the kind of the Rule (section 3) — Component IDs and paths as written, no patterns |
+| the fingerprint | required: `from` and `to`, `cycle`, `component`, or `component` and `library`, by the kind of the Rule (section 3) — Component IDs, paths and Library names as written, no patterns |
 | `reason`       | required: why the Violation is accepted, in a sentence |
 | `justified-by` | optional: the ADR that justifies it — a Trace from the Exception to Decisions |
 
@@ -291,7 +322,7 @@ Conformance adds these **Problems** about `.arch/rules.yml`. Each has a code and
 | `unreadable-rules` | The file cannot be read: it is not YAML, its top level is not a map, a key of its top level is written twice, or `rules`, `exceptions` or `patterns` is not a list. Nothing in it is evaluated |
 | `rules-without-declaration` | The file has Rules, and `.arch/components.yml` declares no Components that can be read. No Rule is evaluated: the Draft's IDs are no names to write down |
 | `unknown-rule-kind` | A Rule has no `kind`, or one the suite does not know |
-| `invalid-rule` | A key of a Rule is missing, is written twice or has a value of the wrong form: no `id`, no `why`, an ID that is no valid Rule ID, `from` without `to`, fewer than two layers, a metric the suite does not know, `max` that is no number, … The sentence names the key |
+| `invalid-rule` | A key of a Rule is missing, is written twice or has a value of the wrong form: no `id`, no `why`, an ID that is no valid Rule ID, `from` without `to`, fewer than two layers, a metric the suite does not know, `max` that is no number, a Rule about Libraries without `library`, with an empty Library pattern, or with both or neither of `only-in` and `not-in`, … The sentence names the key |
 | `duplicate-rule` | Two Rules have the same ID. The first is evaluated, the second is not |
 | `unknown-component` | A Rule, or an applied Pattern, names a Component ID that `.arch/components.yml` does not declare |
 | `no-component-matches` | A Component pattern with a wildcard matches no declared Component |
@@ -338,7 +369,7 @@ patterns:
 
 From part 4 on the window writes Rules and Exceptions, each as a previewed change of its own lines (section 1). Before that, one operation of the suite already does:
 
-- **Rename of a Component** ([structure-format.md](structure-format.md), section 1) rewrites, in the same change set, every Component ID in `.arch/rules.yml` that names the old ID or one below it: in `from`, `to`, `layers`, `among`, `inside` and `of` of the Rules, in the fingerprints of the Exceptions, in the roles of the applied Patterns. A pattern is rewritten where its leading segments, before the first wildcard, are the old ID or begin with it: `core/**` becomes `domain/**` when `core` is renamed to `domain`; a pattern that may match the Component without naming it — `*`, `cor*` — stays as it is, and matches what it matches. The item is rewritten where it stands, its quoting kept. Rename is refused while the file cannot be read, and where an ID is written in a way a splice cannot serve. The app's Rename takes this part along (`packages/app/src/main/traces.ts`); a refusal here refuses the whole Rename.
+- **Rename of a Component** ([structure-format.md](structure-format.md), section 1) rewrites, in the same change set, every Component ID in `.arch/rules.yml` that names the old ID or one below it: in `from`, `to`, `layers`, `among`, `inside`, `of`, `only-in` and `not-in` of the Rules, in the fingerprints of the Exceptions — `component` included, never `library` —, in the roles of the applied Patterns. A Library pattern names a Library, not a Component, and is never rewritten. A pattern is rewritten where its leading segments, before the first wildcard, are the old ID or begin with it: `core/**` becomes `domain/**` when `core` is renamed to `domain`; a pattern that may match the Component without naming it — `*`, `cor*` — stays as it is, and matches what it matches. The item is rewritten where it stands, its quoting kept. Rename is refused while the file cannot be read, and where an ID is written in a way a splice cannot serve. The app's Rename takes this part along (`packages/app/src/main/traces.ts`); a refusal here refuses the whole Rename.
 
 ## 8. What is not in the repository
 
