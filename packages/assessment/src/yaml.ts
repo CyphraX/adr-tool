@@ -88,7 +88,13 @@ export function parseRegion(
 ): Region & { readonly errors: readonly string[] } {
   const lineCounter = new LineCounter()
   const doc = parseDocument(text.slice(span.start, span.end), { lineCounter })
-  const errors = doc.errors.map((error) => error.message.split('\n')[0]!.replace(/[:.]$/, ''))
+  // Where in the region the parser found it says nothing of where it is in the file.
+  const errors = doc.errors.map((error) =>
+    error.message
+      .split('\n')[0]!
+      .replace(/ at line \d+, column \d+:?$/, '')
+      .replace(/[:.]$/, '')
+  )
   const contents = doc.contents
   const empty = contents === null || (isScalar(contents) && contents.value === null)
   const firstLine = lineNumberAt(text, span.start)
