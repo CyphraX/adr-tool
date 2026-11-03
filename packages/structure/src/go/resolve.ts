@@ -5,6 +5,7 @@
  * file that declares the name used: every file contributes what it declares at the top level
  * to its package, as a Java file contributes its types.
  */
+import type { LibraryUseAt } from '../dependencies'
 import type { GoModule, GoModules } from './modules'
 import type { GoOutline } from './outline'
 
@@ -18,8 +19,8 @@ export interface GoUse {
 export interface GoResolution {
   readonly uses: readonly GoUse[]
   readonly notResolved: readonly { file: string; specifier: string; line: number }[]
-  /** The module of each import from outside the repository, once per file. */
-  readonly libraries: readonly { file: string; library: string }[]
+  /** The module of each import from outside the repository, at each import. */
+  readonly libraries: readonly LibraryUseAt[]
 }
 
 const directoryOf = (path: string): string =>
@@ -153,11 +154,10 @@ export function resolveGo(
 
   const uses: GoUse[] = []
   const notResolved: { file: string; specifier: string; line: number }[] = []
-  const libraries: { file: string; library: string }[] = []
+  const libraries: LibraryUseAt[] = []
 
   for (const [path, outline] of outlines) {
     const module = moduleOf(path)
-    const libraryUsed = new Set<string>()
     const use = (files: readonly string[], line: number): void => {
       for (const to of files) if (to !== path) uses.push({ from: path, to, line })
     }
@@ -179,8 +179,7 @@ export function resolveGo(
           .filter((requirement) => isBelow(entry.path, requirement.path))
           .sort((a, b) => b.path.length - a.path.length)[0]
         const library = required?.path ?? entry.path
-        if (!libraryUsed.has(library)) libraries.push({ file: path, library })
-        libraryUsed.add(library)
+        libraries.push({ file: path, library, line: entry.line, typeOnly: false })
         continue
       }
       const imported = directory === null ? undefined : packageAt(directory)

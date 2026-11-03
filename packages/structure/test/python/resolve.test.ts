@@ -180,7 +180,7 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
   })
 
   it('leaves the standard library out, names a Library by its top-level package, and never guesses', async () => {
-    const { edges, unresolved, used } = await analyse({
+    const { edges, unresolved, used, libraries } = await analyse({
       'src/shop/__init__.py': '',
       'src/shop/app.py': [
         'import os.path',
@@ -201,9 +201,26 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
     })
     expect(edges).toEqual([])
     expect(used).toEqual(['src/shop/app.py requests', 'src/shop/app.py google'])
+    expect(libraries.find((use) => use.library === 'requests')?.lines).toEqual([4, 5])
     expect(unresolved).toEqual([
       'src/shop/app.py:7 shop.missing',
       'src/shop/app.py:8 backend_app.models'
+    ])
+  })
+
+  it('marks a Library imported for the type checker alone as type-only', async () => {
+    const { libraries } = await analyse({
+      'app.py': [
+        'from typing import TYPE_CHECKING',
+        'import requests',
+        'if TYPE_CHECKING:',
+        '    import requests.adapters',
+        '    from boto3 import Session'
+      ]
+    })
+    expect(libraries).toEqual([
+      { file: 'app.py', library: 'requests', lines: [2, 4], typeOnly: false, typeOnlyLines: [4] },
+      { file: 'app.py', library: 'boto3', lines: [5], typeOnly: true }
     ])
   })
 

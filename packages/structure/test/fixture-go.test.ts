@@ -46,7 +46,9 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
   expect(analysis.notResolved).toEqual([
     { file: 'web/server.go', specifier: 'example.com/shop/payments', line: 11 }
   ])
-  expect(analysis.libraries).toEqual([{ file: 'cart/line.go', library: 'github.com/google/uuid' }])
+  expect(analysis.libraries).toEqual([
+    { file: 'cart/line.go', library: 'github.com/google/uuid', lines: [5], typeOnly: false }
+  ])
   expect(
     analysis.dependencies.map(
       (dependency) => `${dependency.from} > ${dependency.to} ${dependency.lines.join(',')}`

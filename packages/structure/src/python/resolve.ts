@@ -4,6 +4,7 @@
  * looked up as a file below the source roots of the Python projects, a relative import below
  * the directory of the file that makes it.
  */
+import type { LibraryUseAt } from '../dependencies'
 import type { PythonImport, PythonOutline } from './outline'
 import type { PythonProject } from './projects'
 import { PYTHON_STANDARD_LIBRARY } from './standard-library'
@@ -19,8 +20,8 @@ export interface PythonUse {
 export interface PythonResolution {
   readonly uses: readonly PythonUse[]
   readonly notResolved: readonly { file: string; specifier: string; line: number }[]
-  /** The top-level package of each import from outside the repository, once per file. */
-  readonly libraries: readonly { file: string; library: string }[]
+  /** The top-level package of each import from outside the repository, at each import. */
+  readonly libraries: readonly LibraryUseAt[]
 }
 
 /**
@@ -136,10 +137,9 @@ export function resolvePython(
 
   const uses: PythonUse[] = []
   const notResolved: { file: string; specifier: string; line: number }[] = []
-  const libraries: { file: string; library: string }[] = []
+  const libraries: LibraryUseAt[] = []
 
   for (const [path, outline] of outlines) {
-    const libraryUsed = new Set<string>()
     const use = (to: string, entry: PythonImport): void => {
       // A file never depends on itself: `from . import x` in `__init__.py` may land there.
       if (to !== path) uses.push({ from: path, to, typeOnly: entry.typeOnly, line: entry.line })
@@ -157,8 +157,7 @@ export function resolvePython(
       if (find(path, top) !== undefined) return notFound(dotted, entry)
       if (PYTHON_STANDARD_LIBRARY.has(top)) return
       if (topLevelSomewhere.has(top)) return notFound(dotted, entry)
-      if (!libraryUsed.has(top)) libraries.push({ file: path, library: top })
-      libraryUsed.add(top)
+      libraries.push({ file: path, library: top, line: entry.line, typeOnly: entry.typeOnly })
     }
 
     for (const entry of outline.imports) {

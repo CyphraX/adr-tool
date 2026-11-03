@@ -50,9 +50,9 @@ it('drafts a src layout of Python packages, with their Dependencies and their Cy
     { file: 'src/shop/pricing/rules.py', specifier: 'shop.pricing.tariffs', line: 4 }
   ])
   expect(analysis.libraries).toEqual([
-    { file: 'src/shop/catalog/search.py', library: 'requests' },
-    { file: 'src/shop/pricing/rules.py', library: 'yaml' },
-    { file: 'tests/test_cart.py', library: 'pytest' }
+    { file: 'src/shop/catalog/search.py', library: 'requests', lines: [3], typeOnly: false },
+    { file: 'src/shop/pricing/rules.py', library: 'yaml', lines: [1], typeOnly: false },
+    { file: 'tests/test_cart.py', library: 'pytest', lines: [1], typeOnly: false }
   ])
   const short = (path: string) => path.replace(/^src\/shop\//, '')
   expect(

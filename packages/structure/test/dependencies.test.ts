@@ -71,10 +71,24 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
     })
     expect(result.dependencies).toEqual([])
     expect(result.libraries).toEqual([
-      { file: 'src/a.ts', library: 'lodash' },
-      { file: 'src/a.ts', library: '@fontsource/ibm-plex-sans' }
+      { file: 'src/a.ts', library: 'lodash', lines: [1, 2], typeOnly: false },
+      { file: 'src/a.ts', library: '@fontsource/ibm-plex-sans', lines: [6], typeOnly: false }
     ])
     expect(result.notResolved).toEqual([])
+  })
+
+  it('mark the lines of a Library on which every use is type-only, and a use that is type-only alone', async () => {
+    const result = await analyse({
+      'src/a.ts': [
+        "import type { App } from 'electron'",
+        "import { app } from 'electron'",
+        "import type { Z } from 'zod'"
+      ].join('\n')
+    })
+    expect(result.libraries).toEqual([
+      { file: 'src/a.ts', library: 'electron', lines: [1, 2], typeOnly: false, typeOnlyLines: [1] },
+      { file: 'src/a.ts', library: 'zod', lines: [3], typeOnly: true }
+    ])
   })
 
   it('list what cannot be resolved, with its line, and never guess', async () => {
