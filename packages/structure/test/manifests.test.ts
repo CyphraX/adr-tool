@@ -418,8 +418,10 @@ describe('the Libraries the manifests declare (docs/structure-format.md, section
       'b/build.gradle': `${' '.repeat(megabyte)}implementation group: ${'a: '.repeat(megabyte / 3)}`,
       'gradle/libs.versions.toml': `[libraries]\nx = "${':'.repeat(megabyte)}"\n`
     })
-    expect(performance.now() - started).toBeLessThan(3000)
-  })
+    // About a second alone, a few more beside the other tests; a reader quadratic in the
+    // length of the line would take hours.
+    expect(performance.now() - started).toBeLessThan(10_000)
+  }, 20_000)
 
   it('names nothing from a manifest it cannot read, and nothing that is never looked at', async () => {
     expect(
