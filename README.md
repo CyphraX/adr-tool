@@ -15,17 +15,17 @@ A desktop app for the architecture that lives in a git repository: its Architect
 
 Softarch Suite reads ADRs where they already are: Markdown files in a repository, written by people, by agents or by other tools. It lists them, shows how they relate, finds what is inconsistent, and writes new ones and changes to existing ones. Every change is shown as a diff before it is written, and nothing is changed beyond the lines it was asked to change. Markdown is never re-serialized ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)).
 
-The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Two of them are built, and the cores of two more:
+The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Three of them are built, and the core of one more:
 
 - **Decisions** covers the ADRs. It was called ADR Tool until the suite got its name.
 - **Structure** shows the Components of the code and the Dependencies between them, and links them to the ADRs that affect them.
 - **Conformance** checks the code against Rules the architect writes down. Its core and `adr check` are built; its window is next.
-- **Diagrams** draws pictures of the architecture whose boxes are Components, and says where a picture and the code drift apart. Its core is built; its window is next.
+- **Diagrams** draws pictures of the architecture whose boxes are Components, and says where a picture and the code drift apart.
 
 The app runs locally: there is no backend, no account and no telemetry.
 
 > [!NOTE]
-> Early development. The Decisions and Structure modules are built, and so is the rest of the roadmap; the other modules of the suite are being built part by part ([plan-vision.md](docs/plan-vision.md)). There are no installers yet: the app runs from source.
+> Early development. The Decisions, Structure and Diagrams modules are built, and so is the rest of the roadmap; the other modules of the suite are being built part by part ([plan-vision.md](docs/plan-vision.md)). There are no installers yet: the app runs from source.
 
 ## Table of Contents
 
@@ -33,10 +33,11 @@ The app runs locally: there is no backend, no account and no telemetry.
   - [Decisions](#decisions)
   - [Structure](#structure)
   - [Conformance](#conformance)
+  - [Diagrams](#diagrams)
 - [Install](#install)
 - [Usage](#usage)
   - [Checking ADRs in CI](#checking-adrs-in-ci)
-  - [Checking the code against its Rules](#checking-the-code-against-its-rules)
+  - [Checking the code against its Rules and Diagrams](#checking-the-code-against-its-rules-and-diagrams)
   - [Agents over MCP](#agents-over-mcp)
 - [Development](#development)
 - [Documentation](#documentation)
@@ -69,11 +70,11 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 - **Mermaid.** A `mermaid` code block is drawn as a diagram in the reading view, the preview, the live mode and the app's export. A block that does not parse stays code, with what Mermaid says beside it. An ADR is untrusted input, so Mermaid draws at its strictest and what it draws is sanitized. The export shows each drawing as an image beside its page, and still runs no script. `adr export` has no browser to draw with and keeps the block as code ([ADR-0016](docs/adr/0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image.md)).
 
-- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Where it can know what was meant, a Problem comes with a Repair, which is previewed like any other change. What only follows from a file that cannot be read, or from a Status that is none of the five values, is listed under that root cause. **Repository Problems**, in the sidebar of Decisions and of Structure, puts every Problem of the repository in one list. That covers each Decision Log, the declaration of Components, and every Trace of an ADR to a Component that is not declared. Each Problem opens what it is about in its module, with its Repair.
+- **Problems and Repairs.** The tool finds broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata. Where it can know what was meant, a Problem comes with a Repair, which is previewed like any other change. What only follows from a file that cannot be read, or from a Status that is none of the five values, is listed under that root cause. **Repository Problems**, in the sidebar of Decisions, of Structure and of Diagrams, puts every Problem of the repository in one list. That covers each Decision Log, the declaration of Components, every Trace of an ADR to a Component that is not declared, and the Diagrams. Each Problem opens what it is about in its module, with its Repair.
 
   ![The Problems of a Decision Log, each with its Repair](docs/screenshots/readme/problems.png)
 
-- **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body, in every repository that is open. It ignores case and accents, and reads "ß" as "ss": "strasse" finds "Straße". Below the ADRs it finds the Components of the repository in front, by ID and name, and its Source Files, by path. A Component opens on its page, a Source File in the code viewer.
+- **Search.** <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) searches the full text instantly: number, title and body, in every repository that is open. It ignores case and accents, and reads "ß" as "ss": "strasse" finds "Straße". Below the ADRs it finds the Components of the repository in front, by ID and name, its Source Files, by path, and its Diagrams, by title and ID. A Component opens on its page, a Source File in the code viewer, a Diagram on its canvas.
 - **Several repositories.** Each repository opens in a tab of its own. With more than one open, **Every ADR** and **Every Problem** list them together, and an ADR may depend on or relate to an ADR of another repository, written `payments:docs/adr/0001-ledger`; where both are open, the Relation reads as such from both ends.
 
   ![Every ADR of two open repositories, with the detail of a ledger ADR that an ADR of the other repository depends on](docs/screenshots/readme/together.png)
@@ -147,6 +148,17 @@ The analysis runs in a worker thread and caches its results per file. It follows
 
 - **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, and how far a metric may go. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request; the window follows ([plan-vision.md](docs/plan-vision.md), part 4).
 
+### Diagrams
+
+- **Drawn from the Components.** A Diagram is a YAML file in `docs/architecture/diagrams/`, at a level of the C4 model: the context of the system, its containers, or the components inside one of them. Its boxes are Components of `.arch/components.yml`, named as the declaration names them, External Systems and the repository itself. **New Diagram** starts a Diagram from the Components of a level, placed as Structure places them, and the connections the code has between them, as a previewed new file ([diagrams-format.md](docs/diagrams-format.md)). The page of a Component lists the Diagrams that show it.
+- **The canvas.** Boxes are dragged on a grid and connected by dragging from the dot of a selected box to another one; a double click labels a connection. **Add Component** and **Add External System** place a box where there is room. Every edit is a change of the lines it is about, and **Save** shows it as a diff first; nothing else in the file is touched ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)). Beside the canvas, what the Diagram says is listed as sentences, and the keyboard reaches every box and connection through them.
+- **Drift.** The Diagram is compared with the code while it is drawn. A connection the code does not have is drawn red; a Dependency the code has and the Diagram leaves out is drawn faint and dashed, and a click draws it.
+
+  ![The canvas of a Diagram: one connection the code does not have, one Dependency the Diagram leaves out, and the Drift of the selected Component](docs/screenshots/readme/diagrams.png)
+
+- **Export SVG.** The picture is written beside the Diagram, `<id>.svg`, with what it says as its text for a screen reader, and an ADR embeds it as any image. A picture that no longer matches its Diagram is a Problem, whose Repair exports it again. A Component that is gone from the declaration is one too, whose Repair takes it out of the Diagram.
+- **Rename.** A Rename of a Component rewrites the Diagrams that show it in the same previewed change, and draws again each picture that was current.
+
 ## Install
 
 Requirements:
@@ -171,7 +183,7 @@ Start the app in development mode:
 pnpm dev
 ```
 
-**Open repository**, at the top right, opens the folder of a repository in a new tab. Each tab switches between **Decisions** and **Structure**. On the next start, the app reopens the repositories of the last run.
+**Open repository**, at the top right, opens the folder of a repository in a new tab. Each tab switches between **Decisions**, **Structure** and **Diagrams**. On the next start, the app reopens the repositories of the last run.
 
 `ADR_TOOL_REPO` opens one more repository at start. Give it the full path, because `pnpm dev` runs in `packages/app`:
 
@@ -193,9 +205,9 @@ docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-wri
 10 Problems in 1 Decision Log.
 ```
 
-The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs `adr check`, which does the same and checks its Rules too, on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
+The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs `adr check`, which does the same and checks its Rules and its Diagrams too, on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
 
-### Checking the code against its Rules
+### Checking the code against its Rules and Diagrams
 
 `adr check` does what `adr lint` does, and checks `.arch/components.yml` and the Rules of `.arch/rules.yml` against the code. Each Violation is printed at the line of the import that causes it, with the reason its Rule gives; the command exits with 1 on a Problem or on a Violation without an Exception:
 
@@ -208,7 +220,20 @@ No Problems in 1 Decision Log.
 2 Violations of 2 Rules.
 ```
 
-It reads TypeScript, JavaScript, Java, Python and Go, and runs nothing from the repository. This repository checks its own packages with it in CI ([.arch/rules.yml](.arch/rules.yml)). The command is in [docs/cli.md](docs/cli.md#adr-check-path---format-textjsongithub), the file of Rules in [docs/conformance-format.md](docs/conformance-format.md).
+It checks the Diagrams too. A Problem of a Diagram fails the check, a picture that no longer matches its Diagram among them; a Drift is a note at the line of the Diagram it is about, and fails nothing:
+
+```console
+$ node packages/cli/dist/adr.mjs check packages/diagrams/test/fixtures/shop
+docs/architecture/diagrams/containers.yml:14: component-gone: The Diagram shows shipping, which is not a declared Component.
+docs/architecture/diagrams/containers.yml:27: connection-not-in-code: The Diagram connects persistence to web, but no Source File of persistence depends on one of web.
+docs/architecture/diagrams/containers.yml:12: dependency-not-in-diagram: web depends on persistence in the code, through one Source File Dependency, and the Diagram does not connect them.
+
+No Decision Log.
+No Rules: .arch/rules.yml is not there.
+3 Diagrams: 1 Problem, 2 Drifts.
+```
+
+It reads TypeScript, JavaScript, Java, Python and Go, and runs nothing from the repository. This repository checks its own packages with it in CI ([.arch/rules.yml](.arch/rules.yml)), and its own Diagram ([packages.yml](docs/architecture/diagrams/packages.yml)). The command is in [docs/cli.md](docs/cli.md#adr-check-path---format-textjsongithub), the file of Rules in [docs/conformance-format.md](docs/conformance-format.md).
 
 ### Exporting for readers
 
@@ -223,7 +248,7 @@ Exported 14 ADRs of 1 Decision Log to /home/me/decisions. Open /home/me/decision
 
 ### Agents over MCP
 
-`adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
+`adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. It reads the Diagrams with their Drift against the code, and plans a new Diagram, edits of one, its export and its Repairs the same way. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
 
 ```console
 $ pnpm build
@@ -246,6 +271,7 @@ The test fixtures are useful for exploring the app. They are test data, so copy 
 | `packages/structure/test/fixtures/python-shop` | Python: a src layout of three packages, a Cycle between two of them, one import under `if TYPE_CHECKING:`, and its manifests |
 | `packages/structure/test/fixtures/go-shop` | Go: a module with a nested module reached through `replace`, a Cycle between two files, a test file, and one import that is not resolved |
 | `packages/conformance/test/fixtures/layered-shop` | Three layers and two Rules, broken on purpose by one import, and the ADR an Exception for it would name |
+| `packages/diagrams/test/fixtures/shop` | A Diagram of each level; the one of the containers drifts from the code on purpose and shows a Component that is gone |
 | this repository | Its own ADRs, and its packages as declared Components |
 
 ### Where ADRs are found
@@ -326,11 +352,11 @@ The kinds of Rules, the fingerprint an Exception names and the Problems of the f
 | `pnpm lint` | Runs ESLint |
 | `pnpm format` / `pnpm format:check` | Runs Prettier, writing or checking |
 | `pnpm adr lint` | Checks this repository's ADRs with the built command line |
-| `pnpm adr check` | Checks them too, and this repository's code against `.arch/rules.yml` |
+| `pnpm adr check` | Checks them too, this repository's code against `.arch/rules.yml`, and its Diagram |
 | `pnpm adr export --out <dir>` | Exports this repository's ADRs as HTML pages |
 | `pnpm --filter @adr-tool/diagrams export-own` | Draws this repository's Diagram again, into `docs/architecture/diagrams/packages.svg`; a test fails while the picture is stale |
 
-CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr check` on the repository itself: its Decision Log, its declaration of Components, and its code against `.arch/rules.yml`.
+CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr check` on the repository itself: its Decision Log, its declaration of Components, its code against `.arch/rules.yml`, and its Diagram with its picture.
 
 ### Project layout
 
@@ -342,10 +368,10 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java, Python and Go are read with the grammars of tree-sitter as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
 | [`packages/conformance`](packages/conformance) | The core of the Conformance module, on `kernel` and `structure` alone and under the same guard: the Rules and Exceptions of `.arch/rules.yml`, their evaluation against the Dependencies, the Problems of the file, and Rename in it |
-| [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the Repair of an element whose Component is gone, and the SVG, drawn without a browser |
+| [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the edits of a Diagram and a new one, each a change of its lines, Rename in them, the Repairs, and the SVG, drawn without a browser, with the Problem of a stale picture |
 | [`packages/review`](packages/review) | The core of the Review module, under the same guard: Annotations with their Anchors, Replies and Traces to ADRs, and how an Anchor is found again across commits, renames and rebases ([ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)). It reads git through the kernel's port; the window follows |
-| [`packages/cli`](packages/cli) | The command line, `adr lint`, `adr check` and `adr export`, built on the cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)). `@adr-tool/cli/git` is the one way the suite runs git, for the app as well |
-| [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
+| [`packages/cli`](packages/cli) | The command line, `adr lint`, `adr check` and `adr export`, built on the cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)). `@adr-tool/cli/git` is the one way the suite runs git, for the app as well; `@adr-tool/cli/code` reads the code as the command does, for the MCP server, which `bundle.ts` builds into one file the same way |
+| [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` and `diagrams` into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
 ### Conventions
@@ -371,9 +397,9 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
 | [docs/conformance-format.md](docs/conformance-format.md) | The contract of the Conformance module: Rules, Violations and their fingerprint, Exceptions, the Problems of `.arch/rules.yml` |
 | [docs/review-format.md](docs/review-format.md) | The contract of the Review module: Annotations, their Anchors and Replies, how an Anchor is found again, and the Problems |
-| [docs/diagrams-format.md](docs/diagrams-format.md) | The contract of the Diagrams module: the file of a Diagram, its view levels, suggested connections and Drift, its Problems, and the SVG |
+| [docs/diagrams-format.md](docs/diagrams-format.md) | The contract of the Diagrams module: the file of a Diagram, its view levels, suggested connections and Drift, its Problems, how the suite edits it, and the SVG |
 | [docs/configuration.md](docs/configuration.md) | The contract of `.arch/config.yml`, the suite's settings: one key per module, and what happens when the file cannot be read |
-| [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` and `adr check` with their output, codes and exit codes, and `adr export` |
+| [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` and `adr check` with their output, codes and exit codes — the Diagrams' among them —, and `adr export` |
 | [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
 | [CONTEXT.md](CONTEXT.md), [CONTEXT-MAP.md](CONTEXT-MAP.md) | The domain language and how its contexts relate |
