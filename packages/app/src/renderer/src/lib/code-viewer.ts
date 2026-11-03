@@ -1,6 +1,8 @@
+import { go } from '@codemirror/lang-go'
 import { html } from '@codemirror/lang-html'
 import { java } from '@codemirror/lang-java'
 import { javascript } from '@codemirror/lang-javascript'
+import { python } from '@codemirror/lang-python'
 import { HighlightStyle, syntaxHighlighting, type LanguageSupport } from '@codemirror/language'
 import { Compartment, EditorState, RangeSetBuilder, type Text } from '@codemirror/state'
 import {
@@ -46,6 +48,10 @@ export function languageFor(path: string): LanguageSupport | undefined {
       return html()
     case 'java':
       return java()
+    case 'py':
+      return python()
+    case 'go':
+      return go()
     default:
       return undefined
   }
