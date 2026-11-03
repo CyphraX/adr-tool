@@ -1,8 +1,11 @@
 import { stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { check } from './check'
+import { fails, renderCheck } from './check-report'
 import { describeRefusal, exportTo } from './export'
 import { repositoryFiles } from './files'
 import { lint } from './lint'
+import { listRepository } from './listing'
 import { FORMATS, render, type Format } from './report'
 
 /** Where the command prints, and where it runs. */
@@ -13,11 +16,18 @@ export interface Console {
 }
 
 const USAGE = `Usage: adr lint [path] [--format text|json|github]
+       adr check [path] [--format text|json|github]
        adr export [path] --out <directory> [--log <directory>]...
 
 adr lint checks the Decision Logs of the repository at path (the current directory by
 default) and prints every Problem with its file, line and code.
 Exit codes: 0 no Problem, 1 Problems found, 2 nothing could be checked.
+
+adr check does what adr lint does, checks .arch/components.yml, and checks the Rules of
+.arch/rules.yml against the code: every Violation without an Exception is printed at the
+line of the import that causes it.
+Exit codes: 0 no Problem and no Violation without an Exception, 1 there is one,
+2 nothing could be checked.
 
 adr export writes the Decision Logs of the repository at path, or those named with --log, as
 HTML pages that open from disk into the directory --out: an empty one, or one an earlier
@@ -40,14 +50,14 @@ export async function run(args: readonly string[], console: Console): Promise<nu
     }
     const { command, path } = parsed
     if (command === undefined) throw new Usage('A command is missing.')
-    if (command !== 'lint' && command !== 'export') {
+    if (command !== 'lint' && command !== 'check' && command !== 'export') {
       throw new Usage(`Unknown command "${command}".`)
     }
-    if (command === 'lint' && (parsed.out !== undefined || parsed.logs.length > 0)) {
+    if (command !== 'export' && (parsed.out !== undefined || parsed.logs.length > 0)) {
       throw new Usage('--out and --log are options of adr export.')
     }
     if (command === 'export' && parsed.format !== undefined) {
-      throw new Usage('--format is an option of adr lint.')
+      throw new Usage('--format is an option of adr lint and adr check.')
     }
     const root = resolve(console.cwd, path ?? '.')
     const info = await stat(root).catch(() => undefined)
@@ -77,6 +87,21 @@ export async function run(args: readonly string[], console: Console): Promise<nu
       console.out(`Exported ${adrs} of ${logs} to ${out}. Open ${join(out, 'index.html')}.\n`)
       return 0
     }
+    // GitHub names files from the directory the command runs in, the checkout.
+    const checkout = relative(console.cwd, root).split(sep).join('/')
+    const inside = checkout !== '' && !checkout.startsWith('..') && !isAbsolute(checkout)
+    if (command === 'check') {
+      const checked = await check(repositoryFiles(root, warn), await listRepository(root))
+      if (!checked) {
+        console.err(
+          `adr check: Nothing to check in ${root}: no Decision Log is found there, and neither .arch/components.yml nor .arch/rules.yml is there.\n`
+        )
+        return 2
+      }
+      checked.notes.forEach(warn)
+      console.out(renderCheck(checked, parsed.format ?? 'text', inside ? checkout : ''))
+      return fails(checked) ? 1 : 0
+    }
     const report = await lint(repositoryFiles(root, warn))
     if (!report) {
       console.err(
@@ -85,9 +110,6 @@ export async function run(args: readonly string[], console: Console): Promise<nu
       return 2
     }
     report.notes.forEach(warn)
-    // GitHub names files from the directory the command runs in, the checkout.
-    const checkout = relative(console.cwd, root).split(sep).join('/')
-    const inside = checkout !== '' && !checkout.startsWith('..') && !isAbsolute(checkout)
     console.out(render(report, parsed.format ?? 'text', inside ? checkout : ''))
     return report.problems.length > 0 ? 1 : 0
   } catch (error) {

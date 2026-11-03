@@ -77,6 +77,14 @@ describe('a Problem of Structure', () => {
     if (yaml.kind !== 'unreadable') throw new Error(yaml.kind)
     expect(yaml.said.code).toBe('not-yaml')
     expect(structureEnglishOf(yaml.said)).toBe(yaml.detail)
+    // The parser's first line, without the picture of the line it draws below, and the line.
+    const flow = readDeclaration('components: [\n')
+    if (flow.kind !== 'unreadable') throw new Error(flow.kind)
+    expect(flow.detail).toBe(
+      'it is not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 2, column 1'
+    )
+    expect(flow.line).toBe(2)
+    expect(declaration.line).toBeUndefined()
   })
 })
 
