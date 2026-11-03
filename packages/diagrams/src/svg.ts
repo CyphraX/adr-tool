@@ -71,8 +71,13 @@ export function textWidth(text: string, font: Pick<Font, 'size' | 'bold'>): numb
 
 /** Line breaks and tabs inside a text are blanks; a character XML does not allow is U+FFFD. */
 function oneLine(text: string): string {
-  return text.replace(/[^\t\n\r -퟿-�\u{10000}-\u{10FFFF}]/gu, '�').replace(/[\t\n\r]/g, ' ')
+  return text
+    .replace(/[^\t\n\r -\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/gu, '\uFFFD')
+    .replace(/[\t\n\r]/g, ' ')
 }
+
+/** A text as a sentence ends: with a full stop, unless it ends with one, or with ?, ! or …. */
+const sentence = (text: string): string => (/[.!?…]$/.test(text) ? text : `${text}.`)
 
 /** A text as XML has it, in content and in attributes alike. */
 function xml(text: string): string {
@@ -167,7 +172,8 @@ function lineOf(from: Box, to: Box, both: boolean, label: string | undefined): L
   let start = middleOf(from)
   let end = middleOf(to)
   const direction = { x: end.x - start.x, y: end.y - start.y }
-  const length = Math.hypot(direction.x, direction.y)
+  // Math.sqrt is exact to the last bit everywhere, Math.hypot only as the engine has it.
+  const length = Math.sqrt(direction.x * direction.x + direction.y * direction.y)
   if (length === 0) return undefined
   if (both) {
     // Each of the two is moved to its own right, so that both show.
@@ -183,9 +189,10 @@ function lineOf(from: Box, to: Box, both: boolean, label: string | undefined): L
   const p1 = { x: end.x - b * direction.x, y: end.y - b * direction.y }
   const middle = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }
   // The arrowhead reaches beyond the end of its line, to the border.
-  const span = Math.hypot(p1.x - p0.x, p1.y - p0.y)
+  const along = { x: p1.x - p0.x, y: p1.y - p0.y }
+  const span = Math.sqrt(along.x * along.x + along.y * along.y)
   const pull = span > ARROW ? ARROW / span : 0
-  const lineEnd = { x: p1.x - pull * (p1.x - p0.x), y: p1.y - pull * (p1.y - p0.y) }
+  const lineEnd = { x: p1.x - pull * along.x, y: p1.y - pull * along.y }
   if (label === undefined || oneLine(label).trim() === '') return { from: p0, to: lineEnd }
   const width = Math.ceil(textWidth(label, SMALL)) + 8
   return {
@@ -323,10 +330,13 @@ export function drawDiagram(diagram: Diagram, structure: Declared): string {
 
   const nameOf = (id: string): string => boxOfId.get(id)!.name
   const sentences = [
-    ...(diagram.description === undefined ? [] : [diagram.description]),
-    ...connections.map(
-      ({ from, to, label }) =>
-        `${nameOf(from)} uses ${nameOf(to)}${label === undefined || label.trim() === '' ? '' : `: ${label}`}.`
+    ...(diagram.description === undefined || oneLine(diagram.description).trim() === ''
+      ? []
+      : [sentence(diagram.description.trim())]),
+    ...connections.map(({ from, to, label }) =>
+      sentence(
+        `${nameOf(from)} uses ${nameOf(to)}${label === undefined || oneLine(label).trim() === '' ? '' : `: ${label.trim()}`}`
+      )
     )
   ]
 

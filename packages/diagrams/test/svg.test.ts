@@ -237,6 +237,37 @@ describe('the picture of a Diagram', () => {
     const svg = drawDiagram(read('level: container\n'), none)
     expect(svg).toContain('<title>shop</title>')
     expect(attributesOf(svg, 'svg')).toMatchObject({ width: '48', height: '48' })
+    // What the review of PR #51 found: an empty description gave an empty <desc>.
+    expect(drawDiagram(read('level: container\ndescription: "  "\n'), none)).not.toContain('<desc>')
+  })
+
+  it('ends each sentence of its <desc> with one full stop', () => {
+    const svg = drawDiagram(
+      read(
+        [
+          'description: Its parts',
+          'elements:',
+          '  - external: a',
+          '    at: [0, 0]',
+          '  - external: b',
+          '    at: [200, 0]',
+          '  - external: c',
+          '    at: [400, 0]',
+          'connections:',
+          '  - from: a',
+          '    to: b',
+          '    label: "reads it. "',
+          '  - from: b',
+          '    to: c',
+          '    label: asks?',
+          '  - from: c',
+          '    to: a',
+          ''
+        ].join('\n')
+      ),
+      none
+    )
+    expect(svg).toContain('<desc>Its parts. a uses b: reads it. b uses c: asks? c uses a.</desc>')
   })
 })
 
