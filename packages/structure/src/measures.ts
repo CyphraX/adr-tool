@@ -83,13 +83,17 @@ export function measuring(
 /** The name of a function or class that has none. */
 export const ANONYMOUS = '<anonymous>'
 
+/** Whether a name carries the suffix `Names` gives a name that comes again: `run.map()#2`. */
+export const isPositional = (name: string): boolean => /#\d+(?:\.|$)/.test(name)
+
 /**
  * The names of a file's functions and classes, made unique as they are met in the order of the
  * file: the first keeps its name, a later one with the same name gets `#2`, `#3`, … — so that
- * two Violations never share a fingerprint, and a function keeps its name when another one is
- * added after it. What contains a function is named by the name it was given here, so that
- * `<anonymous>#2.inner` lies in the second anonymous function. No identifier of TypeScript or
- * Java holds `#` followed by a digit, so a suffix never meets a name as written.
+ * two Violations never share a fingerprint. The suffix is positional: a function keeps its
+ * name when one of the same name is added after it, not before it. What contains a function is
+ * named by the name it was given here, so that `<anonymous>#2.inner` lies in the second
+ * anonymous function. No identifier of TypeScript, Java, Python or Go holds `#` followed by a
+ * digit, so a suffix never meets a name as written.
  */
 export class Names {
   private readonly seen = new Map<string, number>()

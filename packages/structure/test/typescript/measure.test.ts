@@ -88,10 +88,11 @@ describe('the complexity of a function (docs/structure-format.md, section 5)', (
         'export { Totals }'
       ].join('\n')
     )
+    // A callback is named by the call it is passed to.
     expect(counted).toEqual({
       outer: 2,
-      'outer.<anonymous>': 2,
-      'outer.<anonymous>#2': 2,
+      'outer.list.filter()': 2,
+      'outer.list.filter().map()': 2,
       'Totals.check': 2
     })
   })
@@ -164,8 +165,8 @@ describe('the complexity of a function (docs/structure-format.md, section 5)', (
       ['Space.inside', 20],
       ['Named.run', 21],
       ['later', 23],
-      // An object that is passed, not named, contains nothing.
-      ['handler', 24],
+      // An object passed to a call is named by the call.
+      ['register().handler', 24],
       ['default', 25],
       ['logged', 26]
     ])
@@ -177,12 +178,22 @@ describe('the complexity of a function (docs/structure-format.md, section 5)', (
       'export function run(): void {',
       '  const a = [1].map(() => 1)',
       '  const b = [2].map(() => 2)',
+      '  ;(() => 3)()',
+      '  ;(() => 4)()',
       '}',
       'function run2(): void {}'
     ]
     const names = (lines: readonly string[]) =>
       measured('a.ts', lines.join('\n')).functions.map((one) => one.name)
-    expect(names(text)).toEqual(['run', 'run.<anonymous>', 'run.<anonymous>#2', 'run2'])
+    // What is called and passed nothing is named by nothing.
+    expect(names(text)).toEqual([
+      'run',
+      'run.map()',
+      'run.map()#2',
+      'run.<anonymous>',
+      'run.<anonymous>#2',
+      'run2'
+    ])
     expect(names(['', '// moved', ...text])).toEqual(names(text))
   })
 

@@ -177,7 +177,7 @@ function functionName(node: Body, source: ts.SourceFile): string {
       node.name?.text ?? (hasModifier(node, ts.SyntaxKind.DefaultKeyword) ? 'default' : ANONYMOUS)
     )
   }
-  return givenName(node, source) ?? (node.name?.text || ANONYMOUS)
+  return givenName(node, source) ?? (node.name?.text || calledWith(node) || ANONYMOUS)
 }
 
 /** The name of a class, as the file gives it. */
@@ -187,7 +187,49 @@ function className(node: ts.ClassLikeDeclaration, source: ts.SourceFile): string
       node.name?.text ?? (hasModifier(node, ts.SyntaxKind.DefaultKeyword) ? 'default' : ANONYMOUS)
     )
   }
-  return givenName(node, source) ?? node.name?.text ?? ANONYMOUS
+  return givenName(node, source) ?? node.name?.text ?? calledWith(node) ?? ANONYMOUS
+}
+
+/**
+ * The name of a value passed to a call, by the call: `load.map()` for the callback of
+ * `load.map(…)`, `new Promise()` for that of `new Promise(…)`, `items.filter().map()` along a
+ * chain; `undefined` where the value is no argument, or the call names nothing.
+ */
+function calledWith(node: ts.Node): string | undefined {
+  const { holder, value } = holderOf(node)
+  if (!(ts.isCallExpression(holder) || ts.isNewExpression(holder))) return undefined
+  if (!holder.arguments?.some((argument) => argument === value)) return undefined
+  const callee = calleeName(holder.expression)
+  if (callee === undefined) return undefined
+  return ts.isNewExpression(holder) ? `new ${callee}()` : `${callee}()`
+}
+
+/**
+ * What a call calls, as written without its arguments: `liveMarks.iterate`,
+ * `items.filter().map`, `this.view.dispatch`. Where it begins with what has no name — `[1].map`
+ * —, from the first name on: `map`.
+ */
+function calleeName(expression: ts.Expression): string | undefined {
+  let written = ''
+  for (let at: ts.Expression = expression; ;) {
+    at = unwrapped(at)
+    if (ts.isIdentifier(at) || ts.isPrivateIdentifier(at)) return at.text + written
+    if (at.kind === ts.SyntaxKind.ThisKeyword) return `this${written}`
+    if (at.kind === ts.SyntaxKind.SuperKeyword) return `super${written}`
+    if (ts.isPropertyAccessExpression(at)) {
+      written = `.${at.name.text}${written}`
+      at = at.expression
+    } else if (ts.isCallExpression(at)) {
+      written = `()${written}`
+      at = at.expression
+    } else if (ts.isElementAccessExpression(at)) {
+      written = `[]${written}`
+      at = at.expression
+    } else {
+      const named = written.replace(/^(?:\(\)|\[\])*\.?/, '')
+      return named === '' ? undefined : named
+    }
+  }
 }
 
 /**
@@ -353,8 +395,9 @@ export function measureTypeScript(source: ts.SourceFile, component?: string): Fi
       return
     }
     if (ts.isObjectLiteralExpression(node)) {
-      // A named object holds its methods as a class does: `api.load`.
-      const name = givenName(node, source)
+      // A named object holds its methods as a class does: `api.load`; one passed to a call is
+      // named by the call, `liveMarks.iterate().enter`.
+      const name = givenName(node, source) ?? calledWith(node)
       nextChildren(node, name === undefined ? scope : { ...scope, names: [...scope.names, name] })
       return
     }

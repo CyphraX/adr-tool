@@ -44,6 +44,7 @@ export { findCycles, type Cycle, type WeightedEdge } from './cycles'
 export { distanceOf, metricsOf, sizeOf, type Metrics, type Size } from './metrics'
 export {
   ANONYMOUS,
+  isPositional,
   type ClassMeasure,
   type DeclarationMeasure,
   type FileMeasures,

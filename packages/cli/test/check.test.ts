@@ -16,6 +16,7 @@ const pythonShop = fileURLToPath(
   new URL('../../structure/test/fixtures/python-shop/', import.meta.url)
 )
 const goShop = fileURLToPath(new URL('../../structure/test/fixtures/go-shop/', import.meta.url))
+const fixtureShop = fileURLToPath(new URL('../../structure/test/fixtures/shop/', import.meta.url))
 
 /** Runs the command in `cwd` as a shell would, and keeps what it prints. */
 async function adrIn(
@@ -405,6 +406,38 @@ describe('adr check (docs/cli.md)', () => {
     })
     expect(lines((await adrIn(accepted, 'check')).out).at(-1)).toBe(
       '1 Rule holds, but for 1 Violation accepted as an Exception.'
+    )
+  })
+
+  it('notes an Exception that names a function by its position among those of its name', async () => {
+    const root = copyOf(fixtureShop, {
+      'src/cart/both.ts':
+        'export function both(list: number[]): number[] {\n  return list.map((x) => (x > 1 ? x : 0)).concat(list.map((x) => (x > 2 ? x : 0)))\n}\n',
+      '.arch/rules.yml': [
+        'rules:',
+        '  - id: functions-stay-simple',
+        '    why: A function with more ways through it than that cannot be tested path by path.',
+        '    kind: threshold',
+        '    metric: complexity',
+        '    max: 2',
+        '    of: [cart]',
+        'exceptions:',
+        '  - rule: functions-stay-simple',
+        '    file: src/cart/both.ts',
+        "    name: 'both.list.map()#2'",
+        '    reason: The second filter is the first one again.',
+        ''
+      ].join('\n')
+    })
+    const { code, out, err } = await adrIn(root, 'check')
+    // The callbacks are named by their call, the second by its position: both are within the
+    // maximum, and the Exception matches nothing.
+    expect(code).toBe(1)
+    expect(out).toContain(
+      'The Exception functions-stay-simple: both.list.map()#2 in src/cart/both.ts matches no Violation any more.'
+    )
+    expect(err).toBe(
+      'adr check: .arch/rules.yml:9: The Exception of functions-stay-simple names both.list.map()#2 by its position among the functions of that name in src/cart/both.ts: it moves to another one when a function of that name is added or removed before it.\n'
     )
   })
 

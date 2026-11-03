@@ -14,7 +14,12 @@ import {
   type NotAnalysed,
   type NotMeasured
 } from '@adr-tool/structure'
-import { DECLARATION_PATH, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
+import {
+  DECLARATION_PATH,
+  isPositional,
+  wordingOf,
+  type StructureProblem
+} from '@adr-tool/structure/model'
 import { goReader, javaReader, pythonReader } from './readers'
 import { lintRepository, type LintReport } from './lint'
 
@@ -57,6 +62,13 @@ export async function check(
   const notes = [...(lint?.notes ?? [])]
   const structure = await openStructure(fs, files)
   const rules = readRules(rulesText)
+  for (const exception of rules.exceptions) {
+    if (exception.name !== undefined && isPositional(exception.name)) {
+      notes.push(
+        `${RULES_PATH}:${exception.line}: The Exception of ${exception.rule} names ${exception.name} by its position among the functions of that name in ${exception.file ?? 'its file'}: it moves to another one when a function of that name is added or removed before it.`
+      )
+    }
+  }
 
   // The code is analysed only for Rules that are checked: it takes a moment on a large repository.
   let model: Awaited<ReturnType<typeof analyseDependencies>> | undefined
