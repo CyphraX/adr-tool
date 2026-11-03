@@ -360,7 +360,7 @@ export function measureTypeScript(source: ts.SourceFile, component?: string): Fi
 }
 
 /** The members a method uses: `this.x`, `Class.x` for a static one, `const { x } = this`. */
-function usesOf(body: ts.Node, own: string | undefined, source: ts.SourceFile): Set<string> {
+function usesOf(body: ts.Node, own: string | undefined): Set<string> {
   const used = new Set<string>()
   const visit = (node: ts.Node, ownThis: boolean): void => {
     // A class inside has a `this` of its own; a function written with `function` too.
@@ -432,7 +432,7 @@ function methodsOf(node: ts.ClassLikeDeclaration, source: ts.SourceFile): Method
   const methodNames = new Set(methods.map((method) => method.name))
   const own = node.name?.text
   return methods.map(({ name, body }) => {
-    const used = usesOf(body, own, source)
+    const used = usesOf(body, own)
     return {
       name,
       fields: new Set([...used].filter((member) => fields.has(member))),
