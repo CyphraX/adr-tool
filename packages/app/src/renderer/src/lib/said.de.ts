@@ -630,6 +630,10 @@ export const DE: Wording<Codes> = {
     `„${v.id}“ ist keine ID eines Eintrags: Buchstaben, Ziffern, „.“, „_“ und „-“, am Anfang ein Buchstabe oder eine Ziffer.`,
   'entry-id-taken': (v) => `${v.assessment} hat bereits einen Eintrag ${v.id}.`,
   'entry-needs-title': () => 'Ein Eintrag braucht einen Titel, seine Überschrift.',
+  'text-ends-entry': (v) =>
+    `Der Text enthält eine Überschrift, die den Eintrag beenden würde: Unter einer Überschrift der Ebene ${v.level} brauchen seine eigenen Überschriften mehr als ${v.level} #.`,
+  'text-left-open': () =>
+    'Der Text öffnet einen Codeblock oder einen HTML-Kommentar, den er nicht schließt: Er würde alles darunter verbergen.',
   'scenario-needs-key': (v) => `Ein Qualitätsszenario braucht „${v.key}“.`,
   'not-a-quality-attribute': (v) =>
     `„${v.value}“ ist weder ein Qualitätsmerkmal noch ein Teilmerkmal der ISO/IEC 25010.`,

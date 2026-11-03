@@ -202,11 +202,8 @@ describe('a new Assessment', () => {
       [`${DIR}/20260512-earlier.md`]: '---\ndate: 2026-05-12\n---\n',
       [`${DIR}/undated.md`]: '# No date\n'
     })
-    const plan = await planAssessmentFromLast(fs, {
-      title: 'The shop again',
-      date: '2027-05-03',
-      authors: ['Lena Becker']
-    })
+    const again = { title: 'The shop again', date: '2027-05-03', authors: ['Lena Becker'] }
+    const plan = await planAssessmentFromLast(fs, again, ['cart', 'web', 'catalog'])
     expect(plan).toMatchObject({
       ok: true,
       id: '20270503-the-shop-again',
@@ -248,6 +245,13 @@ describe('a new Assessment', () => {
         })
       )
     ).toBe('There is no Assessment with a date that a new one could follow.')
+    // Its scope is checked as a new one's is: against the declaration.
+    expect(refused(await planAssessmentFromLast(fs, again, ['cart']))).toBe(
+      'web is not a declared Component.'
+    )
+    expect(refused(await planAssessmentFromLast(fs, again))).toBe(
+      "Components can be named only once they are declared: the Draft's IDs are no names to write down."
+    )
   })
 })
 
@@ -506,6 +510,25 @@ describe('the entries of an Assessment', () => {
       '"S 2" is no ID of an entry: letters, digits, ".", "_" and "-", beginning with a letter or a digit.'
     )
     expect(await scenario({ title: '  ' })).toBe('An entry needs a title, which is its heading.')
+    // Its text stays its own: no heading that ends it, nothing it opens and leaves open.
+    expect(await scenario({ text: 'Why.\n\n### Elsewhere' })).toBe(
+      'The text holds a heading that would end the entry: below a heading of level 4, its own headings need more than 4 #.'
+    )
+    for (const text of ['```js\nfoo()', '<!-- a note', '~~~\n```']) {
+      expect(await scenario({ text })).toBe(
+        'The text opens a code block or an HTML comment that it does not close: it would hide everything below it.'
+      )
+    }
+    const deeper = await planScenario(fs, '20261103-the-shop', {
+      ...SCENARIO,
+      text: 'Why.\n\n##### Deeper\n\n- ```js\n  foo()\n\n<!-- closed -->'
+    })
+    expect(deeper.ok).toBe(true)
+    const read = readAssessment('x', PATH, await textAfter(deeper))
+    expect(read.problems).toEqual([])
+    expect(read.assessment.scenarios.at(-1)!.text).toBe(
+      'Why.\n\n##### Deeper\n\n- ```js\n  foo()\n\n<!-- closed -->'
+    )
 
     const finding = (
       evidence: Parameters<typeof planFinding>[2]['evidence'],
@@ -569,6 +592,16 @@ describe('a rating', () => {
     )
     expect(refused(await planRating(fs, '20261103-the-shop', 'S1', 'good' as 'met'))).toBe(
       '"good" is none of met, partly-met and not-met.'
+    )
+
+    // A rating that is no value is there all the same: it is taken out, or written over.
+    const wrong = SHOP.replace('importance: H\n', 'importance: H\nrating: Met\n')
+    const misrated = memoryFileSystem({ [PATH]: wrong })
+    expect(await textAfter(await planRating(misrated, '20261103-the-shop', 'S1', undefined))).toBe(
+      SHOP
+    )
+    expect(await textAfter(await planRating(misrated, '20261103-the-shop', 'S1', 'met'))).toBe(
+      wrong.replace('rating: Met', 'rating: met')
     )
   })
 
@@ -661,6 +694,21 @@ describe('a Snapshot', () => {
         '    files: 3',
         ''
       ].join('\n')
+    )
+  })
+
+  it('keeps the line ending and the byte order mark of the Snapshot it writes over', async () => {
+    const snapshotPath = `${DIR}/20261103-the-shop.snapshot.yml`
+    const fs = memoryFileSystem({
+      [PATH]: SHOP,
+      [snapshotPath]: '\uFEFFcomponents:\r\n  cart:\r\n    files: 1\r\n'
+    })
+    const plan = await planSnapshot(fs, memoryGit({ commits: [] }), '20261103-the-shop', {
+      date: '2026-11-04',
+      values: { components: { cart: { files: 3 } } }
+    })
+    expect(await textAfter(plan, snapshotPath)).toBe(
+      '\uFEFF# The Snapshot of 20261103-the-shop, taken by the suite: the metric values when it was taken.\r\ndate: 2026-11-04\r\ncomponents:\r\n  cart:\r\n    files: 3\r\n'
     )
   })
 

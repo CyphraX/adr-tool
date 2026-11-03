@@ -53,6 +53,7 @@ import {
   eolOf,
   isBlank,
   linesOf,
+  outlineOf,
   viewFile,
   type Eol,
   type FileView
@@ -62,6 +63,7 @@ import {
   appendBlockItem,
   asText,
   formatScalar,
+  pairOf,
   parseRegion,
   regionFor,
   removeKey,
@@ -343,7 +345,8 @@ function carriedBlock(place: EntryPlace, eol: Eol): string {
  */
 export function planAssessmentFromLast(
   fs: FileSystem,
-  assessment: Omit<NewAssessment, 'scope' | 'previous'>
+  assessment: Omit<NewAssessment, 'scope' | 'previous'>,
+  declared?: readonly string[]
 ): Promise<Plan<{ readonly id: string; readonly previous: string }>> {
   return planning(fs, async (pending) => {
     const title = titleOf(assessment.title)
@@ -353,6 +356,8 @@ export function planAssessmentFromLast(
     const reading = await openAssessments(fs)
     const last = lastAssessment(reading.assessments)
     if (!last) refuse({ code: 'no-assessment-to-follow', values: {} })
+    // Its scope is checked as a new one's: a Component no longer declared is not carried over.
+    const scope = checkedComponents(last.scope, declared)
     const lastText = (await fs.readText(last.path)) ?? ''
     const { id, eol } = await newFileIn(fs, directory, stem)
     const scenarios = outlineAssessment(last.id, last.path, lastText).entries.filter(
@@ -373,12 +378,7 @@ export function planAssessmentFromLast(
             .join('')
     await pending.create(
       joinPath(directory, `${id}.md`),
-      assessmentText(
-        { date: assessment.date, authors, scope: last.scope ?? [], previous: last.id },
-        title,
-        eol,
-        rest
-      )
+      assessmentText({ date: assessment.date, authors, scope, previous: last.id }, title, eol, rest)
     )
     return { id, previous: last.id }
   })
@@ -441,6 +441,22 @@ function blankBefore(view: FileView, at: number): boolean {
   return last === undefined || isBlank(last.content)
 }
 
+/**
+ * Refuse the text of a new entry where it would not read back as the entry's own: a heading
+ * of the entry's level or higher would end the entry; a code block or a comment it opens and
+ * does not close would hide what follows it.
+ */
+function checkedText(text: string, level: number): void {
+  for (const item of outlineOf(text, 0)) {
+    if (item.kind === 'heading' && item.level <= level) {
+      refuse({ code: 'text-ends-entry', values: { level } })
+    }
+    // A block in a list item or a quote ends with its container, before what follows.
+    const open = item.kind === 'comment' || (item.kind === 'fence' && !item.contained)
+    if (open && !item.close) refuse({ code: 'text-left-open', values: {} })
+  }
+}
+
 /** What a new entry is written as: its heading, its block, and its text. */
 interface NewEntry {
   readonly kind: 'scenario' | 'finding'
@@ -458,10 +474,14 @@ function entryEdit(outline: Outline, entry: NewEntry): TextEdit {
   const { view } = outline
   const { text, eol } = view
   const body = inEol(entry.text, eol)
-  const entryLines = (level: number): string =>
-    linesText([headingLine(level, entry.title), ''], eol) +
-    blockText(entry.lines, eol) +
-    (body === '' ? '' : eol + body)
+  const entryLines = (level: number): string => {
+    checkedText(body, level)
+    return (
+      linesText([headingLine(level, entry.title), ''], eol) +
+      blockText(entry.lines, eol) +
+      (body === '' ? '' : eol + body)
+    )
+  }
   const section = entry.kind === 'scenario' ? '## Quality Scenarios' : '## Findings'
 
   const same = outline.entries.filter((place) => place.kind === entry.kind)
@@ -609,9 +629,14 @@ export function planRating(
     }
     const { path, text, assessment: read } = await draftFile(fs, assessment)
     const outline = outlineAssessment(assessment, path, text)
-    entryIn(outline, path, assessment, 'scenario', scenario)
+    const block = entryIn(outline, path, assessment, 'scenario', scenario)
     const now = read.scenarios.find((one) => one.id === scenario)
-    if (now?.rating === rating) refuse({ code: 'rating-unchanged', values: { id: scenario } })
+    // Taken out, a rating is unchanged only where there is none: one that is no value counts.
+    const unchanged =
+      rating === undefined
+        ? pairOf(block.region.map, 'rating') === undefined
+        : now?.rating === rating
+    if (unchanged) refuse({ code: 'rating-unchanged', values: { id: scenario } })
     await pending.write(path, (view) => {
       const place = entryIn(
         outlineAssessment(assessment, path, view.text),
@@ -874,24 +899,26 @@ export function planSnapshot(
       refuse({ code: 'snapshot-without-values', values: {} })
     }
     const commit = await git.headCommit()
-    const written = snapshotText(
-      assessment,
-      {
-        date: snapshot.date,
-        ...(commit !== undefined && isObjectName(commit) && { commit }),
-        values
-      },
-      eolOf(text)
-    )
+    const written = (eol: Eol): string =>
+      snapshotText(
+        assessment,
+        {
+          date: snapshot.date,
+          ...(commit !== undefined && isObjectName(commit) && { commit }),
+          values
+        },
+        eol
+      )
     const at = snapshotPathOf(path)
     if ((await fs.readText(at)) === undefined) {
-      await pending.create(at, written)
+      await pending.create(at, written(eolOf(text)))
       return {}
     }
-    // The Snapshot is the suite's as a whole: all of it is written anew, a byte order mark kept.
+    // The Snapshot is the suite's as a whole: all of it is written anew, in its own line
+    // ending, a byte order mark kept.
     await pending.write(at, (view) => {
       const start = view.text.startsWith('\uFEFF') ? 1 : 0
-      return [{ start, end: view.text.length, insert: written }]
+      return [{ start, end: view.text.length, insert: written(view.eol) }]
     })
     return {}
   })

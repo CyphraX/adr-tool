@@ -203,6 +203,10 @@ export const SENTENCES = {
   'entry-id-taken': (v: { assessment: string; id: string }): string =>
     `${v.assessment} has an entry ${v.id} already.`,
   'entry-needs-title': (): string => 'An entry needs a title, which is its heading.',
+  'text-ends-entry': (v: { level: number }): string =>
+    `The text holds a heading that would end the entry: below a heading of level ${v.level}, its own headings need more than ${v.level} #.`,
+  'text-left-open': (): string =>
+    'The text opens a code block or an HTML comment that it does not close: it would hide everything below it.',
   'scenario-needs-key': (v: { key: string }): string => `A Quality Scenario needs a "${v.key}".`,
   'not-a-quality-attribute': (v: { value: string }): string =>
     `"${v.value}" is no characteristic of ISO/IEC 25010, nor one of its sub-characteristics.`,
