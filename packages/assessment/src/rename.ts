@@ -114,6 +114,14 @@ export function planRenameInAssessments(fs: FileSystem, from: string, to: string
       for (const fence of unread) {
         if (mention.test(text.slice(fence.content.start, fence.content.end))) cannot(path)
       }
+      // A comment that is never closed hides entries the suite cannot read.
+      const hidden = outline.problems.some(
+        (problem) =>
+          problem.kind === 'unreadable-entry' &&
+          typeof problem.detail !== 'string' &&
+          problem.detail.code === 'in-comment-never-closed'
+      )
+      if (hidden && mention.test(text.slice(outline.view.bodyStart))) cannot(path)
 
       const edits: TextEdit[] = []
       const view = outline.view

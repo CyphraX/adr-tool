@@ -120,6 +120,20 @@ export interface Fence {
   readonly content: Span
   /** The closing fence's line; absent when the block is never closed and runs to the end. */
   readonly close?: Line
+  /**
+   * Whether it is opened inside a list item or a block quote, after a list marker or a `>`:
+   * then it ends with its container, and its lines carry the container's indentation.
+   */
+  readonly contained: boolean
+}
+
+/** An HTML comment of the body: what lies in it is no heading and no code block. */
+export interface Comment {
+  readonly kind: 'comment'
+  /** The line it begins on. */
+  readonly open: Line
+  /** The line that holds its `-->`; absent when it is never closed and runs to the end. */
+  readonly close?: Line
 }
 
 // A repository is untrusted input: nothing here backtracks over a long line (as core's headingOf).
@@ -144,17 +158,49 @@ function headingText(raw: string | undefined): string {
   return text.slice(0, closingSequenceAt(text)).trim()
 }
 
+// A list marker or a `>` at the start of a line, read one after another without backtracking.
+const CONTAINER = / {0,3}(?:>[ \t]?|(?:[-+*]|\d{1,9}[.)])[ \t]+)/y
+const QUOTE = / {0,3}>[ \t]?/y
+const COMMENT = /^ {0,3}<!--/
+
+/** How much of a line's start is made of the markers of the regex, one after another. */
+function prefixOf(content: string, markers: RegExp): number {
+  let at = 0
+  for (;;) {
+    markers.lastIndex = at
+    const match = markers.exec(content)
+    if (!match || match[0].length === 0) return at
+    at += match[0].length
+  }
+}
+
+/** The blanks a line begins with. */
+const indentOf = (content: string): number => content.length - content.trimStart().length
+
 /**
- * The headings and fenced code blocks of a body, in their order (CommonMark, ATX headings and
- * fences only): a heading inside a code block is none, and a block that is never closed runs to
- * the end of the text.
+ * The headings, fenced code blocks and HTML comments of a body, in their order (CommonMark:
+ * ATX headings, fences — at the start of a line, or after the markers of a list item or a block
+ * quote —, and comments): a heading inside a code block or a comment is none; a block that is
+ * never closed runs to the end of the text, or of its container; so does a comment.
  */
-export function outlineOf(text: string, bodyStart: number): (Heading | Fence)[] {
-  const items: (Heading | Fence)[] = []
+export function outlineOf(text: string, bodyStart: number): (Heading | Fence | Comment)[] {
+  const items: (Heading | Fence | Comment)[] = []
   const lines = linesOf(text, bodyStart)
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!
-    const opening = OPENING.exec(line.content)
+    if (COMMENT.test(line.content)) {
+      // It ends on the line that holds `-->`: `<!-->` and `<!--->` are whole comments.
+      const ends = text.indexOf('-->', line.start + line.content.indexOf('<!--') + 2)
+      let end = index
+      while (ends !== -1 && end < lines.length && lines[end]!.next <= ends) end++
+      const close = ends === -1 ? undefined : lines[end]
+      items.push({ kind: 'comment', open: line, ...(close && { close }) })
+      if (!close) break
+      index = end
+      continue
+    }
+    const prefix = prefixOf(line.content, CONTAINER)
+    const opening = OPENING.exec(line.content.slice(prefix))
     if (opening) {
       const fence = opening[2]!
       const info = opening[3]!
@@ -163,17 +209,43 @@ export function outlineOf(text: string, bodyStart: number): (Heading | Fence)[] 
         const closing = new RegExp(
           `^ {0,3}${fence[0] === '`' ? '`' : '~'}{${fence.length},}[ \\t]*$`
         )
+        const contained = prefix > 0
+        const quoted = contained && line.content.slice(0, prefix).includes('>')
+        // Inside a list item, a line belongs to it while it is blank or indented as far as the
+        // item's text; inside a block quote, while it begins with a `>`.
+        const inside = (content: string): string | undefined => {
+          if (!contained) return content
+          if (quoted) {
+            const marks = prefixOf(content, QUOTE)
+            return marks === 0 ? undefined : content.slice(marks)
+          }
+          if (isBlank(content)) return content
+          const indent = indentOf(content)
+          return indent < prefix ? undefined : content.slice(prefix)
+        }
         let end = index + 1
-        while (end < lines.length && !closing.test(lines[end]!.content)) end++
-        const close = lines[end]
+        let close: Line | undefined
+        for (; end < lines.length; end++) {
+          const content = inside(lines[end]!.content)
+          if (content === undefined) break
+          if (closing.test(content)) {
+            close = lines[end]
+            break
+          }
+        }
         items.push({
           kind: 'fence',
           open: line,
           language: info.trim().split(/[ \t]+/)[0] ?? '',
-          content: { start: line.next, end: close ? close.start : text.length },
-          ...(close && { close })
+          content: {
+            start: line.next,
+            end: close ? close.start : (lines[end]?.start ?? text.length)
+          },
+          ...(close && { close }),
+          contained
         })
-        index = end
+        // A block that ends with its container leaves the line that ends it to be read.
+        index = close ? end : end - 1
         continue
       }
     }

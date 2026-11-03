@@ -509,7 +509,7 @@ export const DE: Wording<Codes> = {
   'entry-of-two-kinds': (v) =>
     `${v.path}, Zeile ${v.line}: Ein Block ist entweder ein Qualitätsszenario oder ein Befund und hat hier sowohl „scenario“ als auch „finding“.`,
   'entry-without-heading': (v) =>
-    `${v.path}, Zeile ${v.line}: Der Block von ${v.entry} folgt keiner Überschrift, die dem Eintrag seinen Titel gibt.`,
+    `${v.path}, Zeile ${v.line}: Der Block von ${v.entry} folgt nicht unmittelbar auf eine Überschrift der Ebenen 2 bis 6, die dem Eintrag seinen Titel gibt.`,
   'invalid-entry-id': (v) =>
     `${v.path}, Zeile ${v.line}: „${v.entry}“ ist keine ID eines Eintrags: Buchstaben, Ziffern, „.“, „_“ und „-“, am Anfang ein Buchstabe oder eine Ziffer.`,
   'duplicate-entry': (v) =>
@@ -555,6 +555,7 @@ export const DE: Wording<Codes> = {
   'frontmatter-no-mapping': () => 'sein Frontmatter muss ein Mapping sein',
   'block-not-valid-yaml': (v) => `er ist kein gültiges YAML: ${v.message}`,
   'block-never-closed': () => 'sein Codeblock wird nie geschlossen',
+  'in-comment-never-closed': () => 'er steht in einem HTML-Kommentar, der nie geschlossen wird',
   'snapshot-not-valid-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
   'snapshot-no-mapping': () => 'seine oberste Ebene muss ein Mapping sein',
   'snapshot-commit-name': () =>

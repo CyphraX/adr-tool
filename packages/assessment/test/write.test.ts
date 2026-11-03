@@ -446,6 +446,52 @@ describe('the entries of an Assessment', () => {
     expect(added.endsWith(`a${'\n'.repeat(80_000)}b\n`)).toBe(true)
   })
 
+  it('take a new ID past those that stand where no entry is read', async () => {
+    const block = (id: string): string =>
+      [
+        '```yaml',
+        `scenario: ${id}`,
+        'attribute: security',
+        'stimulus: s',
+        'response: r',
+        'measure: m',
+        '```'
+      ].join('\n')
+    const text = [
+      '---',
+      'date: 2026-11-03',
+      '---',
+      '',
+      '## One',
+      '',
+      block('S1'),
+      '',
+      '- ```js',
+      '  foo()',
+      '  ```',
+      '',
+      '### Two',
+      '',
+      block('S2'),
+      '',
+      '<!--',
+      '### Set aside',
+      '',
+      block('S3'),
+      '-->',
+      ''
+    ].join('\n')
+    const plan = await planScenario(
+      memoryFileSystem({ [PATH]: text }),
+      '20261103-the-shop',
+      SCENARIO
+    )
+    expect(plan).toMatchObject({ ok: true, id: 'S4' })
+    const read = readAssessment('x', PATH, await textAfter(plan))
+    expect(read.problems).toEqual([])
+    expect(read.assessment.scenarios.map((one) => one.id)).toEqual(['S1', 'S2', 'S4'])
+  })
+
   it('are refused where they would not read back as given', async () => {
     const fs = memoryFileSystem({ [PATH]: SHOP })
     const scenario = (changes: Partial<NewScenario>) =>

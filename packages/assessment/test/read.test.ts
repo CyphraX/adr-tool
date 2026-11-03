@@ -183,7 +183,7 @@ describe('reading an Assessment', () => {
       ]
     )
     expect(problems.map(wordingOf)).toEqual([
-      `${DIR}/x.md, line 73: the block of F2 does not follow a heading, which gives the entry its title.`,
+      `${DIR}/x.md, line 73: the block of F2 does not directly follow a heading of level 2 to 6, which gives the entry its title.`,
       `${DIR}/x.md, line 79: a block is either a Quality Scenario or a Finding, and has both "scenario" and "finding".`,
       `${DIR}/x.md, line 86: "F 3" is no ID of an entry: letters, digits, ".", "_" and "-", beginning with a letter or a digit.`,
       `${DIR}/x.md, line 92: F1 is there twice among its Findings. The first one counts.`,
@@ -215,6 +215,85 @@ describe('reading an Assessment', () => {
     expect(list.problems.map(wordingOf)).toEqual([
       `${DIR}/x.md cannot be read: its frontmatter must be a mapping.`
     ])
+  })
+
+  it('reads a code block in a list item or a quote as text of the author, and stays in step after it', () => {
+    const scenario = (id: string) => [
+      '```yaml',
+      `scenario: ${id}`,
+      'attribute: security',
+      'stimulus: s',
+      'response: r',
+      'measure: m',
+      '```'
+    ]
+    const text = [
+      '---',
+      'date: 2026-11-03',
+      '---',
+      '',
+      '## One',
+      '',
+      ...scenario('S1'),
+      '',
+      '- ```js',
+      '  foo()',
+      '  ```',
+      '',
+      '> ```yaml',
+      '> scenario: S7',
+      '> ```',
+      '',
+      '1. ```',
+      '   ### Not a heading',
+      'and the item ends here, its block with it',
+      '',
+      '### Two',
+      '',
+      ...scenario('S2'),
+      ''
+    ].join('\n')
+    const { assessment, problems } = readAssessment('x', `${DIR}/x.md`, text)
+    expect(problems).toEqual([])
+    expect(assessment.scenarios.map((one) => [one.id, one.title])).toEqual([
+      ['S1', 'One'],
+      ['S2', 'Two']
+    ])
+  })
+
+  it('reads nothing inside an HTML comment, and says when one hides the rest', () => {
+    const block =
+      '```yaml\nscenario: S2\nattribute: security\nstimulus: s\nresponse: r\nmeasure: m\n```'
+    const closed = readAssessment(
+      'x',
+      `${DIR}/x.md`,
+      `---\ndate: 2026-11-03\n---\n\n<!-- An entry set aside:\n\n## Two\n\n${block}\n-->\n\n## Three\n\n${block.replace('S2', 'S3')}\n`
+    )
+    expect(closed.problems).toEqual([])
+    expect(closed.assessment.scenarios.map((one) => one.id)).toEqual(['S3'])
+    expect(readAssessment('x', `${DIR}/x.md`, `<!--> # Read\n`).assessment.title).toBeUndefined()
+    expect(readAssessment('x', `${DIR}/x.md`, `<!-->\n# Read\n`).assessment.title).toBe('Read')
+
+    const open = readAssessment(
+      'x',
+      `${DIR}/x.md`,
+      `---\ndate: 2026-11-03\n---\n\n<!-- never closed\n\n## Two\n\n${block}\n`
+    )
+    expect(open.assessment.scenarios).toEqual([])
+    expect(open.problems.map(wordingOf)).toEqual([
+      `${DIR}/x.md, line 10: the block of an entry cannot be read: it lies in an HTML comment that is never closed.`
+    ])
+  })
+
+  it('gives an entry its title only from a heading of level 2 to 6', () => {
+    const { problems } = readAssessment(
+      'x',
+      `${DIR}/x.md`,
+      '# The title\n\n```yaml\nscenario: S1\nattribute: security\nstimulus: s\nresponse: r\nmeasure: m\n```\n'
+    )
+    expect(problems.map(wordingOf)).toContain(
+      `${DIR}/x.md, line 3: the block of S1 does not directly follow a heading of level 2 to 6, which gives the entry its title.`
+    )
   })
 
   it('reads a heading without its closing #s, and a long line in linear time', () => {

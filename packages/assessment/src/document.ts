@@ -84,7 +84,23 @@ export function outlineAssessment(id: string, path: string, text: string): Outli
   const about = { path, assessment: id }
 
   items.forEach((item, index) => {
-    if (item.kind !== 'fence' || !['yaml', 'yml'].includes(item.language.toLowerCase())) return
+    if (item.kind === 'comment') {
+      // A comment that is never closed hides the rest of the document, its entries too.
+      const hidden = item.close ? null : ENTRY_KEY.exec(text.slice(item.open.start))
+      if (hidden) {
+        const before = text.slice(item.open.start, item.open.start + hidden.index)
+        problems.push({
+          kind: 'unreadable-entry',
+          ...about,
+          line: item.open.number + before.split('\n').length - 1,
+          detail: { code: 'in-comment-never-closed', values: {} }
+        })
+      }
+      return
+    }
+    // A block inside a list item or a block quote is the author's, never an entry.
+    if (item.kind !== 'fence' || item.contained) return
+    if (!['yaml', 'yml'].includes(item.language.toLowerCase())) return
     const line = item.open.number
     const content = text.slice(item.content.start, item.content.end)
     if (!item.close) {

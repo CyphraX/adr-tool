@@ -107,6 +107,13 @@ describe('a Rename of a Component in the Assessments', () => {
     expect(await refused({ [RISK]: '---\ncomponents: [cart\n---\n' })).toContain(
       `${RISK} may name cart`
     )
+    // A comment that is never closed hides what the suite would have to rewrite.
+    expect(
+      await refused({
+        [PATH]:
+          '---\ndate: 2026-11-03\n---\n\n<!--\n\n## F1\n\n```yaml\nfinding: F1\nevidence:\n  - metric: files\n    component: cart\n```\n'
+      })
+    ).toContain(`${PATH} may name cart`)
     // Where a Trace is an alias, the suite cannot tell what else the rewrite would change.
     expect(await refused({ [PATH]: '---\nx: &s [cart]\nscope: *s\n---\n' })).toContain(
       `${PATH} may name cart`

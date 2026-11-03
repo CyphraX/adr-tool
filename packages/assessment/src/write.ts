@@ -392,8 +392,17 @@ function takenIds(outline: Outline, kind: 'scenario' | 'finding'): Set<string> {
   for (const problem of outline.problems) {
     if ('entry' in problem) taken.add(problem.entry)
   }
+  // An ID that stands where no entry is read — in a comment, in a list item, in a block that
+  // cannot be read — is taken all the same: it may become an entry again.
+  for (const line of outline.view.text.slice(outline.view.bodyStart).split('\n')) {
+    const key = ID_LINE.exec(line.trimStart())
+    if (key?.[1] === kind) taken.add(key[2]!)
+  }
   return taken
 }
+
+/** A line that may give an entry its ID: `scenario: S1`, quoted or not. */
+const ID_LINE = /^(scenario|finding)[ \t]*:[ \t]*['"]?([^\s'"#]+)/
 
 /** The ID of a new entry: the one given, checked, or `S`/`F` and the number after the highest. */
 function entryIdFor(

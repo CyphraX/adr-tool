@@ -75,7 +75,7 @@ export const SENTENCES = {
   'entry-of-two-kinds': (v: { path: string; line: number }): string =>
     `${v.path}, line ${v.line}: a block is either a Quality Scenario or a Finding, and has both "scenario" and "finding".`,
   'entry-without-heading': (v: { path: string; line: number; entry: string }): string =>
-    `${v.path}, line ${v.line}: the block of ${v.entry} does not follow a heading, which gives the entry its title.`,
+    `${v.path}, line ${v.line}: the block of ${v.entry} does not directly follow a heading of level 2 to 6, which gives the entry its title.`,
   'invalid-entry-id': (v: { path: string; line: number; entry: string }): string =>
     `${v.path}, line ${v.line}: "${v.entry}" is no ID of an entry: letters, digits, ".", "_" and "-", beginning with a letter or a digit.`,
   'duplicate-entry': (v: { path: string; line: number; entry: string; of: string }): string =>
@@ -133,6 +133,7 @@ export const SENTENCES = {
   'frontmatter-no-mapping': (): string => 'its frontmatter must be a mapping',
   'block-not-valid-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
   'block-never-closed': (): string => 'its fence is never closed',
+  'in-comment-never-closed': (): string => 'it lies in an HTML comment that is never closed',
   'snapshot-not-valid-yaml': (v: { message: string }): string =>
     `it is not valid YAML: ${v.message}`,
   'snapshot-no-mapping': (): string => 'its top level must be a mapping',
