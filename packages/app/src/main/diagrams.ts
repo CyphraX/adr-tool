@@ -36,7 +36,12 @@ type Declared = ExportModel & Pick<Structure, 'origin' | 'components'>
  * every module's count of Problems needs, without analysing the code.
  */
 export async function declaredOnDisk(fs: FileSystem): Promise<Declared> {
-  const declaration = readDeclaration(await fs.readText(DECLARATION_PATH))
+  return declaredIn(await fs.readText(DECLARATION_PATH))
+}
+
+/** The declaration of Components as a text of `.arch/components.yml` says it. */
+export function declaredIn(text: string | undefined): Declared {
+  const declaration = readDeclaration(text)
   if (declaration.kind === 'declared') {
     return { origin: 'declared', components: declaration.components, problems: [] }
   }

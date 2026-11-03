@@ -3,7 +3,8 @@
  * "IDs"): its ID, and those below it, where they name a Component — in `component` and
  * `scope`, and in `from` and `to` where they name a Component element, not an External System
  * that has the same ID. Each ID is replaced where it stands, quoting kept (ADR-0002); the app
- * joins the change set to the Rename of the declaration, the ADRs and the Rules.
+ * joins the change set to the Rename of the declaration, the ADRs and the Rules. A picture that
+ * was the Diagram as it was is drawn again, so that the Rename leaves it current.
  */
 import { isScalar, parseDocument } from 'yaml'
 import {
@@ -11,33 +12,51 @@ import {
   plan,
   type Config,
   type FileSystem,
+  type PendingFiles,
   type Plan,
   type Said,
   type TextEdit
 } from '@adr-tool/kernel'
 import { elementsOf, readDiagram, type Diagram } from './diagram'
+import type { ExportModel } from './export'
 import { comparable, listOf, mapsOf, pairOf, rangeOf } from './lines'
-import { openDiagrams } from './location'
+import { openDiagrams, svgPathOf } from './location'
 import { englishOf, refusal, type DiagramsSaid } from './sentences'
+import { drawDiagram } from './svg'
 
 const asText = (text: string): string => text
 
 /**
+ * The declaration before the Rename and after it, which the pictures are drawn from. Without
+ * them, a picture is not looked at.
+ */
+export interface RenamedDeclaration {
+  readonly before: ExportModel
+  readonly after: ExportModel
+}
+
+/**
  * Plan the Rename of the Component `from` to `to` in every Diagram of the repository. A Diagram
  * that cannot be read is not rewritten; where its text names the Component, the plan warns of it.
+ * With the declaration before and after, each picture that is current is drawn again from the
+ * renamed Diagram and the renamed declaration; one that is not current is left as it is, and its
+ * Problem `stale-picture` stays.
  */
 export async function planRenameInDiagrams(
   fs: FileSystem,
   from: string,
   to: string,
-  config?: Config
+  config?: Config,
+  declaration?: RenamedDeclaration
 ): Promise<Plan> {
   const warned: DiagramsSaid[] = []
   const planned = await plan(fs, asText, async (pending) => {
     const { diagrams } = await openDiagrams(fs, config)
     for (const diagram of diagrams) {
       if (diagram.readable) {
+        const text = await pending.read(diagram.path)
         await pending.write(diagram.path, (text) => renameEdits(diagram.path, text, from, to))
+        if (declaration) await redraw(fs, pending, diagram, text, from, to, declaration)
       } else if (mentions((await fs.readText(diagram.path)) ?? '', from)) {
         warned.push({
           code: 'diagram-not-renamed',
@@ -48,6 +67,30 @@ export async function planRenameInDiagrams(
   })
   if (!planned.ok || warned.length === 0) return planned
   return { ...planned, warnings: warned.map(englishOf), warned: warned as Said[] }
+}
+
+/** Draw the picture of a Diagram again after the Rename, where it was current before it. */
+async function redraw(
+  fs: FileSystem,
+  pending: PendingFiles,
+  diagram: Diagram,
+  text: string,
+  from: string,
+  to: string,
+  declaration: RenamedDeclaration
+): Promise<void> {
+  const unreadable = (model: ExportModel): boolean =>
+    model.problems.some((problem) => problem.kind === 'unreadable-declaration')
+  if (unreadable(declaration.before) || unreadable(declaration.after)) return
+  const svg = svgPathOf(diagram)
+  const picture = await fs.readText(svg)
+  if (picture === undefined || picture !== drawDiagram(diagram, declaration.before)) return
+  const renamed = readDiagram(diagram.path, renameInDiagram(diagram.path, text, from, to))
+  if (!renamed.readable) return
+  const after = drawDiagram(renamed, declaration.after)
+  // The picture belongs to the suite: it is replaced as a whole (as `planExport` does).
+  if (after !== picture)
+    await pending.write(svg, (old) => [{ start: 0, end: old.length, insert: after }])
 }
 
 /** Whether a text names a Component ID, or one below it, as a word. */

@@ -285,7 +285,7 @@ describe('this repository', () => {
     ])
   })
 
-  it('renames structure in the declaration, in ADR-0006, in the Rules and in its Diagram', async () => {
+  it('renames structure in the declaration, in ADR-0006, in the Rules and in its Diagram, whose picture follows', async () => {
     const plan = await planComponentRename(nodeFileSystem(own), 'structure', 'architecture')
     if (!plan.ok) throw new Error(plan.reason)
     const lines = (text: string): string[] => text.split('\n')
@@ -322,6 +322,14 @@ describe('this repository', () => {
           '    to: structure',
           '    to: structure',
           '    to: structure'
+        ]
+      },
+      {
+        // The box is named after its ID, and the picture says the Diagram in sentences too.
+        path: 'docs/architecture/diagrams/packages.svg',
+        changed: [
+          expect.stringMatching(/^ {2}<desc>.* structure uses kernel\. /),
+          expect.stringContaining('>structure</text>')
         ]
       }
     ])

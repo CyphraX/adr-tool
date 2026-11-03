@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem, type Plan } from '@adr-tool/kernel'
-import { planRenameInDiagrams, renameInDiagram } from '../src'
+import type { DeclaredComponent } from '@adr-tool/structure/model'
+import { drawDiagram, planRenameInDiagrams, readDiagram, renameInDiagram } from '../src'
 
 // A Rename of a Component rewrites the Diagrams that show it (docs/diagrams-format.md, section
 // 2, "IDs"): in `component` and `scope`, and in `from` and `to` where they name a Component
@@ -128,6 +129,68 @@ describe('planning a Rename in the Diagrams', () => {
     expect(plan.warnings).toEqual([
       `${broken} cannot be read, so the Rename does not rewrite what it says of core.`
     ])
+  })
+
+  it('draws a picture that was current again, and leaves one that was not', async () => {
+    const component = (id: string, children: DeclaredComponent[] = []): DeclaredComponent => ({
+      id,
+      name: id.split('/').at(-1)!,
+      paths: [],
+      tests: [],
+      children
+    })
+    const model = (core: string) =>
+      ({
+        origin: 'declared',
+        components: [
+          component(core, [component(`${core}/adr`, [component(`${core}/adr/body`)])]),
+          component('kernel'),
+          component('corelike')
+        ],
+        problems: []
+      }) as const
+    const [before, after] = [model('core'), model('kern')]
+    // The picture of a box named after its ID changes; that of a box whose name stays does not.
+    const other = 'docs/architecture/diagrams/other.yml'
+    const otherText = lines(
+      'level: container',
+      'elements:',
+      '  - component: core',
+      '    at: [0, 0]'
+    )
+    const read = (path: string, text: string) => {
+      const diagram = readDiagram(path, text)
+      if (!diagram.readable) throw new Error(`${path} cannot be read`)
+      return diagram
+    }
+    const fs = (picture: string) =>
+      memoryFileSystem({
+        [PATH]: view,
+        'docs/architecture/diagrams/core.svg': drawDiagram(read(PATH, view), before),
+        [other]: otherText,
+        'docs/architecture/diagrams/other.svg': picture
+      })
+    const drawn = drawDiagram(read(other, otherText), before)
+    const both = { before, after }
+    const paths = (plan: Plan): string[] => planned(plan).changeSet.files.map((file) => file.path)
+
+    const current = planned(await planRenameInDiagrams(fs(drawn), 'core', 'kern', undefined, both))
+    expect(paths(current)).toEqual([PATH, other, 'docs/architecture/diagrams/other.svg'])
+    const renamed = read(other, renameInDiagram(other, otherText, 'core', 'kern'))
+    expect(current.changeSet.files[2]!.after).toBe(drawDiagram(renamed, after))
+    expect(current.changeSet.files[2]!.after).toContain('>kern</text>')
+
+    // A picture that is not current is not drawn: its Problem stays, and so does it.
+    const stale = await planRenameInDiagrams(
+      fs('<svg>old</svg>\n'),
+      'core',
+      'kern',
+      undefined,
+      both
+    )
+    expect(paths(stale)).toEqual([PATH, other])
+    // Without the declaration, no picture is looked at.
+    expect(paths(await planRenameInDiagrams(fs(drawn), 'core', 'kern'))).toEqual([PATH, other])
   })
 
   it('plans nothing where no Diagram is', async () => {

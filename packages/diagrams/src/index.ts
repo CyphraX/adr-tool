@@ -75,7 +75,7 @@ export {
 } from './svg'
 export { checkPicture, planExport, type ExportModel, type ExportPlan } from './export'
 export { newDiagramText, planNewDiagram, type NewDiagram } from './create'
-export { planRenameInDiagrams, renameInDiagram } from './rename'
+export { planRenameInDiagrams, renameInDiagram, type RenamedDeclaration } from './rename'
 export {
   SENTENCES as DIAGRAMS_SENTENCES,
   englishOf as diagramsEnglishOf,
