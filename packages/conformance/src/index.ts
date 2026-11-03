@@ -37,17 +37,32 @@ export { evaluate, type Model, type Violation } from './evaluate'
 export {
   adrExists,
   checkConformance,
+  checkPlannedImport,
   justification,
   needsModel,
   openConformance,
   type CheckedViolation,
   type ConformanceReport,
-  type Decisions
+  type Decisions,
+  type PlannedImport
 } from './check'
 export { planRenameInRules, renameInRules } from './rename'
 export {
+  planAddException,
+  planAddRule,
+  planChangeRule,
+  planConformanceRepair,
+  planRemoveRule,
+  renderRule,
+  repairOf,
+  type ConformanceRepair,
+  type ExceptionDraft,
+  type RuleDraft
+} from './write'
+export {
   SENTENCES as CONFORMANCE_SENTENCES,
   englishOf as conformanceEnglishOf,
+  type Change,
   type ConformanceSaid
 } from './sentences'
 

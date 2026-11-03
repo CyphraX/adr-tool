@@ -8,6 +8,7 @@
 import {
   KERNEL_SENTENCES,
   Refusal,
+  YAML_SENTENCES,
   sentenceOf,
   type Said,
   type SaidBy,
@@ -69,8 +70,27 @@ const namedBy = (v: Naming): string =>
 /** A fingerprint as one line, for reading (docs/conformance-format.md, section 3). */
 type Printed = { readonly fingerprint: string }
 
+/** What the suite was asked to write into `.arch/rules.yml`, as a refusal names it. */
+export type Change =
+  | 'add-rule'
+  | 'change-rule'
+  | 'remove-rule'
+  | 'add-exception'
+  | 'change-exception'
+  | 'remove-exception'
+
+const CHANGES: Record<Change, string> = {
+  'add-rule': 'add a Rule to',
+  'change-rule': 'change a Rule in',
+  'remove-rule': 'remove a Rule from',
+  'add-exception': 'add an Exception to',
+  'change-exception': 'change an Exception in',
+  'remove-exception': 'take an Exception out of'
+}
+
 export const SENTENCES = {
   ...KERNEL_SENTENCES,
+  ...YAML_SENTENCES,
 
   // The Problems of Conformance (docs/conformance-format.md, section 5): a code is a Problem's kind.
   'unreadable-rules': (v: { path: string; detail: Said | string }): string =>
@@ -109,8 +129,7 @@ export const SENTENCES = {
     `The Exception ${v.fingerprint} accepts a Cycle of ${listed(v.members)} only now, and can be narrowed to ${v.members.length > LISTED_AT_MOST ? 'those' : 'them'}.`,
 
   // Why the file, a Rule, an Exception or an applied Pattern cannot be read: the rest of a sentence.
-  'not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
-  'top-not-map': (): string => 'its top level must be a map',
+  // `not-yaml` and `top-not-map` are the kernel's (YAML_SENTENCES).
   'key-not-list': (v: { key: string }): string => `"${v.key}" must be a list`,
   'key-twice': (v: { key: string }): string => `"${v.key}" is written twice`,
   'key-not-of-kind': (v: { key: string; kind: string }): string =>
@@ -168,6 +187,27 @@ export const SENTENCES = {
     `${english(v.violation)}: ${v.file}:${v.line} imports ${v.imports}.`,
   // A Violation that has no import to point at: a threshold.
   'violation-alone': (v: { violation: Said }): string => `${english(v.violation)}.`,
+
+  // Writing a Rule or an Exception (docs/conformance-format.md, sections 1 and 7): why it is refused.
+  'write-unreadable-rules': (v: { path: string }): string =>
+    `${v.path} cannot be read, so the suite cannot write into it. Fix the file first.`,
+  'cannot-write-rules': (v: { path: string; change: Change; why: Said }): string =>
+    `${v.path} is written in a way the suite cannot ${CHANGES[v.change]} without rewriting more of it: ${english(v.why)}. Change it in an editor.`,
+  'rule-exists': (v: { path: string; id: string }): string =>
+    `There is a Rule ${v.id} already. A Rule ID names one Rule in ${v.path}.`,
+  'no-rule': (v: { path: string; id: string }): string =>
+    `${v.path} has no Rule ${v.id}. Look at the file again.`,
+  'rule-unchanged': (v: { id: string }): string => `The Rule ${v.id} says this already.`,
+  'exception-exists': (v: Printed): string => `There is an Exception ${v.fingerprint} already.`,
+  'no-exception': (v: Printed & { path: string; line: number }): string =>
+    `${v.path} has no Exception ${v.fingerprint} at line ${v.line} any more. Look at the file again.`,
+  // Why the file cannot be written there: the rest of a sentence.
+  'top-in-braces': (): string => 'its top level is written in braces',
+  'list-in-brackets': (v: { key: string }): string => `"${v.key}" is written in brackets`,
+  'item-in-braces': (): string => 'the item is written in braces',
+  'anchor-or-alias': (): string => 'the item uses an anchor or an alias',
+  'comment-lost': (): string => 'a comment would be lost',
+  'reads-otherwise': (): string => 'what it would write does not read back as what was meant',
 
   // Rename of a Component (docs/conformance-format.md, section 7).
   'rename-unreadable-rules': (v: { path: string }): string =>

@@ -8,6 +8,7 @@
 import {
   KERNEL_SENTENCES,
   Refusal,
+  YAML_SENTENCES,
   sentenceOf,
   type Said,
   type SaidBy,
@@ -32,6 +33,7 @@ type Pattern = { readonly pattern: string; readonly key: string; readonly compon
 
 export const SENTENCES = {
   ...KERNEL_SENTENCES,
+  ...YAML_SENTENCES,
 
   // Adopt, Repair and Rename.
   'declared-already': (): string => 'The Components of this repository are declared already.',
@@ -82,9 +84,8 @@ export const SENTENCES = {
   'empty-component': (v: { component: string }): string =>
     `${v.component} has neither paths nor components.`,
 
-  // Why the declaration cannot be read: the rest of a sentence about the file.
-  'not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
-  'top-not-map': (): string => 'its top level must be a map',
+  // Why the declaration cannot be read: the rest of a sentence about the file. `not-yaml` and
+  // `top-not-map` are the kernel's (YAML_SENTENCES).
   'components-not-map': (): string => '"components" must be a map of Components',
   'component-not-map': (v: { id: string }): string => `${v.id} must be a map of its keys`,
   'children-not-map': (v: { id: string }): string =>

@@ -46,3 +46,13 @@ export const KERNEL_SENTENCES = {
 } satisfies Sentences
 
 export type KernelSaid = SaidBy<typeof KERNEL_SENTENCES>
+
+/**
+ * Why a file of the suite that is written in YAML cannot be read, as the rest of a sentence
+ * about the file: `.arch/components.yml` and `.arch/rules.yml` alike. The modules that read
+ * such a file take these into their own sentences, so that a code means one thing everywhere.
+ */
+export const YAML_SENTENCES = {
+  'not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
+  'top-not-map': (): string => 'its top level must be a map'
+} satisfies Sentences

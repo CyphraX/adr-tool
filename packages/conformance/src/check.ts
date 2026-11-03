@@ -218,7 +218,7 @@ export async function openConformance(
 }
 
 /** What names a Violation of each kind in an Exception, in words. */
-const FINGERPRINT_KEYS: Record<Rule['kind'], string> = {
+export const FINGERPRINT_KEYS: Record<Rule['kind'], string> = {
   'must-not-depend': '"from" and "to"',
   'may-only-depend': '"from" and "to"',
   layers: '"from" and "to"',
@@ -227,7 +227,10 @@ const FINGERPRINT_KEYS: Record<Rule['kind'], string> = {
 }
 
 /** The fingerprint an Exception names, when its keys fit the kind of its Rule. */
-function fingerprintOf(exception: WrittenException, rule: Rule): Fingerprint | undefined {
+export function fingerprintOf(
+  exception: Pick<WrittenException, 'from' | 'to' | 'cycle' | 'component'>,
+  rule: Rule
+): Fingerprint | undefined {
   const { from, to, cycle, component } = exception
   switch (rule.kind) {
     case 'must-not-depend':
@@ -301,4 +304,46 @@ export function adrExists(reference: string, decisions: Decisions): boolean {
   const log = written === undefined ? decisions.logs[0] : written === '.' ? '' : written
   if (written === undefined && decisions.logs.length !== 1) return false
   return decisions.adrs.some((adr) => adr.log === log && adr.id === id)
+}
+
+/** An import that is not written yet: from one Source File to another. */
+export interface PlannedImport {
+  readonly from: string
+  readonly to: string
+  /** An `import type`, which a Rule that ignores type-only Dependencies does not count. */
+  readonly typeOnly?: boolean
+  /** The line it will stand on; 1 when it is left out. */
+  readonly line?: number
+}
+
+/**
+ * The Violations an import would be part of, before it is written (docs/mcp.md,
+ * `list_violations`): the Rules are checked with the import added to the Dependencies, and
+ * what is found with it behind is returned — accepted by an Exception or not. An import that is
+ * there already is checked as it is. `structure` has to know `from` as a Source File, a file
+ * that is not written yet included: whoever calls lists it among the files of the repository.
+ */
+export function checkPlannedImport(
+  file: RulesFile,
+  structure: Pick<Structure, 'origin' | 'components' | 'sourceFiles'>,
+  model: Omit<Model, 'structure'>,
+  planned: PlannedImport,
+  decisions?: Decisions
+): ConformanceReport & { readonly exists: boolean } {
+  const { from, to } = planned
+  const there = model.dependencies.find((one) => one.from === from && one.to === to)
+  const dependencies = there
+    ? model.dependencies
+    : [
+        ...model.dependencies,
+        { from, to, typeOnly: planned.typeOnly ?? false, lines: [planned.line ?? 1] }
+      ]
+  const report = checkConformance(file, structure, { ...model, dependencies }, decisions)
+  return {
+    ...report,
+    violations: report.violations.filter((violation) =>
+      violation.dependencies.some((one) => one.from === from && one.to === to)
+    ),
+    exists: there !== undefined
+  }
 }
