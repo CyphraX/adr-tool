@@ -285,7 +285,7 @@ CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull re
 
 ### Project layout
 
-A pnpm monorepo. Each module of the suite has one UI-free core package, and the module cores never depend on each other ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)) — except on Structure's model, which every module refers to ([ADR-0018](docs/adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md)).
+A pnpm monorepo. Each module of the suite has one UI-free core package, and the module cores never depend on each other ([ADR-0006](docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md)), except that `diagrams` reads Structure's model ([ADR-0018](docs/adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md)).
 
 | Package | Contents |
 | --- | --- |

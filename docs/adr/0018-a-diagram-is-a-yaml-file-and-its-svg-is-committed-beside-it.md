@@ -4,7 +4,7 @@ created: 2026-11-02
 decided: 2026-11-02
 decision-makers: [Philipp Saal]
 tags: [diagrams, file-format]
-depends-on: [0002-never-reserialize-markdown, 0003-on-disk-contract, 0004-operations-return-change-sets]
+depends-on: [0002-never-reserialize-markdown, 0003-on-disk-contract, 0004-operations-return-change-sets, 0006-one-core-package-per-module-on-a-shared-kernel]
 affects: [diagrams]
 ---
 
@@ -30,5 +30,5 @@ The `diagrams` package draws a Diagram as SVG itself, without a browser, and its
 - A Diagram is two files. The picture is stale when the Diagram or the declaration changed and nobody exported it; until a check reports that, an export whose change set is empty is how to tell that it is current. This repository's own picture, `docs/architecture/diagrams/packages.svg`, is tested to be current.
 - The picture is deterministic: text is measured by fixed figures per character, not by a font, so that the same Diagram draws to the same bytes everywhere — and text may stand a little narrower or wider than a font draws it. It runs nothing and fetches nothing, escapes every text, has a `<title>` and a `<desc>` for a screen reader, and takes the light or the dark palette from the viewer's setting. Its words are English: a file in the repository has one language, and the window says them in its own (part 7).
 - The suite writes into a Diagram only by changing the lines it means — the Repair of an element whose Component is gone now, the editor of part 7 and the Rename of a Component later. The SVG is written as a whole: it is derived, and nobody edits it by hand.
-- `diagrams` reads Structure's model through `@adr-tool/structure/model`, the entry without the parsers, because the elements of a Diagram are Components and Drift is measured against Structure's Dependencies ([CONTEXT-MAP.md](../../CONTEXT-MAP.md), "Structure → Diagrams"). That is a module core that depends on another, which [ADR-0006](0006-one-core-package-per-module-on-a-shared-kernel.md), still proposed, does not allow for. It follows the direction of the context map and is never taken the other way: Structure knows nothing of Diagrams.
+- `diagrams` is a module core as [ADR-0006](0006-one-core-package-per-module-on-a-shared-kernel.md) has them: it depends on the kernel, and on Structure's model, which every other context refers to — through `@adr-tool/structure/model`, the entry without the parsers. The elements of a Diagram are Components, and Drift is measured against Structure's Dependencies ([CONTEXT-MAP.md](../../CONTEXT-MAP.md), "Structure → Diagrams"); Structure knows nothing of Diagrams.
 - `.arch/config.yml` is the suite's file of settings, beside `.arch/components.yml`. Diagrams reads its own key there and leaves every other key alone, for the modules after it.

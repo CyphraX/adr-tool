@@ -118,7 +118,8 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     ...[
       '0002-never-reserialize-markdown',
       '0003-on-disk-contract',
-      '0004-operations-return-change-sets'
+      '0004-operations-return-change-sets',
+      '0006-one-core-package-per-module-on-a-shared-kernel'
     ].map((to) => ({
       type: 'depends-on',
       from: '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it',
