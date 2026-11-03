@@ -29,7 +29,7 @@ export function javaComplexityByWords(text: string): number {
 /** Code without its comments and string literals, for counting its words: Python's and Go's. */
 function codeOf(text: string, comment: RegExp): string {
   return text
-    .replace(/[rRbBuUfF]{0,2}("""|\'\'\')[\s\S]*?\1/g, '""')
+    .replace(/[rRbBuUfF]{0,2}("""|''')[\s\S]*?\1/g, '""')
     .replace(/`[^`]*`/g, '""')
     .replace(/[rRbBuUfF]{0,2}"(?:[^"\\\n]|\\.)*"/g, '""')
     .replace(/[rRbBuUfF]{0,2}'(?:[^'\\\n]|\\.)*'/g, "''")
