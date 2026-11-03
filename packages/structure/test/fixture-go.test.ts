@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import {
@@ -10,6 +11,7 @@ import {
   openStructure,
   prepareGo
 } from '../src'
+import { goComplexityByWords } from './measures-by-definition'
 import { metricsByDefinition } from './metrics-by-definition'
 import { nodeFileSystem, repositoryFiles } from './repository-files'
 
@@ -90,6 +92,54 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
   const { dependencies, lineCounts } = analysis
   expect(metricsOf(structure, dependencies, lineCounts, { tests: true })).toEqual(
     metricsByDefinition(structure, dependencies, lineCounts, true)
+  )
+  // What is measured inside its files (part 13): abstractness and distance by their definitions
+  // too, and the complexity of every function by its words, a second count.
+  const { measures } = analysis
+  expect(metricsOf(structure, dependencies, lineCounts, { tests: true }, measures)).toEqual(
+    metricsByDefinition(structure, dependencies, lineCounts, true, measures)
+  )
+  let functions = 0
+  for (const [path, measured] of measures) {
+    const text = await readFile(join(root, path), 'utf8')
+    for (const one of measured.functions) {
+      expect([
+        path,
+        one.name,
+        goComplexityByWords(
+          text
+            .split('\n')
+            .slice(one.line - 1, one.endLine)
+            .join('\n')
+        )
+      ]).toEqual([path, one.name, one.complexity])
+      functions++
+    }
+  }
+  expect(functions).toBeGreaterThan(5)
+  // And as gocyclo 0.6.0 counted them, `gocyclo .` in the fixture, run outside the tests; it
+  // writes a method `(*Cart).Add`.
+  expect(
+    [...measures]
+      .flatMap(([path, measured]) =>
+        measured.functions.map((one) => [path, one.name, one.line, one.complexity])
+      )
+      .toSorted()
+  ).toEqual(
+    [
+      ['billing/invoice/invoice.go', 'For', 12, 1],
+      ['billing/invoice/tax.go', 'withTax', 6, 1],
+      ['cart/cart.go', 'Cart.Add', 17, 1],
+      ['cart/cart.go', 'Cart.Total', 22, 2],
+      ['cart/cart.go', 'New', 12, 1],
+      ['cart/cart_test.go', 'TestTotal', 9, 2],
+      ['cart/line.go', 'Line.In', 21, 3],
+      ['cart/line.go', 'NewLine', 16, 1],
+      ['catalog/product.go', 'Normalize', 14, 1],
+      ['catalog/search.go', 'Search', 4, 3],
+      ['cmd/shop/main.go', 'main', 11, 1],
+      ['web/server.go', 'Checkout', 15, 1]
+    ].toSorted()
   )
 
   // What its go.mod files require, for the Library inventory: not the modules of the repository.

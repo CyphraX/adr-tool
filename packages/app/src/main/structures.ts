@@ -8,9 +8,11 @@ import {
   levelOf,
   matrixOf,
   metricsOf,
+  propagationCostOf,
   sizeOf,
   withDirectories,
   type DeclaredComponent,
+  type FileMeasures,
   type Level,
   type LevelNode,
   type Metrics,
@@ -20,10 +22,12 @@ import {
   LOWER_BOUND,
   type LowerBound,
   type SourceFileResult,
-  type StructureOutline,
+  type StructureClass,
   type StructureComponent,
+  type StructureFunction,
   type StructureNeighbour,
   type StructureNode,
+  type StructureOutline,
   type StructureView
 } from '../shared/ipc'
 import type { Analysis } from './analysis'
@@ -38,6 +42,9 @@ export const SOURCE_FILE_LIMIT = 4 * 1024 * 1024
  * the count is always the whole.
  */
 const LISTED_AT_MOST = 500
+/** How many of its most complex functions, and of its least cohesive classes, a page lists. */
+const FUNCTIONS_LISTED = 10
+const CLASSES_LISTED = 5
 /**
  * Not watched: what git never lists, and the build output and caches that tools rewrite all
  * the time. A file git lists in one of them changes nothing until the next analysis.
@@ -316,7 +323,8 @@ export function viewOf(
   // way back up as well; `structure` finds them once and hands out the same ones every time.
   const explored = withDirectories(structure)
   collect(explored.components, undefined)
-  const metrics = metricsOf(structure, dependencies.dependencies, lineCounts, { tests })
+  const { measures } = dependencies
+  const metrics = metricsOf(structure, dependencies.dependencies, lineCounts, { tests }, measures)
   const hasPage = (kind: LevelNode['kind']): boolean => kind === 'component' || kind === 'directory'
 
   const nameOf = (node: Pick<LevelNode, 'kind' | 'id'>): string =>
@@ -350,8 +358,14 @@ export function viewOf(
   const testsInside = new Map<string, number>()
   const lowerBoundInside = new Map<string, Set<string>>()
   const filesInside = new Map<string, string[]>()
+  const measuredInside = new Map<string, FileMeasures[]>()
+  const measuredFiles = new Map<FileMeasures, string>()
+  const failed = new Set(dependencies.notMeasured.map(({ file }) => file))
+  const notMeasuredInside = new Map<string, string[]>()
   for (const file of explored.sourceFiles) {
     const counted = tests || !file.test
+    const measured = counted ? measures.get(file.path) : undefined
+    if (measured) measuredFiles.set(measured, file.path)
     for (let id = file.component; id !== undefined; id = parentOf.get(id)) {
       if (file.test) testsInside.set(id, (testsInside.get(id) ?? 0) + 1)
       if (counted && isLowerBound(file.language)) {
@@ -361,14 +375,25 @@ export function viewOf(
       const list = filesInside.get(id) ?? []
       if (list.length < LISTED_AT_MOST) list.push(file.path)
       filesInside.set(id, list)
+      if (failed.has(file.path)) {
+        notMeasuredInside.set(id, [...(notMeasuredInside.get(id) ?? []), file.path])
+      }
+      if (measured === undefined) continue
+      const measuredList = measuredInside.get(id) ?? []
+      measuredList.push(measured)
+      measuredInside.set(id, measuredList)
     }
   }
+  const inside = (id: string): ReturnType<typeof insideOf> =>
+    insideOf(measuredInside.get(id) ?? [], measuredFiles)
   const components = [...shown].map((id) =>
     pageOf(byId.get(id)!, parentOf.get(id), levelAt(parentOf.get(id))!, {
       metrics: metrics.get(id),
       files: filesInside.get(id) ?? [],
       testFiles: testsInside.get(id) ?? 0,
       lowerBound: LOWER_BOUND.filter((language) => lowerBoundInside.get(id)?.has(language)),
+      ...inside(id),
+      notMeasured: notMeasuredInside.get(id) ?? [],
       nameOf
     })
   )
@@ -397,6 +422,7 @@ export function viewOf(
     nodes: level.nodes.map(nodeOf),
     edges: level.edges,
     cycles: level.cycles,
+    propagationCost: propagationCostOf(level),
     matrix: {
       rows: matrix.rows.map((row) => ({
         ...nodeOf(row.node),
@@ -453,6 +479,10 @@ function pageOf(
     readonly files: readonly string[]
     readonly testFiles: number
     readonly lowerBound: readonly LowerBound[]
+    readonly functions: readonly StructureFunction[]
+    readonly functionCount: number
+    readonly classes: readonly StructureClass[]
+    readonly notMeasured: readonly string[]
     readonly nameOf: (node: Pick<LevelNode, 'kind' | 'id'>) => string
   }
 ): StructureComponent {
@@ -477,6 +507,10 @@ function pageOf(
     testFiles: found.testFiles,
     lowerBound: found.lowerBound,
     ...(found.metrics ? { metrics: found.metrics } : {}),
+    functions: found.functions,
+    functionCount: found.functionCount,
+    classes: found.classes,
+    notMeasured: found.notMeasured,
     dependsOn: level.edges
       .filter((edge) => edge.from === component.id)
       .map((edge) => neighbour(edge.to, edge)),
@@ -486,6 +520,36 @@ function pageOf(
     cycles: level.cycles
       .filter((cycle) => cycle.members.includes(component.id))
       .map((cycle) => ({ roundTrip: cycle.roundTrip.map(ref), typeOnly: cycle.typeOnly }))
+  }
+}
+
+/**
+ * The most complex functions and the least cohesive classes in what a page contains: the
+ * first few of each, the most first, then by file and line (structure-format.md, section 5).
+ */
+function insideOf(
+  files: readonly FileMeasures[],
+  pathOf: ReadonlyMap<FileMeasures, string>
+): { functions: StructureFunction[]; functionCount: number; classes: StructureClass[] } {
+  const place = (a: { file: string; line: number }, b: { file: string; line: number }): number =>
+    (a.file < b.file ? -1 : a.file > b.file ? 1 : 0) || a.line - b.line
+  const functions: StructureFunction[] = []
+  const classes: StructureClass[] = []
+  for (const measured of files) {
+    const file = pathOf.get(measured)!
+    for (const { name, line, complexity } of measured.functions) {
+      functions.push({ file, name, line, complexity })
+    }
+    for (const { name, line, methods, lcom4 } of measured.classes) {
+      if (lcom4 !== undefined && lcom4 > 1) classes.push({ file, name, line, methods, lcom4 })
+    }
+  }
+  return {
+    functions: functions
+      .sort((a, b) => b.complexity - a.complexity || place(a, b))
+      .slice(0, FUNCTIONS_LISTED),
+    functionCount: functions.length,
+    classes: classes.sort((a, b) => b.lcom4 - a.lcom4 || place(a, b)).slice(0, CLASSES_LISTED)
   }
 }
 

@@ -6,27 +6,31 @@
 import {
   everyComponent,
   findCycles,
+  levelOf,
   metricsOf,
+  propagationCostOf,
   UNASSIGNED,
   type Cycle,
   type DeclaredComponent,
   type Dependency,
+  type FileMeasures,
   type LibraryUse,
   type Metrics,
   type Structure
 } from '@adr-tool/structure/model'
-import { matcherOf } from './component-patterns'
+import { matcherOf, TOP_LEVEL } from './component-patterns'
 import type { Fingerprint } from './fingerprint'
 import { libraryViolations } from './libraries'
-import type {
-  CyclesRule,
-  DependencyRule,
-  LayersRule,
-  MetricName,
-  Rule,
-  ThresholdRule
+import {
+  SUBJECT_OF,
+  type CyclesRule,
+  type DependencyRule,
+  type LayersRule,
+  type MetricName,
+  type Rule,
+  type ThresholdRule
 } from './rules'
-import type { ConformanceSaid } from './sentences'
+import type { ConformanceSaid, ThresholdSubject } from './sentences'
 
 /** What the Rules are evaluated on: Structure's model of the repository. */
 export interface Model {
@@ -36,6 +40,12 @@ export interface Model {
   readonly lineCounts: ReadonlyMap<string, number>
   /** The Source Files that use each Library, with the lines of their imports. */
   readonly libraries: readonly LibraryUse[]
+  /**
+   * What is measured inside each Source File: its functions, classes and declarations. A file
+   * that is not in it has no function or class with a metric, and counts towards no
+   * abstractness.
+   */
+  readonly measures: ReadonlyMap<string, FileMeasures>
 }
 
 /** One place where the code breaks a Rule. */
@@ -57,9 +67,16 @@ export interface Violation {
     readonly weakest?: { readonly from: string; readonly to: string }
     readonly typeOnly: boolean
   }
-  /** Of a threshold: the Component and its value; of a Rule about Libraries, the Component. */
+  /**
+   * Of a threshold: the Component and its value — for propagation cost, the Component whose
+   * level below it is, `*` for the top level. Of a Rule about Libraries: the Component.
+   */
   readonly component?: string
   readonly value?: number
+  /** Of a threshold on a function or a class: its Source File, the line of its name, its name. */
+  readonly file?: string
+  readonly line?: number
+  readonly name?: string
   /** Of a Rule about Libraries: the Library as the code names it, and its uses in the Component. */
   readonly library?: string
   readonly uses?: readonly LibraryUse[]
@@ -70,6 +87,8 @@ export interface Violation {
    */
   readonly dependencies: readonly Dependency[]
 }
+
+export { TOP_LEVEL }
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -338,8 +357,8 @@ function cycleViolation(
   }
 }
 
-/** Where Structure keeps each metric a threshold can be on. */
-const METRIC_OF: Record<MetricName, (metrics: Metrics) => number | undefined> = {
+/** Where Structure keeps each metric of a Component a threshold can be on. */
+const METRIC_OF: Partial<Record<MetricName, (metrics: Metrics) => number | undefined>> = {
   files: (metrics) => metrics.files,
   lines: (metrics) => metrics.lines,
   'efferent-coupling': (metrics) => metrics.efferent,
@@ -348,39 +367,146 @@ const METRIC_OF: Record<MetricName, (metrics: Metrics) => number | undefined> = 
   'fan-out': (metrics) => metrics.fanOut,
   'fan-in': (metrics) => metrics.fanIn,
   'relational-cohesion': (metrics) => metrics.cohesion,
-  'internal-share': (metrics) => metrics.internalShare
+  'internal-share': (metrics) => metrics.internalShare,
+  abstractness: (metrics) => metrics.abstractness,
+  distance: (metrics) => metrics.distance
+}
+
+/** Which bound of the Rule a value lies outside of, if it does. */
+function outside(rule: ThresholdRule, value: number): 'max' | 'min' | undefined {
+  if (rule.max !== undefined && value > rule.max) return 'max'
+  if (rule.min !== undefined && value < rule.min) return 'min'
+  return undefined
+}
+
+/** Where a threshold Rule is broken: its subject's fingerprint, what it says, and its value. */
+type Outside = Omit<Violation, 'rule' | 'said' | 'dependencies'> & {
+  readonly value: number
+  /** The values of the sentence that name the subject. */
+  readonly subject: ThresholdSubject
 }
 
 function thresholdViolations(rule: ThresholdRule, model: Model): Violation[] {
-  const matches = matcherOf(rule.of)
-  const metrics = metricsOf(model.structure, model.dependencies, model.lineCounts, {
-    tests: rule.tests
-  })
-  const violations: Violation[] = []
-  for (const { id } of chains(model.structure).components) {
-    if (!matches(id)) continue
-    const known = metrics.get(id)
-    const value = known && METRIC_OF[rule.metric](known)
-    if (value === undefined) continue
-    const bound =
-      rule.max !== undefined && value > rule.max
-        ? ('max' as const)
-        : rule.min !== undefined && value < rule.min
-          ? ('min' as const)
-          : undefined
-    if (bound === undefined) continue
-    const limit = bound === 'max' ? rule.max! : rule.min!
-    violations.push({
-      rule,
-      fingerprint: { kind: 'component', rule: rule.id, component: id },
-      said: {
-        code: 'threshold',
-        values: { metric: rule.metric, component: id, value, bound, limit }
-      },
-      component: id,
-      value,
-      dependencies: []
-    })
+  const found: Outside[] = []
+  switch (SUBJECT_OF[rule.metric]) {
+    case 'component':
+      found.push(...componentsOutside(rule, model))
+      break
+    case 'function':
+    case 'class':
+      found.push(...insideOutside(rule, model))
+      break
+    case 'level':
+      found.push(...levelsOutside(rule, model))
+      break
   }
-  return violations
+  return found.flatMap(({ subject, ...violation }): Violation[] => {
+    const bound = outside(rule, violation.value)
+    if (bound === undefined) return []
+    const limit = bound === 'max' ? rule.max! : rule.min!
+    return [
+      {
+        rule,
+        ...violation,
+        said: {
+          code: 'threshold',
+          values: { metric: rule.metric, ...subject, value: violation.value, bound, limit }
+        },
+        dependencies: []
+      }
+    ]
+  })
+}
+
+/** Each matched Component that has the metric. */
+function componentsOutside(rule: ThresholdRule, model: Model): Outside[] {
+  const matches = matcherOf(rule.of)
+  const metrics = metricsOf(
+    model.structure,
+    model.dependencies,
+    model.lineCounts,
+    { tests: rule.tests },
+    model.measures
+  )
+  return chains(model.structure).components.flatMap(({ id }): Outside[] => {
+    const known = matches(id) ? metrics.get(id) : undefined
+    const value = known && METRIC_OF[rule.metric]!(known)
+    if (value === undefined) return []
+    return [
+      {
+        fingerprint: { kind: 'component', rule: rule.id, component: id },
+        component: id,
+        value,
+        subject: { component: id }
+      }
+    ]
+  })
+}
+
+/**
+ * Each function or class in the Source Files that the matched Components contain, in the order
+ * of their files and lines; a class without methods has no LCOM4.
+ */
+function insideOutside(rule: ThresholdRule, model: Model): Outside[] {
+  const matches = matcherOf(rule.of)
+  const { ofFile, test } = chains(model.structure)
+  const kind = SUBJECT_OF[rule.metric] as 'function' | 'class'
+  const files = [...ofFile]
+    .filter(([path, chain]) => chain.some(matches) && (rule.tests || !test.has(path)))
+    .map(([path]) => path)
+    .sort(compare)
+  return files.flatMap((file) => {
+    const measured = model.measures.get(file)
+    if (measured === undefined) return []
+    const subjects =
+      kind === 'function'
+        ? measured.functions.map(({ name, line, complexity }) => ({
+            name,
+            line,
+            value: complexity
+          }))
+        : measured.classes.map(({ name, line, lcom4 }) => ({ name, line, value: lcom4 }))
+    return subjects.flatMap(({ name, line, value }): Outside[] =>
+      value === undefined
+        ? []
+        : [
+            {
+              fingerprint: { kind, rule: rule.id, file, name },
+              file,
+              line,
+              name,
+              value,
+              subject: { subject: kind, name, file, line }
+            }
+          ]
+    )
+  })
+}
+
+/**
+ * The level below each matched Component, and the top level where `of` names `/`: Structure's
+ * levels (structure-format.md, section 4), where one has a propagation cost.
+ */
+function levelsOutside(rule: ThresholdRule, model: Model): Outside[] {
+  const matches = matcherOf(rule.of.filter((pattern) => pattern !== TOP_LEVEL))
+  const parents = [
+    ...(rule.of.includes(TOP_LEVEL) ? [undefined] : []),
+    ...chains(model.structure)
+      .components.map(({ id }) => id)
+      .filter(matches)
+  ]
+  return parents.flatMap((parent): Outside[] => {
+    const level = levelOf(model.structure, model.dependencies, parent, { tests: rule.tests })
+    const value = level && propagationCostOf(level)
+    if (value === undefined) return []
+    const component = parent ?? TOP_LEVEL
+    return [
+      {
+        fingerprint: { kind: 'component', rule: rule.id, component },
+        component,
+        value,
+        subject: { subject: 'level', component }
+      }
+    ]
+  })
 }

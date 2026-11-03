@@ -52,6 +52,9 @@ it('shows the Dependencies of a multi-module Maven project, within a package and
     'Cart > Product',
     'Line > Cart',
     'Line > Product',
+    // The catalog's interface, and the class that implements it.
+    'Catalog > Product',
+    'Search > Catalog',
     'Search > Product',
     'CartView > Cart',
     'Page > Cart',

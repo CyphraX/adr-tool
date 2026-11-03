@@ -43,6 +43,8 @@ const SAME_IN_GERMAN = new Set([
   'H',
   'Fan-in',
   'Fan-out',
+  'A',
+  'D',
   'Version',
   // The ecosystems of Libraries, by their names.
   'npm',
@@ -75,7 +77,9 @@ const SAME_AT = new Set([
   'dashboard.adrCount',
   'structure.graph.directory',
   'structure.value',
-  'structure.page.filesIn'
+  'structure.page.filesIn',
+  // The symbols of the metrics, and their values.
+  'structure.sequence.point'
 ])
 
 /** Every text of `english` that `german` says the same, by where it stands. */

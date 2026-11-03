@@ -7,16 +7,17 @@
   import StructureLibraries from './StructureLibraries.svelte'
   import StructureMatrix from './StructureMatrix.svelte'
   import StructureMetrics from './StructureMetrics.svelte'
+  import StructureSequence from './StructureSequence.svelte'
 
   // The middle of the Structure view: where you are in the hierarchy, and the level as a
-  // drawing, as a matrix or as a table of its metrics — three views of one model, which
-  // share the filter and the selection —, or the Libraries of the whole repository. A Source
-  // File opened from the details takes their place until one of them is chosen again.
+  // drawing, as a matrix, as a table of its metrics or on the main sequence — four views of
+  // one model, which share the filter and the selection. A Source File opened from the details takes their
+  // place until one of them is chosen again. Or the Libraries of the whole repository.
   let { view }: { view: StructureView } = $props()
 
   const show = $derived(app.active?.structure.show ?? 'graph')
   const code = $derived(app.active?.structure.code)
-  const views: StructureShow[] = ['graph', 'matrix', 'metrics']
+  const views: StructureShow[] = ['graph', 'matrix', 'metrics', 'sequence']
 </script>
 
 <div class="center">
@@ -62,6 +63,8 @@
     <StructureMetrics {view} />
   {:else if show === 'libraries'}
     <StructureLibraries {view} />
+  {:else if show === 'sequence'}
+    <StructureSequence {view} />
   {:else}
     <StructureGraph {view} />
   {/if}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { memoryFileSystem } from '@adr-tool/kernel'
 import { analyseDependencies } from '../src/dependencies'
 import type { Extract } from '../src/extraction'
+import { measuring } from '../src/measures'
 import { sourceFilesAmong } from '../src/source-files'
 import { extractUses } from '../src/typescript/extract'
 
@@ -138,13 +139,15 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
       libraries: [],
       manifests: [],
       notAnalysed: [],
-      // Their lines are counted all the same.
+      // Their lines are counted all the same; nothing inside them is measured.
       lineCounts: new Map([
         ['cart/cart.go', 3],
         ['shop/cart.py', 2],
         ['shop/line.py', 0],
         ['src/main/java/a/A.java', 1]
-      ])
+      ]),
+      measures: new Map(),
+      notMeasured: []
     })
   })
 
@@ -184,5 +187,28 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
     }
     await analyse({ 'src/a.ts': "import './b'\n", 'src/b.ts': '' }, extract)
     expect(seen.sort()).toEqual(['src/a.ts', 'src/b.ts'])
+  })
+
+  it('keep the Dependencies of a file that could not be measured, and say which one it is', async () => {
+    // What fails measuring one file fails nothing else (`measuring`, section 5).
+    const broken: Extract = (path, text) => {
+      const read = extractUses(path, text)
+      if (path !== 'src/a.ts' || !read.analysed) return read
+      return {
+        analysed: true,
+        uses: 'uses' in read ? read.uses : [],
+        ...measuring(() => {
+          throw new RangeError('Maximum call stack size exceeded')
+        })
+      }
+    }
+    const result = await analyse({ 'src/a.ts': "import './b'\n", 'src/b.ts': '' }, broken)
+    expect(result.dependencies.map(({ from, to }) => `${from} > ${to}`)).toEqual([
+      'src/a.ts > src/b.ts'
+    ])
+    expect([...result.measures.keys()]).toEqual(['src/b.ts'])
+    expect(result.notMeasured).toEqual([
+      { file: 'src/a.ts', message: 'Maximum call stack size exceeded' }
+    ])
   })
 })

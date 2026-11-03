@@ -2,9 +2,8 @@
  * Structure's analysis of a repository on disk, as the command line and the MCP server run it
  * (docs/structure-format.md, sections 2 and 3): the files as the app lists them — git with its
  * guards, or a walk that honours `.gitignore` —, the Components, and the Dependencies between
- * the Source Files, Java, Python and Go included. Nothing of the repository is run (ADR-0007).
- * The app runs its own, in a worker with a cache of what each file says
- * (packages/app/src/main/analysis.ts).
+ * the Source Files, Java, Python and Go included. Nothing of the repository is run (ADR-0007). The app runs
+ * its own, in a worker with a cache of what each file says (packages/app/src/main/analysis.ts).
  */
 import type { FileSystem } from '@adr-tool/core'
 import {
@@ -18,7 +17,10 @@ import {
 import { listRepository } from './listing'
 import { goReader, javaReader, pythonReader } from './readers'
 
-/** How a repository's Source Files are read: with the reader of each language it has. */
+/**
+ * How a repository's Source Files are read: each language read with tree-sitter by its reader,
+ * prepared only where the repository has the language.
+ */
 export async function extractorFor(structure: Pick<Structure, 'sourceFiles'>): Promise<Extract> {
   const has = (language: string): boolean =>
     structure.sourceFiles.some((file) => file.language === language)
