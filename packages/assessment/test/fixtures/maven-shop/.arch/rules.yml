@@ -1,0 +1,8 @@
+# The Rules of the shop (docs/conformance-format.md). The web broke the first on purpose:
+# its Page uses the catalog's Search itself.
+rules:
+  - id: web-through-cart
+    why: The web shows the catalog through the cart (ADR-0001).
+    kind: must-not-depend
+    from: web
+    to: catalog
