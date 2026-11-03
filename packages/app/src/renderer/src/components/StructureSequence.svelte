@@ -20,11 +20,15 @@
   const BOTTOM = 44
   const WIDTH = LEFT + SIZE + RIGHT
   const HEIGHT = TOP + SIZE + BOTTOM
-  /** How far the corners' zones reach, in units of the axes. */
-  const ZONE = 0.3
+  /** The room inside the frame, so that a point on an edge stays clear of it and of the ticks. */
+  const PAD = 14
+  const RIGHT_EDGE = LEFT + SIZE
+  const BOTTOM_EDGE = TOP + SIZE
+  /** How far the corners' zones reach from the frame's corners: 0.3 in units of the axes. */
+  const ZONE = PAD + 0.3 * (SIZE - 2 * PAD)
 
-  const x = (instability: number): number => LEFT + instability * SIZE
-  const y = (abstractness: number): number => TOP + (1 - abstractness) * SIZE
+  const x = (instability: number): number => LEFT + PAD + instability * (SIZE - 2 * PAD)
+  const y = (abstractness: number): number => TOP + PAD + (1 - abstractness) * (SIZE - 2 * PAD)
 
   interface Point {
     readonly node: StructureNode
@@ -76,25 +80,23 @@
         >
           <path
             class="zone"
-            d="M {x(0)} {y(0)} L {x(ZONE)} {y(0)} A {ZONE * SIZE} {ZONE * SIZE} 0 0 0 {x(0)} {y(
-              ZONE
-            )} Z"
+            d="M {LEFT} {BOTTOM_EDGE} L {LEFT +
+              ZONE} {BOTTOM_EDGE} A {ZONE} {ZONE} 0 0 0 {LEFT} {BOTTOM_EDGE - ZONE} Z"
           />
           <path
             class="zone"
-            d="M {x(1)} {y(1)} L {x(1 - ZONE)} {y(1)} A {ZONE * SIZE} {ZONE * SIZE} 0 0 0 {x(1)} {y(
-              1 - ZONE
-            )} Z"
+            d="M {RIGHT_EDGE} {TOP} L {RIGHT_EDGE -
+              ZONE} {TOP} A {ZONE} {ZONE} 0 0 0 {RIGHT_EDGE} {TOP + ZONE} Z"
           />
-          <text class="zone-label" x={x(0) + 6} y={y(0) - 6}>{t.structure.sequence.pain}</text>
-          <text class="zone-label" x={x(1) - 6} y={y(1) + 14} text-anchor="end"
+          <text class="zone-label" x={LEFT + 6} y={BOTTOM_EDGE - 6}
+            >{t.structure.sequence.pain}</text
+          >
+          <text class="zone-label" x={RIGHT_EDGE - 6} y={TOP + 14} text-anchor="end"
             >{t.structure.sequence.uselessness}</text
           >
           <rect class="frame" x={LEFT} y={TOP} width={SIZE} height={SIZE} />
-          {#each [0.5] as tick (tick)}
-            <line class="grid" x1={x(tick)} y1={y(0)} x2={x(tick)} y2={y(1)} />
-            <line class="grid" x1={x(0)} y1={y(tick)} x2={x(1)} y2={y(tick)} />
-          {/each}
+          <line class="grid" x1={x(0.5)} y1={TOP} x2={x(0.5)} y2={BOTTOM_EDGE} />
+          <line class="grid" x1={LEFT} y1={y(0.5)} x2={RIGHT_EDGE} y2={y(0.5)} />
           <line class="main" x1={x(0)} y1={y(1)} x2={x(1)} y2={y(0)} />
           <text
             class="main-label"
@@ -104,10 +106,10 @@
             transform="rotate(45 {x(0.5)} {y(0.5)})">{t.structure.sequence.line}</text
           >
           {#each [0, 0.5, 1] as tick (tick)}
-            <text class="tick" x={x(tick)} y={y(0) + 16} text-anchor="middle"
+            <text class="tick" x={x(tick)} y={BOTTOM_EDGE + 16} text-anchor="middle"
               >{value('instability', tick)}</text
             >
-            <text class="tick" x={x(0) - 8} y={y(tick) + 4} text-anchor="end"
+            <text class="tick" x={LEFT - 8} y={y(tick) + 4} text-anchor="end"
               >{value('abstractness', tick)}</text
             >
           {/each}
