@@ -26,7 +26,10 @@ export type Found =
       readonly file: 'there' | 'gone'
     }
 
-/** How far from where the Anchor was the lines are looked for without history: lines before and after. */
+/**
+ * How far from where the Anchor is expected the most similar lines are looked for: lines before
+ * and after — where it was, without history, or where the diff takes it.
+ */
 export const WINDOW = 50
 
 /** How many commits of a Source File's history are looked at for the text an Anchor was read in. */
@@ -39,21 +42,31 @@ export const RENAME_COMMITS = 1000
 export interface Finding {
   readonly fs: FileSystem
   readonly git: Git
-  /** What is read once and shared: HEAD, the changes since a commit, the log since a day. */
+  /**
+   * What is read once and shared: HEAD, whether a commit is there, the changes since a commit,
+   * the last commits, the log of a file, a file at a commit.
+   */
   readonly cache?: FindingCache
 }
 
 export interface FindingCache {
   head?: Promise<string | undefined>
-  readonly changes: Map<string, Promise<readonly ChangedFile[] | undefined>>
-  readonly logs: Map<string, Promise<readonly LogEntry[] | undefined>>
   readonly commits: Map<string, Promise<boolean>>
+  readonly changes: Map<string, Promise<readonly ChangedFile[] | undefined>>
+  /** The last commits, by the day since which they are read too. */
+  readonly logs: Map<string, Promise<readonly LogEntry[] | undefined>>
+  /** The last commits of a file, by its path. */
+  readonly fileLogs: Map<string, Promise<readonly LogEntry[] | undefined>>
+  /** A file at a commit, by `<commit>:<path>`. */
+  readonly texts: Map<string, Promise<string | undefined>>
 }
 
 export const findingCache = (): FindingCache => ({
+  commits: new Map(),
   changes: new Map(),
   logs: new Map(),
-  commits: new Map()
+  fileLogs: new Map(),
+  texts: new Map()
 })
 
 const once = <T>(map: Map<string, Promise<T>>, key: string, read: () => Promise<T>): Promise<T> => {
@@ -83,8 +96,9 @@ const weak = (line: string): boolean => !/[\p{L}\p{N}]/u.test(line)
 
 /**
  * Find an Anchor again in the code as it is on disk now (docs/review-format.md, section 4).
- * `date` is the day the Annotation was written, which bounds the commits whose renames are
- * followed when the Anchor's commit is gone. Never writes.
+ * `date` is the day the Annotation was written, or any day before it: when the Anchor's commit
+ * is gone, the renames of the commits since the day before it are followed, besides those of
+ * the last `RENAME_COMMITS`. Never writes.
  */
 export async function findAnchor(anchor: Anchor, finding: Finding, date?: string): Promise<Found> {
   const { fs, git } = finding
@@ -107,7 +121,8 @@ export async function findAnchor(anchor: Anchor, finding: Finding, date?: string
     there = true
     const lines = sourceLines(text)
     if (path === anchor.path && sameLines(lines, anchor)) return { kind: 'unchanged', anchor }
-    const history = head === undefined ? undefined : await historyOf(anchor, path, known, git)
+    const history =
+      head === undefined ? undefined : await historyOf(anchor, path, known, git, cache)
     const block = locate(anchor, lines, history)
     if (!block) continue
     return {
@@ -183,19 +198,24 @@ async function historyOf(
   anchor: Anchor,
   path: string,
   known: boolean,
-  git: Git
+  git: Git,
+  cache: FindingCache
 ): Promise<string[] | undefined> {
-  if (known) {
-    const text = await git.textAt(anchor.commit!, anchor.path)
+  const linesAt = async (commit: string, path: string): Promise<string[] | undefined> => {
+    const text = await once(cache.texts, `${commit}:${path}`, () => git.textAt(commit, path))
     const lines = text === undefined ? undefined : sourceLines(text)
-    if (lines && sameLines(lines, anchor)) return lines
+    return lines && sameLines(lines, anchor) ? lines : undefined
   }
-  for (const entry of (await git.log({ path, limit: STAND_IN_COMMITS })) ?? []) {
+  if (known) {
+    const lines = await linesAt(anchor.commit!, anchor.path)
+    if (lines) return lines
+  }
+  const log = await once(cache.fileLogs, path, () => git.log({ path, limit: STAND_IN_COMMITS }))
+  for (const entry of log ?? []) {
     const change = entry.changes[0]
     if (!change || change.kind === 'deleted') continue
-    const text = await git.textAt(entry.commit, change.path)
-    const lines = text === undefined ? undefined : sourceLines(text)
-    if (lines && sameLines(lines, anchor)) return lines
+    const lines = await linesAt(entry.commit, change.path)
+    if (lines) return lines
   }
   return undefined
 }
@@ -249,40 +269,43 @@ function locate(
   if (exact !== undefined) return { start: exact, end: exact + quote.length, similarity: 1 }
 
   // The block that holds the quoted lines the diff kept, each where it is now: a line inserted
-  // among them belongs to the block, and a kept line is not left out for a shorter one.
+  // among them belongs to the block, and a kept line is not left out for a shorter one. Kept
+  // lines scattered further apart than a block and its window are no block.
   if (matches) {
     const pinned = quote.map((_, offset) => {
       const now = matches.ofOld[start + offset]!
       return now >= 0 ? now : undefined
     })
     const kept = pinned.filter((now) => now !== undefined)
-    if (kept.length > 0) {
-      let [from, to] = [kept[0]!, kept[kept.length - 1]! + 1]
+    const [first, last] = [kept[0], kept.at(-1)]
+    if (first !== undefined && last !== undefined && last - first < 2 * quote.length + WINDOW) {
+      let [from, to] = [first, last + 1]
       let between = true
       for (let at = from; at < to && between; at++) between = allowed(at)
       if (between) {
-        while (from > 0 && allowed(from - 1)) from--
-        while (to < plain.length && allowed(to)) to++
+        while (from > Math.max(0, first - WINDOW) && allowed(from - 1)) from--
+        while (to < Math.min(plain.length, last + 1 + WINDOW) && allowed(to)) to++
         const block = mostSimilarBlock(quote, plain, from, to, near, pinned)
         if (block && block.similarity >= SIMILAR_ENOUGH) return block
       }
     }
   }
 
-  // The most similar block, in the runs of lines that may belong to it.
+  // The most similar block within the window around where the Anchor is expected, in the runs
+  // of lines that may belong to it: the cost of the search grows with the lines it looks at.
+  const [low, high] = [
+    Math.max(0, near - WINDOW),
+    Math.min(plain.length, near + quote.length + WINDOW)
+  ]
   const runs: [number, number][] = []
-  if (matches) {
-    for (let at = 0; at < plain.length;) {
-      if (!allowed(at)) {
-        at++
-        continue
-      }
-      const from = at
-      while (at < plain.length && allowed(at)) at++
-      runs.push([from, at])
+  for (let at = low; at < high;) {
+    if (!allowed(at)) {
+      at++
+      continue
     }
-  } else {
-    runs.push([Math.max(0, start - WINDOW), Math.min(plain.length, end + WINDOW)])
+    const from = at
+    while (at < high && allowed(at)) at++
+    runs.push([from, at])
   }
   let best: Block | undefined
   for (const [from, to] of runs) {
@@ -322,9 +345,14 @@ export async function findAnchors(
   const shared = { ...finding, cache: finding.cache ?? findingCache() }
   const found = new Map<string, Found>()
   const problems: ReviewProblem[] = []
+  // One read of the last commits for all: since the earliest day an Annotation was written.
+  const days = annotations.flatMap((annotation) =>
+    annotation.anchor && annotation.date !== undefined ? [annotation.date] : []
+  )
+  const earliest = days.length === 0 ? undefined : days.reduce((a, b) => (b < a ? b : a))
   for (const annotation of annotations) {
     if (!annotation.anchor) continue
-    const result = await findAnchor(annotation.anchor, shared, annotation.date)
+    const result = await findAnchor(annotation.anchor, shared, earliest)
     found.set(annotation.id, result)
     if (result.kind === 'orphaned') {
       problems.push({

@@ -10,24 +10,53 @@ export const SIMILAR_ENOUGH = 0.5
 /** A line as it is compared: without whitespace at its ends, and each run inside it one space. */
 export const normalized = (line: string): string => line.trim().replace(/\s+/g, ' ')
 
-/** The Levenshtein distance of two texts, in characters (code units). */
+/**
+ * The Levenshtein distance of two texts, in characters (code units): Myers' bit-parallel
+ * algorithm, in blocks of 32 characters of `a` as Hyyrö and Myers give it, so that a pair of
+ * lines costs a few operations per character of `b` rather than one per pair of characters.
+ */
 export function editDistance(a: string, b: string): number {
   if (a === b) return 0
   if (a.length === 0) return b.length
   if (b.length === 0) return a.length
-  let previous = new Uint32Array(b.length + 1)
-  let current = new Uint32Array(b.length + 1)
-  for (let j = 0; j <= b.length; j++) previous[j] = j
-  for (let i = 1; i <= a.length; i++) {
-    current[0] = i
-    const code = a.charCodeAt(i - 1)
-    for (let j = 1; j <= b.length; j++) {
-      const substitute = previous[j - 1]! + (code === b.charCodeAt(j - 1) ? 0 : 1)
-      current[j] = Math.min(substitute, previous[j]! + 1, current[j - 1]! + 1)
-    }
-    ;[previous, current] = [current, previous]
+  const blocks = Math.ceil(a.length / 32)
+  // For each character of `a`, the positions it has, as bits.
+  const positions = new Map<number, Int32Array>()
+  for (let at = 0; at < a.length; at++) {
+    const code = a.charCodeAt(at)
+    let bits = positions.get(code)
+    if (bits === undefined) positions.set(code, (bits = new Int32Array(blocks)))
+    bits[at >>> 5]! |= 1 << (at & 31)
   }
-  return previous[b.length]!
+  const none = new Int32Array(blocks)
+  // The vertical differences of the column, +1 and -1, as bits: all +1 before the first.
+  const plus = new Int32Array(blocks).fill(-1)
+  const minus = new Int32Array(blocks)
+  const last = 1 << ((a.length - 1) & 31)
+  let distance = a.length
+  for (let column = 0; column < b.length; column++) {
+    const equal = positions.get(b.charCodeAt(column)) ?? none
+    // The horizontal difference that enters the block from above: +1 along the first row.
+    let incoming = 1
+    for (let block = 0; block < blocks; block++) {
+      const [pv, mv] = [plus[block]!, minus[block]!]
+      let eq = equal[block]!
+      const xv = eq | mv
+      if (incoming < 0) eq |= 1
+      const xh = (((eq & pv) + pv) ^ pv) | eq
+      let ph = mv | ~(xh | pv)
+      let mh = pv & xh
+      const top = block === blocks - 1 ? last : 1 << 31
+      const outgoing = ph & top ? 1 : mh & top ? -1 : 0
+      ph = (ph << 1) | (incoming > 0 ? 1 : 0)
+      mh = (mh << 1) | (incoming < 0 ? 1 : 0)
+      plus[block] = mh | ~(xv | ph)
+      minus[block] = ph & xv
+      incoming = outgoing
+    }
+    distance += incoming
+  }
+  return distance
 }
 
 /** A block of lines, `[start, end)`, counted from 0, and its similarity to the quoted lines. */

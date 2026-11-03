@@ -374,6 +374,85 @@ describe('what counts as the Anchor’s lines', () => {
   })
 })
 
+describe('the cost of finding an Anchor again', () => {
+  // A file of 3400 lines of words, every one of them different, reformatted in one commit:
+  // every line is new, and the similarity search would compare 100 quoted lines with all.
+  let seed = 7
+  const random = (): number => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const word = (): string =>
+    Array.from({ length: 3 + Math.floor(random() * 8) }, () =>
+      String.fromCharCode(97 + Math.floor(random() * 26))
+    ).join('')
+  const before = Array.from(
+    { length: 3400 },
+    () => `  ${Array.from({ length: 8 }, word).join(' ')}`
+  )
+  const reformatted = before.map((line) => `    ${line.trim()};`)
+  const anchor: Anchor = {
+    path: 'src/a.ts',
+    start: 1701,
+    end: 1800,
+    quote: before.slice(1700, 1800),
+    commit: sha(1)
+  }
+  const start: ScriptedCommit = { ...first, files: { 'src/a.ts': text(before) } }
+
+  it('stays well under a second for a long quote in a long file that changed throughout', async () => {
+    for (const [now, kind] of [
+      [reformatted, 'moved'],
+      [[...reformatted.slice(0, 1700), ...reformatted.slice(1800)], 'orphaned']
+    ] as const) {
+      const repository = after({ 'src/a.ts': text(now) }, [start])
+      const begun = performance.now()
+      const found = await findAnchor(anchor, repository)
+      // Generous for a slow machine; it takes a fraction of that.
+      expect(performance.now() - begun).toBeLessThan(3000)
+      expect(found.kind).toBe(kind)
+    }
+  })
+
+  it('reads the log of a file and a file at a commit once for every Annotation on it', async () => {
+    const git = memoryGit({
+      commits: [
+        { ...first, commit: sha(40) },
+        { commit: sha(41), files: { ...first.files, 'src/cart.ts': text(['', ...CART]) } }
+      ]
+    })
+    const reads = { log: 0, textAt: 0 }
+    const counting = {
+      ...git,
+      log: (options?: Parameters<typeof git.log>[0]) => (reads.log++, git.log(options)),
+      textAt: (commit: string, path: string) => (reads.textAt++, git.textAt(commit, path))
+    }
+    const annotation = (id: string, date: string) => ({
+      id,
+      path: `docs/architecture/annotations/${id}.md`,
+      type: 'note' as const,
+      state: 'open' as const,
+      date,
+      anchor: { ...ANCHOR, commit: sha(99) },
+      cites: [],
+      text: '',
+      replies: [],
+      writable: true
+    })
+    const fs = memoryFileSystem({ ...first.files, 'src/cart.ts': text(['', ...CART]) })
+    const { found } = await findAnchors(
+      [annotation('a', '2026-11-02'), annotation('b', '2026-10-01'), annotation('c', '2026-11-01')],
+      { fs, git: counting }
+    )
+    expect([...found.values()].map((one) => one.kind)).toEqual(['moved', 'moved', 'moved'])
+    // The last commits twice — the last 1000, and since the earliest day —, the file's log
+    // once, and each of its versions once.
+    expect(reads).toEqual({ log: 3, textAt: 2 })
+  })
+})
+
 describe('the Anchors of a repository', () => {
   it('reports each orphaned Annotation as a Problem, and the found ones by their IDs', async () => {
     const annotation = (id: string, lines: string, quote: readonly string[]) =>
@@ -412,6 +491,36 @@ describe('the Anchors of a repository', () => {
 })
 
 describe('similarity', () => {
+  it('measures the edit distance as the table of Levenshtein does, for texts of any length', () => {
+    const reference = (a: string, b: string): number => {
+      let row = Array.from({ length: b.length + 1 }, (_, j) => j)
+      for (let i = 1; i <= a.length; i++) {
+        const next = [i]
+        for (let j = 1; j <= b.length; j++) {
+          const same = a.charCodeAt(i - 1) === b.charCodeAt(j - 1)
+          next[j] = Math.min(row[j - 1]! + (same ? 0 : 1), row[j]! + 1, next[j - 1]! + 1)
+        }
+        row = next
+      }
+      return row[b.length]!
+    }
+    let seed = 11
+    const random = (below: number): number => {
+      seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff
+      return seed % below
+    }
+    // Few characters, so that the texts share many; lengths across several blocks of 32.
+    const alphabet = ['a', 'b', 'c', ' ', 'ä', '😀']
+    const some = (): string =>
+      Array.from({ length: random(110) }, () => alphabet[random(alphabet.length)]).join('')
+    for (let pair = 0; pair < 3000; pair++) {
+      const [a, b] = [some(), some()]
+      expect(editDistance(a, b), `${a} / ${b}`).toBe(reference(a, b))
+    }
+    expect(editDistance('a'.repeat(64), 'a'.repeat(63) + 'b')).toBe(1)
+    expect(editDistance('x'.repeat(33), '')).toBe(33)
+  })
+
   it('is the edit distance in characters, line by line, over the longer of the two', () => {
     expect(editDistance('kitten', 'sitting')).toBe(3)
     expect(normalized('  return   x ;\t')).toBe('return x ;')
