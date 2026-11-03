@@ -238,6 +238,42 @@ describe('a changed Rule', () => {
     expect(changeRuleEdits(relaxed, 'layered', { ...changed, mode: 'relaxed' })).toEqual([])
   })
 
+  it('keeps one pattern written as a list, and a list of one written as the pattern', () => {
+    const written = yaml(
+      'rules:',
+      '  - id: a',
+      '    why: A.',
+      '    kind: must-not-depend',
+      '    from: [ui]',
+      '    to: db',
+      '  - id: b',
+      '    why: B.',
+      '    kind: layers',
+      '    layers: [[ui], db]'
+    )
+    const a: RuleDraft = {
+      id: 'a',
+      why: 'A, said again.',
+      kind: 'must-not-depend',
+      from: ['ui'],
+      to: ['db']
+    }
+    expect(after(written, changeRuleEdits(written, 'a', a))).toBe(
+      written.replace('    why: A.', '    why: A, said again.')
+    )
+    const b: RuleDraft = {
+      id: 'b',
+      why: 'B.',
+      kind: 'layers',
+      layers: [['ui'], ['db']],
+      mode: 'relaxed'
+    }
+    expect(changeRuleEdits(written, 'b', b)).toEqual([])
+    for (const rule of readRules(written).rules) {
+      expect(changeRuleEdits(written, rule.id, draftOf(rule))).toEqual([])
+    }
+  })
+
   it('takes out the keys a new kind does not have, and adds the ones it has', () => {
     const changed: RuleDraft = {
       id: 'billing-not-web',

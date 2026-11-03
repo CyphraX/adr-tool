@@ -193,6 +193,20 @@ function ruleKeys(draft: RuleDraft): [string, Value][] {
   return keys
 }
 
+/** The keys that name Components: one pattern reads as a list of it (section 2). */
+const PATTERN_KEYS = new Set(['from', 'to', 'among', 'inside', 'of'])
+
+/**
+ * A value as the reader takes it, to compare: `from: billing` and `from: [billing]` say the same,
+ * as do a layer of one and that one alone. What says the same stays as it is written.
+ */
+function readAs(key: string, value: unknown): unknown {
+  const list = (item: unknown): unknown => (typeof item === 'string' ? [item] : item)
+  if (PATTERN_KEYS.has(key)) return list(value)
+  if (key === 'layers' && Array.isArray(value)) return value.map(list)
+  return value
+}
+
 /** Whether a key with its default value says something about a Rule of this kind. */
 const meaningful = (key: string, draft: RuleDraft): boolean =>
   key === 'tests' ||
@@ -651,12 +665,8 @@ export function changeRuleEdits(text: string, id: string, draft: RuleDraft): Tex
       delete object[key]
       return
     }
-    if (
-      readsAs(pair.value === null ? null : (pair.value as { toJSON(): unknown }).toJSON()) ===
-      readsAs(valueOf(want))
-    ) {
-      return
-    }
+    const written = pair.value === null ? null : (pair.value as { toJSON(): unknown }).toJSON()
+    if (readsAs(readAs(key, written)) === readsAs(readAs(key, valueOf(want)))) return
     edits.push(replaceValue(text, pair, want, change))
     object[key] = valueOf(want)
   })
