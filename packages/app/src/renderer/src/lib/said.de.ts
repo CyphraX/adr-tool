@@ -417,7 +417,9 @@ export const DE: Wording<Codes> = {
   orphaned: (v) =>
     v.file === 'gone'
       ? `${v.annotation} ist verwaist: ${v.path} gibt es nicht mehr, auch nicht unter einem neuen Namen mit den zitierten Zeilen. ${ATTACH_AGAIN}`
-      : `${v.annotation} ist verwaist: Die zitierten Zeilen ${v.lines} von ${v.path} werden darin nicht mehr gefunden. ${ATTACH_AGAIN}`,
+      : v.lines.includes('-')
+        ? `${v.annotation} ist verwaist: Die zitierten Zeilen ${v.lines} von ${v.path} werden darin nicht mehr gefunden. ${ATTACH_AGAIN}`
+        : `${v.annotation} ist verwaist: Die zitierte Zeile ${v.lines} von ${v.path} wird darin nicht mehr gefunden. ${ATTACH_AGAIN}`,
   'unreadable-reply': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
   'replies-without-annotation': (v) =>
     `${v.path} enthält Antworten auf ${v.annotation}, aber es gibt keine Annotation ${v.annotation}.`,
