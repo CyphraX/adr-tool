@@ -68,6 +68,9 @@ connections:
     to: conformance
     label: checks the Rules
   - from: cli
+    to: diagrams
+    label: checks the Diagrams
+  - from: cli
     to: kernel
     label: the git port
   - from: app

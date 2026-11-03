@@ -8,6 +8,7 @@ import {
   type CheckedViolation
 } from '@adr-tool/conformance'
 import { DECLARATION_PATH } from '@adr-tool/structure/model'
+import { CONFIG_PATH, KERNEL_SENTENCES, sentenceOf, type UnreadableConfig } from '@adr-tool/kernel'
 import type { CheckReport } from './check'
 import {
   data,
@@ -53,20 +54,42 @@ export function renderCheck(report: CheckReport, format: Format, checkout = ''):
   }
 }
 
-/** Whether the check fails: a Problem of any module, or a Violation without an Exception. */
+/**
+ * Whether the check fails: a Problem of any module — a picture of a Diagram that is not
+ * current among them —, or a Violation without an Exception. Drift fails nothing.
+ */
 export function fails(report: CheckReport): boolean {
   return (
     (report.lint?.problems.length ?? 0) > 0 ||
+    report.config !== undefined ||
     report.declaration.length > 0 ||
     report.conformance.problems.length > 0 ||
-    report.conformance.violations.some((violation) => violation.exception === undefined)
+    report.conformance.violations.some((violation) => violation.exception === undefined) ||
+    report.diagrams.problems.length > 0
   )
 }
 
-/** The Problems of the declaration and of the Rules, and every import of a Violation that fails. */
+/** What the one Problem of `.arch/config.yml` says, in English. */
+const configMessage = (problem: UnreadableConfig): string =>
+  sentenceOf(KERNEL_SENTENCES, problem.said)
+
+/**
+ * The Problems of the settings, of the declaration and of the Rules, every import of a
+ * Violation that fails, then the Problems of the Diagrams and their Drift, as notes.
+ */
 function entries(report: CheckReport): Entry[] {
-  const { conformance } = report
+  const { conformance, config, diagrams } = report
   return [
+    ...(config
+      ? [
+          {
+            path: config.path,
+            line: config.line,
+            code: config.kind,
+            message: configMessage(config)
+          }
+        ]
+      : []),
     ...report.declaration.map(({ path, line, code, message }) => ({
       path,
       ...(line !== undefined && { line }),
@@ -88,7 +111,15 @@ function entries(report: CheckReport): Entry[] {
     })),
     ...conformance.violations
       .filter((violation) => violation.exception === undefined)
-      .flatMap(violationEntries)
+      .flatMap(violationEntries),
+    ...diagrams.problems.map(({ path, line, code, message }) => ({ path, line, code, message })),
+    ...diagrams.drift.map(({ path, line, code, message }) => ({
+      path,
+      line,
+      code,
+      message,
+      note: true as const
+    }))
   ]
 }
 
@@ -129,17 +160,26 @@ function command(entry: Entry, checkout: string): string {
 
 const counted = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`
 
-/** The last lines: one for the Decision Logs, one for the declaration if needed, one for the Rules. */
+/**
+ * The last lines: one for the Decision Logs, one for the settings and one for the declaration
+ * if needed, one for the Rules, and one for the Diagrams where there are any.
+ */
 function summaries(report: CheckReport): string[] {
-  const { conformance } = report
   const lines = [report.lint ? lintSummary(report.lint) : 'No Decision Log.']
+  if (report.config) lines.push(`1 Problem in ${CONFIG_PATH}.`)
   if (report.declaration.length > 0) {
     lines.push(`${counted(report.declaration.length, 'Problem')} in ${DECLARATION_PATH}.`)
   }
-  if (!conformance.present) {
-    lines.push(`No Rules: ${RULES_PATH} is not there.`)
-    return lines
-  }
+  lines.push(rulesSummary(report))
+  const diagrams = diagramsSummary(report)
+  if (diagrams) lines.push(diagrams)
+  return lines
+}
+
+/** The line of the Rules. */
+function rulesSummary(report: CheckReport): string {
+  const { conformance } = report
+  if (!conformance.present) return `No Rules: ${RULES_PATH} is not there.`
   const rules = conformance.rules.length
   const open = conformance.violations.filter((violation) => !violation.exception).length
   const accepted = conformance.violations.length - open
@@ -155,18 +195,51 @@ function summaries(report: CheckReport): string[] {
   if (conformance.problems.length > 0) {
     line += `; ${counted(conformance.problems.length, 'Problem')} in ${RULES_PATH}`
   }
-  lines.push(`${line}.`)
-  return lines
+  return `${line}.`
+}
+
+/**
+ * The line of the Diagrams: how many there are, their Problems, and their Drift — or that
+ * they were not compared with the code, on a Draft. None where there is no Diagram and
+ * nothing is wrong with where they are.
+ */
+function diagramsSummary(report: CheckReport): string | undefined {
+  const { diagrams, problems, drift, compared } = report.diagrams
+  if (diagrams.length === 0) {
+    return problems.length === 0
+      ? undefined
+      : `No Diagram is looked for: ${counted(problems.length, 'Problem')} in ${CONFIG_PATH}.`
+  }
+  const found = problems.length === 0 ? 'no Problem' : counted(problems.length, 'Problem')
+  const differ = !compared
+    ? 'not compared with the code'
+    : drift.length === 0
+      ? 'no Drift'
+      : counted(drift.length, 'Drift')
+  return `${counted(diagrams.length, 'Diagram')}: ${found}, ${differ}.`
 }
 
 /** The document of `--format json` (docs/cli.md, "adr check"). */
 function json(report: CheckReport): object {
   const { conformance } = report
   const decisions = report.lint ? lintJson(report.lint) : { logs: [], problems: [] }
+  const { config, diagrams } = report
   return {
     logs: decisions.logs,
     problems: [
       ...decisions.problems.map((problem) => ({ module: 'decisions', ...problem })),
+      ...(config
+        ? [
+            {
+              module: 'kernel',
+              code: config.kind,
+              message: configMessage(config),
+              path: config.path,
+              line: config.line,
+              problem: config
+            }
+          ]
+        : []),
       ...report.declaration.map(({ code, message, path, line, problem }) => ({
         module: 'structure',
         code,
@@ -182,16 +255,21 @@ function json(report: CheckReport): object {
         path: RULES_PATH,
         line: problem.line,
         problem
-      }))
+      })),
+      ...diagrams.problems.map((problem) => ({ module: 'diagrams', ...problem }))
     ],
-    notes: conformance.notes.map((note) => ({
-      module: 'conformance',
-      code: note.kind,
-      message: wordingOf(note),
-      path: RULES_PATH,
-      line: note.line,
-      note
-    })),
+    notes: [
+      ...conformance.notes.map((note) => ({
+        module: 'conformance',
+        code: note.kind,
+        message: wordingOf(note),
+        path: RULES_PATH,
+        line: note.line,
+        note
+      })),
+      ...diagrams.drift.map((drift) => ({ module: 'diagrams', ...drift }))
+    ],
+    diagrams: diagrams.diagrams,
     rules: conformance.rules.map(({ id, kind, why, line }) => ({
       id,
       kind,

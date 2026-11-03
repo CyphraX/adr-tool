@@ -87,6 +87,7 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
       'app > structure',
       'cli > conformance',
       'cli > core',
+      'cli > diagrams',
       'cli > kernel',
       'cli > structure',
       'conformance > kernel',

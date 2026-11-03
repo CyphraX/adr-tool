@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1208" height="672" viewBox="16 20 1208 672" role="img">
   <title>The packages of Softarch Suite</title>
-  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: Diagrams. app uses kernel: the settings. app uses review: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
+  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses diagrams: checks the Diagrams. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: Diagrams. app uses kernel: the settings. app uses review: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
   <style>
     svg { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
     .background, .ground { fill: #eef1f5; }
@@ -44,6 +44,7 @@
     <path class="line" d="M700 210.36L383.9 138.52" marker-end="url(#arrow)"/>
     <path class="line" d="M700 237.64L383.9 309.48" marker-end="url(#arrow)"/>
     <path class="line" d="M736 248L606.83 377.17" marker-end="url(#arrow)"/>
+    <path class="line" d="M746.11 248L555.9 576.54" marker-end="url(#arrow)"/>
     <path class="line" d="M700 240.36L163.86 386.58" marker-end="url(#arrow)"/>
     <path class="line" d="M960 380L383.71 149.49" marker-end="url(#arrow)"/>
     <path class="line" d="M960 397.14L383.97 331.31" marker-end="url(#arrow)"/>
@@ -119,6 +120,8 @@
     <text class="label" x="540" y="177.6" text-anchor="middle">lints and exports</text>
     <rect class="ground" x="614" y="306" width="112" height="16"/>
     <text class="label" x="670" y="317.6" text-anchor="middle">checks the Rules</text>
+    <rect class="ground" x="583" y="406" width="134" height="16"/>
+    <text class="label" x="650" y="417.6" text-anchor="middle">checks the Diagrams</text>
     <rect class="ground" x="393" y="306" width="74" height="16"/>
     <text class="label" x="430" y="317.6" text-anchor="middle">the git port</text>
     <rect class="ground" x="636.5" y="256" width="67" height="16"/>
