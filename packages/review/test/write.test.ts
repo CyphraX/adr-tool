@@ -431,6 +431,52 @@ describe('giving an Annotation a new Anchor', () => {
     ])
   })
 
+  it('fills an anchor key with nothing in it where it stands, with its comment', async () => {
+    const source = { 'src/a.ts': 'one\ntwo\n' }
+    const empty = '---\ntype: note\nstate: open\nanchor:\ncites: [a]\n---\n\nText\n'
+    const fs = memoryFileSystem({ ...source, [PATH]: empty })
+    await applied(fs, await planAttach(fs, HEAD, ID, { path: 'src/a.ts', start: 2, end: 2 }))
+    expect(await fs.readText(PATH)).toBe(
+      `---\ntype: note\nstate: open\nanchor:\n  path: src/a.ts\n  lines: 2\n  commit: ${sha(7)}\ncites: [a]\n---\n\n\`\`\`ts\ntwo\n\`\`\`\n\nText\n`
+    )
+    expect((await readAnnotations(fs)).annotations[0]?.anchor).toMatchObject({
+      path: 'src/a.ts',
+      start: 2,
+      end: 2,
+      quote: ['two']
+    })
+
+    const spelled = '---\r\nanchor: ~ # to be attached\r\ntype: note\r\n---\r\nText\r\n'
+    const crlf = memoryFileSystem({ ...source, [PATH]: spelled })
+    await applied(
+      crlf,
+      await planAttach(crlf, memoryGit({ commits: [] }), ID, {
+        path: 'src/a.ts',
+        start: 1,
+        end: 1
+      })
+    )
+    expect(await crlf.readText(PATH)).toBe(
+      '---\r\nanchor: # to be attached\r\n  path: src/a.ts\r\n  lines: 1\r\ntype: note\r\n---\r\n\r\n```ts\r\none\r\n```\r\n\r\nText\r\n'
+    )
+  })
+
+  it('keeps the quotes a person gave the lines and the commit', async () => {
+    const quoted = BY_HAND.replace('  lines: 4-6', "  lines: '4-6'").replace(
+      `  commit: ${sha(1)}`,
+      `  commit: "${sha(1)}"`
+    )
+    const fs = memoryFileSystem({ [PATH]: quoted, ...SOURCE })
+    await applied(fs, await planAttach(fs, HEAD, ID, { path: 'src/cart.ts', start: 4, end: 5 }))
+    const after = (await fs.readText(PATH))!
+    expect(after).toContain(`  lines: '4-5'\n  commit: "${sha(7)}"\n`)
+    expect((await readAnnotations(fs)).annotations[0]?.anchor).toMatchObject({
+      start: 4,
+      end: 5,
+      commit: sha(7)
+    })
+  })
+
   it('gives an Annotation without quoted lines a block at the start of its body', async () => {
     const bare =
       '---\ntype: note\nanchor:\n  path: src/cart.ts\n  lines: 1-1\n---\n\nAbout the class.\n'

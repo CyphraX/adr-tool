@@ -9,11 +9,13 @@ import {
   type Plan,
   type TextEdit
 } from '@adr-tool/kernel'
+import { isScalar } from 'yaml'
 import { linesText, readAnnotation, type Anchor, type AnnotationType } from './annotation'
 import type { Found } from './find'
 import {
   addToList,
   asText,
+  fillEmptyKey,
   formatScalar,
   frontmatterIn,
   insertKey,
@@ -285,15 +287,19 @@ function anchorEdits(view: FileView, path: string, anchor: Anchor): TextEdit[] {
   const existing = fm.pair('anchor')
   const old = readAnnotation('', path, text, []).annotation.anchor
 
-  if (!existing || existing.value === null) {
-    if (existing) edits.push(...removeKey(fm, 'anchor'))
+  const value = existing?.value
+  if (!existing || value === null || (isScalar(value) && value.value === null)) {
+    // No anchor, or `anchor:` with nothing in it: the three keys, under the key where it stands.
     const lines = [
-      'anchor:',
-      `  path: ${formatScalar(anchor.path)}`,
-      `  lines: ${linesText(anchor)}`,
-      ...(anchor.commit ? [`  commit: ${anchor.commit}`] : [])
+      `path: ${formatScalar(anchor.path)}`,
+      `lines: ${linesText(anchor)}`,
+      ...(anchor.commit ? [`commit: ${anchor.commit}`] : [])
     ]
-    edits.push(insertKey(fm, 'anchor', lines))
+    edits.push(
+      ...(existing
+        ? fillEmptyKey(fm, existing, lines)
+        : [insertKey(fm, 'anchor', ['anchor:', ...lines.map((line) => `  ${line}`)])])
+    )
   } else {
     if (!fm.anchor()) refuse({ code: 'key-by-hand', values: { path, key: 'anchor' } })
     edits.push(...setValue(fm, 'path', anchor.path, 'anchor'))

@@ -110,6 +110,32 @@ function fillEmpty(fm: Frontmatter, pair: AnyPair, formatted: string): TextEdit 
 }
 
 /**
+ * `key:` with nothing after it, or a spelled-out `null`, gets `lines` below it, indented under
+ * it — a mapping where there was none. The key stays where it stands, with its comment.
+ */
+export function fillEmptyKey(fm: Frontmatter, pair: AnyPair, lines: readonly string[]): TextEdit[] {
+  const { text, eol } = fm.view
+  const key = pair.key as Scalar
+  const keyStart = fm.abs(key.range![0])
+  const indent = text.slice(lineStart(text, keyStart), keyStart)
+  if (indent.trim() !== '') {
+    refuse({ code: 'key-by-hand', values: { path: fm.path, key: scalarText(key) ?? '' } })
+  }
+  const edits: TextEdit[] = []
+  const range = (pair.value as Scalar | null)?.range
+  if (range && range[1] > range[0]) {
+    // `~` or `null` goes, with the space before it.
+    const colon = text.indexOf(':', fm.abs(key.range![1]))
+    edits.push({ start: colon + 1, end: fm.abs(range[1]), insert: '' })
+  }
+  const at = pairEnd(fm, pair)
+  const lead = text[at - 1] === '\n' ? '' : eol
+  const insert = lines.map((line) => `${indent}  ${line}${eol}`).join('')
+  edits.push({ start: at, end: at, insert: lead + insert })
+  return edits
+}
+
+/**
  * Insert whole lines — `lines`, without their indentation and line breaks — for `key`: after
  * the last key of the format that comes before it, or at the top of the frontmatter (or of the
  * anchor mapping). Existing keys never move.
