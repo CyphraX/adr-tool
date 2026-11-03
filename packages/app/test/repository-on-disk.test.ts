@@ -166,6 +166,19 @@ describe('a repository on disk', () => {
         join(showcase, 'docs/adr')
       ].sort()
     )
+    // And where the Diagrams are, with the directory they would appear in.
+    expect(watchPaths(showcase, repository, 'docs/architecture/diagrams')).toEqual(
+      [
+        showcase,
+        join(showcase, '.adr'),
+        join(showcase, '.arch'),
+        join(showcase, 'doc'),
+        join(showcase, 'docs'),
+        join(showcase, 'docs/adr'),
+        join(showcase, 'docs/architecture'),
+        join(showcase, 'docs/architecture/diagrams')
+      ].sort()
+    )
   })
 })
 

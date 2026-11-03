@@ -28,6 +28,7 @@
     "@adr-tool/conformance": "workspace:*",
     "@adr-tool/core": "workspace:*",
     "@adr-tool/diagrams": "workspace:*",
+    "@adr-tool/kernel": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-html": "^6.4.12",

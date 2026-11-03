@@ -10,6 +10,7 @@ import type {
   Said,
   Templates
 } from '@adr-tool/core'
+import type { DiagramsApi } from './diagrams'
 import type { Language as WindowLanguage } from './language'
 import type {
   Cycle,
@@ -463,7 +464,7 @@ export type ApplyResult =
       readonly inPart?: true
     }
 
-export interface Api {
+export interface Api extends DiagramsApi {
   /** `win32`, `darwin` or `linux`. */
   readonly platform: string
   /** Reopen what was open when the app was last closed. */
