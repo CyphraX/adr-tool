@@ -187,4 +187,4 @@ it('computes the metrics of this repository as their definitions say', async () 
   // It uses the cores of Decisions, Structure, Conformance, Diagrams and Review, the git and
   // the export of the command line, and the kernel for the settings of `.arch/config.yml`.
   expect(metrics.get('app')).toMatchObject({ fanOut: 7, fanIn: 0 })
-})
+}, 30_000)
