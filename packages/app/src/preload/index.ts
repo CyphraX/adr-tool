@@ -29,10 +29,8 @@ const api: Api = {
   branches: (repositoryId) => ipcRenderer.invoke(CHANNEL.branches, repositoryId),
   branchAdr: (repositoryId, sha, path) =>
     ipcRenderer.invoke(CHANNEL.branchAdr, repositoryId, sha, path),
-  exportSite: (repositoryId, diagrams) =>
-    ipcRenderer.invoke(CHANNEL.exportSite, repositoryId, diagrams),
-  exportPdf: (repositoryId, diagrams) =>
-    ipcRenderer.invoke(CHANNEL.exportPdf, repositoryId, diagrams),
+  pickExport: (repositoryId, kind) => ipcRenderer.invoke(CHANNEL.pickExport, repositoryId, kind),
+  exportTo: (ticket, diagrams) => ipcRenderer.invoke(CHANNEL.exportTo, ticket, diagrams),
   openExported: (path) => ipcRenderer.invoke(CHANNEL.openExported, path),
   applyChange: (changeId) => ipcRenderer.invoke(CHANNEL.applyChange, changeId),
   discardChange: (changeId) => ipcRenderer.invoke(CHANNEL.discardChange, changeId),

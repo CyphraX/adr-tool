@@ -15,6 +15,7 @@ import type {
   BranchOverview,
   CommitPlan,
   Decision,
+  ExportKind,
   HistoryEntry,
   OpenRepository,
   PlannedChange,
@@ -756,22 +757,24 @@ class AppState {
    * Export the Decision Logs, as web pages or as a PDF, to where the person picks in the
    * system's dialog; then offer to open what was written.
    */
-  async exportAs(kind: 'site' | 'pdf'): Promise<void> {
+  async exportAs(kind: ExportKind): Promise<void> {
     const tab = this.active
     if (!tab || this.exporting) return
     this.exporting = true
-    const id = tab.repository.id
-    // The Mermaid blocks are drawn here, where there is a browser to draw them, and shown in the
-    // export as drawn; the export writes them through the same code as `adr export`, which has
-    // none and keeps them as code (docs/adr/0016-…).
-    const result = await drawnForExport(
-      tab.repository.repository.logs.flatMap((log) =>
-        log.adrs.flatMap((adr) => mermaidSources(adr.body))
-      )
-    )
-      .then((diagrams) =>
-        kind === 'site' ? window.api.exportSite(id, diagrams) : window.api.exportPdf(id, diagrams)
-      )
+    // Where it goes first; then the Mermaid blocks are drawn here, where there is a browser to
+    // draw them, and shown in the export as drawn. The export writes them through the same code
+    // as `adr export`, which has none and keeps them as code (docs/adr/0016-…).
+    const result = await window.api
+      .pickExport(tab.repository.id, kind)
+      .then(async (destination) => {
+        if (destination === undefined || !destination.ok) return destination
+        const diagrams = await drawnForExport(
+          tab.repository.repository.logs.flatMap((log) =>
+            log.adrs.flatMap((adr) => mermaidSources(adr.body))
+          )
+        )
+        return window.api.exportTo(destination.ticket, diagrams)
+      })
       .catch((error: unknown) => ({ ok: false as const, reason: String(error) }))
       .finally(() => (this.exporting = false))
     if (result === undefined) return

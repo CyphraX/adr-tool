@@ -447,6 +447,13 @@ export type ExportResult =
   | { readonly ok: true; readonly path: string; readonly adrs: number }
   | { readonly ok: false; readonly reason: string }
 
+/** What an export is written as: web pages into a folder, or one PDF file. */
+export type ExportKind = 'site' | 'pdf'
+
+/** Where the person picked for an export, held by the main process and named by a ticket. */
+export type ExportDestination =
+  { readonly ok: true; readonly ticket: string } | { readonly ok: false; readonly reason: string }
+
 export type ApplyResult =
   | { readonly applied: true; readonly repository: OpenRepository }
   | {
@@ -509,19 +516,17 @@ export interface Api {
   /** An ADR as the commit of a branch has it, read from git; `undefined` for any other file. */
   branchAdr(repositoryId: string, sha: string, path: string): Promise<Adr | undefined>
   /**
-   * Export the Decision Logs as web pages into a folder the person picks; `undefined` when they
-   * pick none (docs/plan-roadmap.md, part 10).
+   * Ask the person where to export the Decision Logs: a folder for web pages, a file for a PDF
+   * with one ADR per page (docs/plan-roadmap.md, part 10). The place stays in the main process;
+   * the window gets a ticket for it, or `undefined` when the person picks none.
    */
-  exportSite(
-    repositoryId: string,
+  pickExport(repositoryId: string, kind: ExportKind): Promise<ExportDestination | undefined>
+  /** Export to the place a ticket names, once. */
+  exportTo(
+    ticket: string,
     /** The Mermaid blocks of the ADRs as the window drew them; a block without one stays code. */
     diagrams: readonly DrawnDiagram[]
-  ): Promise<ExportResult | undefined>
-  /** Export them as a PDF, one ADR per page, to a file the person picks. */
-  exportPdf(
-    repositoryId: string,
-    diagrams: readonly DrawnDiagram[]
-  ): Promise<ExportResult | undefined>
+  ): Promise<ExportResult>
   /** Open what an export wrote, as the system opens such a file; nothing else. */
   openExported(path: string): Promise<void>
   /** Write a planned change, unless a file it touches changed on disk in the meantime. */
@@ -609,8 +614,8 @@ export const CHANNEL = {
   discardCommit: 'git:discard-commit',
   branches: 'git:branches',
   branchAdr: 'git:branch-adr',
-  exportSite: 'export:site',
-  exportPdf: 'export:pdf',
+  pickExport: 'export:pick',
+  exportTo: 'export:write',
   openExported: 'export:open',
   applyChange: 'change:apply',
   discardChange: 'change:discard',
