@@ -9,6 +9,7 @@
  */
 import ts from 'typescript'
 import type { Extraction } from '../extraction'
+import { measureTypeScript } from './measure'
 import { scriptOfSvelte } from './svelte'
 
 export interface Use {
@@ -43,7 +44,8 @@ export function extractUses(path: string, text: string): Extraction {
     // name. An empty export after the last line makes it a module and moves nothing.
     ALWAYS_A_MODULE.test(path) ? `${code}\nexport {}` : code,
     ts.ScriptTarget.Latest,
-    false,
+    // The measures ask what a function is assigned to (./measure.ts).
+    true,
     kind
   )
 
@@ -103,7 +105,9 @@ export function extractUses(path: string, text: string): Extraction {
     ts.forEachChild(node, visit)
   }
   ts.forEachChild(source, visit)
-  return { analysed: true, uses }
+  // A component is named by its file: `Row` for `Row.svelte`.
+  const component = isSvelte ? path.slice(path.lastIndexOf('/') + 1, -'.svelte'.length) : undefined
+  return { analysed: true, uses, measures: measureTypeScript(source, component) }
 }
 
 const isDeclared = (node: ts.ModuleDeclaration): boolean =>

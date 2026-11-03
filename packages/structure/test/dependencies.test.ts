@@ -118,8 +118,9 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
       notResolved: [],
       libraries: [],
       notAnalysed: [],
-      // Its lines are counted all the same.
-      lineCounts: new Map([['src/main/java/a/A.java', 1]])
+      // Its lines are counted all the same; nothing inside it is measured.
+      lineCounts: new Map([['src/main/java/a/A.java', 1]]),
+      measures: new Map()
     })
   })
 

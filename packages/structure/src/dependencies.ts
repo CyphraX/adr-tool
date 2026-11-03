@@ -6,6 +6,7 @@ import type { FileSystem } from '@adr-tool/kernel'
 import { extractorOf, type Extract, type Extraction } from './extraction'
 import type { JavaOutline } from './java/outline'
 import { resolveJava } from './java/resolve'
+import type { FileMeasures } from './measures'
 import type { StructureSaid } from './sentences'
 import type { SourceFile } from './source-files'
 import { prepareResolver } from './typescript/resolution'
@@ -60,6 +61,11 @@ export interface Dependencies {
   readonly notAnalysed: readonly NotAnalysed[]
   /** How many lines each Source File has that could be read (section 5, Size). */
   readonly lineCounts: ReadonlyMap<string, number>
+  /**
+   * What is measured inside each Source File that was analysed by a language that measures:
+   * its functions, classes and declarations (section 5, "Inside a Source File").
+   */
+  readonly measures: ReadonlyMap<string, FileMeasures>
 }
 
 /** How many files are read at a time: enough to keep the disk busy, few enough for any limit. */
@@ -118,6 +124,7 @@ export async function analyseDependencies(
   const libraries: LibraryUse[] = []
   const notAnalysed: NotAnalysed[] = []
   const java = new Map<string, JavaOutline>()
+  const measures = new Map<string, FileMeasures>()
   const depend = (from: string, to: string, typeOnly: boolean, line: number): void => {
     const key = `${from}\n${to}`
     const pair = pairs.get(key)
@@ -142,6 +149,7 @@ export async function analyseDependencies(
       notAnalysed.push({ file: path, line, message, ...(said && { said }) })
       continue
     }
+    if (extraction.measures) measures.set(path, extraction.measures)
     if ('java' in extraction) {
       java.set(path, extraction.java)
       continue
@@ -185,5 +193,5 @@ export async function analyseDependencies(
       return { ...pair, lines, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
     })
     .sort((a, b) => byPath(a.from, b.from) || byPath(a.to, b.to))
-  return { dependencies, notResolved, libraries, notAnalysed, lineCounts }
+  return { dependencies, notResolved, libraries, notAnalysed, lineCounts, measures }
 }

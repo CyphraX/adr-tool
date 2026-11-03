@@ -10,6 +10,7 @@
 import { Language, Parser, type Node } from 'web-tree-sitter'
 import type { Extraction } from '../extraction'
 import { detailed } from '../sentences'
+import { measureJava } from './measure'
 
 export interface JavaImport {
   /** As written, without `.*`: `java.util.List`, `java.util`. */
@@ -87,7 +88,7 @@ export async function prepareJava(wasm: {
         )
         return { analysed: false, line: error.startPosition.row + 1, message, said }
       }
-      return { analysed: true, java: outline(root) }
+      return { analysed: true, java: outline(root), measures: measureJava(root) }
     } finally {
       tree.delete()
     }

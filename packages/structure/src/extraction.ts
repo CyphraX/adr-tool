@@ -4,6 +4,7 @@
  * file's path and text, so the same text yields the same extraction.
  */
 import type { JavaOutline, JavaReader } from './java/outline'
+import type { FileMeasures } from './measures'
 import type { StructureSaid } from './sentences'
 import { languageOf } from './source-files'
 import { extractUses, type Use } from './typescript/extract'
@@ -12,13 +13,18 @@ import { extractUses, type Use } from './typescript/extract'
  * Changes whenever the same text would be extracted differently. What was cached under
  * another version is extracted again.
  */
-export const EXTRACTION_VERSION = 3
+export const EXTRACTION_VERSION = 4
 
 export type Extraction =
   /** TypeScript, JavaScript, Svelte: the module specifiers the code uses, as written. */
-  | { readonly analysed: true; readonly uses: readonly Use[] }
+  | {
+      readonly analysed: true
+      readonly uses: readonly Use[]
+      /** Its functions, classes and declarations (section 5, "Inside a Source File"). */
+      readonly measures?: FileMeasures
+    }
   /** Java: what the file declares and uses, for the symbol table of its packages. */
-  | { readonly analysed: true; readonly java: JavaOutline }
+  | { readonly analysed: true; readonly java: JavaOutline; readonly measures?: FileMeasures }
   /**
    * The file cannot be parsed. It keeps its Component and has no Dependencies of its own
    * (section 2, "Files that cannot be read"). `line` and `message` are the parser's first

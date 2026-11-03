@@ -7,6 +7,7 @@ import type { DeclaredComponent } from './declaration'
 import type { Dependency } from './dependencies'
 import { withDirectories } from './directories'
 import type { LevelOptions } from './levels'
+import type { FileMeasures } from './measures'
 import type { Structure } from './structure'
 
 /** What every node of a level has: the Source Files it stands for, and their lines. */
@@ -30,6 +31,13 @@ export interface Metrics extends Size {
   readonly cohesion: number
   /** R divided by every Dependency that starts or ends inside; `undefined` when there is none. */
   readonly internalShare: number | undefined
+  /**
+   * A: the abstract declarations inside divided by all declarations inside; `undefined` where
+   * nothing inside declares anything abstractness counts, or nothing is measured.
+   */
+  readonly abstractness: number | undefined
+  /** D = |A + I − 1|, the distance from the main sequence; `undefined` where A or I is. */
+  readonly distance: number | undefined
 }
 
 export function sizeOf(files: readonly string[], lineCounts: ReadonlyMap<string, number>): Size {
@@ -49,18 +57,23 @@ interface Tally {
   internal: number
   out: number
   in: number
+  /** The declarations abstractness counts, and the abstract ones among them. */
+  declarations: number
+  abstract: number
 }
 
 /**
  * The metrics of every Component that contains a Source File, and of every directory node,
  * in the order of the declaration, parents before their children. Test files are left out unless asked for;
- * Unassigned files count as outside.
+ * Unassigned files count as outside. Abstractness and distance need what was measured inside
+ * the files; without `measures` they are undefined.
  */
 export function metricsOf(
   structure: Pick<Structure, 'components' | 'sourceFiles'>,
   dependencies: readonly Dependency[],
   lineCounts: ReadonlyMap<string, number>,
-  options: LevelOptions = {}
+  options: LevelOptions = {},
+  measures: ReadonlyMap<string, FileMeasures> = new Map()
 ): Map<string, Metrics> {
   // The directories below a Component without children have metrics as well.
   structure = withDirectories(structure)
@@ -80,7 +93,9 @@ export function metricsOf(
         fanIn: new Set(),
         internal: 0,
         out: 0,
-        in: 0
+        in: 0,
+        declarations: 0,
+        abstract: 0
       })
       walk(component.children, chain)
     }
@@ -94,10 +109,14 @@ export function metricsOf(
     if (file.test && !options.tests) continue
     const chain = (file.component !== undefined && chains.get(file.component)) || NONE
     chainOf.set(file.path, chain)
+    const declarations = measures.get(file.path)?.declarations ?? []
+    const abstract = declarations.filter((declaration) => declaration.abstract).length
     for (const id of chain) {
       const tally = tallies.get(id)!
       tally.files++
       tally.lines += lineCounts.get(file.path) ?? 0
+      tally.declarations += declarations.length
+      tally.abstract += abstract
     }
   }
 
@@ -134,17 +153,31 @@ export function metricsOf(
     const efferent = tally.efferent.size
     const afferent = tally.afferent.size
     const touching = tally.internal + tally.out + tally.in
+    const instability = efferent + afferent === 0 ? undefined : efferent / (efferent + afferent)
+    const abstractness = tally.declarations === 0 ? undefined : tally.abstract / tally.declarations
     metrics.set(id, {
       files: tally.files,
       lines: tally.lines,
       efferent,
       afferent,
-      instability: efferent + afferent === 0 ? undefined : efferent / (efferent + afferent),
+      instability,
       fanOut: tally.fanOut.size,
       fanIn: tally.fanIn.size,
       cohesion: (tally.internal + 1) / tally.files,
-      internalShare: touching === 0 ? undefined : tally.internal / touching
+      internalShare: touching === 0 ? undefined : tally.internal / touching,
+      abstractness,
+      distance: distanceOf(abstractness, instability)
     })
   }
   return metrics
+}
+
+/** D = |A + I − 1|: how far a Component lies from the main sequence, A + I = 1. */
+export function distanceOf(
+  abstractness: number | undefined,
+  instability: number | undefined
+): number | undefined {
+  if (abstractness === undefined || instability === undefined) return undefined
+  // A third and two thirds are not quite one: what lies on the main sequence is 0.
+  return Math.round(Math.abs(abstractness + instability - 1) * 1e12) / 1e12
 }

@@ -39,7 +39,16 @@ export {
   type LevelOptions
 } from './levels'
 export { findCycles, type Cycle, type WeightedEdge } from './cycles'
-export { metricsOf, sizeOf, type Metrics, type Size } from './metrics'
+export { distanceOf, metricsOf, sizeOf, type Metrics, type Size } from './metrics'
+export {
+  ANONYMOUS,
+  type ClassMeasure,
+  type DeclarationMeasure,
+  type FileMeasures,
+  type FunctionMeasure
+} from './measures'
+export { measuredInside, type MeasuredClass, type MeasuredFunction } from './inside'
+export { propagationCostOf } from './propagation'
 export {
   matrixOf,
   orderOf,
