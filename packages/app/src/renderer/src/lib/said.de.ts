@@ -393,10 +393,8 @@ export const DE: Wording<Codes> = {
     `${v.path} ist so geschrieben, dass die Suite ${v.component} nicht herausnehmen kann. Es muss mit seinen Verbindungen in einem Editor entfernt werden.`,
 
   // The Problems of Review.
-  'unreadable-configuration': (v) =>
-    `${v.path} kann nicht gelesen werden: ${german(v.detail)}. Bis die Datei korrigiert ist, wird keine Annotation gelesen.`,
   'invalid-annotations-directory': (v) =>
-    `„annotations“ in ${v.path} muss ein relativer Pfad innerhalb des Repositorys sein, nicht „${v.value}“. Bis das korrigiert ist, wird keine Annotation gelesen.`,
+    `„annotations“ in ${v.path} muss ein relativer Pfad innerhalb des Repositorys sein. Bis das korrigiert ist, wird keine Annotation gelesen.`,
   'unreadable-annotation': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
   'invalid-type': (v) =>
     `${v.path}: „type“ muss note, question oder concern sein, nicht „${v.value}“.`,
@@ -420,7 +418,6 @@ export const DE: Wording<Codes> = {
     `${v.path} enthält Antworten auf ${v.annotation}, aber es gibt keine Annotation ${v.annotation}.`,
 
   // Why an Annotation's file cannot be read, or a value is wrong: the rest of a sentence about it.
-  'config-not-mapping': () => 'die oberste Ebene muss ein Mapping sein',
   'no-frontmatter': () => 'es hat kein Frontmatter',
   'frontmatter-open': () => 'sein Frontmatter wird nie geschlossen',
   'frontmatter-yaml': (v) => `sein Frontmatter ist kein gültiges YAML: ${v.message}`,

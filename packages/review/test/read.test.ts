@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryFileSystem, sentenceOf } from '@adr-tool/kernel'
+import { memoryFileSystem, readConfig, sentenceOf } from '@adr-tool/kernel'
 import {
   annotationsCiting,
   readAnnotations,
@@ -138,37 +138,51 @@ describe('reading the Annotations of a repository', () => {
     expect(read.directory).toBe('docs/reviews')
     expect(read.annotations).toHaveLength(1)
 
-    const problemOf = async (config: string) => {
+    const readingOf = async (config: string) => {
       const reading = await readAnnotations(
         memoryFileSystem({ '.arch/config.yml': config, [`${DIR}/a.md`]: ANNOTATION })
       )
       expect(reading.directory).toBeUndefined()
       expect(reading.annotations).toEqual([])
-      return reading.problems.map(wordingOf)
+      return reading
     }
-    expect(await problemOf('annotations: ../outside\n')).toEqual([
-      '"annotations" in .arch/config.yml must be a relative path inside the repository, not "../outside". No Annotation is read until it is fixed.'
+    const problemOf = async (config: string) => (await readingOf(config)).problems
+    const atLine = (line: number) => [
+      { kind: 'invalid-annotations-directory', path: '.arch/config.yml', line }
+    ]
+    expect(await problemOf('diagrams: design\nannotations: ../outside\n')).toEqual(atLine(2))
+    expect((await problemOf('annotations: ../outside\n')).map(wordingOf)).toEqual([
+      '"annotations" in .arch/config.yml must be a relative path inside the repository. No Annotation is read until it is fixed.'
     ])
-    expect(await problemOf('annotations: [a, b]\n')).toHaveLength(1)
+    expect(await problemOf('annotations: [a, b]\n')).toEqual(atLine(1))
+    expect(await problemOf('annotations: .\n')).toEqual(atLine(1))
     // A number or a truth value is no path, though it is written like one.
     for (const value of ['123', 'true', '0x1f']) {
-      expect(await problemOf(`annotations: ${value}\n`)).toEqual([
-        `"annotations" in .arch/config.yml must be a relative path inside the repository, not "${value}". No Annotation is read until it is fixed.`
-      ])
+      expect(await problemOf(`annotations: ${value}\n`)).toEqual(atLine(1))
     }
     const quoted = await readAnnotations(
       memoryFileSystem({ '.arch/config.yml': 'annotations: "2026"\n' })
     )
     expect(quoted.directory).toBe('2026')
-    expect(await problemOf('- a list\n')).toEqual([
-      '.arch/config.yml cannot be read: its top level must be a mapping. No Annotation is read until it is fixed.'
-    ])
-    expect((await problemOf('annotations: [\n'))[0]).toMatch(
-      /^\.arch\/config\.yml cannot be read: it is not valid YAML: .*\. No Annotation is read until it is fixed\.$/
+
+    // A file that cannot be read is the kernel's one Problem, which the caller reports once for
+    // every module: Review reads no Annotation, and says nothing of its own.
+    for (const config of ['- a list\n', 'annotations: [\n', 'annotations: a\nannotations: b\n']) {
+      expect(await problemOf(config)).toEqual([])
+      expect(readConfig(config)).toMatchObject({ readable: false })
+    }
+    // The configuration a caller read for every module is used as it is.
+    const given = await readAnnotations(
+      memoryFileSystem({ [`${DIR}/a.md`]: ANNOTATION }),
+      readConfig('annotations: docs/reviews\n')
     )
+    expect(given).toMatchObject({ directory: 'docs/reviews', annotations: [], problems: [] })
+
     // Without the key, or with an empty one, the default.
-    const empty = await readAnnotations(memoryFileSystem({ '.arch/config.yml': 'annotations:\n' }))
-    expect(empty.directory).toBe(DIR)
+    for (const config of ['annotations:\n', 'annotations: ~\n', '# nothing\n', '']) {
+      const empty = await readAnnotations(memoryFileSystem({ '.arch/config.yml': config }))
+      expect(empty.directory).toBe(DIR)
+    }
   })
 })
 

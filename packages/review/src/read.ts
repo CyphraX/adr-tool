@@ -1,51 +1,62 @@
-import { isMap, isScalar, parseDocument } from 'yaml'
-import { joinPath, normalizePath, type FileSystem } from '@adr-tool/kernel'
-import { readAnnotation, readReply, scalarText, type Annotation, type Reply } from './annotation'
+import {
+  CONFIG_PATH,
+  joinPath,
+  normalizePath,
+  openConfig,
+  type Config,
+  type FileSystem
+} from '@adr-tool/kernel'
+import { readAnnotation, readReply, type Annotation, type Reply } from './annotation'
 import type { ReviewProblem } from './problems'
 
-/** Where a repository says its Annotations are; other modules keep their settings beside it. */
-export const CONFIGURATION_PATH = '.arch/config.yml'
+/** The key of `.arch/config.yml` that is Review's own (docs/configuration.md). */
+export const ANNOTATIONS_KEY = 'annotations'
 
 /** Where the Annotations are when the configuration does not say (docs/review-format.md, section 1). */
 export const DEFAULT_ANNOTATIONS_DIRECTORY = 'docs/architecture/annotations'
 
-/** The directory of the Annotations, or the Problem that keeps them from being read. */
-export type AnnotationsDirectory =
-  | { readonly directory: string }
-  | { readonly directory?: undefined; readonly problem: ReviewProblem }
+export interface AnnotationsLocation {
+  /**
+   * The directory of the Annotations; `undefined` while `.arch/config.yml` cannot be read, or
+   * its key `annotations` cannot be used.
+   */
+  readonly directory: string | undefined
+  /** What is wrong with the key `annotations`: while there is something, no Annotation is read. */
+  readonly problems: readonly ReviewProblem[]
+}
 
-/** Read `annotations` from `.arch/config.yml`. Never writes. */
-export async function annotationsDirectory(fs: FileSystem): Promise<AnnotationsDirectory> {
-  const text = await fs.readText(CONFIGURATION_PATH)
-  if (text === undefined) return { directory: DEFAULT_ANNOTATIONS_DIRECTORY }
-  const doc = parseDocument(text)
-  const unreadable = (
-    detail: Extract<ReviewProblem, { kind: 'unreadable-configuration' }>['detail']
-  ): AnnotationsDirectory => ({
-    problem: { kind: 'unreadable-configuration', path: CONFIGURATION_PATH, detail } as const
-  })
-  if (doc.errors.length > 0) {
-    const message = doc.errors[0]!.message.split('\n')[0]!.replace(/:$/, '')
-    return unreadable({ code: 'config-not-yaml', values: { message } })
-  }
-  if (doc.contents === null) return { directory: DEFAULT_ANNOTATIONS_DIRECTORY }
-  if (!isMap(doc.contents)) return unreadable({ code: 'config-not-mapping', values: {} })
-  const value = doc.contents.items.find((pair) => scalarText(pair.key) === 'annotations')?.value
-  if (value === undefined || value === null || (isScalar(value) && value.value === null)) {
-    return { directory: DEFAULT_ANNOTATIONS_DIRECTORY }
+/**
+ * Where the settings say the Annotations are. Review reads its own key and no other. While the
+ * file cannot be read, no Annotation is read or written, and the Problem is the file's: the
+ * kernel's, which the caller reports once for every module (docs/configuration.md).
+ */
+export function readLocation(config: Config): AnnotationsLocation {
+  if (!config.readable) return { directory: undefined, problems: [] }
+  const setting = config.settings.get(ANNOTATIONS_KEY)
+  if (setting === undefined || setting.value === null) {
+    return { directory: DEFAULT_ANNOTATIONS_DIRECTORY, problems: [] }
   }
   // A path is a text: `123` or `true` is a number or a truth value as YAML reads it, and other
   // tools that read the file would take it so.
-  const written = isScalar(value) ? scalarText(value) : undefined
-  const path = isScalar(value) && typeof value.value === 'string' ? written : undefined
-  const directory = path === undefined ? undefined : normalizePath(path)
+  const directory = typeof setting.value === 'string' ? normalizePath(setting.value) : undefined
   if (directory === undefined || directory === '') {
-    const shown = written ?? String(doc.contents.get('annotations'))
     return {
-      problem: { kind: 'invalid-annotations-directory', path: CONFIGURATION_PATH, value: shown }
+      directory: undefined,
+      problems: [{ kind: 'invalid-annotations-directory', path: CONFIG_PATH, line: setting.line }]
     }
   }
-  return { directory }
+  return { directory, problems: [] }
+}
+
+/**
+ * Where the Annotations of the repository are. `config` is `.arch/config.yml` as the caller read
+ * it for every module; without it, it is read here. Never writes.
+ */
+export async function locateAnnotations(
+  fs: FileSystem,
+  config?: Config
+): Promise<AnnotationsLocation> {
+  return readLocation(config ?? (await openConfig(fs)))
 }
 
 /**
@@ -59,12 +70,13 @@ export function isAnnotationId(id: string): boolean {
   return /^[^/\\\p{Cc}]*[^/\\\p{Cc}. ]$/u.test(id) && id.toLowerCase() !== 'readme'
 }
 
-export interface AnnotationsReading {
-  /** Where the Annotations are; `undefined` while the configuration cannot be used. */
-  readonly directory: string | undefined
-  /** By their IDs. */
+export interface AnnotationsReading extends AnnotationsLocation {
+  /** By their IDs; empty while the directory is not looked into. */
   readonly annotations: readonly Annotation[]
-  /** What is wrong with the configuration and with each file. Orphaned Annotations are found apart (`findAnchors`). */
+  /**
+   * What is wrong with the key `annotations` and with each file. Orphaned Annotations are found
+   * apart (`findAnchors`); a `.arch/config.yml` that cannot be read is the kernel's Problem.
+   */
   readonly problems: readonly ReviewProblem[]
 }
 
@@ -73,14 +85,16 @@ const byName = (a: { name: string }, b: { name: string }): number =>
 
 /**
  * Read the Annotations of a repository with their Replies (docs/review-format.md, sections 1 to
- * 3). Never throws, never writes: what cannot be read becomes a Problem.
+ * 3). `config` is `.arch/config.yml` as the caller read it for every module; without it, it is
+ * read here. Never throws, never writes: what cannot be read becomes a Problem.
  */
-export async function readAnnotations(fs: FileSystem): Promise<AnnotationsReading> {
-  const where = await annotationsDirectory(fs)
-  if (where.directory === undefined) {
-    return { directory: undefined, annotations: [], problems: [where.problem] }
-  }
-  const { directory } = where
+export async function readAnnotations(
+  fs: FileSystem,
+  config?: Config
+): Promise<AnnotationsReading> {
+  const location = await locateAnnotations(fs, config)
+  const { directory } = location
+  if (directory === undefined) return { ...location, annotations: [] }
   const entries = [...((await fs.list(directory)) ?? [])].sort(byName)
   const files = entries.filter(
     (entry) =>

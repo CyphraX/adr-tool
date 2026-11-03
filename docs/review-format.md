@@ -19,9 +19,10 @@ Each Annotation is a Markdown file of its own in one directory, `docs/architectu
 annotations: docs/reviews        # optional; docs/architecture/annotations when absent
 ```
 
-- `annotations` is a path relative to the repository root, with `/` between its parts, written as a text: `123` or `true` is a number or a truth value to YAML, and is a Problem; `"123"` is the directory `123`. Other keys of `.arch/config.yml` belong to other modules, or to nobody, and are never touched.
+- `annotations` is Review's key of the suite's settings ([configuration.md](configuration.md)): a path relative to the repository root, with `/` between its parts, written as a text: `123` or `true` is a number or a truth value to YAML, and is a Problem; `"123"` is the directory `123`. Without the key, or with nothing after it, the default. Review reads this key and no other.
 - The directory is created with the first Annotation. Opening a repository never creates it.
-- While `.arch/config.yml` cannot be read, or `annotations` is not a relative path inside the repository, no Annotation is read and none is written: they would not be found once the file is repaired. That is a Problem (section 6).
+- While `annotations` is not a relative path inside the repository, no Annotation is read and none is written: they would not be found once the key is fixed. That is a Problem of Review at the line of the key (section 6).
+- While `.arch/config.yml` cannot be read at all — it is not YAML, or its top level is not a map —, no Annotation is read and none is written either, and the default is not used. That is the one Problem of the file, said once for every module ([configuration.md](configuration.md), section 2); Review says nothing of its own about it.
 
 In the directory:
 
@@ -180,8 +181,7 @@ Review adds these **Problems**. Each has a code and an English sentence; the win
 
 | Code | Sentence | Repair |
 | --- | --- | --- |
-| `unreadable-configuration` | `.arch/config.yml` cannot be read: *why*. No Annotation is read until it is fixed. | — |
-| `invalid-annotations-directory` | "annotations" in `.arch/config.yml` must be a relative path inside the repository, not "*value*". No Annotation is read until it is fixed. | — |
+| `invalid-annotations-directory` | "annotations" in `.arch/config.yml` must be a relative path inside the repository. No Annotation is read until it is fixed. At the line of the key. | — |
 | `unreadable-annotation` | *file* cannot be read: *why* — it has no frontmatter, its frontmatter is never closed, is not YAML, or is not a mapping. | — |
 | `invalid-type` | *file*: "type" must be note, question or concern, not "*value*". | — |
 | `invalid-state` | *file*: "state" must be open or resolved, not "*value*". | — |

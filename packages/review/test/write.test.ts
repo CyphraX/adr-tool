@@ -223,8 +223,24 @@ describe('creating an Annotation', () => {
     })
     expect(await planAnnotation(broken, HEAD, NEW)).toMatchObject({
       ok: false,
-      said: { code: 'annotations-unavailable' }
+      said: {
+        code: 'annotations-unavailable',
+        values: { detail: { code: 'invalid-annotations-directory' } }
+      }
     })
+    // A file that cannot be read says so in the kernel's words, as for every module.
+    const unreadable = memoryFileSystem({ ...SOURCE, '.arch/config.yml': '- a list\n' })
+    const refusal = await planAnnotation(unreadable, HEAD, NEW)
+    expect(refusal).toMatchObject({
+      ok: false,
+      said: {
+        code: 'annotations-unavailable',
+        values: { detail: { code: 'unreadable-config', values: { path: '.arch/config.yml' } } }
+      }
+    })
+    expect(refusal.ok ? '' : refusal.reason).toBe(
+      'The Annotations cannot be written: .arch/config.yml cannot be read: its top level must be a map. What its settings decide is not done until it is fixed.'
+    )
     expect(await fs.list(DIR)).toBeUndefined()
   })
 

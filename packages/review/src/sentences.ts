@@ -36,10 +36,8 @@ export const SENTENCES = {
   ...KERNEL_SENTENCES,
 
   // The Problems of Review (docs/review-format.md, section 6): a code is a Problem's kind.
-  'unreadable-configuration': (v: About): string =>
-    `${v.path} cannot be read: ${english(v.detail)}. No Annotation is read until it is fixed.`,
-  'invalid-annotations-directory': (v: { path: string; value: string }): string =>
-    `"annotations" in ${v.path} must be a relative path inside the repository, not "${v.value}". No Annotation is read until it is fixed.`,
+  'invalid-annotations-directory': (v: { path: string }): string =>
+    `"annotations" in ${v.path} must be a relative path inside the repository. No Annotation is read until it is fixed.`,
   'unreadable-annotation': (v: About): string => `${v.path} cannot be read: ${english(v.detail)}.`,
   'invalid-type': (v: { path: string; value: string }): string =>
     `${v.path}: "type" must be note, question or concern, not "${v.value}".`,
@@ -72,8 +70,6 @@ export const SENTENCES = {
     `${v.path} holds Replies to ${v.annotation}, and there is no Annotation ${v.annotation}.`,
 
   // Why a file cannot be read, or a value is wrong: the rest of a sentence about it.
-  'config-not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
-  'config-not-mapping': (): string => 'its top level must be a mapping',
   'no-frontmatter': (): string => 'it has no frontmatter',
   'frontmatter-open': (): string => 'its frontmatter is never closed',
   'frontmatter-yaml': (v: { message: string }): string =>

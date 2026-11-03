@@ -15,12 +15,13 @@ export {
   type Reply
 } from './annotation'
 export {
-  annotationsDirectory,
-  CONFIGURATION_PATH,
+  ANNOTATIONS_KEY,
   DEFAULT_ANNOTATIONS_DIRECTORY,
   isAnnotationId,
+  locateAnnotations,
   readAnnotations,
-  type AnnotationsDirectory,
+  readLocation,
+  type AnnotationsLocation,
   type AnnotationsReading
 } from './read'
 export {

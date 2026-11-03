@@ -1,6 +1,7 @@
 import {
   joinPath,
   normalizePath,
+  openConfig,
   PendingFiles,
   Refusal,
   isDay,
@@ -24,7 +25,7 @@ import {
   setValue
 } from './frontmatter'
 import { saidOf, type ReviewProblem } from './problems'
-import { annotationsDirectory, isAnnotationId } from './read'
+import { isAnnotationId, readLocation } from './read'
 import { refuse, type ReviewSaid } from './sentences'
 import { slugOf } from './slug'
 import { citedAdr, type AdrReference } from './traces'
@@ -47,11 +48,16 @@ async function planning<Outcome extends object>(
   }
 }
 
-/** The directory of the Annotations, or the refusal that it cannot be used. */
+/**
+ * The directory of the Annotations, or the refusal that it cannot be used: `.arch/config.yml`
+ * cannot be read, or its key `annotations` names no directory inside the repository.
+ */
 async function directoryOf(fs: FileSystem): Promise<string> {
-  const where = await annotationsDirectory(fs)
+  const config = await openConfig(fs)
+  const where = readLocation(config)
   if (where.directory === undefined) {
-    refuse({ code: 'annotations-unavailable', values: { detail: saidOf(where.problem) } })
+    const detail = config.readable ? saidOf(where.problems[0]!) : config.problem.said
+    refuse({ code: 'annotations-unavailable', values: { detail } })
   }
   return where.directory
 }

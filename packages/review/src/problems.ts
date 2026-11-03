@@ -2,20 +2,18 @@ import { englishOf, type ReviewSaid } from './sentences'
 
 /**
  * The Problems of Review (docs/review-format.md, section 6): what the suite finds wrong with
- * the Annotations of a repository, their Replies and the place they are configured. `path` is
- * the file a Problem is about; `annotation` the ID of the Annotation, where it is about one.
+ * the Annotations of a repository, their Replies and the key that says where they are. `path`
+ * is the file a Problem is about; `annotation` the ID of the Annotation, where it is about one.
+ * That `.arch/config.yml` cannot be read at all is the kernel's Problem, said once for every
+ * module (docs/configuration.md).
  */
 export type ReviewProblem =
-  | {
-      readonly kind: 'unreadable-configuration'
-      readonly path: string
-      /** Why, as a code. */
-      readonly detail: ReviewSaid
-    }
+  /** The key `annotations` of `.arch/config.yml` is no directory inside the repository. */
   | {
       readonly kind: 'invalid-annotations-directory'
       readonly path: string
-      readonly value: string
+      /** The line of the key, from 1. */
+      readonly line: number
     }
   | {
       readonly kind: 'unreadable-annotation' | 'unreadable-reply'
@@ -90,7 +88,6 @@ export type ReviewProblem =
 
 /** The codes of Review's Problems: a code is a Problem's kind. */
 export const REVIEW_PROBLEM_CODES = [
-  'unreadable-configuration',
   'invalid-annotations-directory',
   'unreadable-annotation',
   'invalid-type',
@@ -110,12 +107,12 @@ export const REVIEW_PROBLEM_CODES = [
 /** What a Problem says, as a code: its kind, with the values of its sentence. */
 export function saidOf(problem: ReviewProblem): ReviewSaid {
   switch (problem.kind) {
-    case 'unreadable-configuration':
     case 'unreadable-annotation':
     case 'unreadable-reply':
     case 'invalid-anchor':
       return { code: problem.kind, values: { path: problem.path, detail: problem.detail } }
     case 'invalid-annotations-directory':
+      return { code: problem.kind, values: { path: problem.path } }
     case 'invalid-type':
     case 'invalid-state':
       return { code: problem.kind, values: { path: problem.path, value: problem.value } }
