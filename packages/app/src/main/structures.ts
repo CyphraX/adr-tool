@@ -253,10 +253,14 @@ export function viewOf(
       const list = filesInside.get(id) ?? []
       if (list.length < LISTED_AT_MOST) list.push(file.path)
       filesInside.set(id, list)
-      if (measured) measuredInside.set(id, [...(measuredInside.get(id) ?? []), measured])
+      if (measured === undefined) continue
+      const measuredList = measuredInside.get(id) ?? []
+      measuredList.push(measured)
+      measuredInside.set(id, measuredList)
     }
   }
-  const inside = (id: string) => insideOf(measuredInside.get(id) ?? [], measuredFiles)
+  const inside = (id: string): ReturnType<typeof insideOf> =>
+    insideOf(measuredInside.get(id) ?? [], measuredFiles)
   const components = [...shown].map((id) =>
     pageOf(byId.get(id)!, parentOf.get(id), levelAt(parentOf.get(id))!, {
       metrics: metrics.get(id),
