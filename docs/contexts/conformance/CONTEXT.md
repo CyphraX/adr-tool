@@ -25,7 +25,7 @@ One place where the code breaks a Rule. It is derived from the code and never st
 _Avoid_: Problem (that is an inconsistency in the suite's own artefacts), Finding (that is a human judgement), error, issue
 
 **Fingerprint**:
-The name of a Violation that stays when lines move: its Rule and what it is about — the source and target Component of a Dependency, the members of a Cycle, the Component of a metric, the Source File and qualified name of a function or class whose metric is outside. Exceptions, the Baseline and Findings name a Violation by it.
+The name of a Violation that stays when lines move: its Rule and what it is about — the source and target Component of a Dependency, the members of a Cycle, the Component of a metric, the Source File and qualified name of a function or class whose metric is outside (a second one of the same name is told apart by its position, which a function of that name added before it moves). Exceptions, the Baseline and Findings name a Violation by it.
 _Avoid_: ID, hash, key (a fingerprint has no line number and is not a hash of the code)
 
 **Exception**:

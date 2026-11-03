@@ -132,7 +132,7 @@ The app runs locally: there is no backend, no account and no telemetry.
 
 - **The main sequence.** A fourth view draws each Component of the level by its instability and abstractness, against the line from stable and abstract to unstable and concrete. Beside it, a list names them furthest from the line first, for the keyboard and screen readers.
 
-- **Inside the code.** A Component's page lists its most complex functions by cyclomatic complexity, each a click into the code at its line, and the classes whose methods fall apart by LCOM4. TypeScript, JavaScript and Svelte are counted as ESLint counts, Java as Checkstyle does ([docs/structure-format.md](docs/structure-format.md), section 5).
+- **Inside the code.** A Component's page lists its most complex functions by cyclomatic complexity, each a click into the code at its line, and the classes whose methods fall apart by LCOM4. TypeScript, JavaScript and Svelte are counted as ESLint counts, Java as Checkstyle, Python as radon and Go as gocyclo do ([docs/structure-format.md](docs/structure-format.md), section 5).
 
 - **From a line to the code.** Click a line in the graph, then one of its line numbers. The Source File opens in a read-only viewer, with the import behind the Dependency marked.
 
