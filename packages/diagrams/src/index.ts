@@ -22,8 +22,8 @@ export {
   type ViewLevel
 } from './diagram'
 export {
-  CONFIG_PATH,
   DEFAULT_DIAGRAMS_DIRECTORY,
+  DIAGRAMS_KEY,
   isDiagramFile,
   locateDiagrams,
   openDiagrams,

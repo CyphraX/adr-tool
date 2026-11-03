@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryFileSystem } from '@adr-tool/kernel'
+import { memoryFileSystem, readConfig } from '@adr-tool/kernel'
 import {
   connectionsOf,
   DEFAULT_DIAGRAMS_DIRECTORY,
@@ -289,31 +289,34 @@ describe('a Diagram', () => {
 })
 
 describe('where the Diagrams are', () => {
+  /** Where `.arch/config.yml`, as `text`, says the Diagrams are. */
+  const locationOf = (text: string | undefined) => readLocation(readConfig(text))
+
   it('is docs/architecture/diagrams, unless .arch/config.yml says otherwise', () => {
-    expect(readLocation(undefined)).toEqual({ directory: DEFAULT_DIAGRAMS_DIRECTORY, problems: [] })
-    expect(readLocation('')).toEqual({ directory: DEFAULT_DIAGRAMS_DIRECTORY, problems: [] })
-    expect(readLocation('rules: x\n').directory).toBe(DEFAULT_DIAGRAMS_DIRECTORY)
-    expect(readLocation('diagrams:\n').directory).toBe(DEFAULT_DIAGRAMS_DIRECTORY)
-    expect(readLocation('diagrams: ./design\\diagrams/\n').directory).toBe('design/diagrams')
+    expect(locationOf(undefined)).toEqual({ directory: DEFAULT_DIAGRAMS_DIRECTORY, problems: [] })
+    expect(locationOf('')).toEqual({ directory: DEFAULT_DIAGRAMS_DIRECTORY, problems: [] })
+    expect(locationOf('rules: x\n').directory).toBe(DEFAULT_DIAGRAMS_DIRECTORY)
+    expect(locationOf('diagrams:\n').directory).toBe(DEFAULT_DIAGRAMS_DIRECTORY)
+    expect(locationOf('diagrams: ./design\\diagrams/\n').directory).toBe('design/diagrams')
+    // Another module's key is its own: Diagrams does not look at it.
+    expect(locationOf('annotations: [whatever, 1]\ndiagrams: d\n')).toEqual({
+      directory: 'd',
+      problems: []
+    })
   })
 
   it('is nowhere while .arch/config.yml cannot be used, so that the mistake shows', () => {
-    const sentence = (text: string): string => {
-      const location = readLocation(text)
-      expect(location.directory).toBeUndefined()
-      return location.problems.map(wordingOf).join(' ')
+    // The file itself: the kernel's Problem, reported once for every module.
+    for (const text of ['diagrams: [oops\n', '- diagrams\n']) {
+      expect(locationOf(text)).toEqual({ directory: undefined, problems: [] })
     }
-    expect(sentence('diagrams: [oops\n')).toMatch(
-      /^\.arch\/config\.yml cannot be read: it is not valid YAML: .+\. No Diagram is looked for until it is fixed\.$/
-    )
-    expect(sentence('- diagrams\n')).toBe(
-      '.arch/config.yml cannot be read: its top level must be a map. No Diagram is looked for until it is fixed.'
-    )
-    for (const wrong of ['../elsewhere', '/abs', '.', '[a]', '7']) {
-      expect(sentence(`# where\ndiagrams: ${wrong}\n`)).toBe(
-        '"diagrams" in .arch/config.yml must be a relative path inside the repository. No Diagram is looked for until it is fixed.'
-      )
-      expect(readLocation(`# where\ndiagrams: ${wrong}\n`).problems[0]!.line).toBe(2)
+    // Diagrams' own key.
+    for (const wrong of ['../elsewhere', '/abs', '.', '[a]', '7', '{ path: d }']) {
+      const location = locationOf(`# where\ndiagrams: ${wrong}\n`)
+      expect(location.directory).toBeUndefined()
+      expect(location.problems.map((problem) => `${problem.line}: ${wordingOf(problem)}`)).toEqual([
+        '2: "diagrams" in .arch/config.yml must be a relative path inside the repository. No Diagram is looked for until it is fixed.'
+      ])
     }
   })
 
@@ -349,6 +352,19 @@ describe('where the Diagrams are', () => {
     )
     expect(lost.diagrams).toEqual([])
     expect(lost.problems.map((problem) => problem.kind)).toEqual(['invalid-diagrams-directory'])
+
+    // The settings as the caller read them for every module, with the file unread.
+    const repository = memoryFileSystem({
+      '.arch/config.yml': '- not a map\n',
+      'design/b.yml': 'level: container\n'
+    })
+    expect(await openDiagrams(repository)).toEqual({
+      directory: undefined,
+      problems: [],
+      diagrams: []
+    })
+    const given = await openDiagrams(repository, readConfig('diagrams: design\n'))
+    expect(given.diagrams.map((diagram) => diagram.id)).toEqual(['b'])
   })
 
   it('says why a Problem’s file cannot be read in the words of its detail', () => {

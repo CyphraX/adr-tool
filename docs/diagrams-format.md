@@ -19,16 +19,15 @@ The Diagrams of a repository are the files directly in `docs/architecture/diagra
 - The picture of a Diagram is the file of the same name with `.svg` in the same directory: `docs/architecture/diagrams/packages.svg` (section 6).
 - Opening a repository never writes.
 
-Another directory is set in `.arch/config.yml`, beside `.arch/components.yml`:
+Another directory is set as `diagrams` in `.arch/config.yml`, the suite's settings, which every module keeps its own key in ([configuration.md](configuration.md)):
 
 ```yaml
 # .arch/config.yml
 diagrams: design/diagrams # optional; docs/architecture/diagrams when absent
 ```
 
-- `diagrams` is a path relative to the repository root, with forward slashes. Without the file, without the key, or with an empty `diagrams:`, the default applies.
-- Keys the suite does not know are preserved and ignored, so that the other modules can keep their own settings in the same file.
-- A file that is not YAML or whose top level is not a map, and a `diagrams` that is not a text, is absolute, leaves the repository or is its root, is a Problem (section 5), and **no Diagram is looked for** while it stands: looking in the default directory instead would hide the mistake, as it would for Decision Logs ([file-format.md](file-format.md), section 6).
+- `diagrams` is a path relative to the repository root, with forward slashes. Without the file, without the key, or with an empty `diagrams:`, the default applies. Diagrams reads this key and no other.
+- A `diagrams` that is not a text, is absolute, leaves the repository or is its root is a Problem (section 5), and **no Diagram is looked for** while it stands: looking in the default directory instead would hide the mistake, as it would for Decision Logs ([file-format.md](file-format.md), section 6). Nor is one looked for while `.arch/config.yml` itself cannot be read, which is the one Problem of the file ([configuration.md](configuration.md), section 2).
 
 ## 2. The file (part 6)
 
@@ -169,12 +168,13 @@ A **suggested connection** from A to B is the set of Dependencies from the Sourc
 
 Diagrams adds these **Problems**. Each is reported at its file and, where it has one, its line; each sentence is the English one of its code, and the window words the code in its own language.
 
-### Of `.arch/config.yml`
+### Of the key `diagrams` in `.arch/config.yml`
 
 | Problem                                                                       | Code                          | Sentence                                                                                                                | Repair |
 | ----------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------ |
-| The file cannot be read: it is not YAML, or its top level is not a map.       | `unreadable-config`           | .arch/config.yml cannot be read: its top level must be a map. No Diagram is looked for until it is fixed.               | —      |
 | `diagrams` is not a text, is absolute, leaves the repository or is its root.  | `invalid-diagrams-directory`  | "diagrams" in .arch/config.yml must be a relative path inside the repository. No Diagram is looked for until it is fixed. | —      |
+
+A file that cannot be read at all is not a Problem of Diagrams but of the file, reported once for every module ([configuration.md](configuration.md), section 2).
 
 ### Of a Diagram's file
 

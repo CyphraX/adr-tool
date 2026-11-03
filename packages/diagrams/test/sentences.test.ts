@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { KERNEL_SENTENCES } from '@adr-tool/kernel'
 import {
   DIAGRAM_PROBLEM_CODES,
   DIAGRAMS_SENTENCES,
@@ -17,15 +18,6 @@ const at = { path: PATH, line: 3 }
 
 /** One Problem of every kind, as the specification words it (docs/diagrams-format.md, section 5). */
 const problems: [DiagramProblem, string][] = [
-  [
-    {
-      ...at,
-      path: '.arch/config.yml',
-      kind: 'unreadable-config',
-      detail: { code: 'config-not-map', values: {} }
-    },
-    '.arch/config.yml cannot be read: its top level must be a map. No Diagram is looked for until it is fixed.'
-  ],
   [
     { ...at, path: '.arch/config.yml', kind: 'invalid-diagrams-directory' },
     '"diagrams" in .arch/config.yml must be a relative path inside the repository. No Diagram is looked for until it is fixed.'
@@ -167,7 +159,8 @@ describe('the sentences of diagrams', () => {
 
   it('have one for every code of a Problem, and take the kernel’s', () => {
     for (const code of DIAGRAM_PROBLEM_CODES) expect(DIAGRAMS_SENTENCES).toHaveProperty([code])
-    expect(DIAGRAMS_SENTENCES).toHaveProperty(['already-exists'])
-    expect(DIAGRAMS_SENTENCES).toHaveProperty(['no-longer-exists'])
+    for (const code of Object.keys(KERNEL_SENTENCES)) {
+      expect(DIAGRAMS_SENTENCES).toHaveProperty([code])
+    }
   })
 })

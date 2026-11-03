@@ -15,7 +15,6 @@ export type DiagramProblem = {
   /** The line of that file, from 1. */
   readonly line: number
 } & (
-  | { readonly kind: 'unreadable-config'; readonly detail: DiagramsSaid }
   | { readonly kind: 'invalid-diagrams-directory' }
   | { readonly kind: 'unreadable-diagram'; readonly detail: DiagramsSaid }
   | { readonly kind: 'no-level' }
@@ -49,7 +48,6 @@ export type UnreadableDiagramProblem = Extract<
 
 /** Every code a Problem of Diagrams can have, in the order of the specification. */
 export const DIAGRAM_PROBLEM_CODES: readonly DiagramProblemCode[] = [
-  'unreadable-config',
   'invalid-diagrams-directory',
   'unreadable-diagram',
   'no-level',
@@ -70,7 +68,6 @@ export const DIAGRAM_PROBLEM_CODES: readonly DiagramProblemCode[] = [
 /** What a Problem says, as a code: its kind, with the values of its sentence. */
 export function saidOf(problem: DiagramProblem): DiagramsSaid {
   switch (problem.kind) {
-    case 'unreadable-config':
     case 'unreadable-diagram':
       return { code: problem.kind, values: { path: problem.path, detail: problem.detail } }
     case 'invalid-diagrams-directory':

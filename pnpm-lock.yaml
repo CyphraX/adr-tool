@@ -232,6 +232,10 @@ importers:
         version: 5.0.1(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(yaml@2.9.1))
 
   packages/kernel:
+    dependencies:
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
     devDependencies:
       '@types/node':
         specifier: ^24.13.5

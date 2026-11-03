@@ -82,9 +82,13 @@ const german = (said: Said | string): string =>
   typeof said === 'string' ? said : (inGerman(said) ?? said.code)
 
 export const DE: Wording<Codes> = {
-  // The kernel: what any operation may refuse.
+  // The kernel: what any operation may refuse, and why .arch/config.yml cannot be read.
   'already-exists': (v) => `${v.path} existiert bereits.`,
   'no-longer-exists': (v) => `${v.path} existiert nicht mehr.`,
+  'unreadable-config': (v) =>
+    `${v.path} kann nicht gelesen werden: ${german(v.detail)}. Was seine Einstellungen entscheiden, geschieht nicht, bis die Datei korrigiert ist.`,
+  'config-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
+  'config-not-map': () => 'die oberste Ebene muss ein Mapping sein',
 
   // Which ADR an operation is about.
   'no-adr': (v) => `Es gibt kein ADR ${v.id} in diesem Decision Log.`,
@@ -300,8 +304,6 @@ export const DE: Wording<Codes> = {
   'java-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
 
   // The Problems of Diagrams.
-  'unreadable-config': (v) =>
-    `${v.path} kann nicht gelesen werden: ${german(v.detail)}. Bis die Datei korrigiert ist, wird nach keinem Diagramm gesucht.`,
   'invalid-diagrams-directory': (v) =>
     `„diagrams“ in ${v.path} muss ein relativer Pfad innerhalb des Repositorys sein. Bis das korrigiert ist, wird nach keinem Diagramm gesucht.`,
   'unreadable-diagram': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
@@ -333,9 +335,7 @@ export const DE: Wording<Codes> = {
   'repository-does-not-fit': (v) =>
     `Das Repository ${v.id} steht für jede Komponente, und nur ein Systemkontext zeigt es.`,
 
-  // Why .arch/config.yml or a Diagram cannot be read: the rest of a sentence about the file.
-  'config-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
-  'config-not-map': () => 'die oberste Ebene muss ein Mapping sein',
+  // Why a Diagram cannot be read: the rest of a sentence about the file.
   'diagram-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
   'diagram-not-map': () => 'die oberste Ebene muss ein Mapping sein',
   'diagram-key-not-text': (v) => `„${v.key}“ in Zeile ${v.line} muss ein Text sein`,

@@ -69,7 +69,14 @@ describe('German', () => {
       [STRUCTURE_SENTENCES, DIAGRAMS_SENTENCES]
     ] as const) {
       const shared = Object.keys(first).filter((code) => code in second)
-      expect(shared.sort()).toEqual(['already-exists', 'no-longer-exists'])
+      // What any operation may refuse, and why .arch/config.yml cannot be read.
+      expect(shared.sort()).toEqual([
+        'already-exists',
+        'config-not-map',
+        'config-not-yaml',
+        'no-longer-exists',
+        'unreadable-config'
+      ])
     }
   })
 

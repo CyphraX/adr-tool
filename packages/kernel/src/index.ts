@@ -28,3 +28,12 @@ export {
 } from './change/said'
 
 export { applyEdits, type TextEdit } from './text/edit'
+
+export {
+  CONFIG_PATH,
+  openConfig,
+  readConfig,
+  type Config,
+  type Setting,
+  type UnreadableConfig
+} from './config'

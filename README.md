@@ -289,7 +289,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 
 | Package | Contents |
 | --- | --- |
-| [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets |
+| [`packages/kernel`](packages/kernel) | What every module needs and none owns: the file-system port, splice edits, change sets, and the reading of `.arch/config.yml` |
 | [`packages/core`](packages/core) | The core of the Decisions module in pure TypeScript. No Electron, no DOM and no disk access of its own; its type check fails if it reaches for any of them |
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java is read with `tree-sitter-java` as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
 | [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the Repair of an element whose Component is gone, and the SVG, drawn without a browser |
@@ -318,6 +318,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package, and the 
 | [docs/design.md](docs/design.md) | How the window looks and behaves, for every module |
 | [docs/file-format.md](docs/file-format.md) | The on-disk contract of ADRs and Decision Logs |
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
+| [docs/configuration.md](docs/configuration.md) | The contract of `.arch/config.yml`, the suite's settings: one key per module, and what happens when the file cannot be read |
 | [docs/diagrams-format.md](docs/diagrams-format.md) | The contract of the Diagrams module: the file of a Diagram, its view levels, suggested connections and Drift, its Problems, and the SVG |
 | [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` with its output, codes and exit codes, and `adr export` |
 | [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |

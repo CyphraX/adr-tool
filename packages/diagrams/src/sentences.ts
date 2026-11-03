@@ -49,8 +49,6 @@ export const SENTENCES = {
   ...KERNEL_SENTENCES,
 
   // The Problems of Diagrams (docs/diagrams-format.md, section 5): a code is a Problem's kind.
-  'unreadable-config': (v: { path: string; detail: Said | string }): string =>
-    `${v.path} cannot be read: ${english(v.detail)}. No Diagram is looked for until it is fixed.`,
   'invalid-diagrams-directory': (v: { path: string }): string =>
     `"diagrams" in ${v.path} must be a relative path inside the repository. No Diagram is looked for until it is fixed.`,
   'unreadable-diagram': (v: { path: string; detail: Said | string }): string =>
@@ -84,10 +82,6 @@ export const SENTENCES = {
         : `${v.component} does not belong in the component view of ${v.scope}, which shows the parts of ${v.scope} and the Components beside it and beside what contains it.`,
   'repository-does-not-fit': (v: { id: string }): string =>
     `The repository ${v.id} stands for every Component, and only a system context shows it.`,
-
-  // Why `.arch/config.yml` cannot be read: the rest of a sentence about the file.
-  'config-not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
-  'config-not-map': (): string => 'its top level must be a map',
 
   // Why a Diagram cannot be read: the rest of a sentence about the file.
   'diagram-not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,

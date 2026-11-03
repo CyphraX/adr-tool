@@ -2,77 +2,57 @@
  * Where the Diagrams of a repository are, and the Diagrams found there (docs/diagrams-format.md,
  * section 1).
  */
-import { isMap, isScalar, LineCounter, parseDocument } from 'yaml'
-import { joinPath, normalizePath, type FileSystem } from '@adr-tool/kernel'
+import {
+  joinPath,
+  normalizePath,
+  openConfig,
+  CONFIG_PATH,
+  type Config,
+  type FileSystem
+} from '@adr-tool/kernel'
 import { readDiagram, type Diagram, type UnreadableDiagram } from './diagram'
 import type { DiagramProblem } from './problems'
 
-/** The settings of `.arch/`, beside the declaration of Components. Other modules keep theirs here too. */
-export const CONFIG_PATH = '.arch/config.yml'
+/** The key of `.arch/config.yml` that is Diagrams' own (docs/configuration.md). */
+export const DIAGRAMS_KEY = 'diagrams'
 
 /** Where Diagrams are when `.arch/config.yml` does not say. */
 export const DEFAULT_DIAGRAMS_DIRECTORY = 'docs/architecture/diagrams'
 
 export interface DiagramsLocation {
-  /** The directory of the Diagrams; `undefined` while `.arch/config.yml` cannot be used. */
+  /**
+   * The directory of the Diagrams; `undefined` while `.arch/config.yml` cannot be read, or its
+   * key `diagrams` cannot be used.
+   */
   readonly directory: string | undefined
-  /** What is wrong with `.arch/config.yml`: while there is something, no Diagram is looked for. */
+  /** What is wrong with the key `diagrams`: while there is something, no Diagram is looked for. */
   readonly problems: readonly DiagramProblem[]
 }
 
-/** Where `.arch/config.yml`, as `text`, says the Diagrams are. */
-export function readLocation(text: string | undefined): DiagramsLocation {
-  const found = { directory: DEFAULT_DIAGRAMS_DIRECTORY, problems: [] }
-  if (text === undefined) return found
-  const lines = new LineCounter()
-  const doc = parseDocument(text, { lineCounter: lines })
-  const lost = (problem: DiagramProblem): DiagramsLocation => ({
-    directory: undefined,
-    problems: [problem]
-  })
-  if (doc.errors.length > 0) {
-    const error = doc.errors[0]!
-    const message = error.message.split('\n')[0]!.replace(/[:.]$/, '')
-    return lost({
-      kind: 'unreadable-config',
-      path: CONFIG_PATH,
-      line: error.linePos?.[0].line ?? 1,
-      detail: { code: 'config-not-yaml', values: { message } }
-    })
+/**
+ * Where the settings say the Diagrams are. Diagrams reads its own key and no other. While the
+ * file cannot be read, no Diagram is looked for, and the Problem is the file's: the kernel's,
+ * which the caller reports once for every module (docs/configuration.md).
+ */
+export function readLocation(config: Config): DiagramsLocation {
+  if (!config.readable) return { directory: undefined, problems: [] }
+  const setting = config.settings.get(DIAGRAMS_KEY)
+  if (setting === undefined || setting.value === null) {
+    return { directory: DEFAULT_DIAGRAMS_DIRECTORY, problems: [] }
   }
-  if (doc.contents === null || (isScalar(doc.contents) && doc.contents.value === null)) {
-    return found
-  }
-  if (!isMap(doc.contents)) {
-    return lost({
-      kind: 'unreadable-config',
-      path: CONFIG_PATH,
-      line: 1,
-      detail: { code: 'config-not-map', values: {} }
-    })
-  }
-  const pair = doc.contents.items.find(
-    (item) => isScalar(item.key) && item.key.value === 'diagrams'
-  )
-  if (pair === undefined) return found
-  const value = pair.value
-  if (value === null || (isScalar(value) && value.value === null)) return found
-  const written = isScalar(value) && typeof value.value === 'string' ? value.value : undefined
-  const directory = written === undefined ? undefined : normalizePath(written)
+  const directory = typeof setting.value === 'string' ? normalizePath(setting.value) : undefined
   if (directory === undefined || directory === '') {
-    const range = (pair.key as { range?: readonly number[] } | null)?.range
-    return lost({
-      kind: 'invalid-diagrams-directory',
-      path: CONFIG_PATH,
-      line: range ? lines.linePos(range[0]!).line : 1
-    })
+    return {
+      directory: undefined,
+      problems: [{ kind: 'invalid-diagrams-directory', path: CONFIG_PATH, line: setting.line }]
+    }
   }
   return { directory, problems: [] }
 }
 
 /** Where the Diagrams of the repository are. Never writes. */
-export async function locateDiagrams(fs: FileSystem): Promise<DiagramsLocation> {
-  return readLocation(await fs.readText(CONFIG_PATH))
+export async function locateDiagrams(fs: FileSystem, config?: Config): Promise<DiagramsLocation> {
+  return readLocation(config ?? (await openConfig(fs)))
 }
 
 export interface RepositoryDiagrams extends DiagramsLocation {
@@ -84,9 +64,12 @@ export interface RepositoryDiagrams extends DiagramsLocation {
 export const isDiagramFile = (name: string): boolean =>
   name.endsWith('.yml') && name.length > '.yml'.length && !name.startsWith('.')
 
-/** The Diagrams of a repository, each read from its file. Never writes. */
-export async function openDiagrams(fs: FileSystem): Promise<RepositoryDiagrams> {
-  const location = await locateDiagrams(fs)
+/**
+ * The Diagrams of a repository, each read from its file. `config` is `.arch/config.yml` as the
+ * caller read it for every module; without it, it is read here. Never writes.
+ */
+export async function openDiagrams(fs: FileSystem, config?: Config): Promise<RepositoryDiagrams> {
+  const location = await locateDiagrams(fs, config)
   if (location.directory === undefined) return { ...location, diagrams: [] }
   const entries = (await fs.list(location.directory)) ?? []
   const names = entries
