@@ -19,7 +19,7 @@ Each Annotation is a Markdown file of its own in one directory, `docs/architectu
 annotations: docs/reviews        # optional; docs/architecture/annotations when absent
 ```
 
-- `annotations` is a path relative to the repository root, with `/` between its parts. Other keys of `.arch/config.yml` belong to other modules, or to nobody, and are never touched.
+- `annotations` is a path relative to the repository root, with `/` between its parts, written as a text: `123` or `true` is a number or a truth value to YAML, and is a Problem; `"123"` is the directory `123`. Other keys of `.arch/config.yml` belong to other modules, or to nobody, and are never touched.
 - The directory is created with the first Annotation. Opening a repository never creates it.
 - While `.arch/config.yml` cannot be read, or `annotations` is not a relative path inside the repository, no Annotation is read and none is written: they would not be found once the file is repaired. That is a Problem (section 6).
 

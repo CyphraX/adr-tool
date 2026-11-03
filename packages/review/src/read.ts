@@ -34,8 +34,11 @@ export async function annotationsDirectory(fs: FileSystem): Promise<AnnotationsD
   if (value === undefined || value === null || (isScalar(value) && value.value === null)) {
     return { directory: DEFAULT_ANNOTATIONS_DIRECTORY }
   }
+  // A path is a text: `123` or `true` is a number or a truth value as YAML reads it, and other
+  // tools that read the file would take it so.
   const written = isScalar(value) ? scalarText(value) : undefined
-  const directory = written === undefined ? undefined : normalizePath(written)
+  const path = isScalar(value) && typeof value.value === 'string' ? written : undefined
+  const directory = path === undefined ? undefined : normalizePath(path)
   if (directory === undefined || directory === '') {
     const shown = written ?? String(doc.contents.get('annotations'))
     return {

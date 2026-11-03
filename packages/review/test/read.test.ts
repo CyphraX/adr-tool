@@ -150,6 +150,16 @@ describe('reading the Annotations of a repository', () => {
       '"annotations" in .arch/config.yml must be a relative path inside the repository, not "../outside". No Annotation is read until it is fixed.'
     ])
     expect(await problemOf('annotations: [a, b]\n')).toHaveLength(1)
+    // A number or a truth value is no path, though it is written like one.
+    for (const value of ['123', 'true', '0x1f']) {
+      expect(await problemOf(`annotations: ${value}\n`)).toEqual([
+        `"annotations" in .arch/config.yml must be a relative path inside the repository, not "${value}". No Annotation is read until it is fixed.`
+      ])
+    }
+    const quoted = await readAnnotations(
+      memoryFileSystem({ '.arch/config.yml': 'annotations: "2026"\n' })
+    )
+    expect(quoted.directory).toBe('2026')
     expect(await problemOf('- a list\n')).toEqual([
       '.arch/config.yml cannot be read: its top level must be a mapping. No Annotation is read until it is fixed.'
     ])
