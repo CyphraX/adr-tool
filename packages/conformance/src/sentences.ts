@@ -15,6 +15,7 @@ import {
   type Sentences
 } from '@adr-tool/kernel'
 import { UNASSIGNED } from '@adr-tool/structure/model'
+import { TOP_LEVEL } from './component-patterns'
 
 /** What makes a Rule ID, as the end of a sentence about one. */
 export const RULE_ID_RULE =
@@ -41,6 +42,9 @@ export function listed(names: readonly string[]): string {
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 }
 
+/** Keys of the file as a sentence names them: `"from" and "to"`. */
+const quoted = (keys: readonly string[]): string => listed(keys.map((key) => `"${key}"`))
+
 /** A round trip, back to where it starts: `a -> b -> c -> a`; past five, the rest as `…`. */
 const tripOf = (trip: readonly string[]): string =>
   [...trip.slice(0, LISTED_AT_MOST), ...(trip.length > LISTED_AT_MOST ? ['…'] : []), trip[0]!].join(
@@ -66,6 +70,32 @@ type Naming = {
 }
 const namedBy = (v: Naming): string =>
   v.by === 'rule' ? `The Rule ${v.owner}` : `The applied Pattern ${v.owner}`
+
+/**
+ * What a threshold is broken by: a Component; the level below one, `*` for the top level; or a
+ * function or class, by its name, its Source File and the line of its name.
+ */
+export type ThresholdSubject =
+  | { readonly subject?: 'component'; readonly component: string }
+  | { readonly subject: 'level'; readonly component: string }
+  | {
+      readonly subject: 'function' | 'class'
+      readonly name: string
+      readonly file: string
+      readonly line: number
+    }
+const subjectOf = (v: ThresholdSubject): string => {
+  switch (v.subject) {
+    case undefined:
+    case 'component':
+      return v.component
+    case 'level':
+      return v.component === TOP_LEVEL ? 'the top level' : `the level below ${v.component}`
+    case 'function':
+    case 'class':
+      return `the ${v.subject} ${v.name} at ${v.file}:${v.line}`
+  }
+}
 
 /** A fingerprint as one line, for reading (docs/conformance-format.md, section 3). */
 type Printed = { readonly fingerprint: string }
@@ -149,8 +179,12 @@ export const SENTENCES = {
   'too-few-layers': (): string => '"layers" must list at least two layers',
   'among-or-inside': (): string => 'it must have either "among" or "inside"',
   'max-or-min': (): string => 'it must have "max", "min" or both',
-  'fingerprint-of-kind': (v: { kind: string; keys: string }): string =>
-    `an Exception from a Rule of the kind ${v.kind} names its Violation by ${v.keys}`,
+  'fingerprint-of-kind': (v: {
+    kind: string
+    keys: readonly string[]
+    topLevel?: string
+  }): string =>
+    `an Exception from a Rule of the kind ${v.kind} names its Violation by ${quoted(v.keys)}${v.topLevel ? `, "${v.topLevel}" for the top level` : ''}`,
   'roles-not-map': (): string => '"roles" must be a map from each role to Component patterns',
 
   // What a Violation is (docs/conformance-format.md, section 3): a code is the kind of its Rule.
@@ -174,14 +208,16 @@ export const SENTENCES = {
     weakest?: readonly string[]
   }): string =>
     `${listed(v.members)} depend on each other in a Cycle${v.members.length > 2 ? `, for example ${tripOf(v.roundTrip)}` : ''}${v.weakest ? `, with ${v.weakest.join(' -> ')} as its weakest Dependency` : ''}`,
-  threshold: (v: {
-    metric: string
-    component: string
-    value: number
-    bound: 'max' | 'min'
-    limit: number
-  }): string =>
-    `The metric ${v.metric} of ${v.component} is ${formatNumber(v.value)}, ${v.bound === 'max' ? 'above the maximum' : 'below the minimum'} of ${formatNumber(v.limit)}`,
+  // Of a Component, or — by its subject — of a function or class, or of a level (part 13).
+  threshold: (
+    v: ThresholdSubject & {
+      metric: string
+      value: number
+      bound: 'max' | 'min'
+      limit: number
+    }
+  ): string =>
+    `The metric ${v.metric} of ${subjectOf(v)} is ${formatNumber(v.value)}, ${v.bound === 'max' ? 'above the maximum' : 'below the minimum'} of ${formatNumber(v.limit)}`,
   // A Violation at one of its imports: what Jonas reads on his pull request.
   'violation-at': (v: { violation: Said; file: string; line: number; imports: string }): string =>
     `${english(v.violation)}: ${v.file}:${v.line} imports ${v.imports}.`,

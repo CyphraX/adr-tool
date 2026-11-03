@@ -24,8 +24,15 @@ import {
 } from 'yaml'
 import { applyEdits, plan, type FileSystem, type Plan, type TextEdit } from '@adr-tool/kernel'
 import { hasWildcard, matcherOf } from './component-patterns'
-import { FINGERPRINT_KEYS, fingerprintOf, justification, type Decisions } from './check'
-import { fingerprintKey, fingerprintText, membersOf, type Fingerprint } from './fingerprint'
+import { fingerprintKeysSaid, fingerprintOf, justification, type Decisions } from './check'
+import {
+  fingerprintKey,
+  fingerprintKeysOf,
+  fingerprintText,
+  membersOf,
+  readFingerprint,
+  type Fingerprint
+} from './fingerprint'
 import { RULES_PATH, saidOf, type ConformanceNote, type ConformanceProblem } from './problems'
 import { readRules, scalarText, type Rule, type RulesFile, type WrittenException } from './rules'
 import { englishOf, refusal, type Change, type ConformanceSaid } from './sentences'
@@ -218,18 +225,7 @@ const meaningful = (key: string, draft: RuleDraft): boolean =>
 /** The keys of an Exception in the order the suite writes them. */
 function exceptionKeys(draft: ExceptionDraft): [string, Value][] {
   const { fingerprint } = draft
-  const keys: [string, Value][] = [['rule', fingerprint.rule]]
-  switch (fingerprint.kind) {
-    case 'dependency':
-      keys.push(['from', fingerprint.from], ['to', fingerprint.to])
-      break
-    case 'cycle':
-      keys.push(['cycle', membersOf(fingerprint.cycle)])
-      break
-    case 'component':
-      keys.push(['component', fingerprint.component])
-      break
-  }
+  const keys: [string, Value][] = [['rule', fingerprint.rule], ...fingerprintKeysOf(fingerprint)]
   keys.push(['reason', draft.reason.trim()])
   if (draft.justifiedBy !== undefined && draft.justifiedBy.trim() !== '') {
     keys.push(['justified-by', draft.justifiedBy.trim()])
@@ -846,7 +842,7 @@ export function addExceptionEdits(
         rule: rule.id,
         detail: {
           code: 'fingerprint-of-kind',
-          values: { kind: rule.kind, keys: FINGERPRINT_KEYS[rule.kind] }
+          values: fingerprintKeysSaid(rule)
         }
       }
     })
@@ -890,7 +886,7 @@ function exceptionAt(
       ? fingerprintKey(named) === fingerprintKey(fingerprint)
       : written !== undefined &&
         written.rule === fingerprint.rule &&
-        fingerprintKey(writtenFingerprint(written, fingerprint)) === fingerprintKey(fingerprint)
+        sameKeys(readFingerprint(fingerprint.kind, written.rule, written), fingerprint)
   if (index === -1 || !same) {
     refuse({
       code: 'no-exception',
@@ -900,26 +896,9 @@ function exceptionAt(
   return index
 }
 
-/** What an Exception names, read by the keys of a fingerprint of that kind. */
-function writtenFingerprint(
-  written: {
-    rule: string
-    from?: string
-    to?: string
-    cycle?: readonly string[]
-    component?: string
-  },
-  like: Fingerprint
-): Fingerprint {
-  switch (like.kind) {
-    case 'dependency':
-      return { kind: like.kind, rule: written.rule, from: written.from ?? '', to: written.to ?? '' }
-    case 'cycle':
-      return { kind: like.kind, rule: written.rule, cycle: written.cycle ?? [] }
-    case 'component':
-      return { kind: like.kind, rule: written.rule, component: written.component ?? '' }
-  }
-}
+/** Whether a fingerprint read from an Exception names what `fingerprint` names. */
+const sameKeys = (read: Fingerprint | undefined, fingerprint: Fingerprint): boolean =>
+  read !== undefined && fingerprintKey(read) === fingerprintKey(fingerprint)
 
 /**
  * The first Exception of the file that names `fingerprint` — by the keys of its Rule's kind, or,
@@ -934,7 +913,9 @@ export function findException(
   const key = fingerprintKey(fingerprint)
   return file.exceptions.find((exception) => {
     if (exception.rule !== fingerprint.rule) return false
-    const named = rule ? fingerprintOf(exception, rule) : writtenFingerprint(exception, fingerprint)
+    const named = rule
+      ? fingerprintOf(exception, rule)
+      : readFingerprint(fingerprint.kind, exception.rule, exception)
     return named !== undefined && fingerprintKey(named) === key
   })
 }

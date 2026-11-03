@@ -5,11 +5,24 @@
  */
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import { everyComponent, type Structure } from '@adr-tool/structure/model'
-import { hasWildcard, matcherOf } from './component-patterns'
+import { hasWildcard, matcherOf, TOP_LEVEL } from './component-patterns'
 import { evaluate, type Model, type Violation } from './evaluate'
-import { fingerprintKey, membersOf, type Fingerprint } from './fingerprint'
+import {
+  FINGERPRINT_SHAPES,
+  fingerprintKey,
+  membersOf,
+  readFingerprint,
+  type Fingerprint
+} from './fingerprint'
 import { RULES_PATH, type ConformanceNote, type ConformanceProblem } from './problems'
-import { readRules, type Naming, type Rule, type RulesFile, type WrittenException } from './rules'
+import {
+  readRules,
+  SUBJECT_OF,
+  type Naming,
+  type Rule,
+  type RulesFile,
+  type WrittenException
+} from './rules'
 
 /**
  * What the checker is told about Decisions, which `conformance` does not know (ADR-0006): the
@@ -136,7 +149,7 @@ export function checkConformance(
         rule: rule.id,
         detail: {
           code: 'fingerprint-of-kind',
-          values: { kind: rule.kind, keys: FINGERPRINT_KEYS[rule.kind] }
+          values: fingerprintKeysSaid(rule)
         },
         line: exception.line
       })
@@ -217,43 +230,43 @@ export async function openConformance(
   return checkConformance(readRules(await fs.readText(RULES_PATH)), structure, model, decisions)
 }
 
-/** What names a Violation of each kind in an Exception, in words. */
-export const FINGERPRINT_KEYS: Record<Rule['kind'], string> = {
-  'must-not-depend': '"from" and "to"',
-  'may-only-depend': '"from" and "to"',
-  layers: '"from" and "to"',
-  'no-cycles': '"cycle", the list of its members',
-  threshold: '"component"'
-}
-
-/** The fingerprint an Exception names, when its keys fit the kind of its Rule. */
-export function fingerprintOf(
-  exception: Pick<WrittenException, 'from' | 'to' | 'cycle' | 'component'>,
-  rule: Rule
-): Fingerprint | undefined {
-  const { from, to, cycle, component } = exception
+/**
+ * The kind of fingerprint a Rule names its Violations by (docs/conformance-format.md,
+ * section 3): a threshold's by the subject of its metric.
+ */
+export function fingerprintKindOf(rule: Rule): Fingerprint['kind'] {
   switch (rule.kind) {
     case 'must-not-depend':
     case 'may-only-depend':
     case 'layers':
-      return from !== undefined &&
-        to !== undefined &&
-        cycle === undefined &&
-        component === undefined
-        ? { kind: 'dependency', rule: rule.id, from, to }
-        : undefined
+      return 'dependency'
     case 'no-cycles':
-      return cycle !== undefined && cycle.length > 1 && from === undefined && to === undefined
-        ? { kind: 'cycle', rule: rule.id, cycle }
-        : undefined
-    case 'threshold':
-      return component !== undefined &&
-        from === undefined &&
-        to === undefined &&
-        cycle === undefined
-        ? { kind: 'component', rule: rule.id, component }
-        : undefined
+      return 'cycle'
+    case 'threshold': {
+      const subject = SUBJECT_OF[rule.metric]
+      return subject === 'function' || subject === 'class' ? subject : 'component'
+    }
   }
+}
+
+/** What an Exception names a Violation of a Rule by, as a sentence says it. */
+export function fingerprintKeysSaid(rule: Rule): {
+  kind: string
+  keys: readonly string[]
+  /** Of propagation cost: what names the top level. */
+  topLevel?: string
+} {
+  const keys = FINGERPRINT_SHAPES[fingerprintKindOf(rule)].map(([key]) => key)
+  const level = rule.kind === 'threshold' && SUBJECT_OF[rule.metric] === 'level'
+  return { kind: rule.kind, keys, ...(level && { topLevel: TOP_LEVEL }) }
+}
+
+/** The fingerprint an Exception names, when its keys — and no others — fit its Rule. */
+export function fingerprintOf(
+  exception: Pick<WrittenException, 'from' | 'to' | 'cycle' | 'component' | 'file' | 'name'>,
+  rule: Rule
+): Fingerprint | undefined {
+  return readFingerprint(fingerprintKindOf(rule), rule.id, exception, true)
 }
 
 /** A web address, or anything else with a scheme and `//`: no name of an ADR. */

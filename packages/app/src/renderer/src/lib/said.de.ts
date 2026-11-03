@@ -19,7 +19,7 @@ import {
   type Said,
   type SENTENCES as CORE_SENTENCES
 } from '@adr-tool/core'
-import type { CONFORMANCE_SENTENCES, Change } from '@adr-tool/conformance'
+import { TOP_LEVEL, type CONFORMANCE_SENTENCES, type Change } from '@adr-tool/conformance'
 import type { REVIEW_SENTENCES } from '@adr-tool/review'
 import { UNASSIGNED, type STRUCTURE_SENTENCES } from '@adr-tool/structure/model'
 import type { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
@@ -126,6 +126,23 @@ const namedBy = (v: { by: 'rule' | 'applied-pattern'; owner: string }): string =
   v.by === 'rule' ? `Die Regel ${v.owner}` : `Das angewandte Pattern ${v.owner}`
 
 /** What the suite was asked to write into the Rules file, as a refusal names it. */
+/** Wessen Metrik ein Schwellenwert misst: einer Komponente, einer Ebene, einer Funktion oder Klasse. */
+function thresholdSubject(
+  v: Parameters<(typeof CONFORMANCE_SENTENCES)['threshold']>[0]
+): string {
+  switch (v.subject) {
+    case undefined:
+    case 'component':
+      return `von ${v.component}`
+    case 'level':
+      return v.component === TOP_LEVEL ? 'der obersten Ebene' : `der Ebene unter ${v.component}`
+    case 'function':
+      return `der Funktion ${v.name} in ${v.file}:${v.line}`
+    case 'class':
+      return `der Klasse ${v.name} in ${v.file}:${v.line}`
+  }
+}
+
 const CHANGES: Record<Change, string> = {
   'add-rule': 'keine Regel hinzufügen',
   'change-rule': 'keine Regel darin ändern',
@@ -413,7 +430,7 @@ export const DE: Wording<Codes> = {
   'among-or-inside': () => 'sie braucht entweder „among“ oder „inside“',
   'max-or-min': () => 'sie braucht „max“, „min“ oder beides',
   'fingerprint-of-kind': (v) =>
-    `eine Ausnahme von einer Regel der Art ${v.kind} nennt ihren Verstoß mit ${v.keys}`,
+    `eine Ausnahme von einer Regel der Art ${v.kind} nennt ihren Verstoß mit ${listed(v.keys.map((key) => `„${key}“`))}${v.topLevel ? `, „${v.topLevel}“ für die oberste Ebene` : ''}`,
   'roles-not-map': () => '„roles“ muss ein Mapping von jeder Rolle auf Komponentenmuster sein',
 
   // What a Violation is: the kind of its Rule.
@@ -429,7 +446,7 @@ export const DE: Wording<Codes> = {
   'no-cycles': (v) =>
     `${listed(v.members)} hängen in einem Zyklus voneinander ab${v.members.length > 2 ? `, zum Beispiel ${tripOf(v.roundTrip)}` : ''}${v.weakest ? `, mit ${v.weakest.join(' -> ')} als schwächster Abhängigkeit` : ''}`,
   threshold: (v) =>
-    `Die Metrik ${v.metric} von ${v.component} ist ${formatNumber(v.value)} und liegt ${v.bound === 'max' ? 'über dem Höchstwert' : 'unter dem Mindestwert'} von ${formatNumber(v.limit)}`,
+    `Die Metrik ${v.metric} ${thresholdSubject(v)} ist ${formatNumber(v.value)} und liegt ${v.bound === 'max' ? 'über dem Höchstwert' : 'unter dem Mindestwert'} von ${formatNumber(v.limit)}`,
   'violation-at': (v) => `${german(v.violation)}: ${v.file}:${v.line} importiert ${v.imports}.`,
   'violation-alone': (v) => `${german(v.violation)}.`,
 

@@ -4,7 +4,18 @@
  * TypeScript: whoever calls it analyses the code with `structure` and hands the Dependencies in.
  */
 export { matcherOf as componentMatcher, hasWildcard } from './component-patterns'
-export { fingerprintKey, fingerprintText, type Fingerprint } from './fingerprint'
+export {
+  FINGERPRINT_KINDS,
+  FINGERPRINT_SHAPES,
+  fingerprintFrom,
+  fingerprintKey,
+  fingerprintKeysOf,
+  fingerprintKindOfKeys,
+  fingerprintNames,
+  fingerprintText,
+  readFingerprint,
+  type Fingerprint
+} from './fingerprint'
 export {
   CONFORMANCE_NOTE_CODES,
   CONFORMANCE_PROBLEM_CODES,
@@ -21,11 +32,13 @@ export {
   isRuleId,
   METRICS,
   readRules,
+  SUBJECT_OF,
   type AppliedPattern,
   type CyclesRule,
   type DependencyRule,
   type LayersRule,
   type MetricName,
+  type MetricSubject,
   type Naming,
   type Rule,
   type RuleKind,
@@ -33,11 +46,12 @@ export {
   type ThresholdRule,
   type WrittenException
 } from './rules'
-export { evaluate, type Model, type Violation } from './evaluate'
+export { evaluate, TOP_LEVEL, type Model, type Violation } from './evaluate'
 export {
   adrExists,
   checkConformance,
-  FINGERPRINT_KEYS,
+  fingerprintKeysSaid,
+  fingerprintKindOf,
   fingerprintOf,
   checkPlannedImport,
   justification,

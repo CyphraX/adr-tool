@@ -79,6 +79,8 @@ export const found = (report: Awaited<ReturnType<typeof checked>>) =>
         ? `${fingerprint.from} -> ${fingerprint.to}`
         : 'cycle' in fingerprint
           ? fingerprint.cycle.join(' ')
-          : fingerprint.component
+          : 'name' in fingerprint
+            ? `${fingerprint.name} in ${fingerprint.file}`
+            : fingerprint.component
     return `${fingerprint.rule}: ${what}${violation.exception ? ' (accepted)' : ''}`
   })

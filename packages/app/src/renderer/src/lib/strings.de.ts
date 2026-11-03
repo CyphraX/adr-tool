@@ -519,7 +519,8 @@ export const de: typeof en = {
       label: 'Diese Ebene zeigen als',
       graph: 'Graph',
       matrix: 'Matrix',
-      metrics: 'Metriken'
+      metrics: 'Metriken',
+      sequence: 'Hauptreihe'
     },
 
     metric: {
@@ -573,12 +574,27 @@ export const de: typeof en = {
         long: 'Interner Anteil',
         definition:
           'Interner Anteil: die Abhängigkeiten zwischen den Dateien innen, geteilt durch alle Abhängigkeiten, die innen beginnen oder enden. Undefiniert, wenn es keine gibt.'
+      },
+      abstractness: {
+        short: 'A',
+        long: 'Abstraktheit, A',
+        definition:
+          'Abstraktheit, A: die abstrakten Deklarationen unter allen, die sie deklariert — Interfaces, abstrakte Klassen, Typ-Aliase — gegenüber Klassen, Enums und Funktionen. 0 ist ganz konkret, 1 ganz abstrakt. Undefiniert, wenn sie nichts deklariert.'
+      },
+      distance: {
+        short: 'D',
+        long: 'Abstand von der Hauptreihe, D',
+        definition:
+          'Abstand von der Hauptreihe, D = |A + I − 1|: 0 auf der Linie von stabil und abstrakt zu instabil und konkret, 1 in einer Ecke — stabil und konkret, schwer zu ändern; oder instabil und abstrakt, ohne Nutzen. Undefiniert, wo A oder I es ist.'
       }
     } satisfies Record<MetricKey, MetricWording>,
     value: (key: MetricKey, value: number | undefined): string =>
       value === undefined
         ? '–'
-        : key === 'instability' || key === 'cohesion'
+        : key === 'instability' ||
+            key === 'cohesion' ||
+            key === 'abstractness' ||
+            key === 'distance'
           ? value.toLocaleString('de', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : key === 'internalShare'
             ? `${Math.round(value * 100)} %`
@@ -595,7 +611,30 @@ export const de: typeof en = {
         python:
           'Importe durch einen Aufruf werden in Python nicht gesehen: Wo es Python gibt, sind diese Zahlen eine Untergrenze.',
         go: 'Methodenaufrufe über Werte und Build-Constraints werden in Go nicht verfolgt: Wo es Go gibt, sind diese Zahlen eine Untergrenze.'
-      }
+      },
+      propagationCost: (value: number | undefined): string =>
+        value === undefined
+          ? 'Ausbreitungskosten dieser Ebene: undefiniert, sie hat weniger als zwei Knoten.'
+          : `Ausbreitungskosten dieser Ebene: ${Math.round(value * 100)} %.`,
+      propagationCostDefinition:
+        'Ausbreitungskosten: unter allen geordneten Paaren von Knoten dieser Ebene, ohne Nicht zugeordnet, der Anteil, in dem der erste den zweiten über Abhängigkeiten erreicht — wie weit eine Änderung reichen kann. Ein Knoten zählt nicht als einer, der sich selbst erreicht.'
+    },
+
+    sequence: {
+      label: 'Abstraktheit gegen Instabilität der Komponenten dieser Ebene',
+      howToRead:
+        'Jede Komponente ist ein Punkt: je weiter rechts, desto instabiler, je weiter oben, desto abstrakter. Die Hauptreihe ist die Diagonale von stabil und abstrakt zu instabil und konkret; je weiter eine Komponente von ihr liegt, desto größer ihr Abstand D. Unten links liegt die Zone des Schmerzes — stabil und konkret, schwer zu ändern; oben rechts die Zone der Nutzlosigkeit — abstrakt und von nichts genutzt.',
+      instability: 'Instabilität, I',
+      abstractness: 'Abstraktheit, A',
+      line: 'Hauptreihe',
+      pain: 'Zone des Schmerzes',
+      uselessness: 'Zone der Nutzlosigkeit',
+      list: 'Am weitesten von der Hauptreihe zuerst',
+      point: (name: string, a: string, i: string, d: string): string =>
+        `${name}: A ${a}, I ${i}, D ${d}`,
+      none: 'Keine Komponente dieser Ebene hat sowohl eine Abstraktheit als auch eine Instabilität.',
+      missing: (names: string): string =>
+        `Nicht eingezeichnet, mangels Abstraktheit oder Instabilität: ${names}.`
     },
 
     matrix: {
@@ -614,11 +653,12 @@ export const de: typeof en = {
 
     viewer: {
       label: 'Quelldatei',
-      back: (show: 'graph' | 'matrix' | 'metrics'): string =>
+      back: (show: 'graph' | 'matrix' | 'metrics' | 'sequence'): string =>
         ({
           graph: 'Zurück zum Graph',
           matrix: 'Zurück zur Matrix',
-          metrics: 'Zurück zu den Metriken'
+          metrics: 'Zurück zu den Metriken',
+          sequence: 'Zurück zur Hauptreihe'
         })[show],
       marked: (lines: readonly number[]): string =>
         `${many(lines.length, 'Zeile', 'Zeilen')} ${lines.join(', ')} markiert`,
@@ -653,6 +693,20 @@ export const de: typeof en = {
       files: 'Quelldateien',
       filesIn: (directory: string): string => `In \`${directory}\`:`,
       metrics: 'Metriken',
+      functions: 'Komplexeste Funktionen',
+      functionsHint:
+        'Nach zyklomatischer Komplexität: 1 und eins mehr für jede Entscheidung, jede Sprache gezählt, wie ihr übliches Werkzeug sie zählt — ESLint für TypeScript und JavaScript (if, Schleife, case, catch, ?:, &&, ||, ??, ?., &&=, ||=, ??=, ein Vorgabewert), Checkstyle für Java, radon für Python, gocyclo für Go. Öffnen Sie eine, um sie zu lesen.',
+      firstFunctions: (shown: number, total: number): string =>
+        `Die ${shown} komplexesten von ${count(total)}.`,
+      complexity: (value: number): string => `Komplexität ${value}`,
+      noFunction: 'Keine Funktion in ihren Quelldateien.',
+      classes: 'Klassen, deren Methoden zerfallen',
+      classesHint:
+        'LCOM4: die Gruppen von Methoden, die kein Feld teilen und keine Methode einer anderen Gruppe aufrufen. Mehr als eine, und die Klasse ließe sich teilen.',
+      groups: (lcom4: number, methods: number): string =>
+        `${lcom4} Gruppen aus ${methods} Methoden`,
+      notMeasured: (files: string): string =>
+        `Nicht von innen vermessen und darum hier nicht aufgeführt: ${files}. Das Vermessen schlug dort fehl; ihre Abhängigkeiten zählen trotzdem.`,
       cycles: 'Zyklen, zu denen sie gehört',
       noCycle: 'Keiner auf ihrer Ebene.',
       atItsLevel: 'Auf ihrer eigenen Ebene, unter den Komponenten neben ihr.',

@@ -9,6 +9,7 @@ import type { GoOutline } from './go/outline'
 import { resolveGo } from './go/resolve'
 import type { JavaOutline } from './java/outline'
 import { resolveJava } from './java/resolve'
+import type { FileMeasures, NotMeasured } from './measures'
 import { manifestLibraries, type ManifestLibrary } from './manifests'
 import type { PythonOutline } from './python/outline'
 import { pythonProjects } from './python/projects'
@@ -75,6 +76,13 @@ export interface Dependencies {
   readonly notAnalysed: readonly NotAnalysed[]
   /** How many lines each Source File has that could be read (section 5, Size). */
   readonly lineCounts: ReadonlyMap<string, number>
+  /**
+   * What is measured inside each Source File that was analysed by a language that measures:
+   * its functions, classes and declarations (section 5, "Inside a Source File").
+   */
+  readonly measures: ReadonlyMap<string, FileMeasures>
+  /** The Source Files that were read but could not be measured inside, in their order. */
+  readonly notMeasured: readonly NotMeasured[]
 }
 
 /** How many files are read at a time: enough to keep the disk busy, few enough for any limit. */
@@ -134,6 +142,8 @@ export async function analyseDependencies(
   const libraries: LibraryUse[] = []
   const notAnalysed: NotAnalysed[] = []
   const java = new Map<string, JavaOutline>()
+  const measures = new Map<string, FileMeasures>()
+  const notMeasured: NotMeasured[] = []
   const python = new Map<string, PythonOutline>()
   const go = new Map<string, GoOutline>()
   const depend = (from: string, to: string, typeOnly: boolean, line: number): void => {
@@ -159,6 +169,10 @@ export async function analyseDependencies(
       const { line, message, said } = extraction
       notAnalysed.push({ file: path, line, message, ...(said && { said }) })
       continue
+    }
+    if (extraction.measures) measures.set(path, extraction.measures)
+    if (extraction.notMeasured !== undefined) {
+      notMeasured.push({ file: path, message: extraction.notMeasured })
     }
     if ('java' in extraction) {
       java.set(path, extraction.java)
@@ -232,5 +246,14 @@ export async function analyseDependencies(
     })
     .sort((a, b) => byPath(a.from, b.from) || byPath(a.to, b.to))
   const manifests = await manifestLibraries(fs, files)
-  return { dependencies, notResolved, libraries, manifests, notAnalysed, lineCounts }
+  return {
+    dependencies,
+    notResolved,
+    libraries,
+    manifests,
+    notAnalysed,
+    lineCounts,
+    measures,
+    notMeasured
+  }
 }
