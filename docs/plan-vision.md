@@ -230,8 +230,8 @@ The window holds no text of its own: the German is in `strings.diagrams.de.ts` a
 **Open:**
 
 - The independent review.
-- Moving several boxes at once.
-- Choosing which suggested connections a new Diagram starts with: all of them are drawn.
+- The canvas does not resize a box: a `size` is kept as it is written.
+- The canvas does not move several boxes at once.
 
 ### Part 8 — Review: Annotations and their Anchors
 
