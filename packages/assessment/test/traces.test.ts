@@ -7,6 +7,8 @@ import {
   metricValueIn,
   openAssessments,
   planEvidence,
+  planRepair,
+  planState,
   traceProblems,
   wordingOf,
   type AdrReference,
@@ -239,5 +241,40 @@ describe('the other direction of a Trace', () => {
       risks: [],
       debtItems: []
     })
+  })
+})
+
+describe('the registers', () => {
+  it('list a Risk that cannot be read with what can be read, say why, and take no write into it', async () => {
+    const path = 'docs/architecture/risks/r.md'
+    const fs = memoryFileSystem({ [path]: '---\nstate: [open\n---\n\n# A broken Risk\n' })
+    const read = await openAssessments(fs)
+    expect(read.risks.map((risk) => [risk.id, risk.title, risk.writable])).toEqual([
+      ['r', 'A broken Risk', false]
+    ])
+    expect(read.problems.map((problem) => problem.kind)).toEqual(['unreadable-risk'])
+    expect(wordingOf(read.problems[0]!)).toMatch(
+      /^docs\/architecture\/risks\/r\.md cannot be read: its frontmatter is not valid YAML: /
+    )
+    const plan = await planState(fs, 'risks', 'r', 'mitigated', '2026-11-04')
+    expect(plan.ok ? 'planned' : plan.reason).toBe(
+      `${path} cannot be read. A person has to fix it before the suite writes into it.`
+    )
+  })
+
+  it('report a Finding that cites a Technical Debt Item that is not there, and take it out', async () => {
+    const text = assessment('date: 2026-11-03', 'evidence:\n  - debt: gone\n  - debt: there')
+    const fs = memoryFileSystem({
+      [`${DIR}/a.md`]: text,
+      'docs/architecture/debt/there.md': '---\nstate: open\n---\n\n# There\n'
+    })
+    const problems = traceProblems(await openAssessments(fs))
+    expect(problems.map(wordingOf)).toEqual([
+      `${DIR}/a.md: F1 cites gone, which is no Technical Debt Item of this repository.`
+    ])
+    const repaired = await planRepair(fs, problems[0]!)
+    expect(repaired.ok && repaired.changeSet.files.map((file) => file.after)).toEqual([
+      text.replace('  - debt: gone\n', '')
+    ])
   })
 })

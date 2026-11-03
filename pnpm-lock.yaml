@@ -211,6 +211,9 @@ importers:
 
   packages/cli:
     devDependencies:
+      '@adr-tool/assessment':
+        specifier: workspace:*
+        version: link:../assessment
       '@adr-tool/conformance':
         specifier: workspace:*
         version: link:../conformance
