@@ -10,10 +10,12 @@ import {
   type Status,
   type TemplateInfo
 } from '@adr-tool/core'
+import { RULES_PATH as RULES_FILE, type ConformanceRepair } from '@adr-tool/conformance'
 import type { StructureProblem } from '@adr-tool/structure/model'
 import type {
   BranchOverview,
   CommitPlan,
+  ConformanceView,
   Decision,
   ExportKind,
   HistoryEntry,
@@ -27,6 +29,7 @@ import type { Language } from '../../../shared/language'
 import { drawnForExport } from './diagrams'
 import { DiagramsModule, DiagramsTab, type DiagramApplied } from './diagrams-tab.svelte'
 import { followHistory, recordedIn } from './history'
+import { draftOfForm, ruleFormOf, type RuleForm } from './conformance'
 import { chooseLanguage } from './language'
 import type { Module } from './modules'
 import { repositoryProblems } from './repository-problems'
@@ -73,6 +76,15 @@ export type StructureSelection =
   | { kind: 'cycle'; index: number }
   | { kind: 'not-resolved' }
   | { kind: 'not-analysed' }
+
+/** What the centre of Conformance shows: the Violations as a list, as a drawing, or the Exceptions. */
+export type ConformanceShow = 'list' | 'graph' | 'exceptions'
+
+/** What is selected in Conformance: a Violation, by its fingerprint as a key, a Rule, an Exception. */
+export type ConformanceSelection =
+  | { kind: 'violation'; key: string }
+  | { kind: 'rule'; id: string }
+  | { kind: 'exception'; line: number }
 
 /** A Source File open in the code viewer, with the lines to mark and the one to bring into view. */
 export interface CodeView {
@@ -122,6 +134,38 @@ class OutlineTab {
   asked = 0
 }
 
+/**
+ * The Conformance module of one repository: the Rules checked against the code, as last
+ * answered, and what the person looks at (docs/plan-vision.md, part 4).
+ */
+class ConformanceTab {
+  /** The last answer, kept while the next one is asked for; replaced as a whole. */
+  view = $state.raw<ConformanceView | undefined>(undefined)
+  reading = $state(false)
+  /** Why the last answer failed. */
+  failed = $state<string | undefined>(undefined)
+  /** The module was opened: the analysis is kept current from then on. */
+  watched = false
+  /** Counts the requests, so that an answer that is overtaken is dropped. */
+  asked = 0
+  show = $state<ConformanceShow>('list')
+  /** The Rule whose Violations the list shows; every Rule's when `undefined`. */
+  rule = $state<string | undefined>(undefined)
+  selection = $state<ConformanceSelection | undefined>(undefined)
+  /** A Source File, or the Rules file, open in place of the list. */
+  code = $state<CodeView | undefined>(undefined)
+  /** The centre shows the Problems of the repository. */
+  problems = $state(false)
+  /** The level of Structure's drawing the Violations are drawn on, as last analysed. */
+  graph = $state.raw<StructureView | undefined>(undefined)
+  graphParent = $state<string | undefined>(undefined)
+  graphSelection = $state<StructureSelection | undefined>(undefined)
+  /** A Rule being written in the detail: a new one, or a change. */
+  form = $state<RuleForm | undefined>(undefined)
+  /** The Violation being accepted as an Exception, by its key, with what was typed. */
+  accepting = $state<{ key: string; reason: string; justifiedBy: string } | undefined>(undefined)
+}
+
 /** What branches that are not checked out do to the ADRs, as git was last asked. */
 interface BranchesTab {
   /** `undefined` until git has answered, and without git. */
@@ -144,6 +188,7 @@ interface Tab {
   selectedId: string | undefined
   structure: StructureTab
   outline: OutlineTab
+  conformance: ConformanceTab
   branches: BranchesTab
   /** The Review module: the Annotations and what is looked at of them (docs/plan-vision.md, part 9). */
   review: ReviewTab
@@ -168,8 +213,8 @@ export type Review =
       caution?: Caution
       /** The change renames a Component: the Structure view follows it. */
       renames?: { from: string; to: string }
-      /** What the module that asked for the change does once it is written. */
-      applied?: () => void
+      /** What follows once it is written: a form that wrote it closes. */
+      done?: () => void
       /** The change is one of the Diagrams module: the canvas follows it. */
       diagram?: DiagramApplied
     }
@@ -361,6 +406,7 @@ class AppState {
       repositoryProblems(
         this.active.repository,
         this.active.outline,
+        this.active.conformance,
         this.active.diagrams,
         this.active.review
       )
@@ -397,6 +443,8 @@ class AppState {
       // The file in the viewer may be one that changed.
       if (tab?.structure.code) void this.readSourceFile(tab)
       if (tab?.outline.known || tab?.outline.reading) void this.loadOutline(tab)
+      if (tab?.conformance.view || tab?.conformance.reading) void this.loadConformance(tab)
+      if (tab?.conformance.code) void this.readCode(tab.repository.id, tab.conformance)
       if (tab) this.diagrams.structureChanged(tab)
     })
     window.api.onCloseRequested(() => this.requestClose())
@@ -487,6 +535,10 @@ class AppState {
     this.leaveEditor(() => {
       tab.module = module
       if (module === 'structure' && !tab.structure.view) void this.loadStructure(tab)
+      if (module === 'conformance' && !tab.conformance.watched) {
+        tab.conformance.watched = true
+        void this.loadConformance(tab)
+      }
       if (module === 'diagrams') this.diagrams.open(tab)
     })
   }
@@ -588,9 +640,13 @@ class AppState {
     // Dropped, as another tab came to the front: asked again when this one does.
   }
 
-  /** Ask for the outline of a tab, unless it is known or asked for already. */
+  /**
+   * Ask for the outline of a tab, unless it is known or asked for already; and for its Rules,
+   * whose Problems count with the repository's.
+   */
   private needOutline(tab: Tab | undefined): void {
     if (tab && !tab.outline.known && !tab.outline.reading) void this.loadOutline(tab)
+    this.needConformance(tab)
     // The Problems of the Diagrams are counted too.
     this.diagrams.need(tab)
   }
@@ -614,6 +670,9 @@ class AppState {
     if (tab.module === 'structure') {
       tab.structure.problems = true
       tab.structure.code = undefined
+    } else if (tab.module === 'conformance') {
+      tab.conformance.problems = true
+      tab.conformance.code = undefined
     } else if (tab.module === 'review') {
       tab.review.problems = true
       tab.review.code = undefined
@@ -719,11 +778,19 @@ class AppState {
     if (this.active) this.active.structure.code = undefined
   }
 
-  private async readSourceFile(tab: Tab): Promise<void> {
-    const path = tab.structure.code?.path
+  private readSourceFile(tab: Tab): Promise<void> {
+    return this.readCode(tab.repository.id, tab.structure)
+  }
+
+  /** Read the file the code viewer of a module shows, as the disk has it now. */
+  private async readCode(
+    repositoryId: string,
+    holder: { code: CodeView | undefined }
+  ): Promise<void> {
+    const path = holder.code?.path
     if (path === undefined) return
-    const result = await window.api.readSourceFile(tab.repository.id, path)
-    const code = tab.structure.code
+    const result = await window.api.readSourceFile(repositoryId, path)
+    const code = holder.code
     // Another file was opened in the meantime, or none.
     if (code?.path !== path) return
     if (result.ok) {
@@ -754,6 +821,319 @@ class AppState {
 
   selectInStructure(selection: StructureSelection | undefined): void {
     if (this.active) this.active.structure.selection = selection
+  }
+
+  /**
+   * Ask for the Rules of a tab checked against its code. Once the module was opened, the
+   * analysis is kept current; before, the last one serves.
+   */
+  async loadConformance(tab: Tab | undefined = this.active): Promise<void> {
+    if (!tab) return
+    const conformance = tab.conformance
+    const asked = ++conformance.asked
+    conformance.reading = true
+    const result = await window.api
+      .conformanceView(tab.repository.id, conformance.watched)
+      .catch((error: unknown) => ({ ok: false as const, reason: String(error) }))
+    if (asked !== conformance.asked) return
+    conformance.reading = false
+    if (result.ok) {
+      const view = result.view
+      conformance.view = view
+      conformance.failed = undefined
+      if (
+        conformance.rule !== undefined &&
+        !view.rules.some((rule) => rule.id === conformance.rule)
+      ) {
+        conformance.rule = undefined
+      }
+      const selection = conformance.selection
+      const there =
+        selection === undefined ||
+        (selection.kind === 'violation' &&
+          view.violations.some((violation) => violation.key === selection.key)) ||
+        (selection.kind === 'rule' && view.rules.some((rule) => rule.id === selection.id)) ||
+        (selection.kind === 'exception' &&
+          view.exceptions.some((exception) => exception.line === selection.line))
+      if (!there) conformance.selection = undefined
+      if (conformance.show === 'graph') void this.loadConformanceGraph(tab)
+    } else if ('reason' in result) {
+      conformance.failed = result.reason
+    }
+    // Dropped, as another tab came to the front: asked again when this one does.
+  }
+
+  /** Ask for the Rules of a tab, unless they are known or asked for already. */
+  private needConformance(tab: Tab | undefined): void {
+    if (tab && !tab.conformance.view && !tab.conformance.reading) void this.loadConformance(tab)
+  }
+
+  /** The level of Structure's drawing that Conformance draws its Violations on. */
+  private async loadConformanceGraph(tab: Tab): Promise<void> {
+    const conformance = tab.conformance
+    const parent = conformance.graphParent
+    const result = await window.api.structureView(tab.repository.id, parent, false, [])
+    if (conformance.graphParent !== parent || !result.ok) return
+    conformance.graph = result.view
+    conformance.graphParent = result.view.parent
+  }
+
+  /** Show the Violations of a Rule, with the Rule beside them; of every Rule with `undefined`. */
+  showRuleViolations(id: string | undefined): void {
+    const conformance = this.active?.conformance
+    if (!conformance) return
+    conformance.rule = id
+    conformance.selection = id === undefined ? undefined : { kind: 'rule', id }
+    conformance.code = undefined
+    conformance.problems = false
+    if (conformance.show === 'exceptions') conformance.show = 'list'
+  }
+
+  /** The Violations as a list or on the drawing, or the Exceptions. */
+  showInConformance(show: ConformanceShow): void {
+    const tab = this.active
+    if (!tab) return
+    tab.conformance.show = show
+    tab.conformance.code = undefined
+    tab.conformance.problems = false
+    if (show === 'graph') void this.loadConformanceGraph(tab)
+  }
+
+  selectInConformance(selection: ConformanceSelection | undefined): void {
+    const conformance = this.active?.conformance
+    if (!conformance) return
+    conformance.selection = selection
+    if (conformance.accepting && selection?.kind !== 'violation') conformance.accepting = undefined
+  }
+
+  /** In the drawing: a line or a box, and the Violation behind it, where there is one. */
+  selectInConformanceGraph(
+    selection: StructureSelection | undefined,
+    violation: string | undefined
+  ): void {
+    const conformance = this.active?.conformance
+    if (!conformance) return
+    conformance.graphSelection = selection
+    conformance.selection =
+      violation === undefined ? undefined : { kind: 'violation', key: violation }
+  }
+
+  /** In the drawing: the level below a Component, or back up; `undefined` is the top. */
+  openInConformanceGraph(id: string | undefined): void {
+    const tab = this.active
+    if (!tab) return
+    tab.conformance.graphParent = id
+    tab.conformance.graphSelection = undefined
+    void this.loadConformanceGraph(tab)
+  }
+
+  /** Open a Source File, or the Rules file, in the code viewer of Conformance. */
+  openConformanceCode(path: string, marks: readonly number[] = [], line?: number): void {
+    const tab = this.active
+    if (!tab) return
+    const conformance = tab.conformance
+    const open = conformance.code?.path === path ? conformance.code.file : undefined
+    conformance.code = { path, marks: [...marks], line, file: open, error: undefined }
+    conformance.problems = false
+    if (!open) void this.readCode(tab.repository.id, conformance)
+  }
+
+  closeConformanceCode(): void {
+    if (this.active) this.active.conformance.code = undefined
+  }
+
+  /**
+   * Show a Rule, a Violation or an Exception in Conformance, from wherever the window is: the
+   * Component page, an ADR, the Problems of the repository.
+   */
+  showInConformanceModule(
+    selection: ConformanceSelection | undefined,
+    code?: { line: number }
+  ): void {
+    const tab = this.active
+    if (!tab) return
+    this.searching = undefined
+    this.leaveEditor(() => {
+      tab.module = 'conformance'
+      if (!tab.conformance.watched) {
+        tab.conformance.watched = true
+        void this.loadConformance(tab)
+      }
+      const conformance = tab.conformance
+      conformance.selection = selection
+      if (selection?.kind === 'rule') conformance.rule = selection.id
+      conformance.problems = false
+      conformance.form = undefined
+      conformance.accepting = undefined
+      if (selection?.kind === 'exception') conformance.show = 'exceptions'
+      else if (conformance.show === 'exceptions') conformance.show = 'list'
+      if (code) this.openConformanceCode(RULES_FILE, [code.line], code.line)
+      else conformance.code = undefined
+    })
+  }
+
+  /**
+   * Open the Rules file at a line, from a Problem of it: the Exception or the Rule that stands
+   * there is selected beside it.
+   */
+  showInRulesFile(line: number): void {
+    const view = this.active?.conformance.view
+    const exception = view?.exceptions.find((candidate) => candidate.line === line)
+    const rule = view?.rules.find((candidate) => candidate.line === line)
+    this.showInConformanceModule(
+      exception ? { kind: 'exception', line } : rule ? { kind: 'rule', id: rule.id } : undefined,
+      { line }
+    )
+  }
+
+  /** Write a new Rule in the detail, or change one. */
+  startRule(id?: string): void {
+    const conformance = this.active?.conformance
+    if (!conformance) return
+    const rule = id === undefined ? undefined : conformance.view?.rules.find((one) => one.id === id)
+    conformance.form = ruleFormOf(rule)
+    conformance.accepting = undefined
+  }
+
+  cancelRule(): void {
+    if (this.active) this.active.conformance.form = undefined
+  }
+
+  /** Plan the Rule of the form. Nothing is written yet; the form closes once it is. */
+  async planRuleOfForm(): Promise<void> {
+    const tab = this.active
+    const form = tab?.conformance.form
+    if (!tab || !form) return
+    const draft = draftOfForm($state.snapshot(form) as RuleForm)
+    if (!draft) return
+    const texts = t.review.rule
+    const original = form.original
+    const plan = await window.api.planRule(
+      tab.repository.id,
+      original === undefined ? { action: 'add', draft } : { action: 'change', id: original, draft }
+    )
+    const title = original === undefined ? texts.addTitle(draft.id) : texts.changeTitle(original)
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title,
+            action: original === undefined ? texts.add : texts.change,
+            change: plan.change,
+            applying: false,
+            done: () => {
+              tab.conformance.form = undefined
+              tab.conformance.selection = { kind: 'rule', id: draft.id }
+              tab.conformance.rule = draft.id
+            }
+          }
+        : {
+            kind: 'refused',
+            title:
+              original === undefined ? texts.addRefused(draft.id) : texts.changeRefused(original),
+            reason: wordOf(plan.said, plan.reason)
+          }
+    )
+  }
+
+  /** Plan taking a Rule out of the file, its Exceptions with it. */
+  async removeRule(id: string): Promise<void> {
+    const tab = this.active
+    if (!tab) return
+    const texts = t.review.rule
+    const plan = await window.api.planRule(tab.repository.id, { action: 'remove', id })
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: texts.removeTitle(id),
+            action: texts.remove,
+            change: plan.change,
+            applying: false,
+            done: () => {
+              if (tab.conformance.rule === id) tab.conformance.rule = undefined
+              tab.conformance.selection = undefined
+            }
+          }
+        : {
+            kind: 'refused',
+            title: texts.removeRefused(id),
+            reason: wordOf(plan.said, plan.reason)
+          }
+    )
+  }
+
+  /** Accept a Violation as an Exception: the form in its detail. */
+  startAccepting(key: string): void {
+    const conformance = this.active?.conformance
+    if (!conformance) return
+    conformance.accepting = { key, reason: '', justifiedBy: '' }
+    conformance.form = undefined
+  }
+
+  cancelAccepting(): void {
+    if (this.active) this.active.conformance.accepting = undefined
+  }
+
+  /** Plan the Exception the form describes. Nothing is written yet. */
+  async planExceptionOfForm(): Promise<void> {
+    const tab = this.active
+    const accepting = tab?.conformance.accepting
+    const violation = tab?.conformance.view?.violations.find(
+      (candidate) => candidate.key === accepting?.key
+    )
+    if (!tab || !accepting || !violation || accepting.reason.trim() === '') return
+    const texts = t.review.exception
+    const justifiedBy = accepting.justifiedBy.trim()
+    const plan = await window.api.planException(tab.repository.id, {
+      fingerprint: $state.snapshot(violation.fingerprint),
+      reason: accepting.reason.trim(),
+      ...(justifiedBy !== '' && { justifiedBy })
+    })
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: texts.title(violation.rule),
+            action: texts.action,
+            change: plan.change,
+            applying: false,
+            done: () => (tab.conformance.accepting = undefined)
+          }
+        : {
+            kind: 'refused',
+            title: texts.refused(violation.rule),
+            reason: wordOf(plan.said, plan.reason)
+          }
+    )
+  }
+
+  /** Plan a Repair of the Rules file: take an Exception out, or narrow it. */
+  async repairConformance(repair: ConformanceRepair): Promise<void> {
+    const tab = this.active
+    if (!tab) return
+    const texts =
+      repair.kind === 'remove-exception' ? t.review.removeException : t.review.narrowException
+    const plan = await window.api.planConformanceRepair(tab.repository.id, $state.snapshot(repair))
+    this.present(
+      plan.ok
+        ? {
+            kind: 'change',
+            title: texts.title(repair.fingerprint.rule),
+            action: texts.action,
+            change: plan.change,
+            applying: false,
+            done: () => {
+              const selection = tab.conformance.selection
+              if (selection?.kind === 'exception') tab.conformance.selection = undefined
+            }
+          }
+        : {
+            kind: 'refused',
+            title: texts.refused(repair.fingerprint.rule),
+            reason: wordOf(plan.said, plan.reason)
+          }
+    )
   }
 
   /** Plan writing the Draft into the declaration. Nothing is written yet. */
@@ -1454,10 +1834,10 @@ class AppState {
       }
       this.replace(result.repository)
       this.review = undefined
+      review.done?.()
       // A renamed Component has a new ID: the Structure view stays with it.
       if (review.renames) this.followRename(review.renames.from, review.renames.to)
       if (review.diagram) this.diagrams.applied(review.diagram, review.change)
-      review.applied?.()
       // A renumbered ADR has a new ID: stay with it.
       const renamedId = review.change.renamedId
       if (renamedId !== undefined && this.active) this.active.selectedId = renamedId
@@ -1605,6 +1985,8 @@ class AppState {
     if (!tab) return
     tab.repository = repository
     this.rebaseMetadata(repository)
+    // The Rules file, or an ADR an Exception names, may have changed.
+    if (tab.conformance.view || tab.conformance.reading) void this.loadConformance(tab)
     this.diagrams.repositoryChanged(tab)
     // A commit or a checkout changes what the other branches have that this one has not.
     void this.loadBranches(tab)
@@ -1660,6 +2042,7 @@ function newTab(repository: OpenRepository): Tab {
       selection: undefined
     },
     outline: new OutlineTab(),
+    conformance: new ConformanceTab(),
     review: new ReviewTab(),
     branches: {
       overview: undefined,

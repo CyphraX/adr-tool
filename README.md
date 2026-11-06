@@ -153,7 +153,28 @@ The analysis runs in a worker thread and caches its results per file. It follows
 
 ### Conformance
 
-- **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, and how far a metric may go — down to the complexity of each function. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request; the window follows ([plan-vision.md](docs/plan-vision.md), part 4).
+- **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, and how far a metric may go — down to the complexity of each function. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request.
+- **The Violations.** The sidebar lists the Rules, each with a red count of its Violations. The centre lists the Violations of every Rule, or of one. A Violation names its Rule and the imports behind it, and each line number opens the code viewer at the import.
+
+  ![A Violation of a Rule written in the window, with the import behind it](docs/screenshots/readme/conformance-violation.png)
+
+- **On the graph.** The same Violations are drawn red on Structure's graph of a level; the other lines step back. A list beside the drawing reads each line out as a sentence, Violations included.
+
+  ![The Violation on the graph of the packages: the red line from structure to core](docs/screenshots/readme/conformance-graph.png)
+
+- **Writing Rules.** **New Rule** opens a form for every kind; **Change** and **Remove** are on the Rule. The preview touches the Rule's own lines and nothing else ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)). What cannot be written that way — a file in braces, an anchor, a comment that would be lost — is refused with a sentence.
+
+  ![The form of a new Rule: core and structure must not depend on each other](docs/screenshots/readme/conformance-rule.png)
+
+- **Accept as Exception.** A Violation is accepted with a reason and, if you like, the ADR that justifies it. An ADR lists the Exceptions it justifies, and the page of a Component lists the Rules that name it and its Violations.
+
+  ![Accepting a Violation as an Exception justified by ADR 0006](docs/screenshots/readme/conformance-exception.png)
+
+- **The Problems of the Rules file** stand in the repository's list with the others. An Exception that matches nothing any more is taken out by its Repair, and one whose Cycle shrank is narrowed.
+
+  ![An Exception that matches no Violation any more, with its Repair](docs/screenshots/readme/conformance-problems.png)
+
+The Rules are checked in the background on Structure's analysis, through the same code as `adr check` and the MCP server. The last result stays until the next one is there, and a change to `.arch/rules.yml` is read at once.
 
 ### Diagrams
 

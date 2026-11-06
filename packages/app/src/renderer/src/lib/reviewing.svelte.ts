@@ -425,7 +425,7 @@ class Reviewing {
       action: texts.action,
       change: plan.change,
       applying: false,
-      ...(applied && { applied: () => applied(created) })
+      ...(applied && { done: () => applied(created) })
     })
   }
 }

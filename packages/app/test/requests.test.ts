@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  conformanceRepairRequest,
   createRequest,
   diagramsRequest,
+  exceptionRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
-  repairRequest
+  repairRequest,
+  ruleRequest
 } from '../src/main/requests'
 
 const valid = {
@@ -220,5 +223,152 @@ describe('the drawn Mermaid blocks an export is asked with', () => {
     const label =
       '<svg xmlns="http://www.w3.org/2000/svg"><text>Never javascript:alert(1) or <tspan>onclick="x"</tspan> &lt;script&gt;</text></svg>'
     expect(diagramsRequest([{ source: 'label', svg: label }])).toEqual(new Map([['label', label]]))
+  })
+})
+
+describe('a Rule, an Exception or a Repair of the Rules as the renderer sends it', () => {
+  const draft = {
+    id: 'billing-not-web',
+    why: 'Billing is the domain.',
+    kind: 'must-not-depend',
+    from: ['billing'],
+    to: ['web']
+  }
+
+  it('names a Rule to add, change or remove, of a kind conformance knows, and nothing else', () => {
+    expect(ruleRequest({ action: 'add', draft })).toEqual({ action: 'add', draft })
+    expect(ruleRequest({ action: 'change', id: 'old', draft: { ...draft, extra: 1 } })).toEqual({
+      action: 'change',
+      id: 'old',
+      draft
+    })
+    expect(ruleRequest({ action: 'remove', id: 'old', draft })).toEqual({
+      action: 'remove',
+      id: 'old'
+    })
+    const threshold = {
+      id: 'simple',
+      why: 'W.',
+      kind: 'threshold',
+      metric: 'complexity',
+      max: 10,
+      of: ['billing'],
+      ignoreTypeOnly: true
+    }
+    // A threshold has no type-only option: it is left behind.
+    const { ignoreTypeOnly, ...without } = threshold
+    expect(ignoreTypeOnly).toBe(true)
+    expect(ruleRequest({ action: 'add', draft: threshold })).toEqual({
+      action: 'add',
+      draft: without
+    })
+    expect(
+      ruleRequest({
+        action: 'add',
+        draft: {
+          id: 'l',
+          why: 'W.',
+          kind: 'layers',
+          layers: [['web'], ['billing']],
+          mode: 'strict'
+        }
+      })
+    ).toMatchObject({ draft: { layers: [['web'], ['billing']], mode: 'strict' } })
+    expect(
+      ruleRequest({
+        action: 'add',
+        draft: { id: 'c', why: 'W.', kind: 'no-cycles', scope: 'inside', components: ['billing'] }
+      })
+    ).toMatchObject({ draft: { scope: 'inside', components: ['billing'] } })
+  })
+
+  it('turns down a Rule that is not what it should be', () => {
+    for (const request of [
+      undefined,
+      { action: 'add' },
+      { action: 'remove' },
+      { action: 'change', draft },
+      { action: 'rewrite', id: 'x', draft },
+      { action: 'add', draft: { ...draft, kind: 'must-not-import' } },
+      { action: 'add', draft: { ...draft, to: 'web' } },
+      { action: 'add', draft: { ...draft, tests: 'yes' } },
+      { action: 'add', draft: { ...draft, why: 1 } },
+      {
+        action: 'add',
+        draft: { id: 'l', why: 'W.', kind: 'layers', layers: [['web']], mode: 'loose' }
+      },
+      {
+        action: 'add',
+        draft: { id: 'c', why: 'W.', kind: 'no-cycles', scope: 'around', components: [] }
+      },
+      {
+        action: 'add',
+        draft: { id: 's', why: 'W.', kind: 'threshold', metric: 'beauty', max: 1, of: ['web'] }
+      },
+      {
+        action: 'add',
+        draft: {
+          id: 's',
+          why: 'W.',
+          kind: 'threshold',
+          metric: 'complexity',
+          max: Infinity,
+          of: ['web']
+        }
+      }
+    ]) {
+      expect(ruleRequest(request), JSON.stringify(request)).toBeUndefined()
+    }
+  })
+
+  it('names an Exception by a fingerprint of any kind, with its reason and an ADR', () => {
+    const fingerprints = [
+      { kind: 'dependency', rule: 'r', from: 'billing', to: 'web' },
+      { kind: 'cycle', rule: 'r', cycle: ['b', 'a'] },
+      { kind: 'component', rule: 'r', component: '/' },
+      { kind: 'function', rule: 'r', file: 'src/a.ts', name: 'render' },
+      { kind: 'class', rule: 'r', file: 'src/a.ts', name: 'Page' }
+    ]
+    for (const fingerprint of fingerprints) {
+      const request = { fingerprint, reason: 'R.', justifiedBy: 'docs/adr/0001-a' }
+      expect(exceptionRequest({ ...request, extra: 1 })).toEqual(request)
+    }
+    for (const request of [
+      { fingerprint: fingerprints[0], reason: 1 },
+      { fingerprint: fingerprints[0], reason: 'R.', justifiedBy: 4 },
+      { fingerprint: { ...fingerprints[0], kind: 'import' }, reason: 'R.' },
+      { fingerprint: { kind: 'dependency', rule: 'r', from: 'billing' }, reason: 'R.' },
+      { fingerprint: { kind: 'cycle', rule: 'r', cycle: ['a'] }, reason: 'R.' },
+      { fingerprint: { kind: 'function', rule: 'r', file: 'src/a.ts' }, reason: 'R.' }
+    ]) {
+      expect(exceptionRequest(request), JSON.stringify(request)).toBeUndefined()
+    }
+  })
+
+  it('names a Repair by its line and fingerprint, and narrows to two members at least', () => {
+    const fingerprint = { kind: 'cycle', rule: 'r', cycle: ['a', 'b', 'c'] }
+    expect(conformanceRepairRequest({ kind: 'remove-exception', line: 7, fingerprint })).toEqual({
+      kind: 'remove-exception',
+      line: 7,
+      fingerprint
+    })
+    expect(
+      conformanceRepairRequest({
+        kind: 'narrow-exception',
+        line: 7,
+        fingerprint,
+        members: ['a', 'b']
+      })
+    ).toEqual({ kind: 'narrow-exception', line: 7, fingerprint, members: ['a', 'b'] })
+    for (const request of [
+      { kind: 'narrow-exception', line: 7, fingerprint, members: ['a'] },
+      { kind: 'narrow-exception', line: 7, fingerprint, members: 'a, b' },
+      { kind: 'remove-exception', line: 7.5, fingerprint },
+      { kind: 'remove-exception', line: '7', fingerprint },
+      { kind: 'rewrite-exception', line: 7, fingerprint },
+      { kind: 'remove-exception', line: 7, fingerprint: { kind: 'cycle', rule: 'r' } }
+    ]) {
+      expect(conformanceRepairRequest(request), JSON.stringify(request)).toBeUndefined()
+    }
   })
 })

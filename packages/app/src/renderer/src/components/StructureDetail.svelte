@@ -8,7 +8,8 @@
     StructureNode,
     StructureView
   } from '../../../shared/ipc'
-  import { wordOf } from '../lib/said'
+  import { rulesNaming, ruleSays, violationsAbout } from '../lib/conformance'
+  import { wordConformance, wordOf } from '../lib/said'
   import { app, statusKey } from '../lib/state.svelte'
   import { METRICS, t } from '../lib/strings'
   import { firstLine, linesOf, openOf, ownersOf, placeOf } from '../lib/review'
@@ -58,6 +59,9 @@
     }
     return [...direct, ...below]
   }
+
+  // The Rules of the repository as last checked: the Component page lists those that name it.
+  const rules = $derived(app.active?.conformance.view)
 
   const nameOfComponent = (id: string): string =>
     app.active?.repository.components?.find((component) => component.id === id)?.name ?? id
@@ -214,6 +218,60 @@
         </li>
       {/each}
     </ul>
+  {/if}
+
+  <!-- The Rules that name it, and where the code breaks them in it (docs/plan-vision.md, part 4). -->
+  <h3>{t.conformance.component.rules}</h3>
+  {#if !rules}
+    <p class="faint">{t.conformance.component.checking}</p>
+  {:else}
+    {@const naming = rulesNaming(rules.rules, page.id)}
+    {@const violations = violationsAbout(
+      rules.violations.filter((violation) => !violation.exception),
+      page.id
+    )}
+    {@const accepted = violationsAbout(
+      rules.violations.filter((violation) => violation.exception),
+      page.id
+    ).length}
+    {#if naming.length === 0}
+      <p class="faint">{t.conformance.component.noRule}</p>
+    {:else}
+      <ul class="rules">
+        {#each naming as rule (rule.id)}
+          <li>
+            <button
+              class="link"
+              onclick={() => app.showInConformanceModule({ kind: 'rule', id: rule.id })}
+              ><code>{rule.id}</code></button
+            >
+            <span class="faint">{ruleSays(rule)}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    {#if naming.length > 0 || violations.length > 0 || accepted > 0}
+      <h3>{t.conformance.component.violations}</h3>
+      {#if violations.length === 0}
+        <p class="faint">{t.conformance.component.noViolation(accepted)}</p>
+      {:else}
+        <ul class="violations">
+          {#each violations as violation (violation.key)}
+            <li>
+              <button
+                class="link"
+                onclick={() =>
+                  app.showInConformanceModule({ kind: 'violation', key: violation.key })}
+                >{wordConformance(violation.said)}</button
+              >
+            </li>
+          {/each}
+        </ul>
+        {#if accepted > 0}
+          <p class="faint">{t.conformance.component.alsoAccepted(accepted)}</p>
+        {/if}
+      {/if}
+    {/if}
   {/if}
 
   <ComponentDiagrams id={page.id} />
@@ -680,6 +738,10 @@
     color: var(--ink);
   }
 
+  .violations .link {
+    color: var(--problem);
+  }
+
   .decisions .link :global(svg) {
     display: inline-block;
     margin-right: 4px;
@@ -712,6 +774,7 @@
     color: var(--problem);
   }
 
+  .rules li,
   .edges li,
   .cycles li {
     display: flex;

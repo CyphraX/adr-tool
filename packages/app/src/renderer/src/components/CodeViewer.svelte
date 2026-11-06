@@ -11,9 +11,10 @@
 
   // A Source File, read-only, with the lines of the Dependency it was opened from marked and
   // the one asked for in view. It stands where the level was; the details stay beside it, so
-  // that one line after another can be opened from there. The Annotations of the file stand
-  // beside their lines (docs/plan-vision.md, part 9); lines selected here are annotated, or an
-  // Annotation is attached to them again.
+  // that one line after another can be opened from there. Conformance opens it as well, at an
+  // import or at the line of a Rule, and says where its button leads back to. The Annotations of
+  // the file stand beside their lines (docs/plan-vision.md, part 9); lines selected here are
+  // annotated, or an Annotation is attached to them again.
   let {
     code,
     back,

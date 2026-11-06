@@ -11,6 +11,7 @@
   "exports": {
     "./analysis": "./src/analysis.ts",
     "./annotations": "./src/annotations.ts",
+    "./conformance": "./src/conformance.ts",
     "./export": "./src/export.ts",
     "./git": "./src/git.ts",
     "./listing": "./src/listing.ts"

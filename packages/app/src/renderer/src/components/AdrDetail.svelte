@@ -1,6 +1,7 @@
 <script lang="ts">
   import { repairsOf, type Adr, type DecisionLog, type Relation } from '@adr-tool/core'
   import type { Decision } from '../../../shared/ipc'
+  import { exceptionNames, exceptionsJustifiedBy } from '../lib/conformance'
   import { problemsOf } from '../lib/problems'
   import { namedIn, type Named } from '../lib/references'
   import { app, statusKey } from '../lib/state.svelte'
@@ -47,6 +48,17 @@
 
   // The Components the repository declares: what `affects` names is shown by its name.
   const declared = $derived(app.active?.repository.components)
+
+  // The Exceptions of the Rules file that name this ADR as their justification: only they
+  // record the Trace, so it is computed here (ADR-0009).
+  const justified = $derived(
+    exceptionsJustifiedBy(
+      app.active?.conformance.view?.exceptions ?? [],
+      app.active?.repository.repository.logs.map((one) => one.path) ?? [],
+      log.path,
+      adr.id
+    )
+  )
 
   // The Annotations that cite this ADR: the other direction of their Traces (docs/plan-vision.md,
   // part 9), which only the Annotations record.
@@ -273,6 +285,24 @@
               {:else}
                 <code>{id}</code>
               {/if}
+            {/each}
+          </span>
+        </li>
+      </ul>
+    {/if}
+
+    {#if justified.length > 0}
+      <ul class="justifies" aria-label={t.conformance.adr.exceptions}>
+        <li>
+          <span class="kind">{t.conformance.adr.justifies}</span>
+          <span class="components">
+            {#each justified as exception (exception.line)}
+              <button
+                title={t.conformance.adr.exception(exception.rule, exceptionNames(exception))}
+                onclick={() =>
+                  app.showInConformanceModule({ kind: 'exception', line: exception.line })}
+                ><code>{exception.rule}</code> {exceptionNames(exception)}</button
+              >
             {/each}
           </span>
         </li>

@@ -267,7 +267,7 @@ describe('the Problems of Review among those of the repository', () => {
     const open = { id: 'r1', root: '/r1', name: 'shop', repository: repo }
     const outline = { known: OUTLINE, reading: false, failed: undefined }
     const known = { known: overview(), reading: false, failed: undefined }
-    expect(repositoryProblems(open, outline, undefined, known).count).toBe(2)
+    expect(repositoryProblems(open, outline, undefined, undefined, known).count).toBe(2)
     // An unreadable `.arch/config.yml` is one Problem, counted once with the settings of the
     // Diagrams: Review says that it reads no Annotation, and counts nothing for it.
     const unreadable = {
@@ -294,7 +294,7 @@ describe('the Problems of Review among those of the repository', () => {
       reading: false,
       failed: undefined
     }
-    const both = repositoryProblems(open, outline, diagrams, unreadable)
+    const both = repositoryProblems(open, outline, undefined, diagrams, unreadable)
     expect(both.count).toBe(1)
     expect(both.review).toMatchObject({ state: 'known', entries: [], configUnreadable: true })
   })

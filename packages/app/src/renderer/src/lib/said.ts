@@ -6,6 +6,14 @@
  * What has no code — what the main process says of its own, a parser's message — is shown as
  * it comes.
  */
+import {
+  conformanceEnglishOf,
+  saidOf as conformanceSaidOf,
+  wordingOf as conformanceWordingOf,
+  type ConformanceNote,
+  type ConformanceProblem,
+  type ConformanceSaid
+} from '@adr-tool/conformance'
 import type { Said } from '@adr-tool/core'
 import {
   saidOf as reviewSaidOf,
@@ -42,4 +50,14 @@ export function wordStructureProblem(problem: StructureProblem): string {
 /** What a Problem of Review says, in the language of the window. */
 export function wordReviewProblem(problem: ReviewProblem): string {
   return wordOf(reviewSaidOf(problem), reviewWordingOf(problem))
+}
+
+/** What `conformance` said — what a Violation is, why a Rule cannot be written — in the language of the window. */
+export function wordConformance(said: ConformanceSaid): string {
+  return wordOf(said, conformanceEnglishOf(said))
+}
+
+/** What a Problem or a note of the Rules file says, in the language of the window. */
+export function wordConformanceProblem(problem: ConformanceProblem | ConformanceNote): string {
+  return wordOf(conformanceSaidOf(problem), conformanceWordingOf(problem))
 }

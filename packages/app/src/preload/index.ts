@@ -57,6 +57,13 @@ const api: Api = {
     ipcRenderer.invoke(CHANNEL.planStructureRepair, repositoryId, problem),
   planRename: (repositoryId, component, segment) =>
     ipcRenderer.invoke(CHANNEL.planRename, repositoryId, component, segment),
+  conformanceView: (repositoryId, watch) =>
+    ipcRenderer.invoke(CHANNEL.conformanceView, repositoryId, watch === true),
+  planRule: (repositoryId, request) => ipcRenderer.invoke(CHANNEL.planRule, repositoryId, request),
+  planException: (repositoryId, draft) =>
+    ipcRenderer.invoke(CHANNEL.planException, repositoryId, draft),
+  planConformanceRepair: (repositoryId, repair) =>
+    ipcRenderer.invoke(CHANNEL.planConformanceRepair, repositoryId, repair),
   setUnsaved: (unsaved) => ipcRenderer.invoke(CHANNEL.setUnsaved, unsaved),
   setLanguage: (language) => ipcRenderer.invoke(CHANNEL.setLanguage, language),
   reloadWindow: () => ipcRenderer.invoke(CHANNEL.reloadWindow),
