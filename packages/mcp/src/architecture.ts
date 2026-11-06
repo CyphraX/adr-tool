@@ -7,13 +7,22 @@
  * its content while the server runs, so that a second call reads only what changed.
  */
 import { createHash } from 'node:crypto'
-import { analyseRepository, extractorFor, type Analysed } from '@adr-tool/cli/analysis'
+import {
+  analyseRepository,
+  extractorFor,
+  listRepository,
+  type Analysed
+} from '@adr-tool/cli/analysis'
 import { conformanceOf, decisionsOf } from '@adr-tool/cli/conformance'
 import {
   checkPlannedImport,
   conformanceEnglishOf,
-  FINGERPRINT_KEYS,
+  FINGERPRINT_SHAPES,
   findException,
+  fingerprintKeysOf,
+  fingerprintKeysSaid,
+  fingerprintKindOf,
+  fingerprintKindOfKeys,
   fingerprintText,
   METRICS,
   needsModel,
@@ -22,6 +31,7 @@ import {
   planChangeRule,
   planConformanceRepair,
   planRemoveRule,
+  readFingerprint,
   readRules,
   repairOf,
   RULE_KIND_NAMES,
@@ -44,6 +54,7 @@ import { prepareResolver, type Extract, type Extraction } from '@adr-tool/struct
 import {
   DECLARATION_PATH,
   everyComponent,
+  languageOf,
   levelOf,
   metricsOf,
   readDeclaration,
@@ -94,44 +105,25 @@ const importsOf = (dependencies: readonly Dependency[]): Record<string, unknown>
   )
 
 /** A fingerprint as an Exception writes it, and as plan_exception takes it: without its kind. */
-function exceptionKeysOf(fingerprint: Fingerprint): Record<string, unknown> {
-  switch (fingerprint.kind) {
-    case 'dependency':
-      return { rule: fingerprint.rule, from: fingerprint.from, to: fingerprint.to }
-    case 'cycle':
-      return { rule: fingerprint.rule, cycle: fingerprint.cycle }
-    case 'component':
-      return { rule: fingerprint.rule, component: fingerprint.component }
-  }
-}
+const exceptionKeysOf = (fingerprint: Fingerprint): Record<string, unknown> => ({
+  rule: fingerprint.rule,
+  ...Object.fromEntries(fingerprintKeysOf(fingerprint))
+})
 
-/** A Rule as list_rules gives it, in the keys plan_rule takes. */
+/** A Rule as list_rules gives it, in the keys plan_rule takes: its draft, with its line. */
 function ruleOf(rule: Rule): Record<string, unknown> {
-  const keys = ((): Record<string, unknown> => {
-    switch (rule.kind) {
-      case 'must-not-depend':
-      case 'may-only-depend':
-        return { from: rule.from, to: rule.to }
-      case 'layers':
-        return { layers: rule.layers, mode: rule.mode }
-      case 'no-cycles':
-        return { [rule.scope]: rule.components }
-      case 'threshold':
-        return {
-          metric: rule.metric,
-          ...(rule.max !== undefined && { max: rule.max }),
-          ...(rule.min !== undefined && { min: rule.min }),
-          of: rule.of
-        }
-    }
-  })()
+  const { tests, ...draft } = draftOf(rule)
+  const { ignoreTypeOnly, ...keys } = draft as typeof draft & { ignoreTypeOnly?: boolean }
+  const named: Record<string, unknown> = { ...keys }
+  if (keys.kind === 'no-cycles') {
+    delete named.scope
+    delete named.components
+    named[keys.scope] = keys.components
+  }
   return {
-    id: rule.id,
-    why: rule.why,
-    kind: rule.kind,
-    ...keys,
-    ...(rule.tests && { tests: true }),
-    ...(rule.ignoreTypeOnly && { ignoreTypeOnly: true }),
+    ...named,
+    ...(tests && { tests: true }),
+    ...(ignoreTypeOnly && { ignoreTypeOnly: true }),
     line: rule.line
   }
 }
@@ -146,6 +138,9 @@ function violationOf(violation: CheckedViolation): Record<string, unknown> {
     fingerprint: exceptionKeysOf(violation.fingerprint),
     ...(violation.cycle && { cycle: violation.cycle }),
     ...(violation.component !== undefined && { component: violation.component }),
+    ...(violation.file !== undefined && { file: violation.file }),
+    ...(violation.name !== undefined && { name: violation.name }),
+    ...(violation.line !== undefined && { line: violation.line }),
     ...(violation.value !== undefined && { value: rounded(violation.value) }),
     ...(violation.exception && {
       acceptedBy: {
@@ -298,46 +293,30 @@ function ruleDraft(input: Record<string, unknown>, id: string, current?: Rule): 
   }
 }
 
+/** Keys of the Rules file as a sentence names them: `"from" and "to"`. */
+const quotedKeys = (keys: readonly string[]): string => {
+  const quoted = keys.map((key) => `"${key}"`)
+  return quoted.length < 2 ? (quoted[0] ?? '') : `${quoted.slice(0, -1).join(', ')} and ${quoted.at(-1)}`
+}
+
 /**
  * The Violation `input` names, for plan_exception: by the keys its Rule's kind names a
- * Violation by — of a Rule that is not in the file, by the keys it was given.
+ * Violation by (FINGERPRINT_SHAPES) — of a Rule that is not in the file, by the keys it was
+ * given.
  */
 function fingerprintFrom(input: Record<string, unknown>, file: RulesFile): Fingerprint {
   const rule = String(input.rule)
-  const kind = file.rules.find((candidate) => candidate.id === rule)?.kind
-  const shape =
-    kind === 'no-cycles'
-      ? 'cycle'
-      : kind === 'threshold'
-        ? 'component'
-        : kind !== undefined
-          ? 'dependency'
-          : input.cycle !== undefined
-            ? 'cycle'
-            : input.component !== undefined
-              ? 'component'
-              : 'dependency'
-  const keys = kind
-    ? FINGERPRINT_KEYS[kind]
-    : { dependency: '"from" and "to"', cycle: '"cycle"', component: '"component"' }[shape]
-  const wrong = (): never => {
-    throw new Refusal(
-      `An Exception from ${rule} names its Violation by ${keys}, as list_violations gives them in "fingerprint".`
-    )
-  }
-  switch (shape) {
-    case 'dependency':
-      if (typeof input.from !== 'string' || typeof input.to !== 'string') wrong()
-      return { kind: shape, rule, from: String(input.from), to: String(input.to) }
-    case 'cycle': {
-      const cycle = strings(input.cycle)
-      if (cycle === undefined || cycle.length < 2) wrong()
-      return { kind: shape, rule, cycle: cycle! }
-    }
-    case 'component':
-      if (typeof input.component !== 'string') wrong()
-      return { kind: shape, rule, component: String(input.component) }
-  }
+  const known = file.rules.find((candidate) => candidate.id === rule)
+  const kind = known ? fingerprintKindOf(known) : fingerprintKindOfKeys(input)
+  const fingerprint = readFingerprint(kind, rule, input)
+  if (fingerprint !== undefined) return fingerprint
+  const said = known
+    ? fingerprintKeysSaid(known)
+    : { keys: FINGERPRINT_SHAPES[kind].map(([key]) => key), topLevel: undefined }
+  const top = said.topLevel === undefined ? '' : `, or "${said.topLevel}" for the top level`
+  throw new Refusal(
+    `An Exception from ${rule} names its Violation by ${quotedKeys(said.keys)}${top}, as list_violations gives them in "fingerprint".`
+  )
 }
 
 /**
@@ -405,18 +384,30 @@ export function architectureTools(context: ArchitectureContext): {
   const planned = async (input: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const from = pathOf(input.from, 'from')
     const written = String(input.to).trim()
-    let { file, analysed, repository } = await check([from])
+    const asPath = normalizePath(written)
+    // A file of the repository named by its path, with the extension of a Source File, is
+    // taken as one, written yet or not: what is planned may be two new files.
+    const listed = await listRepository(context.root)
+    const topOf = (path: string): string => path.slice(0, path.indexOf('/') + 1)
+    const newFile =
+      asPath !== undefined &&
+      !written.startsWith('.') &&
+      asPath.includes('/') &&
+      languageOf(asPath) !== undefined &&
+      !listed.includes(asPath) &&
+      listed.some((path) => path.startsWith(topOf(asPath)))
+    let { file, analysed, repository } = await check(newFile ? [from, asPath] : [from])
     const source = analysed.structure.sourceFiles.find((one) => one.path === from)
     if (source === undefined) {
       throw new Refusal(
-        `${from} is no Source File: the suite reads the imports of TypeScript, JavaScript, Svelte and Java.`
+        `${from} is no Source File: the suite reads the imports of TypeScript, JavaScript, Svelte, Java, Python and Go.`
       )
     }
     const isSource = (path: string | undefined): boolean =>
       path !== undefined && analysed.structure.sourceFiles.some((one) => one.path === path)
-    const asPath = normalizePath(written)
     let to = isSource(asPath) ? asPath : undefined
-    if (to === undefined && source.language !== 'java') {
+    // A specifier is resolved as TypeScript resolves it; from Java, Python or Go, the file is named.
+    if (to === undefined && (source.language === 'typescript' || source.language === 'svelte')) {
       const resolution = (await prepareResolver(fs, analysed.files)).resolve(written, from)
       const outside = (note: string): Record<string, unknown> => ({
         import: { from, to: written },
@@ -520,7 +511,12 @@ export function architectureTools(context: ArchitectureContext): {
             note: `${DECLARATION_PATH} declares no Components: these are the Draft, the Components the suite proposes from the directories.`
           }),
           nodes: level.nodes.map((node) => {
-            const measured = metrics.get(node.id)
+            // A Component's own Source Files and Unassigned have a size and no other metric, as
+            // in the app: their ID is that of the Component they stand beside.
+            const measured =
+              node.kind === 'component' || node.kind === 'directory'
+                ? metrics.get(node.id)
+                : undefined
             return {
               id: node.id,
               kind: node.kind,
@@ -721,7 +717,13 @@ export function architectureTools(context: ArchitectureContext): {
           from: text('Of a Dependency: its source Component.'),
           to: text('Of a Dependency: its target Component.'),
           cycle: list('Of a Cycle: its members.'),
-          component: text('Of a threshold: the Component.'),
+          component: text(
+            'Of a threshold on a Component: the Component; of propagation cost, the Component the level lies below, "/" for the top level.'
+          ),
+          file: text('Of a threshold on a function or a class: its Source File.'),
+          name: text(
+            'Of a threshold on a function or a class: its name in that file, as list_violations gives it.'
+          ),
           reason: text('For add: why the Violation is accepted, in a sentence.'),
           justifiedBy: text(
             'For add: the ADR that justifies it, by the directory of its Decision Log and its ID, e.g. "docs/adr/0007-use-kafka".'
