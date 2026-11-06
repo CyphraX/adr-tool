@@ -529,7 +529,9 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('dev.adr-tool.app')
+  // The appId of electron-builder.yml: Windows groups the window under the shortcut the
+  // installer made only when both name the same.
+  electronApp.setAppUserModelId('io.github.cyphrax.softarch-suite')
 
   // F12 toggles DevTools in development; Ctrl/Cmd+R is ignored in production.
   app.on('browser-window-created', (_, window) => {
