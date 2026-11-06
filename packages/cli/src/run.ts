@@ -94,7 +94,7 @@ export async function run(args: readonly string[], console: Console): Promise<nu
       const checked = await check(repositoryFiles(root, warn), await listRepository(root))
       if (!checked) {
         console.err(
-          `adr check: Nothing to check in ${root}: no Decision Log is found there, and neither .arch/components.yml nor .arch/rules.yml is there.\n`
+          `adr check: Nothing to check in ${root}: no Decision Log is found there, neither .arch/components.yml nor .arch/rules.yml is there, and no Diagram is.\n`
         )
         return 2
       }

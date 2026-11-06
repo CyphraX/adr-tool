@@ -16,22 +16,6 @@ export interface ToolAnnotations {
   readonly openWorldHint?: boolean
 }
 
-/** A tool that only reads. */
-export const READ: ToolAnnotations = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false
-}
-
-/** A plan writes nothing either; it is held until it is applied or discarded. */
-export const PLAN: ToolAnnotations = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: false,
-  openWorldHint: false
-}
-
 export interface Tool {
   readonly name: string
   readonly title: string

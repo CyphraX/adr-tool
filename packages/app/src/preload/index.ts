@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNEL, type Api, type OpenRepository } from '../shared/ipc'
+import { diagramsBridge } from './diagrams'
 
 // The typed bridge between the main process and the sandboxed renderer.
 // The renderer never gets more than what is listed here.
@@ -71,7 +72,8 @@ const api: Api = {
     ipcRenderer.on(CHANNEL.closeRequested, handler)
     return () => ipcRenderer.removeListener(CHANNEL.closeRequested, handler)
   },
-  answerCloseRequest: (close) => ipcRenderer.invoke(CHANNEL.answerCloseRequest, close)
+  answerCloseRequest: (close) => ipcRenderer.invoke(CHANNEL.answerCloseRequest, close),
+  ...diagramsBridge(ipcRenderer)
 }
 
 contextBridge.exposeInMainWorld('api', api)

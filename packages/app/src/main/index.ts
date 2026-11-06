@@ -18,6 +18,7 @@ import {
 } from '../shared/ipc'
 import { isLanguage } from '../shared/language'
 import { analysisHost } from './analysis-host'
+import { registerDiagrams } from './diagrams-ipc'
 import { ASSET_SCHEME, assetHandler } from './assets'
 import { conformanceView, planException, planRule } from './conformance'
 import { exportPdf, writeExport } from './export'
@@ -278,7 +279,7 @@ function registerIpc(): void {
     const root = repositories.rootOf(repositoryId)
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
     try {
-      const { analysis, current, analysedAt } = await structures.analysisOf(
+      const { analysis, current, analysedAt } = await structures.rulesAnalysisOf(
         repositoryId,
         root,
         watch === true
@@ -602,6 +603,7 @@ app.whenReady().then(() => {
     assetHandler((id) => repositories.rootOf(id))
   )
   registerIpc()
+  registerDiagrams(ipcMain, repositories, structures)
   createWindow()
 
   app.on('activate', () => {

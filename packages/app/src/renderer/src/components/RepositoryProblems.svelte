@@ -16,6 +16,7 @@
     prefixOf,
     repairLabel
   } from '../lib/wording'
+  import DiagramsProblems from './DiagramsProblems.svelte'
   import StatusMark from './StatusMark.svelte'
 
   // The Problems of the repository in front, of every module, in one list (docs/plan-vision.md,
@@ -79,6 +80,10 @@
       {:else if tab?.module === 'conformance'}
         <button onclick={() => app.showInConformance(tab.conformance.show)}>
           {t.repositoryProblems.backToConformance}
+        </button>
+      {:else if tab?.module === 'diagrams'}
+        <button onclick={() => app.diagrams.closeProblems()}>
+          {t.diagrams.backToDiagrams}
         </button>
       {:else}
         <button onclick={() => app.show('adrs')}>{t.backToAdrs}</button>
@@ -296,6 +301,8 @@
           </ul>
         {/if}
       </section>
+
+      <DiagramsProblems section={problems.diagrams} />
     </div>
   {/if}
 </div>

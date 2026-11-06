@@ -70,6 +70,21 @@ describe('.arch/config.yml', () => {
     expect(unreadable('- diagrams\n')).toBe(
       '1: .arch/config.yml cannot be read: its top level must be a map. What its settings decide is not done until it is fixed.'
     )
+    // Aliases that would grow to a billion values when read out: refused, not read.
+    const bomb = [
+      'a: &a [x, x, x, x, x, x, x, x, x, x]',
+      ...'bcdefghi'
+        .split('')
+        .map(
+          (name, index) =>
+            `${name}: &${name} [${Array(10).fill(`*${'abcdefghi'[index]}`).join(', ')}]`
+        ),
+      'diagrams: *i',
+      ''
+    ].join('\n')
+    expect(unreadable(bomb)).toMatch(
+      /^1: \.arch\/config\.yml cannot be read: it is not valid YAML: .*alias.*\. What its settings decide is not done until it is fixed\.$/i
+    )
     const config = readConfig('just text\n')
     expect(config.readable).toBe(false)
     if (!config.readable) {

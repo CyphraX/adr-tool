@@ -27,6 +27,7 @@ import type {
 } from '../../../shared/ipc'
 import type { Language } from '../../../shared/language'
 import { drawnForExport } from './diagrams'
+import { DiagramsModule, DiagramsTab, type DiagramApplied } from './diagrams-tab.svelte'
 import { followHistory, recordedIn } from './history'
 import { draftOfForm, ruleFormOf, type RuleForm } from './conformance'
 import { chooseLanguage } from './language'
@@ -190,6 +191,8 @@ interface Tab {
   branches: BranchesTab
   /** How the Relations graph is shown: the Relation types it draws, and its scale. */
   graph: { types: RelationType[]; scale: number }
+  /** The Diagrams of the repository, and the one on the canvas (lib/diagrams-tab.svelte.ts). */
+  diagrams: DiagramsTab
 }
 
 /** What the dialog shows after an action was asked for. */
@@ -209,6 +212,8 @@ export type Review =
       renames?: { from: string; to: string }
       /** What follows once it is written: a form that wrote it closes. */
       done?: () => void
+      /** The change is one of the Diagrams module: the canvas follows it. */
+      diagram?: DiagramApplied
     }
   /** Why something cannot be done, or was not written. */
   | { kind: 'refused'; title: string; reason: string }
@@ -364,6 +369,8 @@ class AppState {
   committing = $state<Committing | undefined>(undefined)
   /** The search palette, while it is open. */
   searching = $state<{ query: string } | undefined>(undefined)
+  /** The Diagrams module: what the canvas does (lib/diagrams-tab.svelte.ts). */
+  readonly diagrams = new DiagramsModule(this)
 
   readonly active = $derived(this.tabs.find((tab) => tab.repository.id === this.activeId))
 
@@ -393,7 +400,12 @@ class AppState {
   /** Every Problem of the repository in front, of every module (docs/plan-vision.md, part 2). */
   readonly repositoryProblems = $derived(
     this.active &&
-      repositoryProblems(this.active.repository, this.active.outline, this.active.conformance)
+      repositoryProblems(
+        this.active.repository,
+        this.active.outline,
+        this.active.conformance,
+        this.active.diagrams
+      )
   )
 
   /** Whether the editor holds text that is not on disk. */
@@ -414,8 +426,8 @@ class AppState {
     this.metadataDirty || (this.creating !== undefined && this.creating.title.trim() !== '')
   )
 
-  /** Whether closing the window now would lose anything that was typed or picked. */
-  readonly holdsUnsaved = $derived(this.dirty || this.dialogDirty)
+  /** Whether closing the window now would lose anything that was typed, picked or drawn. */
+  readonly holdsUnsaved = $derived(this.dirty || this.dialogDirty || this.diagrams.unsaved)
 
   async start(): Promise<void> {
     window.api.onRepositoryChanged((repository) => this.replace(repository))
@@ -427,6 +439,7 @@ class AppState {
       if (tab?.outline.known || tab?.outline.reading) void this.loadOutline(tab)
       if (tab?.conformance.view || tab?.conformance.reading) void this.loadConformance(tab)
       if (tab?.conformance.code) void this.readCode(tab.repository.id, tab.conformance)
+      if (tab) this.diagrams.structureChanged(tab)
     })
     window.api.onCloseRequested(() => this.requestClose())
     const session = await window.api.restoreSession()
@@ -461,8 +474,11 @@ class AppState {
       }
       void window.api.closeRepository(id)
     }
-    if (this.editing?.repositoryId === id) this.leaveEditor(closes)
-    else closes()
+    // Edits of a Diagram of the tab that are not saved are asked about first.
+    const tab = this.tabs.find((candidate) => candidate.repository.id === id)
+    const leaves = (): void => this.diagrams.leave(tab, closes)
+    if (this.editing?.repositoryId === id) this.leaveEditor(leaves)
+    else leaves()
   }
 
   activate(id: string | undefined): void {
@@ -490,10 +506,18 @@ class AppState {
   speak(language: Language | undefined, declined: () => void): void {
     this.leaveDialogs(
       () =>
-        this.leaveEditor(() => {
-          chooseLanguage(language)
-          void window.api.reloadWindow()
-        }, declined),
+        this.leaveEditor(
+          () =>
+            this.diagrams.leave(
+              undefined,
+              () => {
+                chooseLanguage(language)
+                void window.api.reloadWindow()
+              },
+              declined
+            ),
+          declined
+        ),
       declined
     )
   }
@@ -509,6 +533,7 @@ class AppState {
         tab.conformance.watched = true
         void this.loadConformance(tab)
       }
+      if (module === 'diagrams') this.diagrams.open(tab)
     })
   }
 
@@ -616,6 +641,8 @@ class AppState {
   private needOutline(tab: Tab | undefined): void {
     if (tab && !tab.outline.known && !tab.outline.reading) void this.loadOutline(tab)
     this.needConformance(tab)
+    // The Problems of the Diagrams are counted too.
+    this.diagrams.need(tab)
   }
 
   /**
@@ -640,6 +667,8 @@ class AppState {
     } else if (tab.module === 'conformance') {
       tab.conformance.problems = true
       tab.conformance.code = undefined
+    } else if (tab.module === 'diagrams') {
+      this.diagrams.showProblems()
     } else {
       this.show('repository-problems')
     }
@@ -1797,6 +1826,7 @@ class AppState {
       review.done?.()
       // A renamed Component has a new ID: the Structure view stays with it.
       if (review.renames) this.followRename(review.renames.from, review.renames.to)
+      if (review.diagram) this.diagrams.applied(review.diagram, review.change)
       // A renumbered ADR has a new ID: stay with it.
       const renamedId = review.change.renamedId
       if (renamedId !== undefined && this.active) this.active.selectedId = renamedId
@@ -1824,7 +1854,7 @@ class AppState {
   }
 
   /** Show what a plan came back with, unless a question was asked meanwhile. */
-  private present(review: Review): void {
+  present(review: Review): void {
     if (this.review?.kind === 'confirm') {
       if (review.kind === 'change') void window.api.discardChange(review.change.changeId)
       return
@@ -1856,7 +1886,14 @@ class AppState {
     if (this.review?.kind === 'confirm') this.review = undefined
     else this.dismissReview()
     const answer = (close: boolean) => (): void => void window.api.answerCloseRequest(close)
-    this.leaveDialogs(() => this.leaveEditor(answer(true), answer(false)), answer(false))
+    this.leaveDialogs(
+      () =>
+        this.leaveEditor(
+          () => this.diagrams.leave(undefined, answer(true), answer(false)),
+          answer(false)
+        ),
+      answer(false)
+    )
   }
 
   /**
@@ -1938,6 +1975,7 @@ class AppState {
     this.rebaseMetadata(repository)
     // The Rules file, or an ADR an Exception names, may have changed.
     if (tab.conformance.view || tab.conformance.reading) void this.loadConformance(tab)
+    this.diagrams.repositoryChanged(tab)
     // A commit or a checkout changes what the other branches have that this one has not.
     void this.loadBranches(tab)
     // The history follows the file and git while it is open; of an ADR that is gone from
@@ -2000,7 +2038,8 @@ function newTab(repository: OpenRepository): Tab {
       selected: undefined,
       adr: undefined
     },
-    graph: { types: [...RELATION_TYPES], scale: 1 }
+    graph: { types: [...RELATION_TYPES], scale: 1 },
+    diagrams: new DiagramsTab()
   }
 }
 

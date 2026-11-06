@@ -55,8 +55,34 @@ export {
   type SuggestedConnection
 } from './connections'
 export { planRepair, removeComponent } from './repair'
-export { drawDiagram, textWidth } from './svg'
-export { planExport, type ExportModel, type ExportPlan } from './export'
+export {
+  editDiagramText,
+  planDiagramEdit,
+  spliceBetween,
+  yamlText,
+  type DiagramEdit,
+  type NewConnection,
+  type NewElement
+} from './edit'
+export {
+  drawDiagram,
+  geometryOf,
+  lineBetween,
+  textWidth,
+  type Geometry,
+  type PlacedBox,
+  type PlacedLine
+} from './svg'
+export {
+  checkPicture,
+  exportModelOf,
+  planExport,
+  type ExportModel,
+  type ExportPlan
+} from './export'
+export { newDiagramText, planNewDiagram, type NewDiagram } from './create'
+export { readEdits, readNewDiagram } from './given'
+export { planRenameInDiagrams, renameInDiagram, type RenamedDeclaration } from './rename'
 export {
   SENTENCES as DIAGRAMS_SENTENCES,
   englishOf as diagramsEnglishOf,

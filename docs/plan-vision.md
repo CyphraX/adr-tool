@@ -194,6 +194,7 @@ What changed on the way:
 - Merging main, which brought part 3's review, made the code `key-twice` of Conformance `written-twice`, since Structure has a `key-twice` of its own and the German table holds both.
 - The MCP server now depends on `conformance`. The Diagram of the packages has that connection, and its SVG is drawn again.
 - Where design.md did not say, it now does: a form about what the view shows stands in the detail, a table keeps its rows for the arrows, and on Conformance's drawing red is a Violation alone.
+- Merging main with part 7 put Diagrams after Conformance in the module switcher, as design.md orders them; a Component's page lists its Rules before its Diagrams, and Repository Problems has both sections. The MCP server's schema helpers are part 7's `kit.ts`, which now has `number`, `flag` and `oneOf` too; the main process's analysis for the Rules is `rulesAnalysisOf`, beside part 7's `analysisOf`.
 
 The review of the part, and the merge with part 13:
 
@@ -246,6 +247,66 @@ For Lena. The editor.
 - **The Component page** lists the Diagrams that show it; **MCP** reads a Diagram as data and its Drift, and plans changes to it.
 
 *Done when:* Lena draws the container view of this repository from its Components, with GitHub and the file system as External Systems, saves it through its preview, exports it as SVG, embeds the SVG in an ADR whose preview shows it, adds a Dependency in the code and sees the Diagram's Drift; a Rename of a Component it shows rewrites the Diagram in the preview of the Rename.
+
+*Status (2026-11-06):* built and reviewed. **Where it sits:** Diagrams is the module switcher's word after Structure and Conformance. Its sidebar has Repository Problems under *Check*, then the Diagrams, each with the count of its Drift as a red badge and a dot while it has changes that are not saved, where they are kept, and **New Diagram**. The centre is the canvas: the title, then **Add Component**, **Add External System**, **Undo**, **Export SVG** and **Save**, the one primary button. Between the canvas and the detail, *What the Diagram says* lists every box and connection as a sentence, a button the keyboard reaches in reading order, with the Drift below them; below 1600 px it is folded to a strip that names it and counts the Drift, and **Hide** folds it again. A Diagram opens fitted to the canvas, never above its size nor below half of it, with −, its scale, + and **Fit** in the corner, and <kbd>Ctrl</kbd> and the wheel zoom. At the foot, a line says how the canvas is used, above the legend. The detail is the selected element, its connections and its Drift, or the selected connection, or the Diagram with its Problems and their Repairs ([design.md](design.md), which now says how a Diagram is laid out and what its red and dashes mean). Screenshots of Lena's scenario, at 1440 × 900: `docs/screenshots/vision-7-save.png`, `vision-7-adr.png`, `vision-7-problem.png`, and in German `vision-7-drift-de.png` and `vision-7-rename-de.png`; the README has `readme/diagrams.png`.
+
+**In the running app**, on a clone of this repository, in English and in German (Playwright on Electron), Lena:
+
+1. starts *The containers of Softarch Suite* from the container level: ten Components and their 28 connections, placed as Structure lays them out, previewed as one new file;
+2. adds GitHub and the file system as External Systems, which land at the first free spot on the grid and are brought into view;
+3. drags them, connects `cli` to GitHub and `kernel` to the file system, and labels one on the canvas and the other in the detail;
+4. saves through the preview, which holds those eight changes as the lines of the two new boxes, where they were dragged to, and of the two connections;
+5. exports `containers.svg` and embeds it in a new ADR, whose reading view shows the picture at the width of the page;
+6. adds `export { DIAGRAMS_KEY } from '../../diagrams/src/location'` to `packages/kernel/src/index.ts`, after which both Diagrams show `kernel` depending on `diagrams` as Drift, dotted on the canvas, with **Draw it**;
+7. renames `cli` to `command-line` in Structure: the preview holds 8 files, among them `containers.yml` and `packages.yml` with only their ID lines changed, and both pictures drawn again;
+8. moves a box and saves. Repository Problems then has the stale picture, with **Export the picture again** / **Das Bild neu exportieren**;
+9. finds the Diagram with <kbd>Ctrl</kbd> <kbd>K</kbd>.
+
+**The core grew** (`packages/diagrams`, 58 tests then 98):
+
+- `planDiagramEdit` makes the seven edits the window holds until **Save** — move, add, remove and describe an element; add, remove and label a connection — each as a splice of the lines it is about, read back and compared before it is planned. It refuses what it cannot write line by line: a position other than `[x, y]` on one line, or with an anchor; a name, a description or a label written over several lines, as a block, with an anchor, or in an item written as `{…}`; and an item added to or taken from a list of elements or connections written as `[…]`. `spliceBetween` turns the result into one edit.
+- `planNewDiagram` and `newDiagramText` write a new Diagram, and `readEdits` and `readNewDiagram` read what the window or an agent hands in, field by field, with limits.
+- `planRenameInDiagrams` rewrites `component`, `from`, `to` and `scope` where they name the Component, quoting kept. It warns of a Diagram it cannot read, and draws again every picture that was current, against the declaration as the Rename leaves it.
+- `checkPicture` is the Problem `stale-picture`, whose Repair is `planExport`.
+
+The window holds no text of its own: the German is in `strings.diagrams.de.ts` and `said.de.ts`. The app has 30 new tests (`diagram-canvas`, `diagram-overview`, `diagram-requests`), and `traces.test.ts` checks the Rename of this repository with its picture.
+
+**What grows:**
+
+- *The Component page* lists the Diagrams that show it (`ComponentDiagrams.svelte`).
+- *Repository Problems* has a Diagrams section, with Repairs named by what they do.
+- *Search* finds a Diagram by title and ID.
+- *MCP:* six tools, each a plan until `apply_change` (`packages/mcp/src/diagrams.ts`, 7 tests): `list_diagrams`, and `read_diagram`, which reads the code as `adr check` does and answers the Drift, the suggestions and the Problems with their Repair. Then `plan_new_diagram`, `plan_diagram_change` (which says when the picture is left behind), `plan_diagram_export` and `plan_diagram_repair`. The code is read through `@adr-tool/cli/analysis`, as for `component_metrics`, and `packages/cli/command.config.ts` builds both programs as one file, so `adr-mcp.mjs` is now about 13 MB.
+- *`adr check`* reads `.arch/config.yml` and fails on its Problem. It checks the Diagrams (`src/check-diagrams.ts`, 4 tests): a Problem of a Diagram, a stale picture among them, fails it. A Drift is a note at the line of its connection, or of the element that uses, and fails nothing. The summary line reads "1 Diagram: no Problem, no Drift." on this repository ([cli.md](cli.md)).
+- *Rename* is the Diagrams' as above.
+
+**Fixed in the scenario:**
+
+- An added box landed outside the view.
+- The picture in an ADR was wider than its page.
+- A Rename left the pictures stale, which `adr check` now fails.
+- A label on the canvas was crossed by a line drawn after it.
+
+**Departures:**
+
+- The Drift of a Dependency the Diagram leaves out is dotted and faint rather than dashed red: since part 6, dashed red is a connection that is only perhaps not in the code.
+- The Diagram of this repository gained the connections that `cli` and `mcp` now have.
+
+**The review** found no Blocker. What it found, and what became of it:
+
+- An alias bomb in `.arch/config.yml` — anchors that expand past what the parser allows — crashed `adr check` with 2, and the opening of the repository in the app, which reads the file for its Diagrams. The kernel's `readConfig` now says it as `unreadable-config`, "it is not valid YAML", with a test.
+- A move of a box whose `at` spans two lines took a comment between them with it, and an anchored value was edited in place, which changes its aliases too. Both are refused now, as the list above says. An element added after an item with a comment below it, indented as its keys, went between the item and its comment, and after `-   component: a` its keys were misaligned: the comment now stays with its item, and the new item is indented as the first.
+- After a move with <kbd>Shift</kbd> and an arrow, or <kbd>Delete</kbd>, the focus fell to the page, where <kbd>Ctrl</kbd> <kbd>Z</kbd> did nothing. The focus now stays on the box, or goes to the canvas, and <kbd>Ctrl</kbd> <kbd>Z</kbd> undoes anywhere in the module but in a field or a dialog. The dot that connects is no longer a stop of <kbd>Tab</kbd> that does nothing: the keyboard connects with the field under *Connections* in the detail.
+- At 1440 px the canvas was 691 px wide and the Diagram of this repository about 1100, and labels lay on boxes. *What the Diagram says* now folds there, the Diagram opens fitted, and the layout moves a label along its line until it is clear of every box and every other label, on the canvas and in the SVG alike (`svg.test.ts`).
+- The bundle was built twice, by `bundle.ts` with `@adr-tool/cli/code` and by `command.config.ts` with `@adr-tool/cli/analysis` from parts 13 and 10. It is built once, by the latter: `bundle.ts` and `src/code.ts` are gone, `adr check` reads the code with `extractorFor` and `read_diagram` with `analyseRepository`.
+- Rename passed over an ID that YAML reads as a number, `component: 2024`; it compares the text now. A new Diagram with a connection to an element it does not show was refused as an element it "no longer shows"; it is `not-in-new-diagram` now. The Repair of a stale picture hands on the path of the picture it reads.
+- *Left as it is:* `adr-mcp.mjs` is 13 MB where it was 0.9, and answers `initialize` in about a third of a second rather than a sixth, most of it the loading of TypeScript. Minified, it is half the size and starts no sooner. Nor can TypeScript be loaded on first use from the server: one file runs every module it holds as it starts, those imported dynamically among them, so only Structure's reader of TypeScript could put it off ([mcp.md](mcp.md)).
+- *Since part 7*, `adr check` reads `.arch/config.yml` whenever it runs, so it fails with 1 on a key written twice there, a list at its top, YAML that does not parse, or `diagrams` naming a directory outside the repository. A repository with nothing else to check ends with 1 rather than 2 when that file cannot be read ([cli.md](cli.md)).
+
+**Open:**
+
+- The canvas does not resize a box: a `size` is kept as it is written.
+- The canvas does not move several boxes at once.
 
 ### Part 8 — Review: Annotations and their Anchors
 

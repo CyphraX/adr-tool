@@ -7,6 +7,12 @@ import {
 import { repairsOf, type DecisionLog, type Problem, type Repair } from '@adr-tool/core'
 import { hasRepair, type StructureProblem } from '@adr-tool/structure/model'
 import type { ConformanceView, OpenRepository, StructureOutline } from '../../../shared/ipc'
+import {
+  diagramsCount,
+  diagramsSection,
+  type DiagramsKnown,
+  type DiagramsSection
+} from './diagrams-problems'
 import { problemsAcross, type Placed, type PlacedGroup } from './together'
 
 /**
@@ -31,6 +37,8 @@ export interface RepositoryProblems {
   readonly structure: StructureSection
   /** The Problems of `.arch/rules.yml`, and its notes, as far as Conformance knows them. */
   readonly conformance: ConformanceSection
+  /** The Problems of the Diagrams, and of `.arch/config.yml` (lib/diagrams-problems.ts). */
+  readonly diagrams: DiagramsSection
   /** Every Problem known, each root cause once: what every sidebar shows. A note is none. */
   readonly count: number
 }
@@ -120,7 +128,8 @@ const isTrace = (problem: Problem): problem is TraceProblem['problem'] =>
 export function repositoryProblems(
   repository: OpenRepository,
   outline: OutlineKnown,
-  conformance: ConformanceKnown = { view: undefined, reading: true, failed: undefined }
+  conformance: ConformanceKnown = { view: undefined, reading: true, failed: undefined },
+  diagramsKnown: DiagramsKnown = { overview: undefined, reading: false, failed: undefined }
 ): RepositoryProblems {
   const [across] = problemsAcross([repository])
   const logOf = (path: string): DecisionLog | undefined =>
@@ -149,12 +158,14 @@ export function repositoryProblems(
   const structureCount = structure.state === 'known' ? structure.entries.length : 0
   const rulesCount =
     rules.state === 'known' ? rules.entries.filter((entry) => !entry.note).length : 0
+  const diagrams = diagramsSection(diagramsKnown)
   return {
     decisions: { own: across!.own, logs },
     traces,
     structure,
     conformance: rules,
-    count: decisionsCount + traces.length + structureCount + rulesCount
+    diagrams,
+    count: decisionsCount + traces.length + structureCount + rulesCount + diagramsCount(diagrams)
   }
 }
 

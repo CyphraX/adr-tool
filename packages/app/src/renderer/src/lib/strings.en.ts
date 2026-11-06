@@ -1,6 +1,7 @@
 import type { Rule, RuleKind } from '@adr-tool/conformance'
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision, LowerBound } from '../../../shared/ipc'
+import { DIAGRAMS_EN } from './strings.diagrams.en'
 import type { Refusal } from './views'
 
 /**
@@ -111,7 +112,8 @@ export const en = {
     label: 'Modules',
     decisions: 'Decisions',
     structure: 'Structure',
-    conformance: 'Conformance'
+    conformance: 'Conformance',
+    diagrams: 'Diagrams'
   },
 
   tabs: {
@@ -1221,5 +1223,8 @@ export const en = {
         'A dialog holds what you entered, and it has not been carried out. Closing the window now loses it.',
       action: 'Discard and close'
     }
-  }
+  },
+
+  /** The Diagrams module: strings.diagrams.en.ts. */
+  diagrams: DIAGRAMS_EN
 }

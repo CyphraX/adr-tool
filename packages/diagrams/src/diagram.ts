@@ -379,14 +379,14 @@ function numbers(node: unknown): [number, number] | undefined {
 }
 
 /** `key:` without a value is a scalar that holds null, not null itself. */
-const emptyToNull = (node: unknown): unknown =>
+export const emptyToNull = (node: unknown): unknown =>
   node === undefined || node === null || (isScalar(node) && node.value === null) ? null : node
 
 /** A key as the text it was written as. */
-const keyText = (key: unknown): string => scalarText(key) ?? String(key)
+export const keyText = (key: unknown): string => scalarText(key) ?? String(key)
 
 /** A scalar as the text it stands for: `2` and `true` written as a name are text. */
-function scalarText(node: unknown): string | undefined {
+export function scalarText(node: unknown): string | undefined {
   if (!isScalar(node) || node.value === null || typeof node.value === 'object') return undefined
   return typeof node.value === 'string' ? node.value : (node.source ?? String(node.value))
 }

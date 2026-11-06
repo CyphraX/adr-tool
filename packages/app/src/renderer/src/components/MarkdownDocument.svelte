@@ -174,6 +174,12 @@
     margin-right: 0.4em;
   }
 
+  /* An image, such as the exported picture of a Diagram, fits the width of the document. */
+  .document :global(img) {
+    max-width: 100%;
+    height: auto;
+  }
+
   /* A drawn Mermaid block, and a block that cannot be drawn, with what Mermaid says beside it. */
   .document :global(figure.diagram) {
     margin: 0 0 1em;

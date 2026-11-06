@@ -69,7 +69,17 @@ export function readConfig(text: string | undefined): Config {
   if (top === null || (isScalar(top) && top.value === null)) return none
   if (!isMap(top)) return unreadable({ code: 'config-not-map', values: {} }, 1)
 
-  const values = doc.toJS() as Record<string, unknown>
+  // A file of aliases that would grow without bound when read out is refused by YAML here,
+  // after it parsed: it is not YAML that can be read, for every module alike.
+  let values: Record<string, unknown>
+  try {
+    values = doc.toJS() as Record<string, unknown>
+  } catch (error) {
+    const message = (error instanceof Error ? error.message : String(error))
+      .split('\n')[0]!
+      .replace(/[:.]$/, '')
+    return unreadable({ code: 'config-not-yaml', values: { message } }, 1)
+  }
   const settings = new Map<string, Setting>()
   for (const pair of top.items) {
     const key = isScalar(pair.key) ? String(pair.key.value) : String(pair.key)

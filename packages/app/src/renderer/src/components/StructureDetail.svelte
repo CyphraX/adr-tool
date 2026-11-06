@@ -14,6 +14,7 @@
   import { METRICS, t } from '../lib/strings'
   import { commonDirectory, nodeLabel, opens } from '../lib/structure'
   import { codeSpans, prefixOf } from '../lib/wording'
+  import ComponentDiagrams from './ComponentDiagrams.svelte'
   import StatusMark from './StatusMark.svelte'
   import StructureFunctions from './StructureFunctions.svelte'
 
@@ -264,6 +265,8 @@
       {/if}
     {/if}
   {/if}
+
+  <ComponentDiagrams id={page.id} />
 
   <h3>{t.structure.page.patterns}</h3>
   <dl class="patterns">

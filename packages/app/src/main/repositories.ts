@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { basename, join } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
+import { locateDiagrams } from '@adr-tool/diagrams'
 import {
   applyChangeSet,
   firstLog,
@@ -447,16 +448,18 @@ export class Repositories {
 
   private async load(entry: Entry): Promise<OpenRepository> {
     const git = gitIn(entry.root)
-    const [{ repository, components }, tree] = await Promise.all([
-      openWithTraces(nodeFileSystem(entry.root)),
-      git.workingTree()
+    const fs = nodeFileSystem(entry.root)
+    const [{ repository, components }, tree, diagrams] = await Promise.all([
+      openWithTraces(fs),
+      git.workingTree(),
+      locateDiagrams(fs)
     ])
     entry.gitDirectory ??= tree ? ((await git.directory()) ?? null) : undefined
     // A commit, a checkout, a reset or `git add` changes no ADR, and still changes what is uncommitted.
     const gitPaths = entry.gitDirectory
       ? ['HEAD', 'index', 'logs/HEAD'].map((file) => join(entry.gitDirectory!, file))
       : []
-    this.watch(entry, [...watchPaths(entry.root, repository), ...gitPaths])
+    this.watch(entry, [...watchPaths(entry.root, repository, diagrams.directory), ...gitPaths])
 
     const adrPaths = new Set(repository.logs.flatMap((log) => log.adrs.map((adr) => adr.path)))
     return {

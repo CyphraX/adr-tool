@@ -13,7 +13,9 @@ export const MODULES = [
   /** The Components of the code and their Dependencies (docs/contexts/structure/CONTEXT.md). */
   { id: 'structure' },
   /** The Rules of the architecture and where the code breaks them (docs/contexts/conformance/CONTEXT.md). */
-  { id: 'conformance' }
+  { id: 'conformance' },
+  /** Pictures of the architecture, bound to the code (docs/contexts/diagrams/CONTEXT.md). */
+  { id: 'diagrams' }
 ] as const satisfies readonly { readonly id: string }[]
 
 /** A module of the suite, by its ID. */

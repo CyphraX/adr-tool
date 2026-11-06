@@ -11,9 +11,13 @@
   import ConformanceDetail from './components/ConformanceDetail.svelte'
   import ConformanceSidebar from './components/ConformanceSidebar.svelte'
   import DashboardView from './components/DashboardView.svelte'
+  import DiagramDetail from './components/DiagramDetail.svelte'
+  import DiagramsCenter from './components/DiagramsCenter.svelte'
+  import DiagramsSidebar from './components/DiagramsSidebar.svelte'
   import HistoryDialog from './components/HistoryDialog.svelte'
   import MetadataDialog from './components/MetadataDialog.svelte'
   import NewAdrDialog from './components/NewAdrDialog.svelte'
+  import NewDiagramDialog from './components/NewDiagramDialog.svelte'
   import PaneDivider from './components/PaneDivider.svelte'
   import ProblemsList from './components/ProblemsList.svelte'
   import RelationsGraph from './components/RelationsGraph.svelte'
@@ -38,6 +42,7 @@
   import type { Module } from './lib/modules'
   import { app } from './lib/state.svelte'
   import { t } from './lib/strings'
+  import { wordDiagramProblem } from './lib/diagram-words'
   import { codeSpans, describeProblem } from './lib/wording'
 
   onMount(() => void app.start())
@@ -50,7 +55,8 @@
   const FRAMES: Record<Module, Snippet<[Active]>> = {
     decisions: decisionsFrame,
     structure: structureFrame,
-    conformance: conformanceFrame
+    conformance: conformanceFrame,
+    diagrams: diagramsFrame
   }
 
   // The main process holds the window open while there is something to lose — text in the
@@ -141,6 +147,7 @@
   <MetadataDialog />
   <HistoryDialog />
   <CommitDialog />
+  <NewDiagramDialog />
   <SearchPalette />
   <ChangeDialog />
 {/if}
@@ -231,6 +238,47 @@
     {#key conformance.problems}{@render middleDivider()}{/key}
     {#if conformance.view}
       <ConformanceDetail view={conformance.view} />
+    {:else}
+      <aside class="no-detail"></aside>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet diagramsFrame(active: Active)}
+  {@const diagrams = active.diagrams}
+  {@const overview = diagrams.overview}
+  {@const diagram = diagrams.diagram}
+  <!-- What there is: the Diagrams with their Drift; how it hangs together: the canvas; what
+       this one is: the selected element or connection, or the Diagram (docs/plan-vision.md,
+       part 7). -->
+  <div class="panes diagrams" style:--sidebar="{sidebarWidth}px">
+    <DiagramsSidebar />
+    {#if diagrams.problems}
+      <RepositoryProblems />
+    {:else if diagram?.readable}
+      <DiagramsCenter {diagrams} {diagram} />
+    {:else if diagram}
+      <main class="message">
+        <h1>{diagrams.entry?.title ?? diagrams.entry?.id}</h1>
+        {#each diagram.problems as problem, position (position)}
+          <p>{wordDiagramProblem(problem)}</p>
+        {/each}
+      </main>
+    {:else if overview && overview.directory !== undefined && overview.diagrams.length === 0}
+      <main class="message">
+        <h1>{t.diagrams.empty.title}</h1>
+        <p>{t.diagrams.empty.lead}</p>
+        <button class="primary" onclick={() => app.diagrams.startNew()}>
+          {t.diagrams.newDiagram}
+        </button>
+      </main>
+    {:else if diagrams.failed}
+      <main class="message"><p>{t.diagrams.failed(diagrams.failed)}</p></main>
+    {:else}
+      <main class="message"><p>{overview ? t.diagrams.select : t.diagrams.analysing}</p></main>
+    {/if}
+    {#if diagram?.readable}
+      <DiagramDetail {diagrams} {diagram} />
     {:else}
       <aside class="no-detail"></aside>
     {/if}
@@ -387,6 +435,11 @@
       var(--sidebar) 0 var(--middle, minmax(340px, 1fr))
       0 minmax(0, 1.4fr);
     min-height: 0;
+  }
+
+  /* The Diagrams: the canvas wants the room; the detail is there to be glanced at. */
+  .panes.diagrams {
+    grid-template-columns: var(--sidebar) minmax(0, 3fr) minmax(260px, 1fr);
   }
 
   /* A drawing needs room; the ADR next to it is there to be glanced at. So it is in Structure —

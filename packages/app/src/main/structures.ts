@@ -150,7 +150,7 @@ export class Structures {
    * The analysis Conformance checks its Rules on. `watch` keeps it current from now on, as
    * an open Structure does; without it, the last one serves, or one is made as for the outline.
    */
-  async analysisOf(
+  async rulesAnalysisOf(
     repositoryId: string,
     root: string,
     watch: boolean
@@ -170,6 +170,14 @@ export class Structures {
   async sourceFile(repositoryId: string, root: string, path: string): Promise<SourceFileResult> {
     const analysis = await this.opened(repositoryId, root)
     return readSourceFile(root, path, analysis)
+  }
+
+  /**
+   * The analysis for what Diagrams draws of it — the Drift, the suggested connections —, kept
+   * current from now on, as for an open Structure: a Diagram's Drift follows the code.
+   */
+  analysisOf(repositoryId: string, root: string): Promise<Analysis> {
+    return this.opened(repositoryId, root)
   }
 
   /** The Structure as it is now, to plan against. */

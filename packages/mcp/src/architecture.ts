@@ -61,8 +61,8 @@ import {
   sizeOf,
   type Dependency
 } from '@adr-tool/structure/model'
-import { PLAN, READ, Refusal, type Tool } from './protocol'
-import { flag, list, number, object, oneOf, required, text } from './schema'
+import { PLAN, READ, flag, list, number, object, oneOf, required, text } from './kit'
+import { Refusal, type Tool } from './protocol'
 
 export interface ArchitectureContext {
   /** The repository: the directory the server was started for. */

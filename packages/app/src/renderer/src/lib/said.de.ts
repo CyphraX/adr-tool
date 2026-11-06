@@ -561,6 +561,9 @@ export const DE: Wording<Codes> = {
   'repository-does-not-fit': (v) =>
     `Das Repository ${v.id} steht für jede Komponente, und nur ein Systemkontext zeigt es.`,
 
+  'stale-picture': (v) =>
+    `${v.picture} ist nicht das Bild des Diagramms, wie es jetzt ist: Das Diagramm oder seine Komponenten haben sich nach dem Export geändert. Es muss neu exportiert werden.`,
+
   // Why a Diagram cannot be read: the rest of a sentence about the file.
   'diagram-not-yaml': (v) => `es ist kein gültiges YAML: ${v.message}`,
   'diagram-not-map': () => 'die oberste Ebene muss ein Mapping sein',
@@ -608,6 +611,39 @@ export const DE: Wording<Codes> = {
     `${v.path} kann nicht gelesen werden, darum hätte das Bild nicht die Namen seiner Komponenten. Vor dem Export muss die Datei korrigiert werden.`,
   'cannot-remove-element': (v) =>
     `${v.path} ist so geschrieben, dass die Suite ${v.component} nicht herausnehmen kann. Es muss mit seinen Verbindungen in einem Editor entfernt werden.`,
+
+  // Diagrams: the edits of the window and of agents.
+  'cannot-edit-diagram': (v) =>
+    `Die Suite kann in ${v.path} nicht ${german(v.edit)}, ohne mehr von der Datei neu zu schreiben als die Zeilen der Änderung. Diese Änderung muss in einem Editor gemacht werden.`,
+  'editing-move': (v) => `${v.id} verschieben`,
+  'editing-add': (v) => `${v.id} hinzufügen`,
+  'editing-remove': (v) => `${v.id} herausnehmen`,
+  'editing-describe': (v) => `den Namen oder die Beschreibung von ${v.id} ändern`,
+  'editing-connect': (v) => `${v.from} mit ${v.to} verbinden`,
+  'editing-disconnect': (v) => `die Verbindung von ${v.from} zu ${v.to} herausnehmen`,
+  'editing-label': (v) => `die Verbindung von ${v.from} zu ${v.to} beschriften`,
+  'invalid-position': () =>
+    'Eine Position sind zwei Zahlen, [x, y], jede zwischen -1000000 und 1000000.',
+  'already-shown': (v) => `${v.path} zeigt ${v.id} schon.`,
+  'named-by-declaration': (v) =>
+    `Name und Beschreibung von ${v.id} sind die seiner Deklaration in .arch/components.yml, nicht die des Diagramms.`,
+  'connected-to-itself': (v) =>
+    `Ein Element benutzt sich nicht selbst: ${v.id} kann nicht mit ${v.id} verbunden werden.`,
+  'already-connected': (v) => `Das Diagramm verbindet ${v.from} schon mit ${v.to}.`,
+  'not-connected': (v) =>
+    `${v.path} verbindet ${v.from} nicht mit ${v.to}. Die Datei sollte neu angesehen werden.`,
+
+  // Diagrams: a new Diagram, and the Rename of a Component in the Diagrams.
+  'invalid-diagram-id': (v) =>
+    `„${v.id}“ ist keine gültige Diagramm-ID. Eine Diagramm-ID besteht aus Kleinbuchstaben, Ziffern und Bindestrichen und beginnt und endet mit einem Buchstaben oder einer Ziffer.`,
+  'not-in-new-diagram': (v) =>
+    `Das neue Diagramm verbindet ${v.from} mit ${v.to}, zeigt aber kein Element ${v.id}.`,
+  'no-diagrams-directory': (v) =>
+    `${v.path} nennt kein Verzeichnis für die Diagramme, das sich verwenden lässt, darum kann kein Diagramm geschrieben werden. Das muss zuerst korrigiert werden.`,
+  'cannot-rename-in-diagram': (v) =>
+    `${v.path} nennt ${v.component} so, dass die Suite es nicht an seiner Stelle umschreiben kann, etwa als Textblock. Es muss dort zuerst in einem Editor umbenannt werden.`,
+  'diagram-not-renamed': (v) =>
+    `${v.path} kann nicht gelesen werden, darum schreibt die Umbenennung nicht um, was es über ${v.component} sagt.`,
 
   // The Problems of Review.
   'invalid-annotations-directory': (v) =>

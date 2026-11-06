@@ -12,7 +12,10 @@ import {
   wordingOf,
   type StructureProblem
 } from '@adr-tool/structure/model'
+import { openDiagrams } from '@adr-tool/diagrams'
+import { openConfig, type UnreadableConfig } from '@adr-tool/kernel'
 import { dependenciesOf } from './analysis'
+import { checkDiagrams, diagramsNeedModel, type DiagramsCheck } from './check-diagrams'
 import { conformanceOf } from './conformance'
 import { lintRepository, type LintReport } from './lint'
 
@@ -33,15 +36,20 @@ export interface CheckReport {
   /** Whether `.arch/components.yml` is there. */
   readonly declared: boolean
   readonly declaration: readonly DeclarationProblem[]
+  /** That `.arch/config.yml` cannot be read: the one Problem of the file, said once for every module. */
+  readonly config: UnreadableConfig | undefined
   readonly conformance: ConformanceReport
+  readonly diagrams: DiagramsCheck
   /** What was not checked, and why: for standard error, not part of the result. */
   readonly notes: readonly string[]
 }
 
 /**
  * Check the repository behind `fs`, whose files are `files` (`listRepository`): its Decision
- * Logs as `adr lint` does, its declaration of Components, and its Rules against the code.
- * `undefined` when there is nothing to check: no Decision Log, no declaration and no Rules.
+ * Logs as `adr lint` does, its declaration of Components, its Rules against the code, and its
+ * Diagrams — their Problems, their pictures, and their Drift against the code.
+ * `undefined` when there is nothing to check: no Decision Log, no declaration, no Rules, no
+ * Diagram, and nothing wrong with `.arch/config.yml`.
  */
 export async function check(
   fs: FileSystem,
@@ -50,7 +58,16 @@ export async function check(
   const { report: lint, repository } = await lintRepository(fs)
   const rulesText = await fs.readText(RULES_PATH)
   const declared = (await fs.readText(DECLARATION_PATH)) !== undefined
-  if (lint === undefined && rulesText === undefined && !declared) return undefined
+  const config = await openConfig(fs)
+  const found = await openDiagrams(fs, config)
+  const nothing =
+    lint === undefined &&
+    rulesText === undefined &&
+    !declared &&
+    config.readable &&
+    found.problems.length === 0 &&
+    found.diagrams.length === 0
+  if (nothing) return undefined
 
   const notes = [...(lint?.notes ?? [])]
   const structure = await openStructure(fs, files)
@@ -64,9 +81,10 @@ export async function check(
   }
 
   // The code is analysed as analyseRepository analyses it (./analysis.ts), and only for Rules
-  // that are checked: it takes a moment on a large repository.
+  // that are checked and for Drift where a Diagram can have it: it takes a moment on a large
+  // repository.
   let model: Dependencies | undefined
-  if (needsModel(rules, structure)) {
+  if (needsModel(rules, structure) || diagramsNeedModel(found, structure)) {
     model = await dependenciesOf(fs, files, structure)
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
     if (model.notMeasured.length > 0) notes.push(notMeasured(model.notMeasured))
@@ -74,6 +92,7 @@ export async function check(
 
   // The same composition as the app's and the MCP server's (src/conformance.ts).
   const conformance = conformanceOf(rules, structure, model, repository)
+  const diagrams = await checkDiagrams(fs, found, structure, model)
 
   return {
     lint,
@@ -86,7 +105,9 @@ export async function check(
       ...('line' in problem && problem.line !== undefined && { line: problem.line }),
       problem
     })),
+    config: config.readable ? undefined : config.problem,
     conformance,
+    diagrams,
     notes
   }
 }

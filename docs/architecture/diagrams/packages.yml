@@ -67,6 +67,12 @@ connections:
     label: runs git, analyses
   - from: mcp
     to: conformance
+  - from: mcp
+    to: diagrams
+    label: plans Diagrams
+  - from: mcp
+    to: kernel
+    label: the settings
   - from: cli
     to: core
     label: lints and exports
@@ -75,6 +81,9 @@ connections:
   - from: cli
     to: conformance
     label: checks the Rules
+  - from: cli
+    to: diagrams
+    label: checks the Diagrams
   - from: cli
     to: kernel
     label: the git port
@@ -92,7 +101,10 @@ connections:
     label: the export
   - from: app
     to: diagrams
-    label: German sentences
+    label: Diagrams
+  - from: app
+    to: kernel
+    label: the settings
   - from: app
     to: review
     label: German sentences
