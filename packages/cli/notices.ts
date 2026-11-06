@@ -12,6 +12,16 @@ const NODE_MODULES = '/node_modules/'
 const RULE = `\n\n${'-'.repeat(78)}\n\n`
 
 /**
+ * Where the Source Code of a package under the Eclipse Public License is, which every copy of
+ * it has to say, in whatever form (EPL-2.0, section 3.1(a); ADR-0024). A package under the EPL
+ * that is not named here fails the build, as its notice would be incomplete.
+ */
+const SOURCE: Record<string, (version: string) => string> = {
+  elkjs: (version) =>
+    `The Source Code of elkjs ${version} is available under the Eclipse Public License 2.0 at https://github.com/kieler/elkjs, tag ${version}.`
+}
+
+/**
  * Where the notices of a build go. `file`: beside what it builds, as `THIRD-PARTY-NOTICES.txt`,
  * which the installers of the app carry (electron-builder.yml). `comment`: at the end of each
  * file it builds, as a comment, so that a command stays one file (`adr.mjs`, `adr-mcp.mjs`).
@@ -52,7 +62,16 @@ export function notices(into: NoticesInto = 'file'): Plugin {
         const text = file
           ? readFileSync(join(root, file), 'utf8').trim()
           : `Licence: ${manifest.license ?? 'not stated'}, without a licence file in the package.`
-        return `${manifest.name ?? root} ${manifest.version ?? ''}`.trim() + `\n\n${text}`
+        const name = manifest.name ?? root
+        const source = SOURCE[name]?.(manifest.version ?? '')
+        if (source === undefined && /\bEPL\b/.test(manifest.license ?? '')) {
+          this.error(
+            `${name} is under ${manifest.license}, and the notices do not say where its Source Code is: name it in SOURCE (ADR-0024).`
+          )
+        }
+        return [`${name} ${manifest.version ?? ''}`.trim(), ...(source ? [source] : []), text].join(
+          '\n\n'
+        )
       })
       sections.sort()
       const text = [

@@ -10,10 +10,10 @@ const scratch = mkdtempSync(join(tmpdir(), 'adr-notices-'))
 afterAll(() => rmSync(scratch, { recursive: true, force: true }))
 
 /** A package in a `node_modules` of its own, whose licence tries to end a comment. */
-function installed(name: string, licence: string): string {
+function installed(name: string, licence: string, license?: string): string {
   const root = join(scratch, 'node_modules', name)
   mkdirSync(root, { recursive: true })
-  writeFileSync(join(root, 'package.json'), JSON.stringify({ name, version: '1.2.3' }))
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ name, version: '1.2.3', license }))
   writeFileSync(join(root, 'LICENSE'), licence)
   writeFileSync(join(root, 'index.js'), 'module.exports = 1\n')
   return join(root, 'index.js')
@@ -35,7 +35,10 @@ function build(
   const context = {
     getModuleIds: () => modules.values(),
     getWatchFiles: () => [...modules, ...read],
-    emitFile: (file: { source: string }) => emitted.push(file.source)
+    emitFile: (file: { source: string }) => emitted.push(file.source),
+    error: (message: string): never => {
+      throw new Error(message)
+    }
   }
   const hook = notices(into).generateBundle as unknown as (
     this: typeof context,
@@ -73,6 +76,21 @@ describe('the notices of what a build bundles', () => {
     const { emitted } = build('file', [module], '', [grammar.replace('index.js', 'grammar.wasm')])
     expect(emitted[0]).toContain('tree-sitter-tricky 1.2.3\n\nThe Grammar Licence.')
     expect(emitted[0]).toContain('tricky 1.2.3\n\nThe Tricky Licence.')
+  })
+
+  it('say where the Source Code of elkjs is, as the EPL-2.0 asks (ADR-0024)', () => {
+    const elkjs = installed('elkjs', 'Eclipse Public License - v 2.0', 'EPL-2.0')
+    const { emitted } = build('file', [elkjs], '')
+    expect(emitted[0]).toContain(
+      'elkjs 1.2.3\n\nThe Source Code of elkjs 1.2.3 is available under the Eclipse Public License 2.0 at https://github.com/kieler/elkjs, tag 1.2.3.\n\nEclipse Public License - v 2.0'
+    )
+  })
+
+  it('fail a build that bundles another package under the EPL, whose source they cannot name', () => {
+    const other = installed('eclipse-thing', 'Eclipse Public License - v 1.0', 'EPL-1.0')
+    expect(() => build('file', [other], '')).toThrow(
+      'eclipse-thing is under EPL-1.0, and the notices do not say where its Source Code is'
+    )
   })
 
   it('leave a build alone that bundles nothing from node_modules', () => {

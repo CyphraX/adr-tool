@@ -29,6 +29,21 @@ export default defineConfig({
   },
   preload: {},
   renderer: {
-    plugins: [svelte(), notices()]
+    plugins: [svelte(), notices()],
+    build: {
+      rollupOptions: {
+        output: {
+          // elkjs, under the EPL-2.0, is a file of its own beside the MIT code (ADR-0024). The
+          // helpers of CommonJS that it needs, as other packages do, stay out of it: otherwise
+          // every diagram of Mermaid would load elkjs for them.
+          manualChunks: (id) =>
+            id.includes('/node_modules/elkjs/')
+              ? 'elkjs'
+              : id.includes('commonjsHelpers')
+                ? 'commonjs-helpers'
+                : undefined
+        }
+      }
+    }
   }
 })
