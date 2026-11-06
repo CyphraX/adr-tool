@@ -718,7 +718,7 @@ export const de: typeof en = {
       rename: 'Umbenennen',
       renameLabel: (name: string): string => `Neues Segment für ${name}`,
       renameHint: (id: string): string =>
-        `Die ID ${id} ändert sich, und mit ihr die IDs der Komponenten darin. Jedes ADR, das eine davon nennt, wird in derselben Änderung umgeschrieben.`,
+        `Die ID ${id} ändert sich, und mit ihr die IDs der Komponenten darin. Was eine davon nennt – jedes ADR, jede Regel und jede Ausnahme in .arch/rules.yml –, wird in derselben Änderung umgeschrieben.`,
       notASegment:
         'Kleinbuchstaben, Ziffern und Bindestriche, am Anfang und Ende ein Buchstabe oder eine Ziffer.',
       preview: 'Vorschau'

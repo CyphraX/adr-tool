@@ -764,7 +764,7 @@ export const en = {
       rename: 'Rename',
       renameLabel: (name: string): string => `New segment for ${name}`,
       renameHint: (id: string): string =>
-        `The ID ${id} changes, and the IDs of the Components inside it with it. Every ADR that names one of them is rewritten in the same change.`,
+        `The ID ${id} changes, and the IDs of the Components inside it with it. Every ADR that names one of them, and every Rule and Exception of .arch/rules.yml that does, is rewritten in the same change.`,
       notASegment:
         'Lowercase letters, digits and dashes, starting and ending with a letter or a digit.',
       preview: 'Preview'

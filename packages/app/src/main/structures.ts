@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { readFile, stat } from 'node:fs/promises'
-import { join, resolve, sep } from 'node:path'
+import { stat } from 'node:fs/promises'
+import { resolve, sep } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
 import { RULES_PATH } from '@adr-tool/conformance'
 import {
@@ -32,6 +32,7 @@ import {
   type StructureView
 } from '../shared/ipc'
 import type { Analysis } from './analysis'
+import { nodeFileSystem } from './node-file-system'
 import { t } from './strings'
 
 /** Editors, formatters and git touch many files at once; one analysis covers them all. */
@@ -592,7 +593,9 @@ export async function readSourceFile(
     if ((await stat(full)).size > limit) {
       return { ok: false, reason: t.sourceFileTooLarge(path, Math.round(limit / 1024 / 1024)) }
     }
-    const text = await readFile(join(root, path), 'utf8')
+    // Read as every other file of the repository is read: not through a link that leads out.
+    const text = await nodeFileSystem(root).readText(path)
+    if (text === undefined) return { ok: false, reason: t.sourceFileUnreadable(path) }
     return { ok: true, file: { path, ...(file && { language: file.language }), text } }
   } catch {
     return { ok: false, reason: t.sourceFileUnreadable(path) }
