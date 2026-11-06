@@ -87,8 +87,8 @@ export function extractorOf(readers: Readers = {}): Extract {
 
 /**
  * A file its parser, or what reads its tree, fails on — TypeScript's parser recurses, and runs
- * out of stack on a function of 1,200 nested `if`s — is one file that is not analysed: the
- * others are analysed all the same.
+ * out of stack on a function of a few thousand nested `if`s — is one file that is not analysed:
+ * the others are analysed all the same.
  */
 function failed(error: unknown): Extraction {
   const tooDeep = error instanceof RangeError && /call stack/i.test(error.message)

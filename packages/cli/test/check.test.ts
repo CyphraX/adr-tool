@@ -192,8 +192,9 @@ describe('adr check (docs/cli.md)', () => {
   })
 
   it('checks the rest of the code where the parser fails on one file, and names it', async () => {
-    // TypeScript's parser recurses, and runs out of stack on a function of 1,200 nested ifs.
-    const deep = `import '../billing/invoice'\nexport function deep(x: number): number {\n${'if (x) {\n'.repeat(1200)}${'}\n'.repeat(1200)}  return 0\n}\n`
+    // TypeScript's parser recurses: 5,000 nested ifs take it beyond the stack, however much of
+    // it the test runner has left.
+    const deep = `import '../billing/invoice'\nexport function deep(x: number): number {\n${'if (x) {\n'.repeat(5000)}${'}\n'.repeat(5000)}  return 0\n}\n`
     const root = shopWith(EXCEPTIONS, { 'src/web/deep.ts': deep })
     const { code, out, err } = await adrIn(root, 'check')
     expect([code, out]).toEqual([

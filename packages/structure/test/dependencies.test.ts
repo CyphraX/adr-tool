@@ -204,8 +204,9 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
   })
 
   it('analyse every other file where the parser of one fails on it, and say which one it is', async () => {
-    // TypeScript's parser recurses: a function of 1,200 nested `if`s takes it beyond the stack.
-    const deep = `export function deep(x: number): number {\n${'if (x) {\n'.repeat(1200)}${'}\n'.repeat(1200)}  return 0\n}\n`
+    // TypeScript's parser recurses: 5,000 nested `if`s take it beyond the stack, however much of
+    // it the test runner has left.
+    const deep = `export function deep(x: number): number {\n${'if (x) {\n'.repeat(5000)}${'}\n'.repeat(5000)}  return 0\n}\n`
     const result = await analyse({
       'src/a.ts': "import './b'\n",
       'src/b.ts': '',
@@ -232,7 +233,7 @@ describe('a file of Java, Python or Go its reader fails on (docs/structure-forma
     grammar: await readFile(require.resolve(`tree-sitter-${language}/tree-sitter-${language}.wasm`))
   })
   const nested = 5000
-  // Nested as deeply as TypeScript's parser cannot take, and four times as deep again.
+  // Nested as deeply as TypeScript's parser cannot take.
   const deep = {
     'src/main/java/a/Deep.java': `package a;\nclass Deep { int f(int x) { return ${'('.repeat(nested)}x${')'.repeat(nested)}; } }\n`,
     'src/a/deep.py': `def f(x):\n    return ${'('.repeat(nested)}x${')'.repeat(nested)}\n`,
