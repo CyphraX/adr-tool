@@ -95,7 +95,13 @@ export async function check(
 function notAnalysed(files: readonly NotAnalysed[]): string {
   const shown = files
     .slice(0, 3)
-    .map((file) => (file.line === undefined ? file.file : `${file.file}:${file.line}`))
+    .map((file) =>
+      file.line !== undefined
+        ? `${file.file}:${file.line}`
+        : file.message !== undefined
+          ? `${file.file} (${file.message})`
+          : file.file
+    )
   const more = files.length > shown.length ? `, and ${files.length - shown.length} more` : ''
   const count = files.length === 1 ? '1 Source File' : `${files.length} Source Files`
   return `${count} cannot be parsed and ${files.length === 1 ? 'has' : 'have'} no Dependencies of ${files.length === 1 ? 'its' : 'their'} own: ${shown.join(', ')}${more}.`

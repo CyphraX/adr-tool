@@ -1,17 +1,18 @@
 /**
-/**
- * What `core`, `structure`, `conformance`, `diagrams` and `review` say, in German: one sentence
- * for every code they have, taking the values their English sentence takes
- * (docs/plan-roadmap.md, part 12). The compiler asks for a sentence for every code; a code
+ * What `core`, `structure`, `conformance`, `diagrams`, `review` and `assessment` say, in
+ * German: one sentence for every code they have, taking the values their English sentence
+ * takes (docs/plan-roadmap.md, part 12). The compiler asks for a sentence for every code; a code
  * without one does not build.
  *
  * The vocabulary of the tool stays as it is: ADR, Decision Log, Status, Relation, Problem,
- * Migration, Frontmatter, Drift, Annotation; Metadaten, Rückverweis, Reparatur, Korrektur,
- * Vorlage, Komponente, Entwurf, Quelldatei, Diagramm, Element, Verbindung, Antwort, Anker,
- * zitierte Zeilen, verwaist, neu anheften; and of Conformance Regel, Verstoß, Ausnahme,
- * Fingerabdruck, Schicht, Zyklus, Metrik, angewandtes Pattern. What names a value or a key of a
- * file — proposed, accepted, supersedes, affects, container, scope, resolved, must-not-depend,
- * from — is written as the file writes it.
+ * Migration, Frontmatter, Drift, Annotation, Assessment, Snapshot; Metadaten, Rückverweis,
+ * Reparatur, Korrektur, Vorlage, Komponente, Entwurf, Quelldatei, Diagramm, Element, Verbindung,
+ * Antwort, Anker, zitierte Zeilen, verwaist, neu anheften; of Conformance Regel, Verstoß,
+ * Ausnahme, Fingerabdruck, Schicht, Zyklus, Metrik, angewandtes Pattern; of Assessment
+ * Qualitätsszenario, Qualitätsmerkmal, Befund, Beleg, Bewertung, Eintrag, Risiko, Schuldposten —
+ * a Finding that cites something „stützt sich auf“ it. What names a value or a key of a file —
+ * proposed, accepted, supersedes, affects, container, scope, resolved, must-not-depend, from — is
+ * written as the file writes it.
  */
 import {
   STATUSES,
@@ -23,11 +24,12 @@ import { TOP_LEVEL, type CONFORMANCE_SENTENCES, type Change } from '@adr-tool/co
 import type { REVIEW_SENTENCES } from '@adr-tool/review'
 import { UNASSIGNED, type STRUCTURE_SENTENCES } from '@adr-tool/structure/model'
 import type { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
+import type { ASSESSMENT_SENTENCES, EvidenceKind } from '@adr-tool/assessment'
 
 /**
- * Every code of `core`, `structure`, `conformance`, `diagrams` and `review`, with the values of
- * its sentence. The kernel's codes are in each of them, its codes of YAML in `structure` and
- * `conformance`; they are taken once.
+ * Every code of `core`, `structure`, `conformance`, `diagrams`, `review` and `assessment`,
+ * with the values of its sentence. The kernel's codes are in each of them, its codes of YAML in
+ * `structure` and `conformance`; they are taken once.
  */
 type Codes = typeof CORE_SENTENCES &
   Omit<typeof STRUCTURE_SENTENCES, keyof typeof CORE_SENTENCES> &
@@ -36,7 +38,8 @@ type Codes = typeof CORE_SENTENCES &
     keyof typeof CORE_SENTENCES | keyof typeof STRUCTURE_SENTENCES
   > &
   Omit<typeof DIAGRAMS_SENTENCES, keyof typeof CORE_SENTENCES> &
-  Omit<typeof REVIEW_SENTENCES, keyof typeof CORE_SENTENCES>
+  Omit<typeof REVIEW_SENTENCES, keyof typeof CORE_SENTENCES> &
+  Omit<typeof ASSESSMENT_SENTENCES, keyof typeof CORE_SENTENCES>
 
 /** A sentence for every code, taking the values the English one takes. */
 type Wording<S> = { readonly [Code in keyof S]: S[Code] }
@@ -125,11 +128,8 @@ const target = (to: string): string =>
 const namedBy = (v: { by: 'rule' | 'applied-pattern'; owner: string }): string =>
   v.by === 'rule' ? `Die Regel ${v.owner}` : `Das angewandte Pattern ${v.owner}`
 
-/** What the suite was asked to write into the Rules file, as a refusal names it. */
-/** Wessen Metrik ein Schwellenwert misst: einer Komponente, einer Ebene, einer Funktion oder Klasse. */
-function thresholdSubject(
-  v: Parameters<(typeof CONFORMANCE_SENTENCES)['threshold']>[0]
-): string {
+/** Whose metric a threshold measures: a Component's, a level's, a function's or a class's. */
+function thresholdSubject(v: Parameters<(typeof CONFORMANCE_SENTENCES)['threshold']>[0]): string {
   switch (v.subject) {
     case 'level':
       return v.component === TOP_LEVEL ? 'der obersten Ebene' : `der Ebene unter ${v.component}`
@@ -142,6 +142,7 @@ function thresholdSubject(
   }
 }
 
+/** What the suite was asked to write into the Rules file, as a refusal names it. */
 const CHANGES: Record<Change, string> = {
   'add-rule': 'keine Regel hinzufügen',
   'change-rule': 'keine Regel darin ändern',
@@ -149,6 +150,44 @@ const CHANGES: Record<Change, string> = {
   'add-exception': 'keine Ausnahme hinzufügen',
   'change-exception': 'keine Ausnahme darin ändern',
   'remove-exception': 'keine Ausnahme daraus entfernen'
+}
+
+/** What is kept in each directory of Assessment, as a sentence names it. */
+const KEPT: Record<string, string> = {
+  assessments: 'kein Assessment',
+  risks: 'kein Risiko',
+  debt: 'kein Schuldposten'
+}
+const kept = (key: string): string => (Object.hasOwn(KEPT, key) ? KEPT[key]! : `nichts aus ${key}`)
+
+/**
+ * What kind a piece of evidence is, as a noun without its article, by the key the file writes:
+ * a kind a later part adds needs its German here, or the window does not build.
+ */
+const KIND: Record<EvidenceKind, string> = {
+  violation: 'Verstoß',
+  metric: 'Metrik',
+  annotation: 'Annotation',
+  adr: 'ADR',
+  risk: 'Risiko',
+  debt: 'Schuldposten'
+}
+/** A piece of evidence before its name in the accusative: after „stützt sich auf“ and „es gibt“. */
+const ACCUSATIVE: Record<EvidenceKind, string> = {
+  violation: 'den Verstoß',
+  metric: 'die Metrik',
+  annotation: 'die Annotation',
+  adr: 'das ADR',
+  risk: 'das Risiko',
+  debt: 'den Schuldposten'
+}
+const lookUp = (table: Record<string, string>, kind: string): string =>
+  Object.hasOwn(table, kind) ? table[kind]! : kind
+const evidence = (kind: string, name: string): string => `${lookUp(ACCUSATIVE, kind)} ${name}`
+/** The same, at the start of a sentence. */
+const Evidence = (kind: string, name: string): string => {
+  const said = evidence(kind, name)
+  return said.charAt(0).toUpperCase() + said.slice(1)
 }
 
 /** What another sentence said, inside this one; a plain text is passed on as it is. */
@@ -485,6 +524,10 @@ export const DE: Wording<Codes> = {
   'python-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
   'go-missing': (v) => `Es fehlt: ${v.what}.`,
   'go-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
+  // Why a file of any language could not be read to its end.
+  'nested-too-deep': () =>
+    'Sie ist für ihren Parser zu tief verschachtelt: dem Parser ging der Stack aus.',
+  'reader-failed': (v) => `Ihr Leser ist an ihr gescheitert: ${v.message}`,
 
   // The Problems of Diagrams.
   'invalid-diagrams-directory': (v) =>
@@ -635,7 +678,162 @@ export const DE: Wording<Codes> = {
     `„${v.key}“ in ${v.path} ist so geschrieben, dass die Suite es nicht an seiner Stelle ändern kann. Es muss in einem Editor geändert werden.`,
   'not-moved': (v) => `${v.id} steht, wo sein Anker es sagt: Es gibt nichts zu aktualisieren.`,
   'without-repair': () =>
-    'Dieses Problem hat keine Reparatur: Die Suite kann nicht wissen, was gemeint war.'
+    'Dieses Problem hat keine Reparatur: Die Suite kann nicht wissen, was gemeint war.',
+
+  // The Problems of Assessment.
+  'invalid-directory-setting': (v) =>
+    `„${v.key}“ in ${v.path} muss ein relativer Pfad innerhalb des Repositorys sein. Bis das korrigiert ist, wird ${kept(v.key)} gelesen.`,
+  'unreadable-assessment': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'unreadable-risk': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'unreadable-debt-item': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'invalid-frontmatter-value': (v) => `${v.path}: „${v.key}“ ${german(v.detail)}.`,
+  'assessment-without-date': (v) =>
+    `${v.path} hat kein Datum: „date“ muss den Tag des Assessments als YYYY-MM-DD nennen.`,
+  'unreadable-entry': (v) =>
+    `${v.path}, Zeile ${v.line}: Der Block eines Eintrags kann nicht gelesen werden: ${german(v.detail)}.`,
+  'entry-of-two-kinds': (v) =>
+    `${v.path}, Zeile ${v.line}: Ein Block ist entweder ein Qualitätsszenario oder ein Befund und hat hier sowohl „scenario“ als auch „finding“.`,
+  'entry-without-heading': (v) =>
+    `${v.path}, Zeile ${v.line}: Der Block von ${v.entry} folgt nicht unmittelbar auf eine Überschrift der Ebenen 2 bis 6, die dem Eintrag seinen Titel gibt.`,
+  'invalid-entry-id': (v) =>
+    `${v.path}, Zeile ${v.line}: „${v.entry}“ ist keine ID eines Eintrags: Buchstaben, Ziffern, „.“, „_“ und „-“, am Anfang ein Buchstabe oder eine Ziffer.`,
+  'duplicate-entry': (v) =>
+    `${v.path}, Zeile ${v.line}: ${v.entry} steht zweimal unter den ${v.of === 'finding' ? 'Befunden' : 'Qualitätsszenarien'}. Es gilt der erste.`,
+  'missing-entry-key': (v) =>
+    `${v.path}: ${v.entry} hat kein „${v.key}“, das ein Qualitätsszenario braucht.`,
+  'invalid-entry-value': (v) => `${v.path}: ${v.entry}: „${v.key}“ ${german(v.detail)}.`,
+  'unknown-quality-attribute': (v) =>
+    `${v.path}: ${v.entry} handelt von „${v.value}“, doch das ist weder ein Qualitätsmerkmal noch ein Teilmerkmal der ISO/IEC 25010.`,
+  'invalid-evidence': (v) =>
+    `${v.path}, Zeile ${v.line}: Ein Beleg von ${v.entry} ${german(v.detail)}.`,
+  'unreadable-snapshot': (v) => `${v.path} kann nicht gelesen werden: ${german(v.detail)}.`,
+  'snapshot-without-assessment': (v) =>
+    `${v.path} ist der Snapshot von ${v.assessment}, und es gibt kein Assessment ${v.assessment}.`,
+  'names-no-component': (v) =>
+    `${v.path} nennt in „${v.key}“ die Komponente ${v.component}, die nicht deklariert ist.`,
+  'unknown-previous-assessment': (v) =>
+    `${v.path} folgt auf das Assessment ${v.previous}, das es in diesem Repository nicht gibt.`,
+  'finding-unknown-scenario': (v) =>
+    `${v.path}: ${v.finding} betrifft das Qualitätsszenario ${v.scenario}, das es in diesem Assessment nicht gibt.`,
+  'violation-gone': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf den Verstoß ${v.violation}, den der Code nicht mehr hat. Der Befund sollte neu angesehen werden: Vielleicht ist er erledigt.`,
+  'metric-not-in-snapshot': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf die Metrik ${v.metric} von ${v.subject}, die der Snapshot des Assessments nicht enthält.`,
+  'metric-not-measured': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf die Metrik ${v.metric} von ${v.subject}, die der Code nicht hat.`,
+  'final-without-snapshot': (v) =>
+    `${v.path} ist final und stützt sich auf Metriken, hat aber keinen Snapshot, der sie festhält: Mit jedem Commit ergeben sie andere Werte.`,
+  'finding-unknown-annotation': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf die Annotation ${v.target}, die es in diesem Repository nicht gibt.`,
+  'finding-unknown-adr': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf das ADR ${v.target}, das es in diesem Repository nicht gibt.`,
+  'finding-ambiguous-adr': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf das ADR ${v.target}, das es in mehreren Decision Logs gibt: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
+  'finding-unknown-risk': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf das Risiko ${v.target}, das es in diesem Repository nicht gibt.`,
+  'finding-unknown-debt-item': (v) =>
+    `${v.path}: ${v.finding} stützt sich auf den Schuldposten ${v.target}, den es in diesem Repository nicht gibt.`,
+
+  // Why a file or a block of Assessment cannot be read: the rest of a sentence about it.
+  'frontmatter-left-open': () => 'sein Frontmatter wird nie geschlossen',
+  'frontmatter-not-valid-yaml': (v) => `sein Frontmatter ist kein gültiges YAML: ${v.message}`,
+  'frontmatter-no-mapping': () => 'sein Frontmatter muss ein Mapping sein',
+  'block-not-valid-yaml': (v) => `er ist kein gültiges YAML: ${v.message}`,
+  'block-never-closed': () => 'sein Codeblock wird nie geschlossen',
+  'in-comment-never-closed': () => 'er steht in einem HTML-Kommentar, der nie geschlossen wird',
+  'snapshot-not-valid-yaml': (v) => `er ist kein gültiges YAML: ${v.message}`,
+  'snapshot-no-mapping': () => 'seine oberste Ebene muss ein Mapping sein',
+  'snapshot-commit-name': () =>
+    'sein „commit“ muss den Commit mit dessen vollem Namen aus 40 oder 64 Hexadezimalziffern nennen',
+  'snapshot-day': () => 'sein „date“ muss ein Datum der Form YYYY-MM-DD sein',
+  'snapshot-numbers': (v) => `sein „${v.key}“ muss Namen auf Zahlen abbilden`,
+
+  // Why a value of Assessment is wrong: the rest of a sentence about its key.
+  'must-be-text': () => 'muss ein Text sein',
+  'must-be-day': () => 'muss ein Datum der Form YYYY-MM-DD sein',
+  'must-be-texts': () => 'muss eine Liste von Texten sein',
+  'must-be-component-ids': () => 'muss eine Liste von Komponenten-IDs sein',
+  'must-be-status': () => 'muss draft oder final sein',
+  'must-be-risk-state': () => 'muss open, mitigated, accepted oder closed sein',
+  'must-be-debt-state': () => 'muss open, scheduled oder paid-off sein',
+  'must-be-assessment-id': () => 'muss die ID eines Assessments sein',
+  'must-be-scenario-ids': () => 'muss eine Liste von IDs von Qualitätsszenarien sein',
+  'must-be-evidence-list': () => 'muss eine Liste von Belegen sein',
+  'must-be-level': () => 'muss H, M oder L sein',
+  'must-be-rating': () => 'muss met, partly-met oder not-met sein',
+
+  // What is wrong with a piece of evidence: the rest of a sentence about it.
+  'evidence-not-a-mapping': () => 'ist kein Mapping',
+  'evidence-of-no-kind': () => `nennt keines von ${listed(Object.keys(KIND))}`,
+  'evidence-of-two-kinds': () => `nennt mehr als eines von ${listed(Object.keys(KIND))}`,
+  'evidence-needs-key': (v) => `braucht „${v.key}“ als Text`,
+  'evidence-needs-members': () =>
+    'braucht „cycle“ als Liste der Mitglieder des Zyklus, mindestens zwei',
+  'evidence-needs-subject': () =>
+    'braucht, worum es geht: „from“ und „to“, „cycle“, „component“ oder „file“ und „name“',
+  'evidence-needs-metric-subject': () =>
+    'braucht, wovon die Metrik ist: „component“ oder „file“ und „name“',
+
+  // Why an operation of Assessment is refused.
+  'directory-unavailable': (v) => `Es kann ${kept(v.key)} geschrieben werden: ${german(v.detail)}`,
+  'no-assessment': (v) => `Es gibt kein Assessment ${v.id}.`,
+  'no-risk': (v) => `Es gibt kein Risiko ${v.id}.`,
+  'no-debt-item': (v) => `Es gibt keinen Schuldposten ${v.id}.`,
+  'no-scenario': (v) => `${v.assessment} hat kein Qualitätsszenario ${v.id}.`,
+  'no-finding': (v) => `${v.assessment} hat keinen Befund ${v.id}.`,
+  'file-needs-fixing': (v) =>
+    `${v.path} kann nicht gelesen werden. Die Datei muss korrigiert werden, bevor die Suite hineinschreibt.`,
+  'entry-needs-fixing': (v) =>
+    `Der Block von ${v.id} in ${v.path} kann nicht gelesen werden. Er muss korrigiert werden, bevor die Suite hineinschreibt.`,
+  'assessment-final': (v) =>
+    `${v.id} ist final: Was es festhält, ist vollständig. In einem Editor kann es trotzdem geändert werden.`,
+  'final-already': (v) => `${v.id} ist bereits final.`,
+  'title-without-slug': (v) =>
+    `Der Titel „${v.title}“ lässt keinen Namen für die Datei übrig: Er braucht einen Buchstaben oder eine Ziffer.`,
+  'date-not-a-day': (v) => `„${v.date}“ ist kein Datum der Form YYYY-MM-DD.`,
+  'assessment-needs-author': () =>
+    'Ein Assessment braucht den Namen einer Autorin oder eines Autors.',
+  'component-not-known': (v) => `${v.component} ist keine deklarierte Komponente.`,
+  'components-need-declaration': () =>
+    'Komponenten können erst genannt werden, wenn sie deklariert sind: Die IDs des Entwurfs sind keine Namen, die man aufschreibt.',
+  'no-assessment-to-follow': () =>
+    'Es gibt kein Assessment mit Datum, auf das ein neues folgen könnte.',
+  'entry-id-invalid': (v) =>
+    `„${v.id}“ ist keine ID eines Eintrags: Buchstaben, Ziffern, „.“, „_“ und „-“, am Anfang ein Buchstabe oder eine Ziffer.`,
+  'entry-id-taken': (v) => `${v.assessment} hat bereits einen Eintrag ${v.id}.`,
+  'entry-needs-title': () => 'Ein Eintrag braucht einen Titel, seine Überschrift.',
+  'text-ends-entry': (v) =>
+    `Der Text enthält eine Überschrift, die den Eintrag beenden würde: Unter einer Überschrift der Ebene ${v.level} brauchen seine eigenen Überschriften mehr als ${v.level} #.`,
+  'text-left-open': () =>
+    'Der Text öffnet einen Codeblock oder einen HTML-Kommentar, den er nicht schließt: Er würde alles darunter verbergen.',
+  'scenario-needs-key': (v) => `Ein Qualitätsszenario braucht „${v.key}“.`,
+  'not-a-quality-attribute': (v) =>
+    `„${v.value}“ ist weder ein Qualitätsmerkmal noch ein Teilmerkmal der ISO/IEC 25010.`,
+  'not-a-level': (v) => `„${v.value}“ ist keines von H, M und L.`,
+  'not-a-rating': (v) => `„${v.value}“ ist keines von met, partly-met und not-met.`,
+  'rating-unchanged': (v) => `${v.id} ist bereits so bewertet: Es gibt nichts zu ändern.`,
+  'evidence-there-already': (v) =>
+    `${v.finding} stützt sich bereits auf ${evidence(v.kind, v.name)}.`,
+  'evidence-not-there': (v) =>
+    `${Evidence(v.kind, v.name)} gibt es nicht, darum kann sich kein Befund darauf stützen.`,
+  'evidence-ambiguous-adr': (v) =>
+    `Das ADR ${v.adr} gibt es in mehreren Decision Logs: ${listed(v.candidates)}. Es muss mit seinem Log genannt werden.`,
+  'evidence-incomplete': (v) =>
+    `Der Beleg ist nicht vollständig: Ein Beleg der Art ${lookUp(KIND, v.kind)} braucht jeden Schlüssel, den diese Art nennt.`,
+  'snapshot-without-values': () =>
+    'Es gibt keine Metriken festzuhalten: Die Komponenten müssen deklariert sein und Quelldateien enthalten.',
+  'state-unchanged': (v) => `${v.id} hat bereits den Zustand ${v.state}.`,
+  'not-a-risk-state': (v) =>
+    `„${v.state}“ ist kein Zustand eines Risikos: open, mitigated, accepted oder closed.`,
+  'not-a-debt-state': (v) =>
+    `„${v.state}“ ist kein Zustand eines Schuldpostens: open, scheduled oder paid-off.`,
+  'value-by-hand': (v) =>
+    `„${v.key}“ in ${v.path} ist so geschrieben, dass die Suite es nicht an seiner Stelle ändern kann. Es muss in einem Editor geändert werden.`,
+  'cannot-rename-in-assessments': (v) =>
+    `${v.path} nennt ${v.id} vielleicht dort, wo die Suite es nicht umschreiben kann: Die Datei kann nicht gelesen werden, oder die ID ist so geschrieben, dass kein Einfügen an ihrer Stelle möglich ist. Sie muss zuerst in einem Editor geändert werden.`,
+  'has-no-repair': () =>
+    'Dieses Problem hat keine Reparatur: Die Suite kann nicht wissen, was gemeint war.',
+  'problem-no-longer-there': () => 'Das Problem besteht nicht mehr: Es gibt nichts zu reparieren.'
 }
 
 /** What a module said, in German; `undefined` for a code that has no German sentence. */

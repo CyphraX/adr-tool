@@ -12,6 +12,9 @@ const shop = fileURLToPath(
 const mavenShop = fileURLToPath(
   new URL('../../structure/test/fixtures/maven-shop/', import.meta.url)
 )
+const assessedShop = fileURLToPath(
+  new URL('../../assessment/test/fixtures/maven-shop/', import.meta.url)
+)
 const pythonShop = fileURLToPath(
   new URL('../../structure/test/fixtures/python-shop/', import.meta.url)
 )
@@ -191,6 +194,21 @@ describe('adr check (docs/cli.md)', () => {
     expect(report.violations[0].line).toBe(5)
   })
 
+  it('checks the rest of the code where the parser fails on one file, and names it', async () => {
+    // TypeScript's parser recurses: 5,000 nested ifs take it beyond the stack, however much of
+    // it the test runner has left.
+    const deep = `import '../billing/invoice'\nexport function deep(x: number): number {\n${'if (x) {\n'.repeat(5000)}${'}\n'.repeat(5000)}  return 0\n}\n`
+    const root = shopWith(EXCEPTIONS, { 'src/web/deep.ts': deep })
+    const { code, out, err } = await adrIn(root, 'check')
+    expect([code, out]).toEqual([
+      0,
+      'No Problems in 1 Decision Log.\n2 Rules hold, but for 2 Violations accepted as Exceptions.\n'
+    ])
+    expect(err).toBe(
+      'adr check: 1 Source File cannot be parsed and has no Dependencies of its own: src/web/deep.ts (It is nested too deeply for its parser: the parser ran out of stack.).\n'
+    )
+  })
+
   it('names an Exception that matches nothing any more as a Problem', async () => {
     const invoice = readFileSync(join(shop, 'src/billing/invoice.ts'), 'utf8')
     const fixed = invoice
@@ -346,6 +364,27 @@ describe('adr check (docs/cli.md)', () => {
       '',
       'No Decision Log.',
       '2 Violations of 2 Rules.'
+    ])
+  })
+
+  // The Assessment of the Java shop (packages/assessment/test/fixtures) cites the Violation of
+  // its Rule by this fingerprint; its test derives the same one from the Dependencies.
+  it('finds the Violation that the Assessment of the Java shop cites, and nothing else', async () => {
+    const { code, out } = await adrIn(assessedShop, 'check', '--format', 'json')
+    expect(code).toBe(1)
+    const report = JSON.parse(out)
+    expect(report.logs).toEqual(['docs/adr'])
+    expect(report.problems).toEqual([])
+    expect(
+      report.violations.map((violation: { fingerprint: unknown; fingerprintText: string }) => [
+        violation.fingerprint,
+        violation.fingerprintText
+      ])
+    ).toEqual([
+      [
+        { kind: 'dependency', rule: 'web-through-cart', from: 'web', to: 'catalog' },
+        'web-through-cart: web -> catalog'
+      ]
     ])
   })
 

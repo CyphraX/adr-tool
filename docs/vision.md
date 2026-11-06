@@ -120,7 +120,7 @@ Architecture evaluation: a qualitative judgement, backed by what the other modul
 - **Core**
   - An **Assessment** is a dated document in the repository. It rates **Quality Scenarios**, classified by the quality attributes of ISO 25010, and records **Findings**.
   - A **Finding** is a human judgement with evidence attached through Traces: Violations, metric values, Annotations, ADRs.
-  - A **Snapshot** of the metrics, frozen into the Assessment, so that the evidence still reads the same after the code has moved on.
+  - A **Snapshot** of the metrics, frozen in a file beside the Assessment, so that the evidence still reads the same after the code has moved on ([ADR-0021](adr/0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file.md)).
   - **Risks** and **Technical Debt Items** are entries of their own with their own state. They outlive Assessments; an Assessment refers to them.
 - **Next:** trends across Snapshots; comparison of two Assessments; a utility tree for Quality Scenarios; report export (HTML, PDF) for the consultant scenario.
 - **Out:** an automatic overall score. The figures support the judgement; they do not make it.
@@ -146,7 +146,7 @@ Derived data enters the repository in exactly four places, each deliberately:
 
 1. an **Exception** — a declaration that names a Violation by its fingerprint;
 2. the **Baseline** — a set of Violation fingerprints;
-3. the **Snapshot** inside an Assessment — frozen metric values kept as evidence;
+3. the **Snapshot** of an Assessment — frozen metric values kept as evidence, in a file beside it ([ADR-0021](adr/0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file.md));
 4. the **SVG of a Diagram** — its picture, committed beside it so that GitHub shows it and documents can embed it.
 
 ## On disk, in a user's repository

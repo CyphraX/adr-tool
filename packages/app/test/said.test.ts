@@ -4,6 +4,7 @@ import { SENTENCES, type CoreSaid, type Said } from '@adr-tool/core'
 import { REVIEW_SENTENCES } from '@adr-tool/review'
 import { STRUCTURE_SENTENCES, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
 import { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
+import { ASSESSMENT_SENTENCES } from '@adr-tool/assessment'
 import { DE, inGerman } from '../src/renderer/src/lib/said.de'
 import { wordIn, wordOf, wordStructureProblem, wordWarnings } from '../src/renderer/src/lib/said'
 
@@ -18,7 +19,8 @@ type Sentence = (values: unknown) => string
  */
 function some(
   detail: Said,
-  why: Said = { code: 'not-a-list', values: { key: '‹why-key›' } }
+  why: Said = { code: 'not-a-list', values: { key: '‹why-key›' } },
+  own: Record<string, unknown> = {}
 ): Record<string, unknown> {
   // Each value stands out in the sentence, so that a sentence that drops one is seen to.
   const known: Record<string, unknown> = {
@@ -51,7 +53,8 @@ function some(
     limit: 731,
     line: 913,
     violation: { code: 'must-not-depend', values: { from: '‹v-from›', to: '‹v-to›' } },
-    detail
+    detail,
+    ...own
   }
   return new Proxy(known, { get: (values, key: string) => values[key] ?? `‹${key}›` })
 }
@@ -82,6 +85,13 @@ const MODULES = [
     name: 'review',
     sentences: REVIEW_SENTENCES,
     detail: { code: 'frontmatter-yaml', values: { message: '‹detail-message›' } }
+  },
+  {
+    name: 'assessment',
+    sentences: ASSESSMENT_SENTENCES,
+    detail: { code: 'frontmatter-not-valid-yaml', values: { message: '‹detail-message›' } },
+    // What a Finding cites is named, not said: a Violation by its fingerprint as text.
+    own: { violation: '‹violation›' }
   }
 ] as const
 
@@ -101,7 +111,7 @@ const KERNEL_CODES = [
 ]
 
 describe('German', () => {
-  it('has a sentence for every code of core, structure, conformance, diagrams and review', () => {
+  it('has a sentence for every code of core, structure, conformance, diagrams, review and assessment', () => {
     // The compiler asks for them (`DE` is typed by the tables); this says so where it runs.
     for (const { sentences } of MODULES) {
       for (const code of Object.keys(sentences)) expect(Object.keys(DE), code).toContain(code)
@@ -125,7 +135,11 @@ describe('German', () => {
     for (const module of MODULES) {
       const { sentences, detail } = module
       for (const [code, english] of Object.entries(sentences)) {
-        const values = some(detail, 'why' in module ? module.why : undefined)
+        const values = some(
+          detail,
+          'why' in module ? module.why : undefined,
+          'own' in module ? module.own : undefined
+        )
         const german = (DE as unknown as Record<string, Sentence>)[code]!(values)
         expect(german, code).not.toBe((english as Sentence)(values))
         expect(german, code).not.toMatch(/undefined|\[object Object\]|‹(format|type|why|detail)›/)
