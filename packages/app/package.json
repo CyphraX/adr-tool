@@ -31,6 +31,7 @@
     "@adr-tool/conformance": "workspace:*",
     "@adr-tool/core": "workspace:*",
     "@adr-tool/diagrams": "workspace:*",
+    "@adr-tool/kernel": "workspace:*",
     "@adr-tool/review": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@codemirror/commands": "^6.11.1",
