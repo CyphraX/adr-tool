@@ -4,6 +4,11 @@
 appId: io.github.cyphrax.softarch-suite
 productName: Softarch Suite
 copyright: Copyright © 2026 Philipp Saal
+# The name of the package in the workspace is @adr-tool/app, which Windows would make the
+# folder of the per-user install (@adr-toolapp). The app's name, and the folder of its user
+# data, come from productName, in development as installed.
+extraMetadata:
+  name: softarch-suite
 artifactName: Softarch-Suite-${version}-${os}-${arch}.${ext}
 
 directories:

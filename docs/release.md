@@ -38,7 +38,7 @@ Why the release is built this way, and what else was weighed, is recorded in [AD
 
 The app is packaged with [electron-builder](https://www.electron.build), configured in `packages/app/electron-builder.yml`. One tool and one file build every format the release has — AppImage, deb and tar.gz, NSIS and a portable exe, dmg and zip — and both Macs from one runner. Electron Forge would need a maker per format, and its packager expects the flat `node_modules` of npm; under pnpm, that means `node-linker=hoisted` for the whole workspace. electron-builder also builds from an Electron that is already on disk (`electronDist`), which a build without access to GitHub needs.
 
-The appId is `io.github.cyphrax.softarch-suite`; the main process gives the window the same AppUserModelID, so that Windows groups it under the shortcut the installer made. The files are named `Softarch-Suite-<version>-<os>-<arch>.<ext>`, the deb as Debian names packages. `publish: null`: the workflow publishes, never electron-builder.
+The appId is `io.github.cyphrax.softarch-suite`; the main process gives the window the same AppUserModelID, so that Windows groups it under the shortcut the installer made. The files are named `Softarch-Suite-<version>-<os>-<arch>.<ext>`, the deb as Debian names packages. The packaged `package.json` is named `softarch-suite` rather than the workspace's `@adr-tool/app`, which would name the folder of the install on Windows; the app's name, and with it the folder of its user data, comes from `productName`, Softarch Suite, in development as installed. `publish: null`: the workflow publishes, never electron-builder.
 
 ### No `node_modules` in the package
 
