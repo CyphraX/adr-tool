@@ -2,7 +2,7 @@
 
 What each release of Softarch Suite contains. Versions follow [Semantic Versioning](https://semver.org); while the version starts with 0, a minor release may change what a file format or a command promises, and says so here. How a release is made is in [docs/release.md](docs/release.md).
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-11-06
 
 The first release: the desktop app as installers for Linux, Windows and macOS, and the command line and the MCP server as one file each. Five modules of the suite have their window — Decisions, Structure, Conformance, Diagrams and Review —, and Assessment has its core. The app runs locally: no backend, no account, no telemetry ([ADR-0010](docs/adr/0010-the-suite-is-open-source-under-the-mit-licence.md)). The window speaks English and German.
 

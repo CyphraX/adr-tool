@@ -4,6 +4,7 @@ created: 2026-11-02
 decided: 2026-11-02
 decision-makers: [Philipp Saal]
 tags: [licence, release]
+amended-by: [0024-unmodified-modules-under-epl-2-0-or-the-unlicense-may-ship]
 ---
 
 # The suite is open source under the MIT licence

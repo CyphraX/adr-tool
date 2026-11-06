@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 created: 2026-11-06
+decided: 2026-11-06
 decision-makers: [Philipp Saal]
 tags: [release, packaging]
 relates-to: [0008-dependencies-come-from-parsers-alone-without-a-type-checker, 0010-the-suite-is-open-source-under-the-mit-licence, 0011-the-product-is-called-softarch-suite]

@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 created: 2026-11-06
+decided: 2026-11-06
 decision-makers: [Philipp Saal]
 tags: [licence, release]
 amends: [0010-the-suite-is-open-source-under-the-mit-licence]
