@@ -6,7 +6,7 @@ The contract of the suite's server for agents (`packages/mcp`): how it is starte
 
 ## Running it
 
-The server is one file: `pnpm build` writes it to `packages/mcp/dist/adr-mcp.mjs`, and Node.js 22.12 or later runs it. It carries the TypeScript compiler and the tree-sitter grammars that `adr check` carries, to read the code for a Diagram's Drift the way the command does, so it is about 13 MB, as the command is. It speaks the [Model Context Protocol](https://modelcontextprotocol.io) on standard input and output, one JSON-RPC message per line, for the repository it is started for — the current directory when the path is left out. What it has to say beyond the protocol goes to standard error.
+The server is one file: `pnpm build` writes it to `packages/mcp/dist/adr-mcp.mjs`, and Node.js 22.12 or later runs it. It carries the TypeScript compiler and the tree-sitter grammars that `adr check` carries, built the same way (`packages/cli/command.config.ts`), to read the code for `component_metrics` and a Diagram's Drift as the command does (`@adr-tool/cli/analysis`), so it is about 13 MB, as the command is, and answers `initialize` in about a third of a second, most of it the loading of TypeScript. The file is not minified: half the size would not make it start sooner, and a stack trace stays readable. It speaks the [Model Context Protocol](https://modelcontextprotocol.io) on standard input and output, one JSON-RPC message per line, for the repository it is started for — the current directory when the path is left out. What it has to say beyond the protocol goes to standard error.
 
 ```sh
 node packages/mcp/dist/adr-mcp.mjs ../shop     # serve the repository ../shop
