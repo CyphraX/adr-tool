@@ -416,4 +416,45 @@ describe('the geometry of a Diagram, as the window draws it', () => {
       'billing>bank '
     ])
   })
+
+  it('moves a label along its line off a box it would cover, and off another label', () => {
+    // a uses c past b, whose box stands in the middle of the line, and b uses c too.
+    const row = readDiagram(
+      PATH,
+      [
+        'level: container',
+        'elements:',
+        '  - external: a',
+        '    at: [0, 0]',
+        '  - external: b',
+        '    at: [200, 0]',
+        '  - external: c',
+        '    at: [400, 0]',
+        'connections:',
+        '  - from: a',
+        '    to: c',
+        '    label: past b',
+        '  - from: b',
+        '    to: c',
+        '    label: next',
+        ''
+      ].join('\n')
+    )
+    if (!row.readable) throw new Error('unreadable')
+    const { boxes, lines } = geometryOf(row, { origin: 'draft', components: [] })
+    const grounds = lines.map((line) => line.label!.ground)
+    const apart = (a: Rect, b: Rect): boolean =>
+      a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y
+    for (const ground of grounds) {
+      for (const box of boxes) expect(apart(ground, box)).toBe(true)
+    }
+    expect(apart(grounds[0]!, grounds[1]!)).toBe(true)
+  })
 })
+
+interface Rect {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
