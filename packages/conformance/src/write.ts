@@ -667,7 +667,11 @@ function replaceValue(
   if (isSeq(node) && !node.flow && node.items.length > 0) {
     const start = rangeOf(node, change)[0]
     const end = rangeOf(node.items.at(-1), change)[1]
-    if (hasComment(text.slice(start, end))) cannot(change, { code: 'comment-lost', values: {} })
+    // A comment behind the last item, on its line, is that item's: it would stand behind
+    // another one, or behind the key, once the list is written anew.
+    if (hasComment(text.slice(start, lineEnd(text, end)))) {
+      cannot(change, { code: 'comment-lost', values: {} })
+    }
     const patterns = PATTERN_KEYS.has(scalarText(pair.key) ?? '')
     const items = Array.isArray(want) ? want : patterns ? [want] : undefined
     if (items !== undefined && items.length > 0) {

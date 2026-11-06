@@ -655,6 +655,25 @@ describe('what the writer keeps, and where it refuses', () => {
       commented.replace('      - files\n', '')
     )
     expect(() => changeRuleEdits(commented, 'a', to([]))).toThrow('a comment would be lost')
+    // A comment behind the last item is that item's, and would end behind another or the key.
+    const behindLast = blockTo.replace('      - files\n', '      - files # keep files\n')
+    for (const patterns of [['db'], []]) {
+      expect(() => changeRuleEdits(behindLast, 'a', to(patterns)), patterns.join()).toThrow(
+        'a comment would be lost'
+      )
+    }
+    // Behind a scalar it is the key's, and stays.
+    const behindScalar = blockTo.replace('    from: ui\n', '    from: ui # the window\n')
+    const fromWeb: RuleDraft = {
+      id: 'a',
+      why: 'A.',
+      kind: 'must-not-depend',
+      from: ['web'],
+      to: ['db', 'files']
+    }
+    expect(after(behindScalar, changeRuleEdits(behindScalar, 'a', fromWeb))).toBe(
+      behindScalar.replace('    from: ui # the window\n', '    from: web # the window\n')
+    )
   })
 
   it('refuses an item whose anchor is used elsewhere, instead of failing on the alias', () => {
