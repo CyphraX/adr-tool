@@ -358,6 +358,10 @@ export const DE: Wording<Codes> = {
   'python-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
   'go-missing': (v) => `Es fehlt: ${v.what}.`,
   'go-unreadable': () => 'Syntax, die nicht gelesen werden kann.',
+  // Why a file of any language could not be read to its end.
+  'nested-too-deep': () =>
+    'Sie ist für ihren Parser zu tief verschachtelt: dem Parser ging der Stack aus.',
+  'reader-failed': (v) => `Ihr Leser ist an ihr gescheitert: ${v.message}`,
 
   // The Problems of Diagrams.
   'invalid-diagrams-directory': (v) =>
