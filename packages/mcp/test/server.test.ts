@@ -540,6 +540,126 @@ describe('the Structure and the Rules (docs/plan-vision.md, part 4)', () => {
     )
     await close()
   })
+
+  it('plans an import of a file not written yet, measures no own files, and accepts the Violation of a function', async () => {
+    writeFileSync(
+      join(shop, '.arch/components.yml'),
+      [
+        'components:',
+        '  web:',
+        '    paths: [src/web/**]',
+        '  billing:',
+        '    paths: [src/billing/**]',
+        '    components:',
+        '      tax:',
+        '        paths: [src/billing/tax/**]',
+        '  persistence:',
+        '    paths: [src/persistence/**]',
+        ''
+      ].join('\n')
+    )
+    mkdirSync(join(shop, 'src/billing/tax'), { recursive: true })
+    writeFileSync(
+      join(shop, 'src/billing/tax/rate.ts'),
+      [
+        'export function rate(country: string): number {',
+        "  if (country === 'de') return 0.19",
+        "  if (country === 'at') return 0.2",
+        '  return 0',
+        '}',
+        ''
+      ].join('\n')
+    )
+    writeFileSync(
+      join(shop, '.arch/rules.yml'),
+      [
+        'rules:',
+        '  - id: persistence-alone',
+        '    why: What is stored knows nothing of the domain.',
+        '    kind: may-only-depend',
+        '    from: persistence',
+        '    to: []',
+        '  - id: simple',
+        '    why: A function is read in one go.',
+        '    kind: threshold',
+        '    metric: complexity',
+        '    max: 2',
+        '    of: billing',
+        ''
+      ].join('\n')
+    )
+    const { client, close } = await connect(shop)
+
+    // An import of a file that is not there yet, named by its path: a Source File, no Library.
+    const planned = await call(client, 'list_violations', {
+      from: 'src/persistence/db.ts',
+      to: 'src/web/chart.ts'
+    })
+    expect(planned.import).toMatchObject({
+      from: 'src/persistence/db.ts',
+      to: 'src/web/chart.ts',
+      toComponent: 'web',
+      exists: false
+    })
+    expect(planned.violations.map((one: { fingerprint: unknown }) => one.fingerprint)).toEqual([
+      { rule: 'persistence-alone', from: 'persistence', to: 'web' }
+    ])
+
+    // The own files of billing have a size, and no metric of the Component they stand beside.
+    const level = await call(client, 'read_structure', { component: 'billing' })
+    const own = level.nodes.find((node: { kind: string }) => node.kind === 'own-files')
+    expect(own).toEqual({ id: 'billing', kind: 'own-files', files: 1, lines: 2 })
+    expect(level.nodes.find((node: { id: string }) => node.id === 'billing/tax')).toHaveProperty(
+      'fanOut'
+    )
+
+    // The Violation of a function is named by its file and its name, and accepted by them.
+    const found = await call(client, 'list_violations', { component: 'billing' })
+    expect(found.violations[0]).toMatchObject({
+      rule: 'simple',
+      file: 'src/billing/tax/rate.ts',
+      name: 'rate',
+      line: 1,
+      value: 3,
+      fingerprint: { rule: 'simple', file: 'src/billing/tax/rate.ts', name: 'rate' }
+    })
+    expect(
+      await refusal(client, 'plan_exception', {
+        rule: 'simple',
+        component: 'billing',
+        reason: 'R.'
+      })
+    ).toBe(
+      'An Exception from simple names its Violation by "file" and "name", as list_violations gives them in "fingerprint".'
+    )
+    const exception = await call(client, 'plan_exception', {
+      ...found.violations[0].fingerprint,
+      reason: 'The rates are a table, read as one.'
+    })
+    expect(exception.files[0].diff).toContain('+    file: src/billing/tax/rate.ts')
+    expect(exception.files[0].diff).toContain('+    name: rate')
+    await call(client, 'apply_change', { changeId: exception.changeId })
+    const accepted = await call(client, 'list_violations', { component: 'billing' })
+    expect(accepted.breaks).toBe(0)
+    expect(accepted.violations[0].acceptedBy).toMatchObject({
+      reason: 'The rates are a table, read as one.'
+    })
+
+    // A change merges what it names into the Rule: of the same family of kinds, its keys stay.
+    const turned = await call(client, 'plan_rule', {
+      action: 'change',
+      id: 'persistence-alone',
+      kind: 'must-not-depend',
+      to: ['web']
+    })
+    expect(turned.files[0].diff).toContain('+    kind: must-not-depend')
+    expect(turned.files[0].diff).toContain('+    to: [web]')
+    expect(turned.files[0].diff).not.toContain('-    from:')
+    const bounded = await call(client, 'plan_rule', { action: 'change', id: 'simple', min: 1 })
+    expect(bounded.files[0].diff).toContain('-    max: 2')
+    expect(bounded.files[0].diff).toContain('+    min: 1')
+    await close()
+  })
 })
 
 describe('the protocol, line by line', () => {

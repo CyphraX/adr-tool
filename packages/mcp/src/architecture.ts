@@ -621,12 +621,17 @@ export function architectureTools(context: ArchitectureContext): {
           throw new Refusal('A planned import needs both "from" and "to".')
         }
         if (input.from !== undefined) return planned(input)
-        const { report } = await check()
+        const { report, analysed } = await check()
         const component = typeof input.component === 'string' ? input.component : undefined
         const about = (id: string | undefined): boolean =>
           id !== undefined &&
           component !== undefined &&
           (id === component || id.startsWith(`${component}/`))
+        // A function or a class is of the Component its file belongs to.
+        const ownerOf = (path: string | undefined): string | undefined =>
+          path === undefined
+            ? undefined
+            : analysed.structure.sourceFiles.find((one) => one.path === path)?.component
         const violations = report.violations.filter(
           (violation) =>
             (input.rule === undefined || violation.rule.id === input.rule) &&
@@ -634,6 +639,7 @@ export function architectureTools(context: ArchitectureContext): {
               about(violation.from) ||
               about(violation.to) ||
               about(violation.component) ||
+              about(ownerOf(violation.file)) ||
               (violation.cycle?.members.some(about) ?? false))
         )
         return {
