@@ -7,6 +7,7 @@ import { repositoryFiles } from './files'
 import { lint } from './lint'
 import { listRepository } from './listing'
 import { FORMATS, render, type Format } from './report'
+import { version } from '../package.json'
 
 /** Where the command prints, and where it runs. */
 export interface Console {
@@ -18,6 +19,7 @@ export interface Console {
 const USAGE = `Usage: adr lint [path] [--format text|json|github]
        adr check [path] [--format text|json|github]
        adr export [path] --out <directory> [--log <directory>]...
+       adr --version
 
 adr lint checks the Decision Logs of the repository at path (the current directory by
 default) and prints every Problem with its file, line and code.
@@ -34,6 +36,8 @@ HTML pages that open from disk into the directory --out: an empty one, or one an
 export wrote. Nothing of the repository is changed.
 Exit codes: 0 exported, 2 nothing could be exported.
 
+adr --version prints the version of the command.
+
 See docs/cli.md.
 `
 
@@ -46,6 +50,10 @@ export async function run(args: readonly string[], console: Console): Promise<nu
     const parsed = parse(args)
     if (parsed === 'help') {
       console.out(USAGE)
+      return 0
+    }
+    if (parsed === 'version') {
+      console.out(`${version}\n`)
       return 0
     }
     const { command, path } = parsed
@@ -132,15 +140,17 @@ interface Parsed {
 
 /**
  * The command line: the command, then its path, options anywhere. `--` ends the options, so
- * that a path may begin with `-`; `--help` anywhere but as the value of an option asks for help.
+ * that a path may begin with `-`; `--help` anywhere but as the value of an option asks for help,
+ * and `--version` for the version, where help is not asked for too.
  */
-function parse(args: readonly string[]): 'help' | Parsed {
+function parse(args: readonly string[]): 'help' | 'version' | Parsed {
   const words: string[] = []
   let format: Format | undefined
   let out: string | undefined
   const logs: string[] = []
   let options = true
   let help = false
+  let versionAsked = false
   /** The value of an option: `--name value` or `--name=value`. */
   const valueOf = (name: string, arg: string, at: number): [string | undefined, number] =>
     arg === name ? [args[at + 1], at + 1] : [arg.slice(name.length + 1), at]
@@ -152,6 +162,8 @@ function parse(args: readonly string[]): 'help' | Parsed {
       options = false
     } else if (arg === '--help' || arg === '-h') {
       help = true
+    } else if (arg === '--version' || arg === '-v') {
+      versionAsked = true
     } else if (arg === '--format' || arg.startsWith('--format=')) {
       const [value, next] = valueOf('--format', arg, at)
       at = next
@@ -174,6 +186,7 @@ function parse(args: readonly string[]): 'help' | Parsed {
     }
   }
   if (help) return 'help'
+  if (versionAsked) return 'version'
   const [command, path, ...more] = words
   if (more.length > 0) throw new Usage(`adr ${command} takes one path, the root of the repository.`)
   return {

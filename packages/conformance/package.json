@@ -1,6 +1,6 @@
 {
   "name": "@adr-tool/conformance",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "description": "The UI-free core of the Conformance module: Rules, Violations and Exceptions on Structure's model. No Electron, no DOM, no disk access of its own",

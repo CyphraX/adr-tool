@@ -12,6 +12,8 @@ The server is one file: `pnpm build` writes it to `packages/mcp/dist/adr-mcp.mjs
 node packages/mcp/dist/adr-mcp.mjs ../shop     # serve the repository ../shop
 ```
 
+`adr-mcp --version` prints its version. Each release of the suite carries the file as `adr-mcp.mjs` on its [GitHub release page](https://github.com/CyphraX/adr-tool/releases) ([release.md](release.md)), so it runs without a clone of this repository.
+
 An MCP client starts it as a process. With Claude Code, for the repository it runs in:
 
 ```sh

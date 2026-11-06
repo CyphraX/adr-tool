@@ -4,8 +4,10 @@ import { resolve } from 'node:path'
 import { serve } from './protocol'
 import { metricTools } from './metrics'
 import { toolsFor } from './tools'
+import { version } from '../package.json'
 
 const USAGE = `Usage: adr-mcp [path]
+       adr-mcp --version
 
 Serves the Decision Logs of the repository at path (the current directory by default) to an
 agent over the Model Context Protocol, on standard input and output. See docs/mcp.md.
@@ -14,6 +16,10 @@ agent over the Model Context Protocol, on standard input and output. See docs/mc
 async function main(args: readonly string[]): Promise<number> {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(USAGE)
+    return 0
+  }
+  if (args.includes('--version') || args.includes('-v')) {
+    process.stdout.write(`${version}\n`)
     return 0
   }
   if (args.length > 1 || args.some((arg) => arg.startsWith('-'))) {
@@ -36,7 +42,7 @@ async function main(args: readonly string[]): Promise<number> {
     {
       name: 'softarch-suite',
       title: 'Softarch Suite',
-      version: '0.0.0',
+      version,
       instructions: instructionsFor(root)
     },
     [...toolsFor({ root }), ...metricTools({ root })],

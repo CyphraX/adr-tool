@@ -220,6 +220,18 @@ describe('adr lint (docs/cli.md)', () => {
     expect((await adr('lint', '--help')).code).toBe(0)
   })
 
+  it('prints the version of its package with --version, and ends with 0', async () => {
+    const { version } = JSON.parse(
+      readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+    ) as { version: string }
+    expect(version).toMatch(/^\d+\.\d+\.\d+/)
+    for (const args of [['--version'], ['-v'], ['check', '--version']]) {
+      expect(await adr(...args)).toEqual({ code: 0, out: `${version}\n`, err: '' })
+    }
+    // Help is asked for too: help it is.
+    expect((await adr('--version', '--help')).out).toMatch(/^Usage: /)
+  })
+
   it('takes options anywhere, and a path after --', async () => {
     expect((await adr('--format', 'json', 'lint')).out).toBe(
       '{"logs":["docs/adr"],"problems":[]}\n'

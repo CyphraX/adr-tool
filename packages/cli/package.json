@@ -1,6 +1,6 @@
 {
   "name": "@adr-tool/cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository and `adr check` its Rules against the code, for CI; `adr export` writes the Decision Logs as HTML pages. It also holds the one way the suite runs git, which the app uses too",
