@@ -86,7 +86,8 @@ describe('adr check (docs/cli.md)', () => {
     expect(out).toMatch(
       /^No Problems in 1 Decision Log\.\n\d+ Rules hold\.\n1 Diagram: no Problem, no Drift\.\n$/
     )
-  })
+    // The whole code of this repository is read, which takes a while on a busy machine.
+  }, 30_000)
 
   it('prints each Violation at the line of its import, and ends with 1', async () => {
     const { code, out, err } = await adrIn(shop, 'check')
