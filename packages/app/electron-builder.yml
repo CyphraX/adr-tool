@@ -38,7 +38,9 @@ linux:
     - AppImage
     - tar.gz
     - deb
-  icon: build/icon.png
+  # One PNG per size, 16 to 512 px, for the hicolor theme: a desktop looks the icon of the menu
+  # and the dock up by size, and a theme with a 1024 px icon alone has none it asks for.
+  icon: build/icons
   category: Development
   synopsis: A desktop workbench for the architecture that lives in a git repository
   maintainer: Philipp Saal <63289319+CyphraX@users.noreply.github.com>
