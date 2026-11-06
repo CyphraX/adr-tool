@@ -33,6 +33,8 @@ const en = {
   changeGone: 'This change is no longer available.',
   analysisFailed: (reason: string): string =>
     `The code of this repository could not be analysed: ${reason}`,
+  /** Planning a change of the Rules file failed for a reason it has no refusal for. */
+  planFailed: (reason: string): string => `Nothing could be planned: ${sentence(reason)}`,
   notASourceFile: (path: string): string =>
     `${path} is not a Source File of this repository, so it is not shown.`,
   sourceFileTooLarge: (path: string, megabytes: number): string =>
@@ -98,6 +100,7 @@ const de: typeof en = {
   changeGone: 'Diese Änderung ist nicht mehr verfügbar.',
   analysisFailed: (reason: string): string =>
     `Der Code dieses Repositorys ließ sich nicht analysieren: ${reason}`,
+  planFailed: (reason: string): string => `Es ließ sich nichts planen: ${sentence(reason)}`,
   notASourceFile: (path: string): string =>
     `${path} ist keine Quelldatei dieses Repositorys und wird daher nicht gezeigt.`,
   sourceFileTooLarge: (path: string, megabytes: number): string =>

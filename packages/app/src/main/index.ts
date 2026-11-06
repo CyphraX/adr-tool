@@ -4,6 +4,7 @@ import { stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import type { FileSystem, Plan } from '@adr-tool/core'
 import { planConformanceRepair } from '@adr-tool/conformance'
 import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
@@ -12,6 +13,7 @@ import {
   type Decision,
   type ExportKind,
   type OpenRepository,
+  type PlanResult,
   type Session
 } from '../shared/ipc'
 import { isLanguage } from '../shared/language'
@@ -294,37 +296,35 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.handle(CHANNEL.planRule, async (_, repositoryId: unknown, request: unknown) => {
-    const rule = ruleRequest(request)
-    if (!rule) return { ok: false, reason: t.notUnderstood }
-    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
-    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
-    return repositories.hold(repositoryId as string, await planRule(nodeFileSystem(root), rule))
-  })
-
-  ipcMain.handle(CHANNEL.planException, async (_, repositoryId: unknown, request: unknown) => {
-    const draft = exceptionRequest(request)
-    if (!draft) return { ok: false, reason: t.notUnderstood }
-    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
-    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
-    return repositories.hold(
-      repositoryId as string,
-      await planException(nodeFileSystem(root), draft)
-    )
-  })
-
-  ipcMain.handle(
-    CHANNEL.planConformanceRepair,
-    async (_, repositoryId: unknown, request: unknown) => {
-      const repair = conformanceRepairRequest(request)
-      if (!repair) return { ok: false, reason: t.notUnderstood }
+  /**
+   * A plan of the Rules file or of what it names: refused when the request cannot be
+   * understood or the repository is closed, and refused in words, not thrown, where planning
+   * fails for a reason the writer has no refusal for.
+   */
+  const planOfRules =
+    <T>(
+      parse: (request: unknown) => T | undefined,
+      plan: (files: FileSystem, request: T) => Promise<Plan>
+    ) =>
+    async (_: unknown, repositoryId: unknown, request: unknown): Promise<PlanResult> => {
+      const parsed = parse(request)
+      if (parsed === undefined) return { ok: false, reason: t.notUnderstood }
       const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
       if (root === undefined) return { ok: false, reason: t.repositoryClosed }
-      return repositories.hold(
-        repositoryId as string,
-        await planConformanceRepair(nodeFileSystem(root), repair)
-      )
+      try {
+        return repositories.hold(repositoryId as string, await plan(nodeFileSystem(root), parsed))
+      } catch (error) {
+        return {
+          ok: false,
+          reason: t.planFailed(error instanceof Error ? error.message : String(error))
+        }
+      }
     }
+  ipcMain.handle(CHANNEL.planRule, planOfRules(ruleRequest, planRule))
+  ipcMain.handle(CHANNEL.planException, planOfRules(exceptionRequest, planException))
+  ipcMain.handle(
+    CHANNEL.planConformanceRepair,
+    planOfRules(conformanceRepairRequest, planConformanceRepair)
   )
 
   ipcMain.handle(
