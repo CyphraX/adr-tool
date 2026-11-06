@@ -31,6 +31,11 @@
   let query = $state('')
   let focused = $state(false)
   let cursor = $state(0)
+  /**
+   * Something was just picked: the matches stay closed until the person types or asks for them
+   * with an arrow, so that they do not cover what comes below the field — a dialog's buttons.
+   */
+  let picked = $state(false)
 
   const matches = $derived.by((): T[] => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
@@ -40,7 +45,7 @@
     })
     return (newestFirst ? found.toReversed() : found).slice(0, LIMIT)
   })
-  const open = $derived(focused && matches.length > 0)
+  const open = $derived(focused && !picked && matches.length > 0)
 
   // The matches stand over everything around the field, also over the edge of a dialog whose
   // lists scroll: they are placed in the window, below the field, or above it where the space
@@ -100,16 +105,21 @@
     onpick(candidate.id)
     query = ''
     cursor = 0
+    picked = true
   }
 
   function onkeydown(event: KeyboardEvent): void {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
+      if (picked) {
+        picked = false
+        return
+      }
       const step = event.key === 'ArrowDown' ? 1 : -1
       cursor = (cursor + step + matches.length) % Math.max(matches.length, 1)
     } else if (event.key === 'Enter') {
       event.preventDefault()
-      pick(matches[cursor])
+      if (!picked) pick(matches[cursor])
     } else if (event.key === 'Escape' && query !== '') {
       // The first Escape empties the search; the dialog closes on the next one.
       event.preventDefault()
@@ -130,8 +140,14 @@
     aria-autocomplete="list"
     placeholder={candidates.length === 0 ? noneLeft : placeholder}
     disabled={candidates.length === 0}
-    oninput={() => (cursor = 0)}
-    onfocus={() => (focused = true)}
+    oninput={() => {
+      cursor = 0
+      picked = false
+    }}
+    onfocus={() => {
+      focused = true
+      picked = false
+    }}
     onblur={() => (focused = false)}
     {onkeydown}
   />
