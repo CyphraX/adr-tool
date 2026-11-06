@@ -199,6 +199,71 @@ describe('renaming a Component that the Rules name (docs/conformance-format.md, 
   })
 })
 
+describe('renaming a Component that Diagrams show (docs/diagrams-format.md, section 2)', () => {
+  const DIAGRAM = 'docs/architecture/diagrams/packages.yml'
+  const PACKAGES = [
+    'level: container',
+    'elements:',
+    '  - component: core',
+    '    at: [40, 40]',
+    '  - component: structure',
+    '    at: [300, 40]',
+    'connections:',
+    '  - from: core',
+    '    to: structure',
+    '    label: reads the structure',
+    ''
+  ].join('\n')
+
+  it('rewrites the elements and connections in the same change set', async () => {
+    const fs = memoryFileSystem({ ...REPOSITORY, [DIAGRAM]: PACKAGES })
+    const plan = await planComponentRename(fs, 'structure', 'architecture')
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.changeSet.files.map((file) => file.path)).toEqual([
+      '.arch/components.yml',
+      'docs/adr/0001-one-core-per-module.md',
+      DIAGRAM
+    ])
+    expect(plan.changeSet.files[2]!.after).toBe(
+      PACKAGES.replace('component: structure', 'component: architecture').replace(
+        'to: structure',
+        'to: architecture'
+      )
+    )
+  })
+
+  it('warns of a Diagram it cannot read, with the code of the warning', async () => {
+    // An alias is no text the reader takes: the Diagram cannot be read.
+    const broken = [
+      'level: container',
+      'elements:',
+      '  - component: &s structure',
+      '    at: [0, 0]',
+      'connections:',
+      '  - from: *s',
+      '    to: core',
+      ''
+    ].join('\n')
+    const fs = memoryFileSystem({ ...REPOSITORY, [DIAGRAM]: broken })
+    const plan = await planComponentRename(fs, 'structure', 'architecture')
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.warned).toEqual([
+      { code: 'diagram-not-renamed', values: { path: DIAGRAM, component: 'structure' } }
+    ])
+  })
+
+  it('is refused with the reason and code of diagrams where it cannot rename in place', async () => {
+    const block =
+      'level: container\nelements:\n  - component: >-\n      structure\n    at: [0, 0]\n'
+    const fs = memoryFileSystem({ ...REPOSITORY, [DIAGRAM]: block })
+    const plan = await planComponentRename(fs, 'structure', 'architecture')
+    expect(plan.ok ? undefined : plan.said).toEqual({
+      code: 'cannot-rename-in-diagram',
+      values: { path: DIAGRAM, component: 'structure' }
+    })
+  })
+})
+
 // The done-when of part 7 (docs/plan-structure.md), as far as the files go: this repository
 // declares its Components, and its ADRs name them.
 describe('this repository', () => {
@@ -221,7 +286,7 @@ describe('this repository', () => {
     ])
   })
 
-  it('renames structure in the declaration, in ADR-0006 and ADR-0022, and in the Rules', async () => {
+  it('renames structure in the declaration, in ADR-0006 and ADR-0022, in the Rules and in its Diagram, whose picture follows', async () => {
     const plan = await planComponentRename(nodeFileSystem(own), 'structure', 'architecture')
     if (!plan.ok) throw new Error(plan.reason)
     const lines = (text: string): string[] => text.split('\n')
@@ -250,6 +315,28 @@ describe('this repository', () => {
           '    to: [kernel, structure]',
           '    to: [kernel, structure]',
           '      [app, [cli, mcp], [conformance, diagrams, review, assessment], [core, structure], kernel]'
+        ]
+      },
+      {
+        path: 'docs/architecture/diagrams/packages.yml',
+        changed: [
+          '  - component: structure',
+          '  - from: structure',
+          '    to: structure',
+          '    to: structure',
+          '    to: structure',
+          '    to: structure',
+          '    to: structure',
+          '    to: structure',
+          '    to: structure'
+        ]
+      },
+      {
+        // The box is named after its ID, and the picture says the Diagram in sentences too.
+        path: 'docs/architecture/diagrams/packages.svg',
+        changed: [
+          expect.stringMatching(/^ {2}<desc>.* structure uses kernel\. /),
+          expect.stringContaining('>structure</text>')
         ]
       }
     ])

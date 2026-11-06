@@ -1,6 +1,7 @@
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Ecosystem, LibraryStatus, Mapping, UnknownLicence } from '@adr-tool/structure/model'
 import type { Decision, LowerBound } from '../../../shared/ipc'
+import { DIAGRAMS_EN } from './strings.diagrams.en'
 import type { Refusal } from './views'
 
 /**
@@ -106,7 +107,8 @@ export const en = {
   modules: {
     label: 'Modules',
     decisions: 'Decisions',
-    structure: 'Structure'
+    structure: 'Structure',
+    diagrams: 'Diagrams'
   },
 
   tabs: {
@@ -1015,5 +1017,8 @@ export const en = {
         'A dialog holds what you entered, and it has not been carried out. Closing the window now loses it.',
       action: 'Discard and close'
     }
-  }
+  },
+
+  /** The Diagrams module: strings.diagrams.en.ts. */
+  diagrams: DIAGRAMS_EN
 }

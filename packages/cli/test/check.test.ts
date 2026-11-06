@@ -83,8 +83,10 @@ describe('adr check (docs/cli.md)', () => {
   it('finds nothing in this repository, and ends with 0', async () => {
     const { code, out, err } = await adr('check')
     expect([code, err]).toEqual([0, ''])
-    expect(out).toMatch(/^No Problems in 1 Decision Log\.\n\d+ Rules hold\.\n$/)
-    // The whole repository, measured and parsed in every language: a few seconds alone.
+    expect(out).toMatch(
+      /^No Problems in 1 Decision Log\.\n\d+ Rules hold\.\n1 Diagram: no Problem, no Drift\.\n$/
+    )
+    // The whole code of this repository is read, which takes a while on a busy machine.
   }, 30_000)
 
   it('prints each Violation at the line of its import, and ends with 1', async () => {
@@ -641,4 +643,132 @@ describe('adr check on Rules about Libraries (docs/cli.md)', () => {
     )
     expect(lines(out).at(-1)).toMatch(/^1 Violation of \d+ Rules\.$/)
   }, 30_000)
+})
+
+describe('adr check of the Diagrams (docs/cli.md, docs/diagrams-format.md)', () => {
+  const DIAGRAM = 'docs/architecture/diagrams/shop.yml'
+  const PICTURE = 'docs/architecture/diagrams/shop.svg'
+  // web uses billing and billing persistence, as the code has it; the Diagram leaves out that
+  // billing uses web, and draws web using persistence, which the code does not have.
+  const shopDiagram = [
+    'title: The shop',
+    'level: container',
+    'elements:',
+    '  - component: web',
+    '    at: [40, 40]',
+    '  - component: billing',
+    '    at: [300, 40]',
+    '  - component: persistence',
+    '    at: [560, 40]',
+    '  - external: payments',
+    '    at: [300, 200]',
+    'connections:',
+    '  - from: web',
+    '    to: billing',
+    '  - from: billing',
+    '    to: persistence',
+    '  - from: web',
+    '    to: persistence',
+    '  - from: billing',
+    '    to: payments',
+    ''
+  ].join('\n')
+  const NOT_IN_CODE =
+    'The Diagram connects web to persistence, but no Source File of web depends on one of persistence.'
+  const LEFT_OUT =
+    'billing depends on web in the code, through one Source File Dependency, and the Diagram does not connect them.'
+  const withDiagram = (files: Record<string, string> = {}): string =>
+    shopWith(EXCEPTIONS, { [DIAGRAM]: shopDiagram, ...files })
+
+  it('notes the Drift of a Diagram at its lines, which fails nothing', async () => {
+    const { code, out, err } = await adrIn(withDiagram(), 'check')
+    expect([code, err]).toEqual([0, ''])
+    expect(lines(out)).toEqual([
+      `${DIAGRAM}:17: connection-not-in-code: ${NOT_IN_CODE}`,
+      `${DIAGRAM}:6: dependency-not-in-diagram: ${LEFT_OUT}`,
+      '',
+      'No Problems in 1 Decision Log.',
+      '2 Rules hold, but for 2 Violations accepted as Exceptions.',
+      '1 Diagram: no Problem, 2 Drifts.'
+    ])
+    const github = await adrIn(withDiagram(), 'check', '--format', 'github')
+    expect(lines(github.out).slice(0, 2)).toEqual([
+      `::notice file=${DIAGRAM},line=17,title=connection-not-in-code::${NOT_IN_CODE}`,
+      `::notice file=${DIAGRAM},line=6,title=dependency-not-in-diagram::${LEFT_OUT}`
+    ])
+  })
+
+  it('fails on a picture that is not the Diagram as it is now, and on the Problems of a Diagram', async () => {
+    const root = withDiagram({
+      [PICTURE]: '<svg>an older picture</svg>\n',
+      'docs/architecture/diagrams/gone.yml':
+        'level: container\nelements:\n  - component: shipping\n    at: [0, 0]\n'
+    })
+    const { code, out } = await adrIn(root, 'check')
+    expect(code).toBe(1)
+    expect(lines(out)).toEqual([
+      'docs/architecture/diagrams/gone.yml:3: component-gone: The Diagram shows shipping, which is not a declared Component.',
+      `${DIAGRAM}:1: stale-picture: ${PICTURE} is not the picture of the Diagram as it is now: the Diagram or its Components changed after it was exported. Export it again.`,
+      `${DIAGRAM}:17: connection-not-in-code: ${NOT_IN_CODE}`,
+      `${DIAGRAM}:6: dependency-not-in-diagram: ${LEFT_OUT}`,
+      '',
+      'No Problems in 1 Decision Log.',
+      '2 Rules hold, but for 2 Violations accepted as Exceptions.',
+      '2 Diagrams: 2 Problems, 2 Drifts.'
+    ])
+    const report = JSON.parse((await adrIn(root, 'check', '--format', 'json')).out)
+    expect(report.diagrams).toEqual([
+      { id: 'gone', path: 'docs/architecture/diagrams/gone.yml' },
+      { id: 'shop', path: DIAGRAM, title: 'The shop' }
+    ])
+    expect(report.problems).toMatchObject([
+      { module: 'diagrams', code: 'component-gone', line: 3 },
+      {
+        module: 'diagrams',
+        code: 'stale-picture',
+        path: DIAGRAM,
+        line: 1,
+        problem: { picture: PICTURE }
+      }
+    ])
+    expect(report.notes).toMatchObject([
+      { module: 'diagrams', code: 'connection-not-in-code', path: DIAGRAM, line: 17 },
+      { module: 'diagrams', code: 'dependency-not-in-diagram', path: DIAGRAM, line: 6 }
+    ])
+    expect(report.notes[1].drift).toMatchObject({ from: 'billing', to: 'web', weight: 1 })
+  })
+
+  it('compares no Diagram with the code on a Draft', async () => {
+    const root = copyOf(undefined, { [DIAGRAM]: shopDiagram, 'src/web/page.ts': 'export {}\n' })
+    expect(await adrIn(root, 'check')).toEqual({
+      code: 0,
+      out: 'No Decision Log.\nNo Rules: .arch/rules.yml is not there.\n1 Diagram: no Problem, not compared with the code.\n',
+      err: ''
+    })
+  })
+
+  it('fails once on settings that cannot be read, and on a directory of Diagrams it cannot use', async () => {
+    const unreadable = await adrIn(copyOf(shop, { '.arch/config.yml': 'diagrams: [\n' }), 'check')
+    expect(unreadable.code).toBe(1)
+    expect(lines(unreadable.out)[0]).toMatch(/^\.arch\/config\.yml:\d+: unreadable-config: /)
+    expect(lines(unreadable.out).slice(-3)).toEqual([
+      'No Problems in 1 Decision Log.',
+      '1 Problem in .arch/config.yml.',
+      '2 Violations of 2 Rules.'
+    ])
+    const outside = await adrIn(
+      copyOf(shop, { '.arch/config.yml': 'diagrams: ../elsewhere\n' }),
+      'check',
+      '--format',
+      'json'
+    )
+    expect(JSON.parse(outside.out).problems).toMatchObject([
+      { module: 'diagrams', code: 'invalid-diagrams-directory', path: '.arch/config.yml', line: 1 }
+    ])
+    expect(
+      lines(
+        (await adrIn(copyOf(shop, { '.arch/config.yml': 'diagrams: ../elsewhere\n' }), 'check')).out
+      ).at(-1)
+    ).toBe('No Diagram is looked for: 1 Problem in .arch/config.yml.')
+  })
 })

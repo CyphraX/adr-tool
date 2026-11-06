@@ -1,6 +1,7 @@
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 import type { MetricKey, MetricWording, ReviewWording, en } from './strings.en'
+import { DIAGRAMS_DE } from './strings.diagrams.de'
 import type { Refusal } from './views'
 
 /**
@@ -56,7 +57,8 @@ export const de: typeof en = {
   modules: {
     label: 'Module',
     decisions: 'Entscheidungen',
-    structure: 'Struktur'
+    structure: 'Struktur',
+    diagrams: 'Diagramme'
   },
 
   tabs: {
@@ -964,5 +966,7 @@ export const de: typeof en = {
         'Ein Dialog enthält, was Sie eingegeben haben, und es wurde nicht ausgeführt. Wenn Sie das Fenster jetzt schließen, geht es verloren.',
       action: 'Verwerfen und schließen'
     }
-  }
+  },
+
+  diagrams: DIAGRAMS_DE
 }

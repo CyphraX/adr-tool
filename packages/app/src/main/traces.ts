@@ -13,6 +13,7 @@ import {
   type Repository
 } from '@adr-tool/core'
 import { planRenameInRules } from '@adr-tool/conformance'
+import { planRenameInDiagrams } from '@adr-tool/diagrams'
 import {
   DECLARATION_PATH,
   everyComponent,
@@ -20,6 +21,7 @@ import {
   readDeclaration
 } from '@adr-tool/structure/model'
 import type { ComponentName } from '../shared/ipc'
+import { declaredIn } from './diagrams'
 
 /**
  * The Components the repository declares, which Traces name, each parent before its children.
@@ -45,8 +47,10 @@ export async function openWithTraces(
 /**
  * Rename a Component: Structure plans the new segment in the declaration, `core` the Traces in
  * every ADR that name the Component or one below it, Conformance the IDs in `.arch/rules.yml`
- * (docs/conformance-format.md, section 7). One change set, previewed as a whole, with what any
- * part warns of — and why any part refuses — as its module says it, code and all.
+ * (docs/conformance-format.md, section 7), Diagrams the elements and connections of every
+ * Diagram that shows it (docs/diagrams-format.md, section 2), and the pictures of them that
+ * were current. One change set, previewed as a whole, with what any part warns of — and why
+ * any part refuses — as its module says it, code and all.
  */
 export async function planComponentRename(
   fs: FileSystem,
@@ -60,12 +64,30 @@ export async function planComponentRename(
   if (!traces.ok) return traces
   const rules = await planRenameInRules(fs, declared.renamed.from, declared.renamed.to)
   if (!rules.ok) return rules
-  const parts = [declared, traces, rules]
+  // The pictures that are current are drawn again, with the names the Rename gives.
+  const renamedDeclaration = declared.changeSet.files.find((file) => file.path === DECLARATION_PATH)
+  const diagrams = await planRenameInDiagrams(
+    fs,
+    declared.renamed.from,
+    declared.renamed.to,
+    undefined,
+    renamedDeclaration && {
+      before: declaredIn(renamedDeclaration.before),
+      after: declaredIn(renamedDeclaration.after)
+    }
+  )
+  if (!diagrams.ok) return diagrams
+  const parts = [declared, traces, rules, diagrams]
   const warnings = parts.flatMap((part) => part.warnings ?? [])
   const warned = parts.flatMap((part) => part.warned ?? [])
   return {
     ok: true,
-    changeSet: joinChangeSets(declared.changeSet, traces.changeSet, rules.changeSet),
+    changeSet: joinChangeSets(
+      declared.changeSet,
+      traces.changeSet,
+      rules.changeSet,
+      diagrams.changeSet
+    ),
     ...(warnings.length > 0 && { warnings }),
     // Codes only where every warning has one: a code stands where its warning stands.
     ...(warned.length > 0 && warned.length === warnings.length && { warned })

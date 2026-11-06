@@ -15,6 +15,7 @@
   import { codeSpans, prefixOf } from '../lib/wording'
   import ComponentLibraries from './ComponentLibraries.svelte'
   import LibraryDetail from './LibraryDetail.svelte'
+  import ComponentDiagrams from './ComponentDiagrams.svelte'
   import StatusMark from './StatusMark.svelte'
   import StructureFunctions from './StructureFunctions.svelte'
 
@@ -208,6 +209,8 @@
       {/each}
     </ul>
   {/if}
+
+  <ComponentDiagrams id={page.id} />
 
   <h3>{t.structure.page.patterns}</h3>
   <dl class="patterns">

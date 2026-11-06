@@ -116,7 +116,7 @@ A new kind of Problem gets a new code. A code is never given a different meaning
 
 ## `adr check [path] [--format text|json|github]`
 
-Does what `adr lint` does, then checks the declaration of Components in `.arch/components.yml` ([structure-format.md](structure-format.md)) and the Rules in `.arch/rules.yml` against the code ([conformance-format.md](conformance-format.md)). It fails on every Problem — of a Decision Log, of the declaration, of the file of Rules — and on every Violation that no Exception accepts. Its options are those of `adr lint`, and they may stand anywhere on the line.
+Does what `adr lint` does, then checks the declaration of Components in `.arch/components.yml` ([structure-format.md](structure-format.md)), the Rules in `.arch/rules.yml` against the code ([conformance-format.md](conformance-format.md)), and the Diagrams ([diagrams-format.md](diagrams-format.md)): their Problems, whether the picture beside each is current, and their Drift against the code. It fails on every Problem — of a Decision Log, of `.arch/config.yml`, of the declaration, of the file of Rules, of a Diagram or its picture — and on every Violation that no Exception accepts; Drift is noted, and fails nothing. Its options are those of `adr lint`, and they may stand anywhere on the line.
 
 ```sh
 node packages/cli/dist/adr.mjs check                  # the repository in the current directory
@@ -125,14 +125,17 @@ node packages/cli/dist/adr.mjs check --format github  # in a pipeline
 
 - **The Decision Logs** are found and checked as `adr lint` checks them, with the same lines and codes. A repository without one is checked all the same, when it has `.arch/components.yml` or `.arch/rules.yml`.
 - **The files of the repository** are what the app lists ([structure-format.md, section 2](structure-format.md#2-source-files-part-2)): in a git repository, what git tracks and what it neither tracks nor ignores; elsewhere, a walk of the directory that honours `.gitignore`. git is run without a pager, without locks, without the file system monitor and without fetching what a partial clone lacks; nothing the repository brings along is run ([ADR-0007](adr/0007-the-analysis-never-executes-anything-from-the-analysed.md)).
-- **The code** is read only when a Rule needs it: TypeScript and JavaScript with the TypeScript compiler, Java, Python and Go with the tree-sitter grammars that the command carries. A Source File that cannot be parsed is named on standard error; it has no Dependencies of its own, and the check goes on — so does one the parser fails on as a whole, nested too deeply for its stack, say, which is named with why. A Source File that is parsed and cannot be measured inside — should its measuring fail — is named on standard error as well: it keeps its Dependencies, and its functions and classes count towards no Rule on a metric of the code inside it. An Exception that names a function by the suffix `#2`, `#3`, … that tells functions of one name apart is noted there too: the suffix is positional, and moves to another function when one of that name is added or removed before it ([conformance-format.md](conformance-format.md), section 3).
+- **The code** is read only when a Rule or the Drift of a Diagram needs it: TypeScript and JavaScript with the TypeScript compiler, Java, Python and Go with the tree-sitter grammars that the command carries. A Source File that cannot be parsed is named on standard error; it has no Dependencies of its own, and the check goes on — so does one the parser fails on as a whole, nested too deeply for its stack, say, which is named with why. A Source File that is parsed and cannot be measured inside — should its measuring fail — is named on standard error as well: it keeps its Dependencies, and its functions and classes count towards no Rule on a metric of the code inside it. An Exception that names a function by the suffix `#2`, `#3`, … that tells functions of one name apart is noted there too: the suffix is positional, and moves to another function when one of that name is added or removed before it ([conformance-format.md](conformance-format.md), section 3).
 - **The Rules** are evaluated only against a declaration that can be read. On a Draft — no `.arch/components.yml`, or one that cannot be read — the file of Rules has the Problem `rules-without-declaration`, and no Rule is checked ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)).
+- **The settings** in `.arch/config.yml` ([configuration.md](configuration.md#2-when-it-cannot-be-read)): a file that is not YAML, or whose top level is not a map, is one Problem, `unreadable-config`, said once for every module. While it is, no Diagram is looked for.
+- **The Diagrams** are the files in the directory the key `diagrams` names, `docs/architecture/diagrams` by default ([diagrams-format.md, section 1](diagrams-format.md#1-where-diagrams-are-part-6)). Each has the Problems of its file and, against a declaration that can be read, those against the declaration ([section 5](diagrams-format.md#5-problems-part-6)). Its picture, the SVG beside it, is drawn as the export draws it and compared with the file there, byte for byte: where they differ, the Diagram has the Problem `stale-picture` — export it again. A Diagram that is not exported has no picture to be stale.
+- **Drift** ([section 4](diagrams-format.md#4-suggested-connections-and-drift-part-6)) is found only where the declaration can be read and a Diagram shows a Component; the code is read for it as for the Rules. Each Drift is a note: a connection the code does not have at the line of its connection, a Dependency the Diagram leaves out at the line of the element that uses. On a Draft, the Diagrams are not compared with the code.
 
 Nothing is written. `adr lint` stays as it was: it reads no Rules, and what it prints and how it ends do not change.
 
 ### What it prints
 
-First what `adr lint` prints, without its count; then the Problems of `.arch/components.yml`, named by the file (`path: code: message`) — and by the line the YAML parser stopped at, for a file that is not YAML; then the Problems of `.arch/rules.yml` at their line; then each Violation that no Exception accepts, once for each line of each import behind it:
+First what `adr lint` prints, without its count; then the Problem of `.arch/config.yml`, if it has one; then the Problems of `.arch/components.yml`, named by the file (`path: code: message`) — and by the line the YAML parser stopped at, for a file that is not YAML; then the Problems of `.arch/rules.yml` at their line; then each Violation that no Exception accepts, once for each line of each import behind it; then the Problems of the Diagrams — of the key `diagrams` first, then of each Diagram in the order of its file name — and last their Drift:
 
 ```
 src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
@@ -146,7 +149,12 @@ cart/src/main/java/com/shop/cart/Cart.java:19: functions-stay-simple: The metric
 - **The code** is the ID of the Rule, which the architect chose and which stays as long as the Rule does. A Problem has its code, as in `adr lint`.
 - **The message** is the sentence of the Violation ([conformance-format.md, section 3](conformance-format.md#3-violations-and-their-fingerprint-part-3)), the import that causes it, and the reason the Rule gives, in the architect's words.
 
-A Violation that an Exception accepts is not printed; it is counted. A note about `.arch/rules.yml` — an Exception of a Cycle that can be narrowed — is printed among the Problems of the file, at its line, and fails nothing. After an empty line, the last lines count: one for the Decision Logs, as `adr lint` counts them, or `No Decision Log.`; one for the declaration when it has Problems, `1 Problem in .arch/components.yml.`; and one for the Rules:
+```
+docs/architecture/diagrams/packages.yml:1: stale-picture: docs/architecture/diagrams/packages.svg is not the picture of the Diagram as it is now: the Diagram or its Components changed after it was exported. Export it again.
+docs/architecture/diagrams/packages.yml:22: dependency-not-in-diagram: cli depends on diagrams in the code, through 2 Source File Dependencies, and the Diagram does not connect them.
+```
+
+A Violation that an Exception accepts is not printed; it is counted. A note about `.arch/rules.yml` — an Exception of a Cycle that can be narrowed — is printed among the Problems of the file, at its line, and fails nothing; so is the Drift of a Diagram, at its line in the Diagram's file. After an empty line, the last lines count: one for the Decision Logs, as `adr lint` counts them, or `No Decision Log.`; `1 Problem in .arch/config.yml.` when the settings cannot be read; one for the declaration when it has Problems, `1 Problem in .arch/components.yml.`; one for the Rules; and one for the Diagrams, where there are any:
 
 | Last line | When |
 | --------- | ---- |
@@ -159,6 +167,14 @@ A Violation that an Exception accepts is not printed; it is counted. A note abou
 | `No Rules: .arch/rules.yml is not there.` | No file of Rules |
 
 Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem in .arch/rules.yml.` A Rule with a Problem of its own form is not counted among the Rules.
+
+| Last line of the Diagrams | When |
+| ------------------------- | ---- |
+| `2 Diagrams: no Problem, no Drift.` | The Diagrams agree with the declaration, their pictures and the code |
+| `2 Diagrams: 1 Problem, 3 Drifts.` | Some are not; only the Problem fails the check |
+| `1 Diagram: no Problem, not compared with the code.` | On a Draft, or where no Diagram shows a Component |
+| `No Diagram is looked for: 1 Problem in .arch/config.yml.` | The key `diagrams` cannot be used |
+| — | There is no Diagram, and nothing is wrong with where they are |
 
 `--format json` prints one JSON document instead, and nothing else. It holds every Violation, the accepted ones too, each with its fingerprint ([conformance-format.md, section 3](conformance-format.md#the-fingerprint)) — what an Exception names to accept it:
 
@@ -187,8 +203,9 @@ Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem i
 }
 ```
 
-- **`notes`** holds the notes of `.arch/rules.yml`, each with `module`, `code`, `message`, `path`, `line` and `note` as Conformance reports it; they fail nothing.
-- **`problems`** holds the Problems of every module, each with `module`: `decisions` (as `adr lint` writes them), `structure` (of `.arch/components.yml`) or `conformance` (of `.arch/rules.yml`), with `code`, `message`, `path`, `line` where there is one, and `problem` as the module reports it.
+- **`notes`** holds the notes of `.arch/rules.yml`, each with `module`, `code`, `message`, `path`, `line` and `note` as Conformance reports it, then the Drift of the Diagrams, each with `module` `diagrams`, `code`, `message`, `path` and `line` as printed, and `drift` as Diagrams reports it; they fail nothing.
+- **`problems`** holds the Problems of every module, each with `module`: `decisions` (as `adr lint` writes them), `kernel` (that `.arch/config.yml` cannot be read), `structure` (of `.arch/components.yml`), `conformance` (of `.arch/rules.yml`) or `diagrams` (of the key `diagrams`, of a Diagram, and `stale-picture`), with `code`, `message`, `path`, `line` where there is one, and `problem` as the module reports it.
+- **`diagrams`** lists the Diagrams found, each with `id`, `path` and `title` where it has one.
 - **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, of the function or class of a threshold, or of the Rule; `value` is the value of a threshold's metric; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `uses`, for a Rule about Libraries alone, the uses of the Library behind it — each with `file`, `library`, `lines`, `typeOnly`, and `typeOnlyLines` where some of its lines are type-only —, whose first import gives `path` and `line`; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
 
 `--format github` prints one `::error` [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message) for each line of the text format, so that a pull request shows each Violation on the line of its import, titled with the ID of the Rule, and each Problem titled with its code — a note as a `::notice`; the Problems of the Decision Logs are written as `adr lint` writes them. The counts come last, as lines of their own. The files are named from the directory the command runs in, as with `adr lint`:
@@ -202,8 +219,8 @@ Problems of the file of Rules are added to that line: `5 Rules hold; 1 Problem i
 | Exit code | When |
 | --------- | ---- |
 | 0 | There is no Problem, and every Violation has an Exception |
-| 1 | There is at least one Problem — in a Decision Log, in `.arch/components.yml` or in `.arch/rules.yml`, an Exception that matches nothing or names an ADR that is not there among them — or a Violation without an Exception |
-| 2 | Nothing could be checked: `path` is no directory; no Decision Log is found there, and neither `.arch/components.yml` nor `.arch/rules.yml` is there; the command line is not understood; or reading failed in a way the command did not expect. What went wrong is printed to standard error |
+| 1 | There is at least one Problem — in a Decision Log, in `.arch/config.yml`, in `.arch/components.yml`, in `.arch/rules.yml` (an Exception that matches nothing or names an ADR that is not there among them) or of a Diagram (a picture that is not current among them) — or a Violation without an Exception |
+| 2 | Nothing could be checked: `path` is no directory; no Decision Log is found there, neither `.arch/components.yml` nor `.arch/rules.yml` is there, no Diagram is, and `.arch/config.yml` can be read; the command line is not understood; or reading failed in a way the command did not expect. What went wrong is printed to standard error |
 
 ### The codes
 
@@ -214,6 +231,9 @@ The Problems of the Decision Logs have the codes of `adr lint`, above. The other
 | `unreadable-declaration`, `invalid-segment`, `duplicate-component`, `dead-pattern`, `pattern-outside-repository`, `overlapping-components`, `empty-component` | The Problems of `.arch/components.yml` ([structure-format.md, section 6](structure-format.md#6-problems-part-2)), as Structure names them (`packages/structure/src/problems.ts`) |
 | `unreadable-rules`, `rules-without-declaration`, `unknown-rule-kind`, `invalid-rule`, `duplicate-rule`, `unknown-component`, `no-component-matches`, `invalid-exception`, `exception-unknown-rule`, `unmatched-exception`, `duplicate-exception`, `unknown-justification`, `invalid-justification`, `invalid-applied-pattern` | The Problems of `.arch/rules.yml` ([conformance-format.md, section 5](conformance-format.md#5-problems-part-3)) |
 | `exception-can-shrink` | A note of `.arch/rules.yml`, which fails nothing (the same section) |
+| `unreadable-config` | `.arch/config.yml` cannot be read ([configuration.md, section 2](configuration.md#2-when-it-cannot-be-read)) |
+| `invalid-diagrams-directory`, `unreadable-diagram`, `no-level`, `unknown-level`, `no-scope`, `scope-without-component-level`, `invalid-element-id`, `duplicate-element`, `self-connection`, `unknown-element`, `duplicate-connection`, `component-gone`, `unknown-scope`, `component-does-not-fit`, `repository-does-not-fit`, `stale-picture` | The Problems of the Diagrams ([diagrams-format.md, section 5](diagrams-format.md#5-problems-part-6)), as Diagrams names them (`packages/diagrams/src/problems.ts`) |
+| `connection-not-in-code`, `connection-perhaps-not-in-code`, `dependency-not-in-diagram`, `scope-dependency-not-in-diagram` | Drift of a Diagram, a note, which fails nothing ([diagrams-format.md, section 4](diagrams-format.md#4-suggested-connections-and-drift-part-6)) |
 
 A Violation is named by the ID of its Rule, and in JSON its `code` is the kind of the Rule: `must-not-depend`, `may-only-depend`, `layers`, `no-cycles`, `threshold`, `library`. The same rule for new codes holds as for `adr lint`.
 

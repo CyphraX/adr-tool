@@ -125,6 +125,12 @@ describe('the MCP server (docs/mcp.md)', () => {
       'plan_edit_metadata',
       'plan_repair',
       'plan_migration',
+      'list_diagrams',
+      'read_diagram',
+      'plan_new_diagram',
+      'plan_diagram_change',
+      'plan_diagram_export',
+      'plan_diagram_repair',
       'apply_change',
       'discard_change'
     ])

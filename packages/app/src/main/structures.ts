@@ -150,6 +150,14 @@ export class Structures {
     return readSourceFile(root, path, analysis)
   }
 
+  /**
+   * The analysis for what Diagrams draws of it — the Drift, the suggested connections —, kept
+   * current from now on, as for an open Structure: a Diagram's Drift follows the code.
+   */
+  analysisOf(repositoryId: string, root: string): Promise<Analysis> {
+    return this.opened(repositoryId, root)
+  }
+
   /** The Structure as it is now, to plan against. */
   async structureOf(repositoryId: string, root: string): Promise<Structure> {
     const entry = this.entryOf(repositoryId, root)
