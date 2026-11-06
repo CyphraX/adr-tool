@@ -1,23 +1,26 @@
-// Draws icon.svg in the Chromium of Electron — the app's icon is drawn by what draws the app —
-// into icon.png, 1024 px square, from which electron-builder derives the .ico of Windows and
-// the .icns of macOS, and into icons/<size>x<size>.png, from 16 to 512 px, which go into the
-// hicolor theme on Linux (electron-builder.yml, docs/release.md). A desktop looks a launcher's
-// icon up there by size, and finds none in a theme without the sizes it asks for. Each size is
-// drawn from the SVG, not scaled down from the large one. Run it from packages/app after a
-// change to the SVG, and commit what it writes:
+// Draws build/icon.svg in the Chromium of Electron — the app's icon is drawn by what draws the
+// app — into build/icon.png, 1024 px square, from which electron-builder derives the .ico of
+// Windows and the .icns of macOS, and into build/icons/<size>x<size>.png, from 16 to 512 px,
+// which go into the hicolor theme on Linux (electron-builder.yml, docs/release.md). A desktop
+// looks a launcher's icon up there by size, and finds none in a theme without the sizes it asks
+// for. Each size is drawn from the SVG, not scaled down from the large one. It runs when the
+// icon changes and is not shipped; it lives outside build/, which the analysis leaves out where
+// git does not list the files (docs/structure-format.md, section 2), so that its Exception of
+// .arch/rules.yml holds either way (ADR-0023). Run it from packages/app after a change to the
+// SVG, and commit what it writes:
 //
-//   pnpm exec electron build/render-icon.mjs
+//   pnpm exec electron scripts/render-icon.mjs
 //
-// On Linux without a display, under `xvfb-run -a`.
+// On Linux without a display, under `xvfb-run -a`; as root, with `--no-sandbox` as well.
 import { app, BrowserWindow } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 const LARGE = 1024
 const SIZES = [512, 256, 128, 64, 48, 32, 16]
-const svg = fileURLToPath(new URL('icon.svg', import.meta.url))
-const png = fileURLToPath(new URL('icon.png', import.meta.url))
-const icons = fileURLToPath(new URL('icons/', import.meta.url))
+const svg = fileURLToPath(new URL('../build/icon.svg', import.meta.url))
+const png = fileURLToPath(new URL('../build/icon.png', import.meta.url))
+const icons = fileURLToPath(new URL('../build/icons/', import.meta.url))
 
 // One pixel of the picture is one of the PNG, whatever the screen.
 app.commandLine.appendSwitch('force-device-scale-factor', '1')

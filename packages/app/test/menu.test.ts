@@ -1,7 +1,10 @@
-import type { MenuItemConstructorOptions } from 'electron'
 import { afterEach, describe, expect, it } from 'vitest'
 import { menuTemplate } from '../src/main/menu'
 import { setLanguage } from '../src/main/strings'
+
+// An item of the menu, as Electron takes it; named through menu.ts, so that the tests import
+// nothing of Electron, which only the window uses (.arch/rules.yml).
+type MenuItemConstructorOptions = ReturnType<typeof menuTemplate>[number]
 
 /** Every item of a menu, those of its submenus included. */
 function items(menu: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {

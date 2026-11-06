@@ -524,12 +524,18 @@ describe('the Library inventory of this repository', () => {
     const named = (name: string, ecosystem = 'npm') =>
       libraries.find((library) => library.name === name && library.ecosystem === ecosystem)!
 
-    // Only the window uses Electron: its main process and its preload script.
+    // Only the window uses Electron: its main process and its preload script — and the icon
+    // script of the release, packages/app/scripts/render-icon.mjs, which draws the icon in
+    // Electron and is not shipped; the Rule accepts it as an Exception (ADR-0023).
     const electron = named('electron')
     expect(
       electron.declared.map(({ manifest, group, component }) => [manifest, group, component])
     ).toEqual([['packages/app/package.json', 'dev', 'app']])
-    expect(electron.usedBy.map((user) => user.component)).toEqual(['app/main', 'app/preload'])
+    expect(electron.usedBy.map((user) => user.component)).toEqual([
+      'app',
+      'app/main',
+      'app/preload'
+    ])
     expect(electron.licence).toEqual({
       kind: 'declared',
       licence: 'MIT',

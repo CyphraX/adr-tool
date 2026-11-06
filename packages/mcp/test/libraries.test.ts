@@ -259,9 +259,15 @@ describe('list_libraries (docs/mcp.md)', () => {
     const electron = (result.libraries as Record<string, unknown>[]).find(
       (library) => library.name === 'electron'
     )
+    // The window's main process and preload script, and the icon script of the release, which
+    // the Rules accept as an Exception (ADR-0023).
     expect(electron).toMatchObject({
       status: 'used',
-      usedBy: [{ component: 'app/main' }, { component: 'app/preload' }],
+      usedBy: [
+        { component: 'app', files: ['packages/app/scripts/render-icon.mjs'] },
+        { component: 'app/main' },
+        { component: 'app/preload' }
+      ],
       licence: { kind: 'declared', licence: 'MIT' }
     })
   }, 60_000)

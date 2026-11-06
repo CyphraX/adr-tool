@@ -57,10 +57,10 @@ The app sets a menu of its own, in the language of the window (`packages/app/src
 
 ### The icon
 
-`packages/app/build/icon.svg` is the source: four Components and the Dependencies between them, drawn as the window draws a graph ([design.md](design.md)), on the window's ink. `packages/app/build/render-icon.mjs` draws it in Electron's Chromium into `icon.png`, 1024 px square, from which electron-builder derives the `.ico` of Windows and the `.icns` of macOS, and into `build/icons/`, one PNG for each size from 16 to 512 px, which the deb and the AppImage install into the hicolor theme of Linux: the menu and the dock look the icon up there by size. Each size is drawn from the SVG, not scaled down. After a change to the SVG, from `packages/app` (on Linux without a display, under `xvfb-run -a`):
+`packages/app/build/icon.svg` is the source: four Components and the Dependencies between them, drawn as the window draws a graph ([design.md](design.md)), on the window's ink. `packages/app/scripts/render-icon.mjs` draws it in Electron's Chromium into `build/icon.png`, 1024 px square, from which electron-builder derives the `.ico` of Windows and the `.icns` of macOS, and into `build/icons/`, one PNG for each size from 16 to 512 px, which the deb and the AppImage install into the hicolor theme of Linux: the menu and the dock look the icon up there by size. Each size is drawn from the SVG, not scaled down. After a change to the SVG, from `packages/app` (on Linux without a display, under `xvfb-run -a`):
 
 ```sh
-pnpm exec electron build/render-icon.mjs
+pnpm exec electron scripts/render-icon.mjs
 ```
 
 and commit what it writes.
