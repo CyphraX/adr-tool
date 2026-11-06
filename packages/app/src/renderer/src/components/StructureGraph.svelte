@@ -89,13 +89,28 @@
   const widthOf = (edge: StructureEdge): number =>
     violating(edge) ? Math.max(2.6, strokeOf(edge.weight)) : strokeOf(edge.weight)
 
-  // A level that is drawn anew shows what breaks a Rule on it, wherever it lies in the drawing.
+  // A level that is drawn anew shows what is selected on it, or else the first thing that
+  // breaks a Rule, wherever it lies in the drawing: scrolled only as far as it takes to see it
+  // whole, and only when the level or the selection changed — not on every refresh.
   let canvas = $state<HTMLDivElement>()
+  let shownFor: string | undefined
   $effect(() => {
     if (!violations || !canvas) return
-    void view
-    const first = canvas.querySelector('.line.violating, .node.violating')
-    first?.scrollIntoView({ block: 'center', inline: 'center' })
+    const at = `${view.parent ?? ''}\n${JSON.stringify(selection ?? null)}`
+    if (at === shownFor) return
+    shownFor = at
+    const target =
+      canvas.querySelector('.node.selected, .line.violating.highlighted') ??
+      canvas.querySelector('.line.violating, .node.violating')
+    if (!target) return
+    const box = target.getBoundingClientRect()
+    const frame = canvas.getBoundingClientRect()
+    const whole =
+      box.left >= frame.left &&
+      box.right <= frame.right &&
+      box.top >= frame.top &&
+      box.bottom <= frame.bottom
+    if (!whole) target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   })
 </script>
 

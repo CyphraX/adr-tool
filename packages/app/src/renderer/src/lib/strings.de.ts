@@ -924,7 +924,16 @@ export const de: typeof en = {
       rules: 'Regeln',
       noRule: 'Keine Regel nennt sie.',
       violations: 'Verstöße',
-      noViolation: 'Keine.',
+      noViolation: (accepted: number): string =>
+        accepted === 0
+          ? 'Keine.'
+          : accepted === 1
+            ? 'Nur einer, den eine Ausnahme akzeptiert.'
+            : `Nur ${accepted}, die Ausnahmen akzeptieren.`,
+      alsoAccepted: (accepted: number): string =>
+        accepted === 1
+          ? 'Dazu einer, den eine Ausnahme akzeptiert.'
+          : `Dazu ${accepted}, die Ausnahmen akzeptieren.`,
       checking: 'Die Regeln werden geprüft …'
     },
     adr: {

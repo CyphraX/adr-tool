@@ -221,6 +221,10 @@
       rules.violations.filter((violation) => !violation.exception),
       page.id
     )}
+    {@const accepted = violationsAbout(
+      rules.violations.filter((violation) => violation.exception),
+      page.id
+    ).length}
     {#if naming.length === 0}
       <p class="faint">{t.conformance.component.noRule}</p>
     {:else}
@@ -237,10 +241,10 @@
         {/each}
       </ul>
     {/if}
-    {#if naming.length > 0 || violations.length > 0}
+    {#if naming.length > 0 || violations.length > 0 || accepted > 0}
       <h3>{t.conformance.component.violations}</h3>
       {#if violations.length === 0}
-        <p class="faint">{t.conformance.component.noViolation}</p>
+        <p class="faint">{t.conformance.component.noViolation(accepted)}</p>
       {:else}
         <ul class="violations">
           {#each violations as violation (violation.key)}
@@ -254,6 +258,9 @@
             </li>
           {/each}
         </ul>
+        {#if accepted > 0}
+          <p class="faint">{t.conformance.component.alsoAccepted(accepted)}</p>
+        {/if}
       {/if}
     {/if}
   {/if}

@@ -971,7 +971,18 @@ export const en = {
       rules: 'Rules',
       noRule: 'No Rule names it.',
       violations: 'Violations',
-      noViolation: 'None.',
+      /** None that no Exception accepts, and how many an Exception does accept. */
+      noViolation: (accepted: number): string =>
+        accepted === 0
+          ? 'None.'
+          : accepted === 1
+            ? 'Only one, which an Exception accepts.'
+            : `Only ${accepted}, which Exceptions accept.`,
+      /** Below the Violations no Exception accepts: how many more one does. */
+      alsoAccepted: (accepted: number): string =>
+        accepted === 1
+          ? 'And one more, which an Exception accepts.'
+          : `And ${accepted} more, which Exceptions accept.`,
       checking: 'Checking the Rules …'
     },
     adr: {
