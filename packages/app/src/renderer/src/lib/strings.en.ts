@@ -865,6 +865,8 @@ export const en = {
     reading: 'Reading the Annotations …',
     finding:
       'The code changed: the Anchors are being found again. Until then the Annotations stand where they were found last.',
+    lookFailed: (reason: string): string =>
+      `The Anchors could not be found again (${reason}). The Annotations stand where they were found last; the next change to the code looks again.`,
     stateHeading: 'State',
     states: { open: 'Open', resolved: 'Resolved' } satisfies Record<AnnotationState, string>,
     anchorHeading: 'Anchors',

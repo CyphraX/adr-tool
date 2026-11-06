@@ -81,6 +81,8 @@
       <p class="about" role="status">{t.annotations.reading}</p>
     {:else if known?.finding}
       <p class="about" role="status">{t.annotations.finding}</p>
+    {:else if known?.failed !== undefined}
+      <p class="about failed" role="status">{t.annotations.lookFailed(known.failed)}</p>
     {/if}
   </section>
 
@@ -160,6 +162,10 @@
     color: var(--ink-soft);
     font-size: 12px;
     line-height: 1.5;
+  }
+
+  .about.failed {
+    color: var(--problem);
   }
 
   .row {

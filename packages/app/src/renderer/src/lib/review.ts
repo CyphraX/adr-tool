@@ -43,6 +43,19 @@ export function placeOf(annotation: AnnotationView): Place | undefined {
 }
 
 /**
+ * What stays selected when the Annotations come back: what is gone is no longer selected —
+ * deleted, or renamed by hand —, unless they are looked for again, when one just written may
+ * not be in the last result yet.
+ */
+export function keptSelection(
+  id: string | undefined,
+  overview: Pick<ReviewOverview, 'annotations' | 'finding'>
+): string | undefined {
+  if (id === undefined || overview.finding) return id
+  return overview.annotations.some((annotation) => annotation.id === id) ? id : undefined
+}
+
+/**
  * Where Attach again opens the code viewer: the Source File an Annotation's lines are in, or
  * were in; `undefined` when it is gone, and a Source File is picked instead.
  */

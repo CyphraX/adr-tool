@@ -811,6 +811,8 @@ export const de: typeof en = {
     reading: 'Die Annotationen werden gelesen …',
     finding:
       'Der Code hat sich geändert: Die Anker werden neu gesucht. Bis dahin stehen die Annotationen, wo sie zuletzt gefunden wurden.',
+    lookFailed: (reason: string): string =>
+      `Die Anker ließen sich nicht neu finden (${reason}). Die Annotationen stehen, wo sie zuletzt gefunden wurden; die nächste Änderung am Code sucht sie erneut.`,
     stateHeading: 'Zustand',
     states: { open: 'Offen', resolved: 'Erledigt' },
     anchorHeading: 'Anker',

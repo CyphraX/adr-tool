@@ -238,8 +238,13 @@ describe('the background look at the Annotations', () => {
       })
       expect(watched).toHaveBeenCalledWith(['/repository/docs'], expect.any(Function))
 
-      // HEAD moved: the window gets the last result, with `finding`, until the new one is there.
+      // HEAD moved: the window gets the last result, with `finding`, until the new one is there —
+      // from the change on, before the look begins, so that a write just applied counts.
       onChange!()
+      expect(await annotations.overview('r', '/repository')).toMatchObject({
+        head: 'head-1',
+        finding: true
+      })
       await vi.advanceTimersByTimeAsync(400)
       expect(changed).toHaveBeenCalledTimes(1)
       expect(await annotations.overview('r', '/repository')).toMatchObject({
@@ -256,6 +261,41 @@ describe('the background look at the Annotations', () => {
       // The same paths are watched by the same watcher.
       expect(watched).toHaveBeenCalledTimes(1)
       await annotations.closeAll()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the last result when a look fails, says why, and looks again at what changed meanwhile', async () => {
+    vi.useFakeTimers()
+    try {
+      let looks = 0
+      let fail: ((error: Error) => void) | undefined
+      const look = vi.fn(async () => {
+        looks += 1
+        if (looks === 2) await new Promise<void>((_, reject) => (fail = reject))
+        return looked(`head-${looks}`)
+      })
+      const changed = vi.fn()
+      const annotations = new Annotations(changed, look, false)
+      await annotations.overview('r', '/repository')
+
+      annotations.refresh('r')
+      await vi.advanceTimersByTimeAsync(400)
+      // Something changes while the look runs: it is looked at once the look is over.
+      annotations.refresh('r')
+      await vi.advanceTimersByTimeAsync(400)
+      fail!(new Error('git is gone'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(changed).toHaveBeenCalledTimes(2)
+      const after = await annotations.overview('r', '/repository')
+      expect(after).toMatchObject({ head: 'head-1', failed: 'Error: git is gone', finding: true })
+
+      await vi.advanceTimersByTimeAsync(400)
+      const next = await annotations.overview('r', '/repository')
+      expect(next).toMatchObject({ head: 'head-3', finding: false })
+      expect(next).not.toHaveProperty('failed')
+      expect(look).toHaveBeenCalledTimes(3)
     } finally {
       vi.useRealTimers()
     }

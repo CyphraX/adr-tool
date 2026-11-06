@@ -9,7 +9,14 @@
 import { untrack } from 'svelte'
 import type { AnnotationState } from '@adr-tool/review'
 import type { PlanResult, ReviewRequest } from '../../../shared/ipc'
-import { attachPathOf, placeOf, type Facet, type Place, type ReviewFilter } from './review'
+import {
+  attachPathOf,
+  keptSelection,
+  placeOf,
+  type Facet,
+  type Place,
+  type ReviewFilter
+} from './review'
 import { reviewForms } from './review-tab.svelte'
 import { wordOf } from './said'
 import { app } from './state.svelte'
@@ -64,10 +71,8 @@ class Reviewing {
     review.known = result.overview
     review.failed = undefined
     // What was selected may be gone: deleted, or renamed by hand.
-    const ids = new Set(result.overview.annotations.map((annotation) => annotation.id))
-    if (review.selectedId !== undefined && !ids.has(review.selectedId))
-      review.selectedId = undefined
-    if (review.attaching !== undefined && !ids.has(review.attaching)) review.attaching = undefined
+    review.selectedId = keptSelection(review.selectedId, result.overview)
+    review.attaching = keptSelection(review.attaching, result.overview)
   }
 
   private need(tab: Tab): void {

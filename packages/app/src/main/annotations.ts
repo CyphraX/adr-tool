@@ -34,7 +34,7 @@ const LOOK_AGAIN_DELAY_MS = 300
 
 /** What a look at a repository found, and what has to be watched to know when to look again. */
 export interface Looked {
-  readonly overview: Omit<ReviewOverview, 'repositoryId' | 'finding'>
+  readonly overview: Omit<ReviewOverview, 'repositoryId' | 'finding' | 'failed'>
   /** Absolute paths, each watched one level deep. */
   readonly watch: readonly string[]
 }
@@ -103,7 +103,10 @@ interface Entry {
   running?: Promise<void>
   /** Something changed while a look was running: it runs again when it is done. */
   again: boolean
+  /** A look is due: it starts when the timer goes off. */
   timer?: NodeJS.Timeout
+  /** Why the last look failed, while the result before it is what the window gets. */
+  failed?: string
   watcher?: { close(): Promise<void> }
   watched: readonly string[]
 }
@@ -122,11 +125,20 @@ export class Annotations {
     private readonly watchPaths: WatchPaths | false = chokidar
   ) {}
 
-  /** The last result, or the first one once it is there. */
+  /**
+   * The last result, or the first one once it is there. `finding` while a look runs or is due —
+   * from the moment something changed, so that a write just applied is not taken for undone —,
+   * and `failed` when the last look failed and an earlier result is what is shown.
+   */
   async overview(repositoryId: string, root: string): Promise<ReviewOverview> {
     const entry = this.entryOf(repositoryId, root)
     if (!entry.last) await this.run(repositoryId, entry)
-    return { repositoryId, ...entry.last!, finding: entry.running !== undefined }
+    return {
+      repositoryId,
+      ...entry.last!,
+      finding: entry.running !== undefined || entry.timer !== undefined,
+      ...(entry.failed !== undefined && { failed: entry.failed })
+    }
   }
 
   /** Look again soon, if the repository was looked at at all. */
@@ -135,14 +147,14 @@ export class Annotations {
     if (!entry) return
     clearTimeout(entry.timer)
     entry.timer = setTimeout(() => {
+      entry.timer = undefined
       if (entry.running) {
         entry.again = true
         return
       }
-      void this.run(repositoryId, entry).then(
-        () => this.onChanged(repositoryId),
-        () => undefined
-      )
+      // Done or failed, the window asks again: the new result, or the last one and why not.
+      const done = (): void => this.onChanged(repositoryId)
+      void this.run(repositoryId, entry).then(done, done)
       // The window shows that the Anchors are looked for again.
       this.onChanged(repositoryId)
     }, LOOK_AGAIN_DELAY_MS)
@@ -180,19 +192,28 @@ export class Annotations {
         entry.running = undefined
         if (this.entries.get(repositoryId) !== entry) return
         entry.last = looked.overview
+        entry.failed = undefined
         this.watch(repositoryId, entry, looked.watch)
-        if (entry.again) {
-          entry.again = false
-          this.refresh(repositoryId)
-        }
+        this.again(repositoryId, entry)
       },
       (error: unknown) => {
         entry.running = undefined
+        if (this.entries.get(repositoryId) === entry) {
+          entry.failed = String(error)
+          this.again(repositoryId, entry)
+        }
         throw error
       }
     )
     entry.running = running
     return running
+  }
+
+  /** What changed while a look ran is looked at once it is done, whether it found or failed. */
+  private again(repositoryId: string, entry: Entry): void {
+    if (!entry.again) return
+    entry.again = false
+    this.refresh(repositoryId)
   }
 
   /** (Re)start the watcher when the paths changed: an Annotation on a file of another directory. */

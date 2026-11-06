@@ -400,8 +400,6 @@ function registerIpc(): void {
     else unsaved.delete(event.sender.id)
   })
 
-  // The person was asked. "Discard": the window closes, and a quit it held up goes on —
-  // on a Mac the app would otherwise stay in the dock. "Keep editing": nothing is to quit.
   // Review (docs/plan-vision.md, part 9): the Annotations, looked at in the background.
   ipcMain.handle(CHANNEL.reviewOverview, async (_, repositoryId: unknown) => {
     if (typeof repositoryId !== 'string') return { ok: false, reason: t.notUnderstood }
@@ -419,7 +417,13 @@ function registerIpc(): void {
     if (!asked) return { ok: false, reason: t.notUnderstood }
     const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
     if (root === undefined) return { ok: false, reason: t.repositoryClosed }
-    return repositories.hold(repositoryId as string, await planReview(root, asked))
+    // What fails on the way — a file that cannot be read, git that cannot be run — is said in
+    // the window's language, as a refusal, and nothing is held.
+    try {
+      return repositories.hold(repositoryId as string, await planReview(root, asked))
+    } catch (error) {
+      return { ok: false, reason: t.reviewPlanFailed(String(error)) }
+    }
   })
 
   ipcMain.handle(CHANNEL.gitUserName, async (_, repositoryId: unknown) => {
@@ -427,6 +431,8 @@ function registerIpc(): void {
     return root === undefined ? undefined : gitIn(root).userName()
   })
 
+  // The person was asked. "Discard": the window closes, and a quit it held up goes on —
+  // on a Mac the app would otherwise stay in the dock. "Keep editing": nothing is to quit.
   ipcMain.handle(CHANNEL.answerCloseRequest, (event, close: unknown) => {
     const resumeQuit = quitHeldUp && close === true
     quitHeldUp = false

@@ -8,6 +8,7 @@ import { repositoryProblems } from '../src/renderer/src/lib/repository-problems'
 import {
   anchorStateOf,
   attachPathOf,
+  keptSelection,
   citationOf,
   citedBy,
   citing,
@@ -325,5 +326,17 @@ describe('Attach again', () => {
     )
     expect(attachPathOf(lost({ kind: 'orphaned', file: 'there' }))).toBe('cart/Cart.java')
     expect(attachPathOf(lost({ kind: 'orphaned', file: 'gone' }))).toBeUndefined()
+  })
+})
+
+describe('the selection, as the Annotations come back', () => {
+  // A new Annotation was selected once written, and lost again: the first answer after the write
+  // was the last result, without it, while the Anchors were looked for again.
+  it('keeps an Annotation that is not there yet while they are looked for again', () => {
+    const known = { annotations: [annotation('a')], finding: false }
+    expect(keptSelection('a', known)).toBe('a')
+    expect(keptSelection('new', known)).toBeUndefined()
+    expect(keptSelection('new', { ...known, finding: true })).toBe('new')
+    expect(keptSelection(undefined, known)).toBeUndefined()
   })
 })

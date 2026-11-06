@@ -534,8 +534,10 @@ export interface ReviewOverview {
   readonly head: string | undefined
   /** When they were looked for, in milliseconds since the epoch. */
   readonly foundAt: number
-  /** They are looked for again: what is shown is the last result. */
+  /** They are looked for again, or soon will be: what is shown is the last result. */
   readonly finding: boolean
+  /** The last look failed, and why: what is shown is the result before it. */
+  readonly failed?: string
 }
 
 export type ReviewResult =

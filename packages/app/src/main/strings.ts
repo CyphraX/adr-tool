@@ -35,6 +35,7 @@ const en = {
     `The code of this repository could not be analysed: ${reason}`,
   annotationsFailed: (reason: string): string =>
     `The Annotations of this repository could not be read: ${reason}`,
+  reviewPlanFailed: (reason: string): string => `The change could not be planned: ${reason}`,
   notASourceFile: (path: string): string =>
     `${path} is not a Source File of this repository, so it is not shown.`,
   sourceFileTooLarge: (path: string, megabytes: number): string =>
@@ -102,6 +103,7 @@ const de: typeof en = {
     `Der Code dieses Repositorys ließ sich nicht analysieren: ${reason}`,
   annotationsFailed: (reason: string): string =>
     `Die Annotationen dieses Repositorys ließen sich nicht lesen: ${reason}`,
+  reviewPlanFailed: (reason: string): string => `Die Änderung ließ sich nicht planen: ${reason}`,
   notASourceFile: (path: string): string =>
     `${path} ist keine Quelldatei dieses Repositorys und wird daher nicht gezeigt.`,
   sourceFileTooLarge: (path: string, megabytes: number): string =>
