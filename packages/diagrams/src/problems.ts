@@ -36,6 +36,12 @@ export type DiagramProblem = {
       readonly scope: string
     }
   | { readonly kind: 'repository-does-not-fit'; readonly id: string }
+  | {
+      /** The picture beside the Diagram is not the Diagram as it is now. */
+      readonly kind: 'stale-picture'
+      /** The path of the picture, beside the Diagram. */
+      readonly picture: string
+    }
 )
 
 export type DiagramProblemCode = DiagramProblem['kind']
@@ -62,7 +68,8 @@ export const DIAGRAM_PROBLEM_CODES: readonly DiagramProblemCode[] = [
   'component-gone',
   'unknown-scope',
   'component-does-not-fit',
-  'repository-does-not-fit'
+  'repository-does-not-fit',
+  'stale-picture'
 ]
 
 /** What a Problem says, as a code: its kind, with the values of its sentence. */
@@ -94,6 +101,8 @@ export function saidOf(problem: DiagramProblem): DiagramsSaid {
       const { component, level, scope } = problem
       return { code: problem.kind, values: { component, level, scope } }
     }
+    case 'stale-picture':
+      return { code: problem.kind, values: { picture: problem.picture } }
   }
 }
 
@@ -102,5 +111,9 @@ export function wordingOf(problem: DiagramProblem): string {
   return englishOf(saidOf(problem))
 }
 
-/** Whether a Problem has a Repair. One has: an element whose Component is gone is taken out. */
-export const hasRepair = (problem: DiagramProblem): boolean => problem.kind === 'component-gone'
+/**
+ * Whether a Problem has a Repair. Two have: an element whose Component is gone is taken out
+ * (`planRepair`), and a picture that is not current is exported again (`planExport`).
+ */
+export const hasRepair = (problem: DiagramProblem): boolean =>
+  problem.kind === 'component-gone' || problem.kind === 'stale-picture'

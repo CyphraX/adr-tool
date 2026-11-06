@@ -44,7 +44,11 @@ const SAME_IN_GERMAN = new Set([
   'Fan-in',
   'Fan-out',
   'A',
-  'D'
+  'D',
+  // The Diagrams module: a word of the glossary, a key of the file, and one German has too.
+  'Drift',
+  'Scope',
+  'Name'
 ])
 
 /** Arguments to try a text that is a function with: a name or a count, a list, an object. */

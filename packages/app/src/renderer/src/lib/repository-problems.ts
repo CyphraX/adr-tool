@@ -1,6 +1,12 @@
 import { repairsOf, type DecisionLog, type Problem, type Repair } from '@adr-tool/core'
 import { hasRepair, type StructureProblem } from '@adr-tool/structure/model'
 import type { OpenRepository, StructureOutline } from '../../../shared/ipc'
+import {
+  diagramsCount,
+  diagramsSection,
+  type DiagramsKnown,
+  type DiagramsSection
+} from './diagrams-problems'
 import { problemsAcross, type Placed, type PlacedGroup } from './together'
 
 /**
@@ -23,6 +29,8 @@ export interface RepositoryProblems {
   readonly traces: readonly TraceProblem[]
   /** The Problems of the declaration of Components, as far as Structure knows them. */
   readonly structure: StructureSection
+  /** The Problems of the Diagrams, and of `.arch/config.yml` (lib/diagrams-problems.ts). */
+  readonly diagrams: DiagramsSection
   /** Every Problem known, each root cause once: what every sidebar shows. */
   readonly count: number
 }
@@ -86,7 +94,8 @@ const isTrace = (problem: Problem): problem is TraceProblem['problem'] =>
 
 export function repositoryProblems(
   repository: OpenRepository,
-  outline: OutlineKnown
+  outline: OutlineKnown,
+  diagramsKnown: DiagramsKnown = { overview: undefined, reading: false, failed: undefined }
 ): RepositoryProblems {
   const [across] = problemsAcross([repository])
   const logOf = (path: string): DecisionLog | undefined =>
@@ -112,11 +121,13 @@ export function repositoryProblems(
   const structure = structureSection(outline)
   const decisionsCount = across!.own.length + logs.reduce((sum, log) => sum + log.groups.length, 0)
   const structureCount = structure.state === 'known' ? structure.entries.length : 0
+  const diagrams = diagramsSection(diagramsKnown)
   return {
     decisions: { own: across!.own, logs },
     traces,
     structure,
-    count: decisionsCount + traces.length + structureCount
+    diagrams,
+    count: decisionsCount + traces.length + structureCount + diagramsCount(diagrams)
   }
 }
 

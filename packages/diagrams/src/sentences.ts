@@ -82,6 +82,8 @@ export const SENTENCES = {
         : `${v.component} does not belong in the component view of ${v.scope}, which shows the parts of ${v.scope} and the Components beside it and beside what contains it.`,
   'repository-does-not-fit': (v: { id: string }): string =>
     `The repository ${v.id} stands for every Component, and only a system context shows it.`,
+  'stale-picture': (v: { picture: string }): string =>
+    `${v.picture} is not the picture of the Diagram as it is now: the Diagram or its Components changed after it was exported. Export it again.`,
 
   // Why a Diagram cannot be read: the rest of a sentence about the file.
   'diagram-not-yaml': (v: { message: string }): string => `it is not valid YAML: ${v.message}`,
@@ -137,7 +139,41 @@ export const SENTENCES = {
   'no-export-without-declaration': (v: { path: string }): string =>
     `${v.path} cannot be read, so the picture would not have the names of its Components. Fix it, then export.`,
   'cannot-remove-element': (v: { path: string; component: string }): string =>
-    `${v.path} is written in a way the suite cannot take ${v.component} out of. Remove it and its connections in an editor.`
+    `${v.path} is written in a way the suite cannot take ${v.component} out of. Remove it and its connections in an editor.`,
+
+  // The edits of the window and of agents (docs/diagrams-format.md, section 2).
+  'cannot-edit-diagram': (v: { path: string; edit: Said | string }): string =>
+    `The suite cannot ${english(v.edit)} in ${v.path} without rewriting more of the file than the lines of the change. Make this change in an editor.`,
+  'editing-move': (v: { id: string }): string => `move ${v.id}`,
+  'editing-add': (v: { id: string }): string => `add ${v.id}`,
+  'editing-remove': (v: { id: string }): string => `take ${v.id} out`,
+  'editing-describe': (v: { id: string }): string =>
+    `change the name or the description of ${v.id}`,
+  'editing-connect': (v: Ends): string => `connect ${v.from} to ${v.to}`,
+  'editing-disconnect': (v: Ends): string => `take the connection from ${v.from} to ${v.to} out`,
+  'editing-label': (v: Ends): string => `label the connection from ${v.from} to ${v.to}`,
+  'invalid-position': (): string =>
+    'A position is two numbers, [x, y], each between -1000000 and 1000000.',
+  'already-shown': (v: { path: string; id: string }): string => `${v.path} shows ${v.id} already.`,
+  'named-by-declaration': (v: { id: string }): string =>
+    `The name and the description of ${v.id} are those of its declaration in .arch/components.yml, not of the Diagram.`,
+  'connected-to-itself': (v: { id: string }): string =>
+    `An element does not use itself: ${v.id} cannot be connected to ${v.id}.`,
+  'already-connected': (v: Ends): string => `The Diagram connects ${v.from} to ${v.to} already.`,
+  'not-connected': (v: Ends & { path: string }): string =>
+    `${v.path} does not connect ${v.from} to ${v.to}. Look at the file again.`,
+
+  // A new Diagram, and the Rename of a Component in the Diagrams.
+  'invalid-diagram-id': (v: { id: string }): string =>
+    `"${v.id}" is not a valid Diagram ID. A Diagram ID consists of lowercase letters, digits and dashes, and starts and ends with a letter or a digit.`,
+  'not-in-new-diagram': (v: { from: string; to: string; id: string }): string =>
+    `The new Diagram connects ${v.from} to ${v.to}, but shows no element ${v.id}.`,
+  'no-diagrams-directory': (v: { path: string }): string =>
+    `${v.path} names no directory for the Diagrams that can be used, so no Diagram can be written. Fix it first.`,
+  'cannot-rename-in-diagram': (v: { path: string; component: string }): string =>
+    `${v.path} names ${v.component} in a way the suite cannot rewrite where it stands: as a block of text, say. Rename it there in an editor first.`,
+  'diagram-not-renamed': (v: { path: string; component: string }): string =>
+    `${v.path} cannot be read, so the Rename does not rewrite what it says of ${v.component}.`
 } satisfies Sentences
 
 /** What `diagrams` may say: one of its codes, with the values of its sentence. */

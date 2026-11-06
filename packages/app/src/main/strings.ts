@@ -39,6 +39,9 @@ const en = {
     `${path} is too large to show here: more than ${megabytes} MB.`,
   sourceFileUnreadable: (path: string): string =>
     `${path} cannot be read. It may have been moved or deleted since the code was analysed.`,
+  /** The window named a file as a Diagram that the repository does not have as one. */
+  notADiagram: (path: string): string =>
+    `${path} is not one of the Diagrams of this repository, so nothing is planned for it.`,
   changedSincePreview: (files: string): string =>
     `Nothing was written: ${files} changed on disk after the preview was made. Try again to see the change against the current files.`,
   /**
@@ -104,6 +107,8 @@ const de: typeof en = {
     `${path} ist zu groß, um hier gezeigt zu werden: mehr als ${megabytes} MB.`,
   sourceFileUnreadable: (path: string): string =>
     `${path} lässt sich nicht lesen. Vielleicht wurde die Datei verschoben oder gelöscht, seit der Code analysiert wurde.`,
+  notADiagram: (path: string): string =>
+    `${path} ist keines der Diagramme dieses Repositorys, daher wird dafür nichts geplant.`,
   changedSincePreview: (files: string): string =>
     `Nichts wurde geschrieben, denn seit der Vorschau hat sich auf der Festplatte etwas geändert: ${files}. Versuchen Sie es noch einmal, um die Änderung gegen die aktuellen Dateien zu sehen.`,
   writeFailed: (error: string): string =>
