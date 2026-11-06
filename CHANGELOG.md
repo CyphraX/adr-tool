@@ -4,7 +4,7 @@ What each release of Softarch Suite contains. Versions follow [Semantic Versioni
 
 ## [0.1.0] — unreleased
 
-The first release: the desktop app as installers for Linux, Windows and macOS, and the command line and the MCP server as one file each. Two modules of the suite have their window — Decisions and Structure —; Conformance, Diagrams, Review and Assessment have their cores, and Conformance is checked from the command line. The app runs locally: no backend, no account, no telemetry ([ADR-0010](docs/adr/0010-the-suite-is-open-source-under-the-mit-licence.md)). The window speaks English and German.
+The first release: the desktop app as installers for Linux, Windows and macOS, and the command line and the MCP server as one file each. Three modules of the suite have their window — Decisions, Structure and Diagrams —; Conformance, Review and Assessment have their cores, and Conformance is checked from the command line. The app runs locally: no backend, no account, no telemetry ([ADR-0010](docs/adr/0010-the-suite-is-open-source-under-the-mit-licence.md)). The window speaks English and German.
 
 ### Downloads
 
@@ -26,7 +26,7 @@ The Architecture Decision Records of a repository, where they already are: Markd
 - **Timeline, Board and Dashboard:** each ADR from creation to decision; a column per Status, where a drag decides; the counts, the Problems, the waiting proposals and the latest decisions.
 - **Mermaid** blocks drawn in the reading view, the preview, the live mode and the export, at Mermaid's strictest and sanitized ([ADR-0016](docs/adr/0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image.md)).
 - **Problems and Repairs:** broken Relations, inconsistent Back-references, duplicate numbers and invalid Metadata, each with a Repair where the tool can know what was meant; **Repository Problems** lists those of every module in one place.
-- **Search** over number, title and body in every open repository, ignoring case and accents and reading "ß" as "ss", and over the Components and Source Files of the repository in front.
+- **Search** over number, title and body in every open repository, ignoring case and accents and reading "ß" as "ss", and over the Components, Source Files and Diagrams of the repository in front.
 - **Several repositories:** Every ADR and Every Problem across the open ones, and Relations to an ADR of another repository.
 - **git:** the branch, the uncommitted ADRs, each ADR's history with its diffs, **Commit** for an ADR's files alone ([ADR-0012](docs/adr/0012-committing-an-adr-runs-git-commit-for-its-files-only.md)), and the ADRs of other branches, with a warning when a number is taken there.
 - **Export** as static web pages and as a PDF, one ADR per page ([ADR-0014](docs/adr/0014-the-export-is-static-html-from-core-printed-to-pdf-by.md)).
@@ -40,15 +40,23 @@ The Components of the code and the Dependencies between them ([docs/structure-fo
 - **Dependencies** of TypeScript, JavaScript, Svelte, Java, Python and Go, with **Cycles**, their example round trip and their weakest Dependency; the Libraries the code uses and those its manifests declare.
 - **Views:** the graph of each level, the dependency structure matrix, the metrics table — size, coupling, instability, fan-out and fan-in, cohesion, abstractness and distance, and the propagation cost of the level — and the main sequence.
 - **Inside the code:** the most complex functions of a Component, counted as each language's usual tool counts them, and the classes whose methods fall apart by LCOM4; levels down through the directories to single files; a read-only code viewer that marks the import behind a Dependency.
-- **Traces and Rename:** an ADR names the Components it affects, a Component lists its ADRs ([ADR-0009](docs/adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)), and Rename rewrites the declaration, the ADRs and the Rules that name a Component in one change.
+- **Traces and Rename:** an ADR names the Components it affects, a Component lists its ADRs and its Diagrams ([ADR-0009](docs/adr/0009-traces-are-recorded-on-the-source-only-unlike-back.md)), and Rename rewrites the declaration, the ADRs, the Rules and the Diagrams that name a Component in one change.
 - The analysis runs in a worker, caches per file, follows changes on disk, and counts a file its parser fails on as not analysed without losing the rest.
 
-### Conformance, Diagrams, Review and Assessment
+### Diagrams
+
+Pictures of the architecture whose boxes are Components, kept as YAML files beside the code and compared with it ([docs/diagrams-format.md](docs/diagrams-format.md), [ADR-0018](docs/adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md)).
+
+- **New Diagram** starts one at a level of the C4 model — the context of the system, its containers, or the components inside one — from the Components of that level and the connections the code has between them.
+- **The canvas:** boxes dragged on a grid, connections drawn and labelled, Components and External Systems added; every edit changes only its lines, and **Save** shows the diff first. What the Diagram says is listed beside it as sentences, which the keyboard and a screen reader go through.
+- **Drift:** a connection the code does not have is drawn red, a Dependency the Diagram leaves out faint and dashed.
+- **Export SVG** writes the picture beside the Diagram for an ADR to embed; a picture that no longer matches, and a Component that is gone, are Problems with a Repair.
+
+### Conformance, Review and Assessment
 
 Their cores are built, each pure TypeScript with a contract of its own; their windows follow ([docs/plan-vision.md](docs/plan-vision.md)).
 
 - **Conformance:** Rules and Exceptions in `.arch/rules.yml` — must-not-depend, may-only-depend, layers, no Cycles, and thresholds on the metrics — with Exceptions keyed by a fingerprint that survives moved code ([docs/conformance-format.md](docs/conformance-format.md), [ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them.
-- **Diagrams:** a Diagram as a YAML file whose boxes are Components, its Drift from the code, and its SVG ([docs/diagrams-format.md](docs/diagrams-format.md), [ADR-0018](docs/adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md)).
 - **Review:** Annotations on code, with Replies, whose Anchors are found again across commits, renames and rebases ([docs/review-format.md](docs/review-format.md), [ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)).
 - **Assessment:** Assessments with Quality Scenarios, Findings and their evidence, Snapshots of the metrics, and the registers of Risks and Technical Debt Items ([docs/assessment-format.md](docs/assessment-format.md), [ADR-0021](docs/adr/0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file.md)).
 
@@ -57,13 +65,13 @@ Their cores are built, each pure TypeScript with a contract of its own; their wi
 One file that Node.js runs, for CI and for anyone who wants the checks without the window ([docs/cli.md](docs/cli.md)).
 
 - `adr lint` checks the Decision Logs by the app's rules.
-- `adr check` does that, checks `.arch/components.yml`, and checks the Rules of `.arch/rules.yml` against the code, each Violation at the line of its import; `--format github` annotates a pull request.
+- `adr check` does that, checks `.arch/components.yml`, checks the Rules of `.arch/rules.yml` against the code, each Violation at the line of its import, and checks the Diagrams, their Drift as notes; `--format github` annotates a pull request.
 - `adr export` writes the Decision Logs as web pages.
 - `adr --version` prints the version.
 
 ### The MCP server, `adr-mcp`
 
-The Decision Logs of a repository for agents over the Model Context Protocol, with the app's operations, each planned as a change the person sees before `apply_change` writes it, and the metrics of a Component as data ([docs/mcp.md](docs/mcp.md), [ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
+The Decision Logs and the Diagrams of a repository for agents over the Model Context Protocol, with the app's operations, each planned as a change the person sees before `apply_change` writes it, and the metrics of a Component as data ([docs/mcp.md](docs/mcp.md), [ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
 
 ### Known limitations
 
