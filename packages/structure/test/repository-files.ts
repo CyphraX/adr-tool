@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { FileSystem } from '@adr-tool/kernel'
 
@@ -11,7 +11,12 @@ export function nodeFileSystem(root: string): FileSystem {
     throw error
   }
   return {
-    readText: (path) => readFile(join(root, path), 'utf8').catch(missing),
+    readText: async (path, options) => {
+      const info = await stat(join(root, path)).catch(missing)
+      if (!info?.isFile()) return undefined
+      if (options?.atMost !== undefined && info.size > options.atMost) return undefined
+      return readFile(join(root, path), 'utf8').catch(missing)
+    },
     list: (path) =>
       readdir(join(root, path), { withFileTypes: true })
         .then((entries) =>

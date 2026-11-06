@@ -246,6 +246,8 @@ export function fingerprintKindOf(rule: Rule): Fingerprint['kind'] {
       const subject = SUBJECT_OF[rule.metric]
       return subject === 'function' || subject === 'class' ? subject : 'component'
     }
+    case 'library':
+      return 'library'
   }
 }
 
@@ -263,7 +265,10 @@ export function fingerprintKeysSaid(rule: Rule): {
 
 /** The fingerprint an Exception names, when its keys — and no others — fit its Rule. */
 export function fingerprintOf(
-  exception: Pick<WrittenException, 'from' | 'to' | 'cycle' | 'component' | 'file' | 'name'>,
+  exception: Pick<
+    WrittenException,
+    'from' | 'to' | 'cycle' | 'component' | 'library' | 'file' | 'name'
+  >,
   rule: Rule
 ): Fingerprint | undefined {
   return readFingerprint(fingerprintKindOf(rule), rule.id, exception, true)

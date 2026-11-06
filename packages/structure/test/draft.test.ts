@@ -93,6 +93,23 @@ describe('the Draft (docs/structure-format.md, section 1)', () => {
     ])
   })
 
+  it('reads the modules of a profile too, and a pom of a megabyte of tags in linear time', async () => {
+    expect(
+      await draft({
+        'pom.xml':
+          '<project><profiles><profile><modules><module>extra</module></modules></profile></profiles></project>',
+        'extra/pom.xml': '<project/>',
+        'extra/src/main/java/X.java': ''
+      })
+    ).toEqual(['extra ← extra/**'])
+    const started = performance.now()
+    await draft({
+      'pom.xml': `<project><modules>${'<module>'.repeat(130_000)}${' '.repeat(1024 * 1024)}`,
+      'a/pom.xml': `<project>${'<!--'.repeat(256 * 1024)}`
+    })
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+
   it('reads the includes of Gradle as text, string literals only, in both dialects', async () => {
     expect(
       await draft({

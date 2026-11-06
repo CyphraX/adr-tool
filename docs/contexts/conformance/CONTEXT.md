@@ -5,12 +5,16 @@ The intended architecture of a repository, declared by the architect, and the pl
 ## Language
 
 **Rule**:
-A declared statement about what the code may look like — which Components may depend on which, that there are no cycles, that a metric stays within a threshold. It lives in a file in the repository.
+A declared statement about what the code may look like — which Components may depend on which, that there are no cycles, that a metric stays within a threshold, which Components may use a Library. It lives in a file in the repository.
 _Avoid_: Constraint, check, policy, fitness function (a Rule on a metric is one, but it is still a Rule)
 
 **Component pattern**:
 How a Rule names Components: a Component ID, or one with wildcards over IDs — `*` within a segment, `**` for any number of segments — such as `ui/**` or `features/*`. It is matched against the declared Components, never against paths.
 _Avoid_: Glob, path pattern (those match files, as `paths` in the declaration does), selector, wildcard
+
+**Library pattern**:
+How a Rule names Libraries: the name the code imports a Library by, or one with wildcards over its segments, which `/` separates, and `.` as well except in an npm name — `@codemirror/*`, `org.apache.**`, `lodash*`. A name without a wildcard names, in Java and Python, the packages below it too. It is matched against the Libraries the code uses, never against what a Manifest declares.
+_Avoid_: Component pattern (that names Components), package pattern, glob
 
 **Pattern**:
 A named set of Rules for an architecture style, such as layered or hexagonal, written in terms of roles. It is applied by assigning Components to its roles.
@@ -25,7 +29,7 @@ One place where the code breaks a Rule. It is derived from the code and never st
 _Avoid_: Problem (that is an inconsistency in the suite's own artefacts), Finding (that is a human judgement), error, issue
 
 **Fingerprint**:
-The name of a Violation that stays when lines move: its Rule and what it is about — the source and target Component of a Dependency, the members of a Cycle, the Component of a metric, the Source File and qualified name of a function or class whose metric is outside (a second one of the same name is told apart by its position, which a function of that name added before it moves). Exceptions, the Baseline and Findings name a Violation by it.
+The name of a Violation that stays when lines move: its Rule and what it is about — the source and target Component of a Dependency, the members of a Cycle, the Component of a metric, the Source File and qualified name of a function or class whose metric is outside (a second one of the same name is told apart by its position, which a function of that name added before it moves), the Component and the Library of a use of a Library. Exceptions, the Baseline and Findings name a Violation by it.
 _Avoid_: ID, hash, key (a fingerprint has no line number and is not a hash of the code)
 
 **Exception**:

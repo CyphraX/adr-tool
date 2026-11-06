@@ -263,22 +263,41 @@
     </p>
   {/if}
 
-  <h3>{t.conformance.detail.imports}</h3>
-  {#if violation.dependencies.length === 0}
-    <p class="faint">{t.conformance.detail.noImports}</p>
-  {:else}
+  {#if violation.uses !== undefined}
+    <!-- A Rule about Libraries: each Source File that imports the Library, at its lines. -->
+    <h3>{t.conformance.detail.uses}</h3>
     <ul class="dependencies">
-      {#each violation.dependencies as dependency (`${dependency.from}\n${dependency.to}`)}
+      {#each violation.uses as use (use.file)}
         <li>
-          {@render fileLink(dependency.from, dependency.lines)}
-          {@render lineLinks(dependency.from, dependency.lines)}
-          {#if dependency.typeOnly}<span class="tag">{t.structure.detail.typeOnly}</span>{/if}
+          {@render fileLink(use.file, use.lines)}
+          {@render lineLinks(use.file, use.lines)}
+          {#if use.typeOnly}<span class="tag">{t.structure.detail.typeOnly}</span>{/if}
           <span class="to"
-            ><span class="arrow" aria-hidden="true">→</span>{@render fileLink(dependency.to)}</span
+            ><span class="arrow" aria-hidden="true">→</span><code>{use.library}</code></span
           >
         </li>
       {/each}
     </ul>
+  {:else}
+    <h3>{t.conformance.detail.imports}</h3>
+    {#if violation.dependencies.length === 0}
+      <p class="faint">{t.conformance.detail.noImports}</p>
+    {:else}
+      <ul class="dependencies">
+        {#each violation.dependencies as dependency (`${dependency.from}\n${dependency.to}`)}
+          <li>
+            {@render fileLink(dependency.from, dependency.lines)}
+            {@render lineLinks(dependency.from, dependency.lines)}
+            {#if dependency.typeOnly}<span class="tag">{t.structure.detail.typeOnly}</span>{/if}
+            <span class="to"
+              ><span class="arrow" aria-hidden="true">→</span>{@render fileLink(
+                dependency.to
+              )}</span
+            >
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {/if}
 {/snippet}
 

@@ -11,7 +11,7 @@ import {
   type TemplateInfo
 } from '@adr-tool/core'
 import { RULES_PATH as RULES_FILE, type ConformanceRepair } from '@adr-tool/conformance'
-import type { StructureProblem } from '@adr-tool/structure/model'
+import type { Ecosystem, StructureProblem } from '@adr-tool/structure/model'
 import type {
   BranchOverview,
   CommitPlan,
@@ -65,9 +65,9 @@ export type { Module }
 
 /**
  * What the middle of the Structure view shows of a level: the drawing, the matrix, the metrics,
- * or its Components on the main sequence.
+ * or its Components on the main sequence; or the Libraries of the whole repository.
  */
-export type StructureShow = 'graph' | 'matrix' | 'metrics' | 'sequence'
+export type StructureShow = 'graph' | 'matrix' | 'metrics' | 'sequence' | 'libraries'
 
 /** What is selected in the Structure view: a node, a line, a Cycle, or one of the lists. */
 export type StructureSelection =
@@ -76,6 +76,7 @@ export type StructureSelection =
   | { kind: 'cycle'; index: number }
   | { kind: 'not-resolved' }
   | { kind: 'not-analysed' }
+  | { kind: 'library'; ecosystem: Ecosystem; name: string }
 
 /** What the centre of Conformance shows: the Violations as a list, as a drawing, or the Exceptions. */
 export type ConformanceShow = 'list' | 'graph' | 'exceptions'
@@ -595,12 +596,29 @@ class AppState {
     this.searching = undefined
     this.leaveEditor(() => {
       tab.module = 'structure'
+      // A Component is shown in the level that holds it, not in the inventory of Libraries.
+      if (tab.structure.show === 'libraries') tab.structure.show = 'graph'
       tab.structure.parent = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : undefined
       tab.structure.expanded = []
       tab.structure.selection = { kind: 'node', id }
       tab.structure.code = undefined
       tab.structure.problems = fromProblems
       void this.loadStructure(tab)
+    })
+  }
+
+  /** Show a Library in the inventory of Structure, from wherever the view is: the search. */
+  showLibrary(ecosystem: Ecosystem, name: string): void {
+    const tab = this.active
+    if (!tab) return
+    this.searching = undefined
+    this.leaveEditor(() => {
+      tab.module = 'structure'
+      tab.structure.show = 'libraries'
+      tab.structure.selection = { kind: 'library', ecosystem, name }
+      tab.structure.code = undefined
+      tab.structure.problems = false
+      if (!tab.structure.view) void this.loadStructure(tab)
     })
   }
 
@@ -2076,6 +2094,10 @@ function stillThere(selection: StructureSelection | undefined, view: StructureVi
     case 'not-resolved':
     case 'not-analysed':
       return true
+    case 'library':
+      return view.inventory.libraries.some(
+        (library) => library.ecosystem === selection.ecosystem && library.name === selection.name
+      )
   }
 }
 

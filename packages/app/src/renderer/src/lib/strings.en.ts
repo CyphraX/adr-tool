@@ -1,6 +1,7 @@
 import type { Rule, RuleKind } from '@adr-tool/conformance'
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { AnnotationState, AnnotationType } from '@adr-tool/review'
+import type { Ecosystem, LibraryStatus, Mapping, UnknownLicence } from '@adr-tool/structure/model'
 import type { Decision, LowerBound } from '../../../shared/ipc'
 import { DIAGRAMS_EN } from './strings.diagrams.en'
 import type { Refusal } from './views'
@@ -530,7 +531,6 @@ export const en = {
     testFiles: (count: number): string =>
       many(count, 'one of them a test', `${count} of them tests`),
     dependencies: (count: number): string => many(count, 'One Dependency', `${count} Dependencies`),
-    libraries: (count: number): string => many(count, 'One Library', `${count} Libraries`),
     analysedIn: (milliseconds: number): string =>
       `Analysed in ${(milliseconds / 1000).toFixed(1)} s`,
     lowerBound: {
@@ -723,12 +723,13 @@ export const en = {
 
     viewer: {
       label: 'Source File',
-      back: (show: 'graph' | 'matrix' | 'metrics' | 'sequence'): string =>
+      back: (show: 'graph' | 'matrix' | 'metrics' | 'sequence' | 'libraries'): string =>
         ({
           graph: 'Back to the graph',
           matrix: 'Back to the matrix',
           metrics: 'Back to the metrics',
-          sequence: 'Back to the main sequence'
+          sequence: 'Back to the main sequence',
+          libraries: 'Back to the Libraries'
         })[show],
       marked: (lines: readonly number[]): string =>
         `${many(lines.length, 'Line', 'Lines')} ${lines.join(', ')} marked`,
@@ -815,6 +816,100 @@ export const en = {
         'They keep their Component and have no Dependencies of their own until they can be parsed.',
       unreadable: 'could not be read',
       none: 'None.'
+    },
+
+    /** The Library inventory (docs/structure-format.md, section 3): its table, a Library, a page's section. */
+    inventory: {
+      entry: 'Libraries',
+      title: 'Libraries',
+      label: 'The Libraries the manifests declare and the code uses',
+      library: 'Library',
+      version: 'Version',
+      usedBy: 'Used by',
+      files: 'Files',
+      licence: 'Licence',
+      sortBy: (column: string): string => `Sort by ${column}`,
+      filter: 'Which Libraries to show',
+      filters: {
+        all: 'All',
+        used: 'Used',
+        unused: 'Not used',
+        undeclared: 'Not declared'
+      } satisfies Record<'all' | LibraryStatus, string>,
+      status: {
+        used: 'Declared and used',
+        unused: 'Declared, and used by no Source File',
+        undeclared: 'Used by a Source File for which no manifest declares it'
+      } satisfies Record<LibraryStatus, string>,
+      tag: { unused: 'not used', undeclared: 'not declared' },
+      ecosystem: {
+        npm: 'npm',
+        maven: 'Maven',
+        python: 'Python',
+        go: 'Go'
+      } satisfies Record<Ecosystem, string>,
+      licenceFile: 'LICENSE file present',
+      licenceUnknown: {
+        'not-installed': 'cannot be told: not installed in the repository',
+        'not-declared': 'none declared',
+        unreadable: 'cannot be told: what it declares cannot be read',
+        outside: 'cannot be told: installed outside the repository'
+      } satisfies Record<UnknownLicence, string>,
+      licenceShort: {
+        'not-installed': 'cannot be told: not installed',
+        'not-declared': 'none declared',
+        unreadable: 'cannot be told: unreadable',
+        outside: 'cannot be told: outside the repository'
+      } satisfies Record<UnknownLicence, string>,
+      hint: 'Select a Library to see the manifests that declare it, the Source Files that use it, and its licence.',
+      unassigned: 'Unassigned',
+      testsOnly: 'tests only',
+      none: 'No manifest declares a Library, and no Source File uses one.',
+      noneShown: 'No Library is in this list.',
+      howToRead:
+        'A Library is read from the manifests — package.json, pom.xml, build.gradle, requirements files, pyproject.toml, go.mod — and from the imports of the Source Files. Its licence is what its installed package declares; nothing is looked up outside the repository. A tool that is run and never imported is declared and not used.',
+      javaLicence:
+        "The licence of a Java Library cannot be told: Maven's local repository lies outside the repository, and is not read.",
+      linkedOutside:
+        'It is installed through a link that leads out of the repository, which is not followed.',
+      notRead: (count: number): string =>
+        many(
+          count,
+          'One manifest could not be read, and declares nothing here:',
+          `${count} manifests could not be read, and declare nothing here:`
+        ),
+
+      kind: (ecosystem: string): string => `Library · ${ecosystem}`,
+      declaredIn: 'Declared in',
+      notDeclared: 'No manifest declares it.',
+      importedAs: 'Imported as',
+      importedBelow:
+        'A Rule about Libraries that names one of these names the packages below it as well: org.slf4j is org.slf4j.event too.',
+      mapping: {
+        same: 'by the name it is declared by',
+        installed: 'as its installed package lists them',
+        known: "from the suite's table of known names",
+        normalised: 'a guess: its name taken as the name it is imported by',
+        group: 'a guess: its group ID taken as the prefix of its packages'
+      } satisfies Record<Mapping, string>,
+      testsHidden: (count: number): string =>
+        many(
+          count,
+          'One test file uses it, and test files are left out.',
+          `${count} test files use it, and test files are left out.`
+        ),
+      usedByNone: 'No Source File uses it.',
+      undeclaredFile: 'No manifest in its directory or above declares the Library.',
+      installed: 'Installed',
+      notInstalled: 'Not installed in the repository.',
+      licenceFrom: (field: string, source: string): string => `As \`${field}\` in \`${source}\`.`,
+      licenceFileFrom: (source: string): string =>
+        `No metadata names it; \`${source}\` is there and is not read for a name.`,
+      fileCount: (count: number): string => many(count, 'one file', `${count} files`),
+      firstOf: (shown: number, total: number): string => `The first ${shown} of ${total}.`,
+
+      page: 'Libraries',
+      pageNone: 'It declares no Library, and its Source Files use none.'
     }
   },
 
@@ -907,6 +1002,7 @@ export const en = {
       notAnAdr: (reference: string): string => `${reference} — not an ADR of this repository`,
       preview: 'Preview',
       imports: 'Source File Dependencies',
+      uses: 'The imports of the Library',
       noImports: 'A threshold has no import behind it: what it is of is measured as a whole.',
       /** Of a function or a class: where it begins. */
       inCode: 'In the code',
@@ -956,8 +1052,16 @@ export const en = {
       threshold: {
         name: 'threshold',
         about: 'A Component it names whose metric is outside the limits is a Violation.'
+      },
+      library: {
+        name: 'Libraries',
+        about:
+          'A use of one of the Libraries by a Component that is not in `only-in`, or that is in `not-in`, is a Violation.'
       }
     } satisfies Record<RuleKind, { name: string; about: string }>,
+
+    /** How many Source Files import the Library behind a Violation of a Rule about Libraries. */
+    usesCount: (count: number): string => many(count, 'one file', `${count} files`),
 
     /** What a Rule says, in words; `metric` is the long name of its metric. */
     says: (rule: Rule, metric: string): string => {
@@ -980,6 +1084,10 @@ export const en = {
                 ? `at most ${rule.max}`
                 : `at least ${rule.min}`
           }`
+        case 'library':
+          return rule.scope === 'only-in'
+            ? `Only ${listed(rule.components)} may use ${listed(rule.libraries)}`
+            : `${listed(rule.components)} must not use ${listed(rule.libraries)}`
       }
     },
 
@@ -1036,6 +1144,13 @@ export const en = {
       max: 'At most',
       min: 'At least',
       of: 'Of the Components',
+      libraries: 'Libraries',
+      librariesAbout:
+        'By the name the code imports them by: `pg`, `@codemirror/*`, `org.apache.**`; in Java and Python a name stands for the packages below it too.',
+      libraryPlaceholder: 'A Library or pattern, then Enter',
+      libraryScope: 'Who',
+      onlyIn: 'Only these Components may use them',
+      notIn: 'These Components must not use them',
       tests: 'Test files count',
       ignoreTypeOnly: 'Type-only Dependencies do not count',
       patternPlaceholder: 'A Component ID or pattern, then Enter',
@@ -1089,17 +1204,19 @@ export const en = {
   },
 
   searching: {
-    label: 'Search ADRs, Components, Source Files and Annotations',
+    label: 'Search ADRs, Components, Source Files, Libraries and Annotations',
     placeholder:
-      'Search ADRs, Components, Source Files, Annotations — or type the number of an ADR',
+      'Search ADRs, Components, Source Files, Libraries, Annotations — or type the number of an ADR',
     found: 'Found',
     adrs: 'ADRs',
     components: 'Components',
     sourceFiles: 'Source Files',
+    libraries: 'Libraries',
     annotations: 'Annotations',
     /** Beside each hit: what kind of thing it is. */
     component: 'Component',
     sourceFile: 'Source File',
+    library: 'Library',
     annotation: 'Annotation',
     draft: 'Draft',
     unassigned: 'Unassigned',
@@ -1108,11 +1225,11 @@ export const en = {
     moreOf: (shown: number, all: number): string => `The best ${shown} of ${all}.`,
     none: 'Nothing has all of these words.',
     analysing:
-      'Structure is still analysing the code: its Components and Source Files are searched once it is done.',
+      'Structure is still analysing the code: its Components, Source Files and Libraries are searched once it is done.',
     analysingAgain:
-      'Structure is analysing the code again: its Components and Source Files are searched as it last found them.',
+      'Structure is analysing the code again: its Components, Source Files and Libraries are searched as it last found them.',
     notAnalysed: (reason: string): string =>
-      `Components and Source Files are not searched: ${reason}`
+      `Components, Source Files and Libraries are not searched: ${reason}`
   },
 
   /**

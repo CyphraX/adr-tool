@@ -115,10 +115,14 @@ function ruleOf(rule: Rule): Record<string, unknown> {
   const { tests, ...draft } = draftOf(rule)
   const { ignoreTypeOnly, ...keys } = draft as typeof draft & { ignoreTypeOnly?: boolean }
   const named: Record<string, unknown> = { ...keys }
-  if (keys.kind === 'no-cycles') {
+  if (keys.kind === 'no-cycles' || keys.kind === 'library') {
     delete named.scope
     delete named.components
     named[keys.scope] = keys.components
+  }
+  if (keys.kind === 'library') {
+    delete named.libraries
+    named.library = keys.libraries
   }
   return {
     ...named,
@@ -130,7 +134,12 @@ function ruleOf(rule: Rule): Record<string, unknown> {
 
 /** A Violation: what it is, in a sentence, what an Exception names it by, and its imports. */
 function violationOf(violation: CheckedViolation): Record<string, unknown> {
-  const imports = importsOf(violation.dependencies)
+  // Of a Rule about Libraries: each import of the Library, which is no Source File.
+  const imports = violation.uses
+    ? violation.uses.flatMap((use) =>
+        use.lines.map((line) => ({ file: use.file, line, imports: use.library }))
+      )
+    : importsOf(violation.dependencies)
   return {
     rule: violation.rule.id,
     kind: violation.rule.kind,
@@ -138,6 +147,7 @@ function violationOf(violation: CheckedViolation): Record<string, unknown> {
     fingerprint: exceptionKeysOf(violation.fingerprint),
     ...(violation.cycle && { cycle: violation.cycle }),
     ...(violation.component !== undefined && { component: violation.component }),
+    ...(violation.library !== undefined && { library: violation.library }),
     ...(violation.file !== undefined && { file: violation.file }),
     ...(violation.name !== undefined && { name: violation.name }),
     ...(violation.line !== undefined && { line: violation.line }),
@@ -197,6 +207,8 @@ const familyOf = (kind: unknown): unknown => (kind === 'may-only-depend' ? 'must
 const REPLACES: Readonly<Record<string, readonly string[]>> = {
   among: ['inside'],
   inside: ['among'],
+  'only-in': ['not-in'],
+  'not-in': ['only-in'],
   max: ['min'],
   min: ['max']
 }
@@ -214,6 +226,9 @@ function ruleDraft(input: Record<string, unknown>, id: string, current?: Rule): 
   }
   if (kind === 'no-cycles' && input.among !== undefined && input.inside !== undefined) {
     throw new Refusal('A Rule of the kind no-cycles has either "among" or "inside", not both.')
+  }
+  if (kind === 'library' && input['only-in'] !== undefined && input['not-in'] !== undefined) {
+    throw new Refusal('A Rule of the kind library has either "only-in" or "not-in", not both.')
   }
   const kept: Record<string, unknown> =
     familyOf(before.kind) === familyOf(kind)
@@ -287,6 +302,21 @@ function ruleDraft(input: Record<string, unknown>, id: string, current?: Rule): 
         ...(max !== undefined && { max }),
         ...(min !== undefined && { min }),
         of: need(strings(keys.of), 'of')
+      }
+    }
+    case 'library': {
+      const scope =
+        keys['only-in'] !== undefined
+          ? ('only-in' as const)
+          : keys['not-in'] !== undefined
+            ? ('not-in' as const)
+            : undefined
+      return {
+        ...options,
+        kind,
+        libraries: need(strings(keys.library), 'library'),
+        scope: need(scope, 'only-in" or "not-in'),
+        components: need(strings(keys[scope ?? 'only-in']), scope ?? 'only-in')
       }
     }
   }
@@ -682,6 +712,11 @@ export function architectureTools(context: ArchitectureContext): {
           max: number('For threshold: the highest value allowed.'),
           min: number('For threshold: the lowest value allowed.'),
           of: COMPONENTS,
+          library: list(
+            'For library: Library patterns, by the name the code imports a Library by: "pg", "@codemirror/*", "org.apache.**".'
+          ),
+          'only-in': COMPONENTS,
+          'not-in': COMPONENTS,
           tests: flag('Test files count as well.'),
           ignoreTypeOnly: flag('Type-only imports do not count. Not for threshold.')
         },
@@ -725,7 +760,10 @@ export function architectureTools(context: ArchitectureContext): {
           to: text('Of a Dependency: its target Component.'),
           cycle: list('Of a Cycle: its members.'),
           component: text(
-            'Of a threshold on a Component: the Component; of propagation cost, the Component the level lies below, "/" for the top level.'
+            'Of a threshold on a Component: the Component; of propagation cost, the Component the level lies below, "/" for the top level; of a Rule about Libraries, the Component that uses the Library.'
+          ),
+          library: text(
+            'Of a Rule about Libraries: the Library, by the name the code uses, as list_violations gives it.'
           ),
           file: text('Of a threshold on a function or a class: its Source File.'),
           name: text(

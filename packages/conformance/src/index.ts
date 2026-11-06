@@ -37,6 +37,7 @@ export {
   type CyclesRule,
   type DependencyRule,
   type LayersRule,
+  type LibraryRule,
   type MetricName,
   type MetricSubject,
   type Naming,
@@ -47,6 +48,7 @@ export {
   type WrittenException
 } from './rules'
 export { evaluate, TOP_LEVEL, type Model, type Violation } from './evaluate'
+export { libraryMatcher } from './library-patterns'
 export {
   adrExists,
   checkConformance,
@@ -84,7 +86,7 @@ export {
   type ConformanceSaid
 } from './sentences'
 
-import type { Dependency } from '@adr-tool/structure/model'
+import type { Dependency, LibraryUse } from '@adr-tool/structure/model'
 import type { Violation } from './evaluate'
 import { englishOf, type ConformanceSaid } from './sentences'
 
@@ -114,3 +116,23 @@ export function saidAt(
 /** The English of `saidAt`. */
 export const sentenceAt = (violation: Violation, dependency?: Dependency, line?: number): string =>
   englishOf(saidAt(violation, dependency, line))
+
+/**
+ * What a Violation of a Rule about Libraries says at one line of one of its uses: "ui must not
+ * use pg: packages/ui/src/list.ts:2 imports pg."
+ */
+export function saidAtUse(violation: Violation, use: LibraryUse, line?: number): ConformanceSaid {
+  return {
+    code: 'violation-at',
+    values: {
+      violation: violation.said,
+      file: use.file,
+      line: line ?? use.lines[0] ?? 1,
+      imports: use.library
+    }
+  }
+}
+
+/** The English of `saidAtUse`. */
+export const sentenceAtUse = (violation: Violation, use: LibraryUse, line?: number): string =>
+  englishOf(saidAtUse(violation, use, line))

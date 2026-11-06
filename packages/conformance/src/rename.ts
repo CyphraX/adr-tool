@@ -13,7 +13,7 @@ import { readRules, scalarText } from './rules'
 import { refusal } from './sentences'
 
 /** The keys of a Rule that take Component patterns. */
-const RULE_KEYS = ['from', 'to', 'of', 'among', 'inside', 'layers']
+const RULE_KEYS = ['from', 'to', 'of', 'among', 'inside', 'layers', 'only-in', 'not-in']
 /** The keys of an Exception that take Component IDs, whatever the kind of its Rule. */
 const EXCEPTION_KEYS = ['from', 'to', 'component']
 

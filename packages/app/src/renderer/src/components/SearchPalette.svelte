@@ -1,8 +1,10 @@
 <script lang="ts">
   import {
     searchComponents,
+    searchLibraries,
     searchSourceFiles,
     type ComponentHit,
+    type LibraryHit,
     type SourceFileHit
   } from '../lib/search'
   import { searchDiagrams, type DiagramHit } from '../lib/diagram-canvas'
@@ -16,13 +18,14 @@
 
   // Full-text search with quick jump: type, arrow, Enter. It searches every Decision Log of
   // every open repository, the one in front first, in what is already loaded — nothing is
-  // read for it. Below the ADRs, the Components and Source Files of the repository in front,
-  // as far as Structure's analysis knows them (docs/plan-vision.md, part 2), and its
-  // Annotations, by their text, their Replies and their ID (part 9).
+  // read for it. Below the ADRs, the Components, Source Files and Libraries of the repository in
+  // front, as far as Structure's analysis knows them (docs/plan-vision.md, parts 2 and 15), and
+  // its Annotations, by their text, their Replies and their ID (part 9).
   const LIMIT = 12
   const COMPONENT_LIMIT = 6
   const SOURCE_FILE_LIMIT = 8
   const DIAGRAM_LIMIT = 6
+  const LIBRARY_LIMIT = 6
   const ANNOTATION_LIMIT = 6
 
   type Row =
@@ -30,6 +33,7 @@
     | { readonly kind: 'component'; readonly key: string; readonly hit: ComponentHit }
     | { readonly kind: 'sourceFile'; readonly key: string; readonly hit: SourceFileHit }
     | { readonly kind: 'diagram'; readonly key: string; readonly hit: DiagramHit }
+    | { readonly kind: 'library'; readonly key: string; readonly hit: LibraryHit }
     | { readonly kind: 'annotation'; readonly key: string; readonly hit: AnnotationHit }
 
   let dialog = $state<HTMLDialogElement>()
@@ -62,6 +66,9 @@
   const allSourceFiles = $derived(
     outline?.known ? searchSourceFiles(outline.known.sourceFiles, query) : []
   )
+  const allLibraries = $derived(
+    outline?.known ? searchLibraries(outline.known.libraries, query) : []
+  )
   const allAnnotations = $derived(
     searchAnnotations(app.active?.review.known?.annotations ?? [], query)
   )
@@ -71,6 +78,7 @@
   const allDiagrams = $derived(searchDiagrams(app.active?.diagrams.overview?.diagrams ?? [], query))
   const diagrams = $derived(allDiagrams.slice(0, DIAGRAM_LIMIT))
   const sourceFiles = $derived(allSourceFiles.slice(0, SOURCE_FILE_LIMIT))
+  const libraries = $derived(allLibraries.slice(0, LIBRARY_LIMIT))
   const draft = $derived(outline?.known?.origin === 'draft')
   // What the search says of Structure: still analysing, analysing again, or why it cannot.
   const analysis = $derived(
@@ -86,7 +94,7 @@
   )
 
   // One list for the keyboard, in the order it is shown: ADRs, Components, Diagrams, Source
-  // Files, Annotations.
+  // Files, Libraries, Annotations.
   const rows = $derived<Row[]>([
     ...found.map((hit) => ({
       kind: 'adr' as const,
@@ -96,6 +104,11 @@
     ...components.map((hit) => ({ kind: 'component' as const, key: `component:${hit.id}`, hit })),
     ...diagrams.map((hit) => ({ kind: 'diagram' as const, key: `diagram:${hit.path}`, hit })),
     ...sourceFiles.map((hit) => ({ kind: 'sourceFile' as const, key: `file:${hit.path}`, hit })),
+    ...libraries.map((hit) => ({
+      kind: 'library' as const,
+      key: `library:${hit.ecosystem}:${hit.name}`,
+      hit
+    })),
     ...annotations.map((hit) => ({
       kind: 'annotation' as const,
       key: `annotation:${hit.annotation.id}`,
@@ -124,6 +137,12 @@
         all: allSourceFiles.length
       },
       {
+        kind: 'library' as const,
+        heading: t.searching.libraries,
+        shown: libraries.length,
+        all: allLibraries.length
+      },
+      {
         kind: 'annotation' as const,
         heading: t.searching.annotations,
         shown: annotations.length,
@@ -135,12 +154,13 @@
   const position = $derived(Math.min(chosen, rows.length - 1))
 
   /**
-   * Open a hit in its module: an ADR in Decisions, a Component or a Source File in Structure,
-   * a Diagram in Diagrams, an Annotation in Review.
+   * Open a hit in its module: an ADR in Decisions, a Component, a Source File or a Library in
+   * Structure, a Diagram in Diagrams, an Annotation in Review.
    */
   function open(row: Row): void {
     if (row.kind === 'adr') app.jumpTo(row.hit.logPath, row.hit.adr.id, row.hit.repositoryId)
     else if (row.kind === 'component') app.showComponent(row.hit.id)
+    else if (row.kind === 'library') app.showLibrary(row.hit.ecosystem, row.hit.name)
     else if (row.kind === 'diagram') {
       app.stopSearching()
       app.diagrams.reveal(row.hit.path)
@@ -243,6 +263,13 @@
                       {#if draft}
                         <span class="where">{t.searching.draft}</span>
                       {/if}
+                    </span>
+                  {:else if row.kind === 'library'}
+                    <span class="line">
+                      <span class="kind">{t.searching.library}</span>
+                      <code class="title path">{row.hit.name}</code>
+                      <span class="where">{t.structure.inventory.ecosystem[row.hit.ecosystem]}</span
+                      >
                     </span>
                   {:else if row.kind === 'diagram'}
                     <span class="line">

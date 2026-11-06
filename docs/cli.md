@@ -142,7 +142,7 @@ First what `adr lint` prints, without its count; then the Problem of `.arch/conf
 src/billing/invoice.ts:3: billing-not-web: billing must not depend on web: src/billing/invoice.ts:3 imports src/web/format.ts. Billing is the domain; the web is how it is shown, and may change without it.
 ```
 
-- **The file and the line** are those of the import — where the person who wrote it reads the message. A Violation with no import behind it, a `threshold`, is printed at the line of its Rule in `.arch/rules.yml` — a threshold on the complexity of a function or the LCOM4 of a class at the line of its name, where it is changed:
+- **The file and the line** are those of the import — where the person who wrote it reads the message. A Violation of a Rule about Libraries stands at each import of the Library by its Component's files: `packages/core/src/window.ts:1: only-the-window-uses-electron: core uses electron, which only app/main and app/preload may use: packages/core/src/window.ts:1 imports electron. …`. A Violation with no import behind it, a `threshold`, is printed at the line of its Rule in `.arch/rules.yml` — a threshold on the complexity of a function or the LCOM4 of a class at the line of its name, where it is changed:
 
 ```
 cart/src/main/java/com/shop/cart/Cart.java:19: functions-stay-simple: The metric complexity of the function Cart.discount(long) at cart/src/main/java/com/shop/cart/Cart.java:19 is 5, above the maximum of 4. A function with more ways through it than that cannot be tested path by path.
@@ -220,7 +220,7 @@ docs/architecture/annotations/20261102-the-total.md: orphaned: 20261102-the-tota
 - **`problems`** holds the Problems of every module, each with `module`: `decisions` (as `adr lint` writes them), `kernel` (that `.arch/config.yml` cannot be read), `structure` (of `.arch/components.yml`), `conformance` (of `.arch/rules.yml`), `diagrams` (of the key `diagrams`, of a Diagram, and `stale-picture`) or `review` (of the Annotations and their Replies), with `code`, `message`, `path`, `line` where there is one, and `problem` as the module reports it.
 - **`diagrams`** lists the Diagrams found, each with `id`, `path` and `title` where it has one.
 - **`annotations`** says where the Annotations are and how many were read, `{ "directory": "docs/architecture/annotations", "count": 3 }`; `null` while `.arch/config.yml` names no directory that can be used.
-- **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, of the function or class of a threshold, or of the Rule; `value` is the value of a threshold's metric; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
+- **`violations`**: `code` is the kind of the Rule, `rule` its ID; `path` and `line` are those of the first import, of the function or class of a threshold, or of the Rule; `value` is the value of a threshold's metric; `dependencies` are the Dependencies between Source Files behind the Violation, with the lines of their imports; `uses`, for a Rule about Libraries alone, the uses of the Library behind it — each with `file`, `library`, `lines`, `typeOnly`, and `typeOnlyLines` where some of its lines are type-only —, whose first import gives `path` and `line`; `exception` is there only when an Exception accepts the Violation, `justified-by` only when it names an ADR.
 
 `--format github` prints one `::error` [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message) for each line of the text format, so that a pull request shows each Violation on the line of its import, titled with the ID of the Rule, and each Problem titled with its code — a note, an orphaned Annotation among them, as a `::notice`; the Problems of the Decision Logs are written as `adr lint` writes them. The counts come last, as lines of their own. The files are named from the directory the command runs in, as with `adr lint`:
 
@@ -251,7 +251,7 @@ The Problems of the Decision Logs have the codes of `adr lint`, above. The other
 | `invalid-annotations-directory`, `unreadable-annotation`, `invalid-type`, `invalid-state`, `invalid-key`, `no-anchor`, `invalid-anchor`, `no-quote`, `quote-does-not-match-lines`, `unknown-adr`, `ambiguous-adr`, `unreadable-reply`, `replies-without-annotation` | The Problems of the Annotations and their Replies ([review-format.md, section 6](review-format.md#6-problems)), as Review names them (`packages/review/src/problems.ts`) |
 | `orphaned` | A note: an Annotation whose lines are not found in the code any more, which a person attaches again in the app (the same section) |
 
-A Violation is named by the ID of its Rule, and in JSON its `code` is the kind of the Rule: `must-not-depend`, `may-only-depend`, `layers`, `no-cycles`, `threshold`. The same rule for new codes holds as for `adr lint`.
+A Violation is named by the ID of its Rule, and in JSON its `code` is the kind of the Rule: `must-not-depend`, `may-only-depend`, `layers`, `no-cycles`, `threshold`, `library`. The same rule for new codes holds as for `adr lint`.
 
 ## `adr export [path] --out <directory> [--log <directory>]...`
 

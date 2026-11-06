@@ -29,8 +29,30 @@ export {
   type StructureSaid
 } from './sentences'
 export { hasRepair, planAdopt, planRename, planRepair, type RenamePlan } from './operations'
-export type { Dependencies, Dependency, LibraryUse, NotAnalysed, NotResolved } from './dependencies'
-export type { ManifestLibrary } from './manifests'
+export type {
+  Dependencies,
+  Dependency,
+  LibraryUse,
+  LibraryUseAt,
+  NotAnalysed,
+  NotResolved
+} from './dependencies'
+export type { ManifestLibrary, ManifestNotRead } from './manifests'
+export {
+  ecosystemOfLanguage,
+  ecosystemOfManifest,
+  librariesIn,
+  libraryInventory,
+  type Ecosystem,
+  type InventoryLibrary,
+  type LibraryDeclaration,
+  type LibraryInventory,
+  type LibraryStatus,
+  type LibraryUser,
+  type Mapping,
+  type ScopedLibrary
+} from './libraries/inventory'
+export type { Installed, Licence, LicenceField, UnknownLicence } from './libraries/installed'
 export {
   edgesAmong,
   levelOf,

@@ -6,10 +6,20 @@
  * e.g. `docs/adr/0001-first.md`. The root itself is the empty string.
  */
 export interface FileSystem {
-  /** The text of a file, or `undefined` when there is no such file. */
-  readText(path: string): Promise<string | undefined>
+  /**
+   * The text of a file, or `undefined` when there is no such file. With `atMost`, a file of
+   * more bytes than that is as good as not there: what reads what a repository does not own —
+   * an installed package's metadata — reads it within a limit.
+   */
+  readText(path: string, options?: ReadOptions): Promise<string | undefined>
   /** The entries of a directory in no particular order, or `undefined` when there is no such directory. */
   list(path: string): Promise<DirectoryEntry[] | undefined>
+  /**
+   * Whether `path` is there, but only through a symbolic link that leads out of the
+   * repository: as good as not there for reading, and yet installed. Nothing out there is
+   * read. Missing where a file system has no such links.
+   */
+  leadsOutside?(path: string): Promise<boolean>
 }
 
 /**
@@ -35,6 +45,11 @@ export interface WritableFileSystem extends FileSystem {
   remove(path: string): Promise<void>
   /** Remove a directory that is empty. Refused when it is not empty, or not a directory. */
   removeDirectory(path: string): Promise<void>
+}
+
+export interface ReadOptions {
+  /** The most bytes a file may have to be read. */
+  readonly atMost?: number
 }
 
 export interface DirectoryEntry {

@@ -260,8 +260,8 @@ describe('the Problems of the file (docs/conformance-format.md, section 5)', () 
         )
       )
     ).toEqual([
-      "2: unknown-rule-kind: The Rule a has no kind. A Rule's kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold.",
-      '6: unknown-rule-kind: The Rule b has the kind "only-uses-library", which the suite does not know. A Rule\'s kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold.'
+      "2: unknown-rule-kind: The Rule a has no kind. A Rule's kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold, library.",
+      '6: unknown-rule-kind: The Rule b has the kind "only-uses-library", which the suite does not know. A Rule\'s kind is one of must-not-depend, may-only-depend, layers, no-cycles, threshold, library.'
     ])
     expect(
       readRules('rules:\n  - {id: c, why: W., kind: no-cycles, inside: x}\n').rules

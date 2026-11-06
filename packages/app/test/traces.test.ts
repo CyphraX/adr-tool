@@ -286,7 +286,7 @@ describe('this repository', () => {
     ])
   })
 
-  it('renames structure in the declaration, in ADR-0006, in the Rules and in its Diagram, whose picture follows', async () => {
+  it('renames structure in the declaration, in ADR-0006 and ADR-0022, in the Rules and in its Diagram, whose picture follows', async () => {
     const plan = await planComponentRename(nodeFileSystem(own), 'structure', 'architecture')
     if (!plan.ok) throw new Error(plan.reason)
     const lines = (text: string): string[] => text.split('\n')
@@ -300,6 +300,10 @@ describe('this repository', () => {
       {
         path: 'docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md',
         changed: ['affects: [kernel, core, structure, conformance, diagrams, review, assessment]']
+      },
+      {
+        path: 'docs/adr/0022-a-rule-about-libraries-names-them-as-the-code-imports-them.md',
+        changed: ['affects: [conformance, structure/libraries]']
       },
       {
         path: '.arch/rules.yml',

@@ -10,7 +10,7 @@ import type { Refusal } from './views'
  * strings.en.ts, which explains how the texts are arranged. The words of the domain stay
  * the tool's own — ADR, Decision Log, Status, Relation, Trace, Frontmatter — and the rest is
  * said as German says it: Metadaten, Rückverweis, Reparatur, Korrektur, Vorlage, Komponente,
- * Entwurf, Quelldatei, Abhängigkeit, Zyklus.
+ * Entwurf, Quelldatei, Abhängigkeit, Zyklus, Bibliothek, Manifest, Lizenz.
  */
 
 const many = (count: number, one: string, more: string): string => (count === 1 ? one : more)
@@ -476,7 +476,6 @@ export const de: typeof en = {
     testFiles: (count: number): string => many(count, 'davon ein Test', `davon ${count} Tests`),
     dependencies: (count: number): string =>
       many(count, 'Eine Abhängigkeit', `${count} Abhängigkeiten`),
-    libraries: (count: number): string => many(count, 'Eine Bibliothek', `${count} Bibliotheken`),
     analysedIn: (milliseconds: number): string =>
       `Analysiert in ${(milliseconds / 1000).toLocaleString('de', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`,
     lowerBound: {
@@ -670,12 +669,13 @@ export const de: typeof en = {
 
     viewer: {
       label: 'Quelldatei',
-      back: (show: 'graph' | 'matrix' | 'metrics' | 'sequence'): string =>
+      back: (show: 'graph' | 'matrix' | 'metrics' | 'sequence' | 'libraries'): string =>
         ({
           graph: 'Zurück zum Graph',
           matrix: 'Zurück zur Matrix',
           metrics: 'Zurück zu den Metriken',
-          sequence: 'Zurück zur Hauptreihe'
+          sequence: 'Zurück zur Hauptreihe',
+          libraries: 'Zurück zu den Bibliotheken'
         })[show],
       marked: (lines: readonly number[]): string =>
         `${many(lines.length, 'Zeile', 'Zeilen')} ${lines.join(', ')} markiert`,
@@ -768,6 +768,94 @@ export const de: typeof en = {
         'Sie behalten ihre Komponente und haben keine eigenen Abhängigkeiten, bis sie sich parsen lassen.',
       unreadable: 'konnte nicht gelesen werden',
       none: 'Keine.'
+    },
+
+    inventory: {
+      entry: 'Bibliotheken',
+      title: 'Bibliotheken',
+      label: 'Die Bibliotheken, die die Manifeste deklarieren und der Code verwendet',
+      library: 'Bibliothek',
+      version: 'Version',
+      usedBy: 'Verwendet von',
+      files: 'Dateien',
+      licence: 'Lizenz',
+      sortBy: (column: string): string => `Nach ${column} sortieren`,
+      filter: 'Welche Bibliotheken gezeigt werden',
+      filters: {
+        all: 'Alle',
+        used: 'Verwendet',
+        unused: 'Nicht verwendet',
+        undeclared: 'Nicht deklariert'
+      },
+      status: {
+        used: 'Deklariert und verwendet',
+        unused: 'Deklariert, und von keiner Quelldatei verwendet',
+        undeclared: 'Von einer Quelldatei verwendet, für die kein Manifest sie deklariert'
+      },
+      tag: { unused: 'nicht verwendet', undeclared: 'nicht deklariert' },
+      ecosystem: { npm: 'npm', maven: 'Maven', python: 'Python', go: 'Go' },
+      licenceFile: 'LICENSE-Datei vorhanden',
+      licenceUnknown: {
+        'not-installed': 'nicht feststellbar: nicht im Repository installiert',
+        'not-declared': 'keine angegeben',
+        unreadable: 'nicht feststellbar: ihre Angaben lassen sich nicht lesen',
+        outside: 'nicht feststellbar: außerhalb des Repositorys installiert'
+      },
+      licenceShort: {
+        'not-installed': 'nicht feststellbar: nicht installiert',
+        'not-declared': 'keine angegeben',
+        unreadable: 'nicht feststellbar: nicht lesbar',
+        outside: 'nicht feststellbar: außerhalb des Repositorys'
+      },
+      hint: 'Wählen Sie eine Bibliothek, um die Manifeste zu sehen, die sie deklarieren, die Quelldateien, die sie verwenden, und ihre Lizenz.',
+      unassigned: 'Nicht zugeordnet',
+      testsOnly: 'nur Tests',
+      none: 'Kein Manifest deklariert eine Bibliothek, und keine Quelldatei verwendet eine.',
+      noneShown: 'Keine Bibliothek steht in dieser Liste.',
+      howToRead:
+        'Eine Bibliothek wird aus den Manifesten gelesen — package.json, pom.xml, build.gradle, Requirements-Dateien, pyproject.toml, go.mod — und aus den Importen der Quelldateien. Ihre Lizenz ist, was ihr installiertes Paket angibt; außerhalb des Repositorys wird nichts nachgeschlagen. Ein Werkzeug, das ausgeführt und nie importiert wird, ist deklariert und nicht verwendet.',
+      javaLicence:
+        'Die Lizenz einer Java-Bibliothek lässt sich nicht feststellen: Das lokale Repository von Maven liegt außerhalb des Repositorys und wird nicht gelesen.',
+      linkedOutside:
+        'Sie ist über einen Link installiert, der aus dem Repository hinausführt und dem nicht gefolgt wird.',
+      notRead: (count: number): string =>
+        many(
+          count,
+          'Ein Manifest ließ sich nicht lesen und deklariert hier nichts:',
+          `${count} Manifeste ließen sich nicht lesen und deklarieren hier nichts:`
+        ),
+
+      kind: (ecosystem: string): string => `Bibliothek · ${ecosystem}`,
+      declaredIn: 'Deklariert in',
+      notDeclared: 'Kein Manifest deklariert sie.',
+      importedAs: 'Importiert als',
+      importedBelow:
+        'Eine Regel über Bibliotheken, die einen dieser Namen nennt, nennt auch die Pakete darunter: org.slf4j ist auch org.slf4j.event.',
+      mapping: {
+        same: 'unter dem Namen, unter dem sie deklariert ist',
+        installed: 'wie ihr installiertes Paket sie aufführt',
+        known: 'aus der Tabelle bekannter Namen der Suite',
+        normalised: 'geschätzt: ihr Name als der Name, unter dem sie importiert wird',
+        group: 'geschätzt: ihre Group-ID als Präfix ihrer Pakete'
+      },
+      testsHidden: (count: number): string =>
+        many(
+          count,
+          'Eine Testdatei verwendet sie, und Testdateien sind ausgeblendet.',
+          `${count} Testdateien verwenden sie, und Testdateien sind ausgeblendet.`
+        ),
+      usedByNone: 'Keine Quelldatei verwendet sie.',
+      undeclaredFile: 'Kein Manifest in ihrem Verzeichnis oder darüber deklariert die Bibliothek.',
+      installed: 'Installiert',
+      notInstalled: 'Nicht im Repository installiert.',
+      licenceFrom: (field: string, source: string): string => `Als \`${field}\` in \`${source}\`.`,
+      licenceFileFrom: (source: string): string =>
+        `Keine Metadaten nennen sie; \`${source}\` ist vorhanden und wird nicht nach einem Namen gelesen.`,
+      fileCount: (count: number): string => many(count, 'eine Datei', `${count} Dateien`),
+      firstOf: (shown: number, total: number): string => `Die ersten ${shown} von ${total}.`,
+
+      page: 'Bibliotheken',
+      pageNone: 'Sie deklariert keine Bibliothek, und ihre Quelldateien verwenden keine.'
     }
   },
 
@@ -861,6 +949,7 @@ export const de: typeof en = {
       notAnAdr: (reference: string): string => `${reference} – kein ADR dieses Repositorys`,
       preview: 'Vorschau',
       imports: 'Abhängigkeiten zwischen Quelldateien',
+      uses: 'Die Importe der Bibliothek',
       noImports:
         'Hinter einem Schwellenwert steht kein Import: Gemessen wird, worauf er sich bezieht, als Ganzes.',
       inCode: 'Im Code',
@@ -910,8 +999,15 @@ export const de: typeof en = {
         name: 'Schwellenwert',
         about:
           'Eine Komponente, die sie nennt und deren Metrik außerhalb der Grenzen liegt, ist ein Verstoß.'
+      },
+      library: {
+        name: 'Bibliotheken',
+        about:
+          'Eine Verwendung einer der Bibliotheken durch eine Komponente, die nicht in `only-in` oder die in `not-in` steht, ist ein Verstoß.'
       }
     },
+
+    usesCount: (count: number): string => many(count, 'eine Datei', `${count} Dateien`),
 
     says: (rule: Rule, metric: string): string => {
       switch (rule.kind) {
@@ -933,6 +1029,10 @@ export const de: typeof en = {
                 ? `höchstens ${decimal(rule.max)}`
                 : `mindestens ${decimal(rule.min)}`
           }`
+        case 'library':
+          return rule.scope === 'only-in'
+            ? `Nur ${listed(rule.components)} ${rule.components.length > 1 ? 'dürfen' : 'darf'} ${listed(rule.libraries)} verwenden`
+            : `${listed(rule.components)} ${rule.components.length > 1 ? 'dürfen' : 'darf'} ${listed(rule.libraries)} nicht verwenden`
       }
     },
 
@@ -986,6 +1086,13 @@ export const de: typeof en = {
       max: 'Höchstens',
       min: 'Mindestens',
       of: 'Der Komponenten',
+      libraries: 'Bibliotheken',
+      librariesAbout:
+        'Unter dem Namen, unter dem der Code sie importiert: `pg`, `@codemirror/*`, `org.apache.**`; in Java und Python steht ein Name auch für die Pakete darunter.',
+      libraryPlaceholder: 'Eine Bibliothek oder ein Muster, dann Enter',
+      libraryScope: 'Wer',
+      onlyIn: 'Nur diese Komponenten dürfen sie verwenden',
+      notIn: 'Diese Komponenten dürfen sie nicht verwenden',
       tests: 'Testdateien zählen mit',
       ignoreTypeOnly: 'Abhängigkeiten nur über Typen zählen nicht',
       patternPlaceholder: 'Eine Komponenten-ID oder ein Muster, dann Enter',
@@ -1037,16 +1144,18 @@ export const de: typeof en = {
   },
 
   searching: {
-    label: 'ADRs, Komponenten, Quelldateien und Annotationen durchsuchen',
+    label: 'ADRs, Komponenten, Quelldateien, Bibliotheken und Annotationen durchsuchen',
     placeholder:
-      'ADRs, Komponenten, Quelldateien, Annotationen suchen — oder die Nummer eines ADRs eingeben',
+      'ADRs, Komponenten, Quelldateien, Bibliotheken, Annotationen suchen — oder die Nummer eines ADRs eingeben',
     found: 'Gefunden',
     adrs: 'ADRs',
     components: 'Komponenten',
     sourceFiles: 'Quelldateien',
+    libraries: 'Bibliotheken',
     annotations: 'Annotationen',
     component: 'Komponente',
     sourceFile: 'Quelldatei',
+    library: 'Bibliothek',
     annotation: 'Annotation',
     draft: 'Entwurf',
     unassigned: 'Nicht zugeordnet',
@@ -1055,11 +1164,11 @@ export const de: typeof en = {
     moreOf: (shown: number, all: number): string => `Die besten ${shown} von ${all}.`,
     none: 'Nichts enthält alle diese Wörter.',
     analysing:
-      'Die Struktur analysiert den Code noch; ihre Komponenten und Quelldateien werden durchsucht, sobald sie fertig ist.',
+      'Die Struktur analysiert den Code noch; ihre Komponenten, Quelldateien und Bibliotheken werden durchsucht, sobald sie fertig ist.',
     analysingAgain:
-      'Die Struktur analysiert den Code erneut; ihre Komponenten und Quelldateien werden durchsucht, wie sie sie zuletzt gefunden hat.',
+      'Die Struktur analysiert den Code erneut; ihre Komponenten, Quelldateien und Bibliotheken werden durchsucht, wie sie sie zuletzt gefunden hat.',
     notAnalysed: (reason: string): string =>
-      `Komponenten und Quelldateien werden nicht durchsucht: ${reason}`
+      `Komponenten, Quelldateien und Bibliotheken werden nicht durchsucht: ${reason}`
   },
 
   annotations: {

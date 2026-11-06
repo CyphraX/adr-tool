@@ -262,6 +262,7 @@ function namesComponent(evidence: Evidence, component: string): boolean {
     case 'cycle':
       return violation.cycle.includes(component)
     case 'component':
+    case 'library':
       return violation.component === component
     case 'inside':
       return false

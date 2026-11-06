@@ -6,6 +6,7 @@ import {
   EXTRACTION_VERSION,
   analyseDependencies,
   extractorOf,
+  libraryInventory,
   openStructure,
   prepareGo,
   prepareJava,
@@ -13,17 +14,22 @@ import {
   type Dependencies,
   type Extraction,
   type Language,
+  type LibraryInventory,
   type Readers,
   type Structure
 } from '@adr-tool/structure'
 import { nodeFileSystem } from './node-file-system'
 import { repositoryFiles } from './repository-files'
 
-/** What the Structure module knows about a repository: its Components and their Dependencies. */
+/**
+ * What the Structure module knows about a repository: its Components, their Dependencies, and
+ * the Libraries the manifests declare and the code uses.
+ */
 export interface Analysis {
   readonly structure: Structure
   readonly dependencies: Dependencies
-  /** How long reading, parsing and resolving took. */
+  readonly inventory: LibraryInventory
+  /** How long reading, parsing and resolving took, the inventory included. */
   readonly milliseconds: number
 }
 
@@ -112,13 +118,20 @@ export async function analyse(
     return extraction
   }
   const dependencies = await analyseDependencies(fs, files, structure.sourceFiles, extract)
+  // What is installed is read within limits, and never through a link out of the repository.
+  const inventory = await libraryInventory(fs, files, structure, dependencies)
 
   const changed =
     parsed > 0 ||
     cache?.version !== EXTRACTION_VERSION ||
     Object.keys(previous).length !== Object.keys(next).length
   return {
-    analysis: { structure, dependencies, milliseconds: Math.round(performance.now() - started) },
+    analysis: {
+      structure,
+      dependencies,
+      inventory,
+      milliseconds: Math.round(performance.now() - started)
+    },
     cache: { version: EXTRACTION_VERSION, files: next },
     changed
   }

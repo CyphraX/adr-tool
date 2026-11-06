@@ -307,7 +307,7 @@ describe('the Rules as the main process checks and plans them', () => {
     return conformanceView(
       'r1',
       fs,
-      { structure, dependencies, milliseconds: 0 },
+      { structure, dependencies, inventory: { libraries: [] }, milliseconds: 0 },
       {
         current: true,
         analysedAt: 0

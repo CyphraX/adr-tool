@@ -1,13 +1,19 @@
 /**
  * The Libraries a repository's manifests declare, for the Library inventory
- * (docs/structure-format.md, section 3, "Manifests"): `pyproject.toml`, `requirements.txt` and
- * `go.mod`, read as text. Nothing is run, installed or looked up: what is listed is what the
- * files say, as they say it.
+ * (docs/structure-format.md, section 3, "Manifests"): `package.json`, `pom.xml`,
+ * `build.gradle` and `build.gradle.kts`, `pyproject.toml`, `requirements.txt` and `go.mod`,
+ * read as text. Nothing is run, installed or looked up: what is listed is what the files say,
+ * as they say it. What the repository holds itself — a workspace package, a Maven module, a
+ * Go module of the repository — is no Library.
  */
 import type { FileSystem } from '@adr-tool/kernel'
 import { goModules } from './go/modules'
+import { inGradle, readCatalog } from './libraries/gradle'
+import { inPoms } from './libraries/maven'
+import { inPackageJson, packageName } from './libraries/package-json'
 import { parsePyproject } from './python/projects'
 import { isNeverLookedAt } from './source-files'
+import { workspacePackages } from './workspace'
 
 /** A Library as a manifest declares it. */
 export interface ManifestLibrary {
@@ -18,7 +24,9 @@ export interface ManifestLibrary {
   /** As written: `>=2.31`, `^2.0`, `v1.6.0`. Missing where none is. */
   readonly version?: string
   /**
-   * Where the manifest does not count it among what the code needs to run: the optional or
+   * Where the manifest does not count it among what the code needs to run: the key of a
+   * `package.json` it is under (`dev`, `peer`, `optional`), the scope of Maven (`test`,
+   * `provided`) or the configuration of Gradle (`testImplementation`), the optional or
    * development group of Python it is in (`dev`), or `indirect` for a requirement go.mod marks so.
    */
   readonly group?: string
@@ -35,29 +43,115 @@ const isRequirements = (path: string): boolean =>
   /^requirements(?:[-_.][^/]*)?\.txt$/.test(fileName(path)) ||
   (/\.txt$/.test(path) && path.split('/').at(-2) === 'requirements')
 
-/** Every Library the manifests of a repository declare, manifest by manifest in path order. */
+/** The manifests that are read whole, the poms of the repository together. */
+const isPom = (path: string): boolean => fileName(path) === 'pom.xml'
+const isGradle = (path: string): boolean => /^build\.gradle(?:\.kts)?$/.test(fileName(path))
+
+/** A manifest that could not be read to its end, and why: it names no Library. */
+export interface ManifestNotRead {
+  readonly manifest: string
+  /** What its reader said: the message of the error it failed with. */
+  readonly message: string
+}
+
+/** The message of what a reader failed with. */
+const messageOf = (error: unknown): string =>
+  error instanceof RangeError && /call stack/i.test(error.message)
+    ? 'It is nested too deeply for its reader.'
+    : error instanceof Error
+      ? error.message
+      : String(error)
+
+/**
+ * Every Library the manifests of a repository declare, manifest by manifest in path order. A
+ * manifest whose reader fails on it names nothing and is told to `notRead`; every other one is
+ * read all the same.
+ */
 export async function manifestLibraries(
   fs: FileSystem,
-  files: readonly string[]
+  files: readonly string[],
+  notRead: (manifest: ManifestNotRead) => void = () => {}
 ): Promise<ManifestLibrary[]> {
+  const failed = (manifest: string, error: unknown): void =>
+    notRead({ manifest, message: messageOf(error) })
+  /** What `read` gives, or nothing where it fails: one manifest does not stop the others. */
+  const guarded = <T>(manifest: string, read: () => T): T | undefined => {
+    try {
+      return read()
+    } catch (error) {
+      failed(manifest, error)
+      return undefined
+    }
+  }
   const found: ManifestLibrary[] = []
   const manifests = files.filter((path) => !isNeverLookedAt(path)).sort()
+  const read = (path: string): Promise<string | undefined> =>
+    fs.readText(path).catch(() => undefined)
+  const goRead = await goModules(fs, manifests)
   const go = new Map(
-    (await goModules(fs, manifests)).modules.map((module) => [
+    goRead.modules.map((module) => [
       module.directory === '' ? 'go.mod' : `${module.directory}/go.mod`,
       module
     ])
   )
+  // A module of the repository, or one replaced by a directory of it, is the repository's own.
+  const goLocal = new Set([
+    ...goRead.modules.map((module) => module.path),
+    ...goRead.modules.flatMap((module) => module.replaces.map((replace) => replace.path)),
+    ...goRead.replaces.map((replace) => replace.path)
+  ])
+
+  // The packages the workspace holds, and the root package: by their names.
+  const local = new Set<string>()
+  if (manifests.some((path) => fileName(path) === 'package.json')) {
+    for (const directory of ['', ...(await workspacePackages(fs, manifests))]) {
+      const path = directory === '' ? 'package.json' : `${directory}/package.json`
+      const text = await read(path)
+      const name = guarded(path, () => packageName(text))
+      if (name !== undefined) local.add(name)
+    }
+  }
+  const poms = new Map<string, string>()
+  for (const path of manifests.filter(isPom)) {
+    const text = await read(path)
+    if (text !== undefined) poms.set(path, text)
+  }
+  const fromPoms = new Map<string, ManifestLibrary[]>()
+  for (const library of inPoms(poms, failed)) {
+    fromPoms.set(library.manifest, [...(fromPoms.get(library.manifest) ?? []), library])
+  }
+  const catalogText = manifests.includes('gradle/libs.versions.toml')
+    ? await read('gradle/libs.versions.toml')
+    : undefined
+  const catalog =
+    catalogText === undefined
+      ? undefined
+      : guarded('gradle/libs.versions.toml', () => readCatalog(catalogText))
+
   for (const path of manifests) {
-    if (fileName(path) === 'pyproject.toml') {
-      const text = await fs.readText(path).catch(() => undefined)
-      const document = text === undefined ? undefined : parsePyproject(text)
-      if (document) found.push(...inPyproject(path, document, linesOf(text!)))
+    if (fileName(path) === 'package.json') {
+      const text = await read(path)
+      if (text !== undefined) {
+        found.push(...(guarded(path, () => inPackageJson(path, text, (n) => local.has(n))) ?? []))
+      }
+    } else if (isPom(path)) {
+      found.push(...(fromPoms.get(path) ?? []))
+    } else if (isGradle(path)) {
+      const text = await read(path)
+      if (text !== undefined)
+        found.push(...(guarded(path, () => inGradle(path, text, catalog)) ?? []))
+    } else if (fileName(path) === 'pyproject.toml') {
+      const text = await read(path)
+      const document = text === undefined ? undefined : guarded(path, () => parsePyproject(text))
+      if (document) {
+        found.push(...(guarded(path, () => inPyproject(path, document, linesOf(text!))) ?? []))
+      }
     } else if (isRequirements(path)) {
-      const text = await fs.readText(path).catch(() => undefined)
-      if (text !== undefined) found.push(...inRequirements(path, text))
+      const text = await read(path)
+      if (text !== undefined) found.push(...(guarded(path, () => inRequirements(path, text)) ?? []))
     } else if (go.has(path)) {
       for (const requirement of go.get(path)!.requires) {
+        if (goLocal.has(requirement.path)) continue
         found.push({
           manifest: path,
           name: requirement.path,
