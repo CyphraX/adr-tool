@@ -43,6 +43,9 @@ linux:
   synopsis: A desktop workbench for the architecture that lives in a git repository
   maintainer: Philipp Saal <63289319+CyphraX@users.noreply.github.com>
   executableName: softarch-suite
+  # The .desktop file is named after desktopName in package.json, the app_id and WM_CLASS
+  # Electron gives the window, so that the desktop puts the window under its launcher.
+  syncDesktopName: true
 
 deb:
   artifactName: softarch-suite_${version}_${arch}.${ext}

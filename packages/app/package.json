@@ -7,6 +7,7 @@
   "description": "The Softarch Suite desktop app",
   "author": "Philipp Saal <63289319+CyphraX@users.noreply.github.com>",
   "homepage": "https://github.com/CyphraX/adr-tool",
+  "desktopName": "softarch-suite.desktop",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
