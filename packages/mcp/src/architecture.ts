@@ -190,104 +190,103 @@ function notCheckedOf(report: ConformanceReport): Record<string, unknown> {
 const strings = (value: unknown): string[] | undefined =>
   Array.isArray(value) ? value.map(String) : undefined
 
+/** The kinds of a Rule whose keys carry over when a change turns one into the other. */
+const familyOf = (kind: unknown): unknown => (kind === 'may-only-depend' ? 'must-not-depend' : kind)
+
+/** Each key of plan_rule that, given, replaces the keys a Rule had beside it. */
+const REPLACES: Readonly<Record<string, readonly string[]>> = {
+  among: ['inside'],
+  inside: ['among'],
+  max: ['min'],
+  min: ['max']
+}
+
 /**
  * The Rule `input` describes, for plan_rule: what it says, and for a change what the Rule said
- * where it says nothing — of another kind, only its ID, its why and its options.
+ * where it says nothing (`ruleOf`) — of another kind, only its why and its options. The keys
+ * are merged first and then read as one.
  */
 function ruleDraft(input: Record<string, unknown>, id: string, current?: Rule): RuleDraft {
-  const before = current && draftOf(current)
-  const kind = (input.kind as Rule['kind'] | undefined) ?? before?.kind
+  const before: Record<string, unknown> = current ? ruleOf(current) : {}
+  const kind = (input.kind ?? before.kind) as Rule['kind'] | undefined
   if (kind === undefined) {
     throw new Refusal(`A new Rule needs a "kind": one of ${RULE_KIND_NAMES.join(', ')}.`)
   }
-  const same = before?.kind === kind ? before : undefined
-  const why = typeof input.why === 'string' ? input.why : before?.why
-  if (why === undefined || why.trim() === '') {
+  if (kind === 'no-cycles' && input.among !== undefined && input.inside !== undefined) {
+    throw new Refusal('A Rule of the kind no-cycles has either "among" or "inside", not both.')
+  }
+  const kept: Record<string, unknown> =
+    familyOf(before.kind) === familyOf(kind)
+      ? { ...before }
+      : { why: before.why, tests: before.tests, ignoreTypeOnly: before.ignoreTypeOnly }
+  for (const [key, replaced] of Object.entries(REPLACES)) {
+    if (input[key] !== undefined) for (const other of replaced) delete kept[other]
+  }
+  const keys: Record<string, unknown> = {
+    ...kept,
+    ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))
+  }
+
+  const why = keys.why
+  if (typeof why !== 'string' || why.trim() === '') {
     throw new Refusal('A Rule needs a "why": the reason it exists, in a sentence.')
   }
-  const tests = (input.tests as boolean | undefined) ?? before?.tests ?? false
-  const ignoreTypeOnly =
-    (input.ignoreTypeOnly as boolean | undefined) ??
-    (before && 'ignoreTypeOnly' in before ? before.ignoreTypeOnly : undefined) ??
-    false
   const need = <T>(value: T | undefined, key: string): T => {
     if (value === undefined) throw new Refusal(`A Rule of the kind ${kind} needs "${key}".`)
     return value
   }
-  const common = { id, why, ...(tests && { tests }) }
+  const common = { id, why, ...(keys.tests === true && { tests: true }) }
+  const options = { ...common, ...(keys.ignoreTypeOnly === true && { ignoreTypeOnly: true }) }
   switch (kind) {
     case 'must-not-depend':
-    case 'may-only-depend': {
-      const was = before?.kind === 'must-not-depend' || before?.kind === 'may-only-depend'
+    case 'may-only-depend':
       return {
-        ...common,
-        ...(ignoreTypeOnly && { ignoreTypeOnly }),
+        ...options,
         kind,
-        from: need(strings(input.from) ?? (was ? before.from : undefined), 'from'),
-        to: need(strings(input.to) ?? (was ? before.to : undefined), 'to')
+        from: need(strings(keys.from), 'from'),
+        to: need(strings(keys.to), 'to')
       }
-    }
-    case 'layers': {
-      const layers = Array.isArray(input.layers)
-        ? input.layers.map((layer) => (Array.isArray(layer) ? layer.map(String) : [String(layer)]))
-        : same?.kind === 'layers'
-          ? same.layers
-          : undefined
-      const mode =
-        (input.mode as 'relaxed' | 'strict' | undefined) ??
-        (same?.kind === 'layers' ? same.mode : 'relaxed')
+    case 'layers':
       return {
-        ...common,
-        ...(ignoreTypeOnly && { ignoreTypeOnly }),
+        ...options,
         kind,
-        layers: need(layers, 'layers'),
-        mode
+        layers: need(
+          Array.isArray(keys.layers)
+            ? keys.layers.map((layer) =>
+                Array.isArray(layer) ? layer.map(String) : [String(layer)]
+              )
+            : undefined,
+          'layers'
+        ),
+        mode: (keys.mode as 'relaxed' | 'strict' | undefined) ?? 'relaxed'
       }
-    }
     case 'no-cycles': {
-      if (input.among !== undefined && input.inside !== undefined) {
-        throw new Refusal('A Rule of the kind no-cycles has either "among" or "inside", not both.')
-      }
       const scope =
-        input.among !== undefined
+        keys.among !== undefined
           ? ('among' as const)
-          : input.inside !== undefined
+          : keys.inside !== undefined
             ? ('inside' as const)
-            : same?.kind === 'no-cycles'
-              ? same.scope
-              : undefined
-      const components =
-        strings(input.among ?? input.inside) ??
-        (same?.kind === 'no-cycles' ? same.components : undefined)
+            : undefined
       return {
-        ...common,
-        ...(ignoreTypeOnly && { ignoreTypeOnly }),
+        ...options,
         kind,
         scope: need(scope, 'among" or "inside'),
-        components: need(components, scope ?? 'among')
+        components: need(strings(keys[scope ?? 'among']), scope ?? 'among')
       }
     }
     case 'threshold': {
-      const bounds =
-        input.max !== undefined || input.min !== undefined
-          ? { max: input.max as number | undefined, min: input.min as number | undefined }
-          : same?.kind === 'threshold'
-            ? { max: same.max, min: same.min }
-            : {}
-      if (bounds.max === undefined && bounds.min === undefined) {
+      const max = keys.max as number | undefined
+      const min = keys.min as number | undefined
+      if (max === undefined && min === undefined) {
         throw new Refusal('A Rule of the kind threshold needs "max", "min" or both.')
       }
       return {
         ...common,
         kind,
-        metric: need(
-          (input.metric as MetricName | undefined) ??
-            (same?.kind === 'threshold' ? same.metric : undefined),
-          'metric'
-        ),
-        ...(bounds.max !== undefined && { max: bounds.max }),
-        ...(bounds.min !== undefined && { min: bounds.min }),
-        of: need(strings(input.of) ?? (same?.kind === 'threshold' ? same.of : undefined), 'of')
+        metric: need(keys.metric as MetricName | undefined, 'metric'),
+        ...(max !== undefined && { max }),
+        ...(min !== undefined && { min }),
+        of: need(strings(keys.of), 'of')
       }
     }
   }
@@ -296,7 +295,9 @@ function ruleDraft(input: Record<string, unknown>, id: string, current?: Rule): 
 /** Keys of the Rules file as a sentence names them: `"from" and "to"`. */
 const quotedKeys = (keys: readonly string[]): string => {
   const quoted = keys.map((key) => `"${key}"`)
-  return quoted.length < 2 ? (quoted[0] ?? '') : `${quoted.slice(0, -1).join(', ')} and ${quoted.at(-1)}`
+  return quoted.length < 2
+    ? (quoted[0] ?? '')
+    : `${quoted.slice(0, -1).join(', ')} and ${quoted.at(-1)}`
 }
 
 /**

@@ -31,6 +31,19 @@ export async function extractorFor(structure: Pick<Structure, 'sourceFiles'>): P
   })
 }
 
+/**
+ * The Dependencies between the Source Files of `structure`, which `files` are the repository's
+ * files of, each file read by what `extract` prepares for it.
+ */
+export async function dependenciesOf(
+  fs: FileSystem,
+  files: readonly string[],
+  structure: Structure,
+  extract: (structure: Structure) => Promise<Extract> = extractorFor
+): Promise<Dependencies> {
+  return analyseDependencies(fs, files, structure.sourceFiles, await extract(structure))
+}
+
 /** What the analysis of a repository found. */
 export interface Analysed {
   /** The files the repository consists of, relative to its root. */
@@ -55,8 +68,7 @@ export async function analyseRepository(
   const listed = await listRepository(root)
   const files = [...new Set([...listed, ...(options.extra ?? [])])].sort()
   const structure = await openStructure(fs, files)
-  const extract = await (options.extract ?? extractorFor)(structure)
-  const dependencies = await analyseDependencies(fs, files, structure.sourceFiles, extract)
+  const dependencies = await dependenciesOf(fs, files, structure, options.extract)
   return { files, structure, dependencies }
 }
 

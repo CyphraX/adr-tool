@@ -1,8 +1,8 @@
 import type { FileSystem } from '@adr-tool/core'
 import { needsModel, readRules, RULES_PATH, type ConformanceReport } from '@adr-tool/conformance'
 import {
-  analyseDependencies,
   openStructure,
+  type Dependencies,
   type NotAnalysed,
   type NotMeasured
 } from '@adr-tool/structure'
@@ -12,7 +12,7 @@ import {
   wordingOf,
   type StructureProblem
 } from '@adr-tool/structure/model'
-import { extractorFor } from './analysis'
+import { dependenciesOf } from './analysis'
 import { conformanceOf } from './conformance'
 import { lintRepository, type LintReport } from './lint'
 
@@ -63,11 +63,11 @@ export async function check(
     }
   }
 
-  // The code is analysed only for Rules that are checked: it takes a moment on a large repository.
-  let model: Awaited<ReturnType<typeof analyseDependencies>> | undefined
+  // The code is analysed as analyseRepository analyses it (./analysis.ts), and only for Rules
+  // that are checked: it takes a moment on a large repository.
+  let model: Dependencies | undefined
   if (needsModel(rules, structure)) {
-    const extract = await extractorFor(structure)
-    model = await analyseDependencies(fs, files, structure.sourceFiles, extract)
+    model = await dependenciesOf(fs, files, structure)
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
     if (model.notMeasured.length > 0) notes.push(notMeasured(model.notMeasured))
   }
