@@ -32,6 +32,8 @@ Every installer carries the licence of the suite as `LICENSE.txt` beside the app
 
 ## How it is packaged
 
+Why the release is built this way, and what else was weighed, is recorded in [ADR-0023](adr/0023-everything-a-release-runs-is-bundled-and-electron-builder.md).
+
 ### electron-builder
 
 The app is packaged with [electron-builder](https://www.electron.build), configured in `packages/app/electron-builder.yml`. One tool and one file build every format the release has — AppImage, deb and tar.gz, NSIS and a portable exe, dmg and zip — and both Macs from one runner. Electron Forge would need a maker per format, and its packager expects the flat `node_modules` of npm; under pnpm, that means `node-linker=hoisted` for the whole workspace. electron-builder also builds from an Electron that is already on disk (`electronDist`), which a build without access to GitHub needs.
