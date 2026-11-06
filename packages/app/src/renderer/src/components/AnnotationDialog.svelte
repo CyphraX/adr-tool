@@ -72,9 +72,11 @@
       </h1>
 
       <div class="fields">
-        <div class="quote" aria-hidden="true">
+        <div class="quote" role="group" aria-label={t.annotations.detail.quoted}>
           {#each composing.quote as line, position (position)}
-            <span class="number">{composing.start + position}</span><span class="line">{line}</span>
+            <span class="number" aria-hidden="true">{composing.start + position}</span><span
+              class="line">{line}</span
+            >
           {/each}
         </div>
 

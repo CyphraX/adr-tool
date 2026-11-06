@@ -134,6 +134,10 @@ export interface CodeViewer {
   show(file: { path: string; text: string }, marks: readonly number[], line?: number): void
   /** Show the Annotations of the file beside their lines, `selected` among them (part 9 of the vision). */
   annotate(annotations: readonly CodeAnnotation[], selected: string | undefined): void
+  /** Let go of the lines selected: they were annotated, or an Annotation attached to them. */
+  deselect(): void
+  /** Take the keyboard: the code is what is read now. */
+  focus(): void
   destroy(): void
 }
 
@@ -214,6 +218,13 @@ export function createCodeViewer(parent: HTMLElement, events: CodeViewerEvents =
       view.dispatch({
         effects: annotations.reconfigure(annotationsIn(view.state.doc, list, selected, open))
       })
+    },
+    deselect() {
+      if (!view.state.selection.main.empty)
+        view.dispatch({ selection: { anchor: view.state.selection.main.head } })
+    },
+    focus() {
+      view.focus()
     },
     destroy() {
       view.destroy()

@@ -244,13 +244,25 @@ export function annotationsIn(
  */
 export function selectLineOnNumber(view: EditorView, from: number, event: Event): boolean {
   const doc = view.state.doc
-  const clicked = doc.lineAt(from).number
-  const current = (event as MouseEvent).shiftKey ? selectedLines(view.state) : undefined
-  const start = current ? Math.min(current.start, clicked) : clicked
-  const end = current ? Math.max(current.end, clicked) : clicked
+  const { start, end } = linesOnNumber(
+    view.state,
+    doc.lineAt(from).number,
+    (event as MouseEvent).shiftKey
+  )
   const head = end < doc.lines ? doc.line(end + 1).from : doc.line(end).to
   view.dispatch({ selection: { anchor: doc.line(start).from, head } })
   return true
+}
+
+/**
+ * The lines a click on the number of line `clicked` selects: that line, or with Shift every line
+ * from the selection — or from the line the cursor is on — to it.
+ */
+export function linesOnNumber(state: EditorState, clicked: number, shift: boolean): Lines {
+  if (!shift) return { start: clicked, end: clicked }
+  const cursor = state.doc.lineAt(state.selection.main.head).number
+  const current = selectedLines(state) ?? { start: cursor, end: cursor }
+  return { start: Math.min(current.start, clicked), end: Math.max(current.end, clicked) }
 }
 
 /** How the marks and the cards look, in the app's tokens. */

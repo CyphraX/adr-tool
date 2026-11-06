@@ -59,6 +59,8 @@ export interface Replying {
 class ReviewForms {
   composing = $state<Composing | undefined>(undefined)
   replying = $state<Replying | undefined>(undefined)
+  /** Counts the writes on selected lines — Create, Attach again —: the code viewer lets go of them. */
+  written = $state(0)
 
   /** Whether a form holds text that would be lost. */
   readonly dirty = $derived(

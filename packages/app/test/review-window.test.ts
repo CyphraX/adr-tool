@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { memoryFileSystem, openRepository, type Repository } from '@adr-tool/core'
 import type { Anchor } from '@adr-tool/review'
 import type { AnnotationView, ReviewOverview, StructureOutline } from '../src/shared/ipc'
-import { columnsOf, selectedLines } from '../src/renderer/src/lib/code-annotations'
+import { columnsOf, linesOnNumber, selectedLines } from '../src/renderer/src/lib/code-annotations'
 import { repositoryProblems } from '../src/renderer/src/lib/repository-problems'
 import {
   anchorStateOf,
@@ -338,5 +338,23 @@ describe('the selection, as the Annotations come back', () => {
     expect(keptSelection('new', known)).toBeUndefined()
     expect(keptSelection('new', { ...known, finding: true })).toBe('new')
     expect(keptSelection(undefined, known)).toBeUndefined()
+  })
+})
+
+describe('selecting lines by their numbers', () => {
+  const doc = Array.from({ length: 20 }, (_, at) => `line ${at + 1}`).join('\n')
+  const at = (anchor: number, head = anchor): EditorState =>
+    EditorState.create({ doc, selection: EditorSelection.single(anchor, head) })
+  const from = (state: EditorState, line: number): number => state.doc.line(line).from
+
+  // Shift and a click from a cursor selected the clicked line alone.
+  it('extends from the cursor with Shift, as from a selection', () => {
+    const cursor = at(0)
+    const on9 = at(from(cursor, 9) + 2)
+    expect(linesOnNumber(on9, 12, true)).toEqual({ start: 9, end: 12 })
+    expect(linesOnNumber(on9, 4, true)).toEqual({ start: 4, end: 9 })
+    expect(linesOnNumber(on9, 12, false)).toEqual({ start: 12, end: 12 })
+    const selected = at(from(cursor, 9), from(cursor, 12))
+    expect(linesOnNumber(selected, 15, true)).toEqual({ start: 9, end: 15 })
   })
 })

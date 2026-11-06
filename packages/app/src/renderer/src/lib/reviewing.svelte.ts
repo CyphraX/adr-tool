@@ -28,9 +28,6 @@ const tabOf = (repositoryId: string): Tab | undefined =>
   app.tabs.find((tab) => tab.repository.id === repositoryId)
 
 class Reviewing {
-  /** Who git says the person is, by repository: what a new Annotation and a Reply propose. */
-  private readonly authors = new Map<string, Promise<string | undefined>>()
-
   /**
    * Follow the main process: it says when the Annotations of a repository are looked at again,
    * and when the files Structure analyses change — the file in a code viewer may be one. The
@@ -203,14 +200,12 @@ class Reviewing {
     }
   }
 
-  /** Who git says the person is, asked once per repository. */
+  /**
+   * Who git says the person is: what a new Annotation and a Reply propose. Asked each time a form
+   * opens — `git config user.name` may have been set since.
+   */
   private author(repositoryId: string): Promise<string | undefined> {
-    let known = this.authors.get(repositoryId)
-    if (!known) {
-      known = window.api.gitUserName(repositoryId).catch(() => undefined)
-      this.authors.set(repositoryId, known)
-    }
-    return known
+    return window.api.gitUserName(repositoryId).catch(() => undefined)
   }
 
   /** Open the dialog for a new Annotation on lines selected in a code viewer. */
@@ -252,6 +247,7 @@ class Reviewing {
       { title: texts.title(path, start, end), action: texts.action, refused: texts.refused },
       (created) => {
         if (reviewForms.composing === composing) reviewForms.composing = undefined
+        reviewForms.written += 1
         // The new Annotation is selected, where the window was: in the code viewer it shows.
         const id = created?.replace(/^.*\//, '').replace(/\.md$/, '')
         const tab = tabOf(repositoryId)
@@ -364,6 +360,7 @@ class Reviewing {
         refused: texts.refused(id)
       },
       () => {
+        reviewForms.written += 1
         const review = tabOf(repositoryId)?.review
         if (review?.attaching === id) review.attaching = undefined
       }

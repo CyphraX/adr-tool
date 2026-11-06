@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import type { AnnotationView } from '../../../shared/ipc'
   import type { CodeAnnotation, Lines } from '../lib/code-annotations'
   import { createCodeViewer, quotedLines, type CodeViewer } from '../lib/code-viewer'
   import { firstLine, onFile, placeOf } from '../lib/review'
+  import { reviewForms } from '../lib/review-tab.svelte'
   import { reviewing } from '../lib/reviewing.svelte'
   import { app, type CodeView } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -83,6 +84,15 @@
     const file = code.file
     if (!viewer || !file) return
     viewer.show({ path: file.path, text: file.text }, $state.snapshot(code.marks), code.line)
+    // Opened from the keyboard — a Source File picked with Enter —, the code takes the focus
+    // that the list it was picked from took with it.
+    if (document.activeElement === null || document.activeElement === document.body) viewer.focus()
+  })
+
+  // Lines annotated, or attached to, are let go of: what is offered for them is done.
+  $effect(() => {
+    void reviewForms.written
+    untrack(() => viewer?.deselect())
   })
 
   $effect(() => {
