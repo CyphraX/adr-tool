@@ -10,9 +10,9 @@ const require = createRequire(import.meta.url)
  * The WebAssembly of tree-sitter goes into the command as base64 text (ADR-0017), so that the
  * one file reads Java, Python and Go wherever it is copied to: `src/tree-sitter-wasm.ts`, which
  * reads the files from the installed packages, is replaced by them. The tests read the same
- * module.
+ * module. The app's analysis worker reads it too, and is built with this plugin as well.
  */
-function treeSitterWasm(): Plugin {
+export function treeSitterWasm(): Plugin {
   const file = fileURLToPath(new URL('src/tree-sitter-wasm.ts', import.meta.url))
   const base64 = (path: string): string => readFileSync(require.resolve(path)).toString('base64')
   const constant = (name: string, path: string): string =>

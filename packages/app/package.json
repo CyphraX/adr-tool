@@ -16,15 +16,6 @@
     "typecheck": "pnpm typecheck:node && pnpm typecheck:web",
     "postinstall": "install-electron"
   },
-  "dependencies": {
-    "@electron-toolkit/utils": "^4.0.0",
-    "chokidar": "^5.0.0",
-    "tree-sitter-go": "0.25.0",
-    "tree-sitter-java": "^0.23.5",
-    "tree-sitter-python": "0.25.0",
-    "typescript": "^5.9.3",
-    "web-tree-sitter": "^0.27.0"
-  },
   "devDependencies": {
     "@adr-tool/assessment": "workspace:*",
     "@adr-tool/cli": "workspace:*",
@@ -44,12 +35,14 @@
     "@codemirror/state": "^6.7.5",
     "@codemirror/view": "^6.43.12",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@electron-toolkit/utils": "^4.0.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/ibm-plex-serif": "^5.3.0",
     "@lezer/highlight": "^1.2.3",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@types/node": "^24.13.5",
+    "chokidar": "^5.0.0",
     "diff": "^9.0.0",
     "dompurify": "3.4.17",
     "electron": "^44.4.1",
@@ -64,6 +57,7 @@
     "remark-rehype": "^11.1.2",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
+    "typescript": "^5.9.3",
     "unified": "^11.0.5",
     "vite": "^7.3.6",
     "vitest": "^5.0.1"

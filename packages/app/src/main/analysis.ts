@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
+import { goGrammar, javaGrammar, pythonGrammar, runtime } from '@adr-tool/cli/tree-sitter-wasm'
 import {
   EXTRACTION_VERSION,
   analyseDependencies,
@@ -39,11 +39,11 @@ export interface ExtractionCache {
   >
 }
 
-/** The languages read with tree-sitter, how each is prepared, and the package of its grammar. */
+/** The languages read with tree-sitter, how each is prepared, and its grammar. */
 const TREE_SITTER = {
-  java: { prepare: prepareJava, grammar: 'tree-sitter-java/tree-sitter-java.wasm' },
-  python: { prepare: preparePython, grammar: 'tree-sitter-python/tree-sitter-python.wasm' },
-  go: { prepare: prepareGo, grammar: 'tree-sitter-go/tree-sitter-go.wasm' }
+  java: { prepare: prepareJava, grammar: javaGrammar },
+  python: { prepare: preparePython, grammar: pythonGrammar },
+  go: { prepare: prepareGo, grammar: goGrammar }
 } as const
 type TreeSitterLanguage = keyof typeof TREE_SITTER
 
@@ -51,18 +51,19 @@ const readers = new Map<TreeSitterLanguage, Promise<Readers[TreeSitterLanguage]>
 
 /**
  * The reader of a language read with tree-sitter, prepared once per thread and only for a
- * repository that has the language. The `.wasm` files lie next to their packages; where they
- * lie in a packaged app is decided with distribution. Without them, the language is not read.
+ * repository that has the language. The `.wasm` files are the command line's: read from their
+ * packages in development and in the tests, and carried in the built worker as base64
+ * (electron.vite.config.ts), so that the packaged app has no file to find. Should one not be
+ * there, the language is not read.
  */
 function readerOf(language: TreeSitterLanguage): Promise<Readers[TreeSitterLanguage]> {
   const prepared =
     readers.get(language) ??
     (async () => {
-      const require = createRequire(import.meta.url)
       try {
         return await TREE_SITTER[language].prepare({
-          runtime: await readFile(require.resolve('web-tree-sitter/web-tree-sitter.wasm')),
-          grammar: await readFile(require.resolve(TREE_SITTER[language].grammar))
+          runtime: runtime(),
+          grammar: TREE_SITTER[language].grammar()
         })
       } catch (error) {
         console.error(error)

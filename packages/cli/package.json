@@ -11,7 +11,8 @@
   "exports": {
     "./analysis": "./src/analysis.ts",
     "./export": "./src/export.ts",
-    "./git": "./src/git.ts"
+    "./git": "./src/git.ts",
+    "./tree-sitter-wasm": "./src/tree-sitter-wasm.ts"
   },
   "scripts": {
     "build": "vite build",
