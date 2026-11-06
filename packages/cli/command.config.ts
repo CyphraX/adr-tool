@@ -7,7 +7,7 @@ import type { Plugin, UserConfig } from 'vite'
 const require = createRequire(import.meta.url)
 
 /**
- * The WebAssembly of tree-sitter goes into the bundle as base64 text (ADR-0017), so that the
+ * The WebAssembly of tree-sitter goes into the command as base64 text (ADR-0017), so that the
  * one file reads Java, Python and Go wherever it is copied to: `src/tree-sitter-wasm.ts`, which
  * reads the files from the installed packages, is replaced by them. The tests read the same
  * module.
@@ -34,7 +34,7 @@ function treeSitterWasm(): Plugin {
 
 /**
  * TypeScript is a CommonJS package that asks for `require`, `__filename` and `__dirname`, which
- * a module does not have; the bundle gives them to it.
+ * a module does not have; the command gives them to it.
  */
 const COMMONJS = [
   '#!/usr/bin/env node',
@@ -47,16 +47,16 @@ const COMMONJS = [
 ].join('\n')
 
 /**
- * A program that reads code as one file that Node.js runs as it is: the command line, and the
- * MCP server, which reads the code the way the command does (`src/code.ts`). The workspace
- * packages, TypeScript, tree-sitter and `yaml` are bundled into it, Node's own modules are not.
- * The workspace packages are source-only, as for the app.
+ * How a command that analyses code is built — `adr` and `adr-mcp`: one file that Node.js runs
+ * as it is, `src/main.ts` of the package bundled into `dist/<file>`. The workspace packages,
+ * TypeScript, tree-sitter and `yaml` are in it, Node's own modules are not; the workspace
+ * packages are source-only, as for the app.
  */
-export function oneFile(entry: string, name: string): UserConfig {
+export function commandConfig(file: string): UserConfig {
   return {
     plugins: [treeSitterWasm()],
     build: {
-      ssr: entry,
+      ssr: 'src/main.ts',
       outDir: 'dist',
       target: 'node22',
       emptyOutDir: true,
@@ -66,12 +66,12 @@ export function oneFile(entry: string, name: string): UserConfig {
       rollupOptions: {
         onwarn(warning, warn) {
           // Emscripten's loader in web-tree-sitter evaluates the JavaScript a WebAssembly module
-          // carries. It only ever loads those bundled here, never a file of the analysed repository.
+          // carries. It only ever loads the two bundled here, never a file of the analysed repository.
           if (warning.code === 'EVAL' && warning.id?.includes('web-tree-sitter')) return
           warn(warning)
         },
         output: {
-          entryFileNames: name,
+          entryFileNames: file,
           inlineDynamicImports: true,
           banner: COMMONJS
         }

@@ -43,6 +43,8 @@ const SAME_IN_GERMAN = new Set([
   'H',
   'Fan-in',
   'Fan-out',
+  'A',
+  'D',
   // The Diagrams module: a word of the glossary, a key of the file, and one German has too.
   'Drift',
   'Scope',
@@ -73,7 +75,9 @@ const SAME_AT = new Set([
   'dashboard.adrCount',
   'structure.graph.directory',
   'structure.value',
-  'structure.page.filesIn'
+  'structure.page.filesIn',
+  // The symbols of the metrics, and their values.
+  'structure.sequence.point'
 ])
 
 /** Every text of `english` that `german` says the same, by where it stands. */

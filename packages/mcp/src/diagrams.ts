@@ -38,10 +38,8 @@ import {
   type RepositoryDiagrams,
   type UnreadableDiagram
 } from '@adr-tool/diagrams'
-import { openStructure } from '@adr-tool/structure'
 import { DECLARATION_PATH, everyComponent } from '@adr-tool/structure/model'
-import { readCode } from '@adr-tool/cli/code'
-import { listRepository } from '@adr-tool/cli/listing'
+import { analyseRepository } from '@adr-tool/cli/analysis'
 import { PLAN, READ, object, required, text } from './kit'
 import { Refusal, type Tool } from './protocol'
 import type { Schema } from './schema'
@@ -241,9 +239,7 @@ export function diagramToolsFor({ root, fs, hold }: DiagramToolsContext): Tool[]
             note: `${DECLARATION_PATH} declares no Component that can be read, so the Diagram is not compared with the code.`
           }
         }
-        const files = await listRepository(root)
-        const structure = await openStructure(fs, files)
-        const model = await readCode(fs, files, structure)
+        const { structure, dependencies: model } = await analyseRepository(root, fs)
         return {
           ...body,
           drift: driftOf(diagram, structure, model).map((one) => listedDrift(diagram, one)),

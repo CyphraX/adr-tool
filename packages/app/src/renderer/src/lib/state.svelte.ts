@@ -59,8 +59,11 @@ export type MiddleView =
 
 export type { Module }
 
-/** What the middle of the Structure view shows of a level: the drawing, the matrix, or the metrics. */
-export type StructureShow = 'graph' | 'matrix' | 'metrics'
+/**
+ * What the middle of the Structure view shows of a level: the drawing, the matrix, the metrics,
+ * or its Components on the main sequence.
+ */
+export type StructureShow = 'graph' | 'matrix' | 'metrics' | 'sequence'
 
 /** What is selected in the Structure view: a node, a line, a Cycle, or one of the lists. */
 export type StructureSelection =
@@ -673,7 +676,7 @@ class AppState {
     }
   }
 
-  /** Show the level as a drawing, as a matrix, or as a table of its metrics. */
+  /** Show the level as a drawing, as a matrix, as a table of its metrics, or on the main sequence. */
   showInStructure(show: StructureShow): void {
     if (!this.active) return
     this.active.structure.show = show

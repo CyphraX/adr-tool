@@ -9,10 +9,9 @@
     "adr": "./dist/adr.mjs"
   },
   "exports": {
-    "./code": "./src/code.ts",
+    "./analysis": "./src/analysis.ts",
     "./export": "./src/export.ts",
-    "./git": "./src/git.ts",
-    "./listing": "./src/listing.ts"
+    "./git": "./src/git.ts"
   },
   "scripts": {
     "build": "vite build",
@@ -20,6 +19,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@adr-tool/assessment": "workspace:*",
     "@adr-tool/conformance": "workspace:*",
     "@adr-tool/core": "workspace:*",
     "@adr-tool/diagrams": "workspace:*",

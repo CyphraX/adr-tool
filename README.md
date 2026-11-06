@@ -124,11 +124,16 @@ The app runs locally: there is no backend, no account and no telemetry.
   - instability;
   - fan-out and fan-in;
   - relational cohesion;
-  - internal share.
+  - internal share;
+  - abstractness and distance from the main sequence.
 
-  Each metric has its definition on its column heading.
+  Each metric has its definition on its column heading. Under the table stands the level's propagation cost: how much of the level a change can reach.
 
   ![The metrics of this repository's packages](docs/screenshots/readme/structure-metrics.png)
+
+- **The main sequence.** A fourth view draws each Component of the level by its instability and abstractness, against the line from stable and abstract to unstable and concrete. Beside it, a list names them furthest from the line first, for the keyboard and screen readers.
+
+- **Inside the code.** A Component's page lists its most complex functions by cyclomatic complexity, each a click into the code at its line, and the classes whose methods fall apart by LCOM4. TypeScript, JavaScript and Svelte are counted as ESLint counts, Java as Checkstyle, Python as radon and Go as gocyclo do ([docs/structure-format.md](docs/structure-format.md), section 5).
 
 - **From a line to the code.** Click a line in the graph, then one of its line numbers. The Source File opens in a read-only viewer, with the import behind the Dependency marked.
 
@@ -146,7 +151,7 @@ The analysis runs in a worker thread and caches its results per file. It follows
 
 ### Conformance
 
-- **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, and how far a metric may go. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request; the window follows ([plan-vision.md](docs/plan-vision.md), part 4).
+- **Rules and Exceptions.** `.arch/rules.yml` says what the code may look like: which Component must not depend on which, which may only depend on which, which layers stand over which, where no Cycle may be, and how far a metric may go — down to the complexity of each function. Each Rule says why it holds. A Violation the architect accepts is written down as an Exception next to the Rules, with its reason and the ADR that justifies it, and it keeps matching when the code around the import moves ([ADR-0017](docs/adr/0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint.md)). `adr check` checks them in CI and puts each Violation on the line of its import in a pull request; the window follows ([plan-vision.md](docs/plan-vision.md), part 4).
 
 ### Diagrams
 
@@ -248,7 +253,7 @@ Exported 14 ADRs of 1 Decision Log to /home/me/decisions. Open /home/me/decision
 
 ### Agents over MCP
 
-`adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. It reads the Diagrams with their Drift against the code, and plans a new Diagram, edits of one, its export and its Repairs the same way. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
+`adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. `component_metrics` gives it the metrics of a Component's code as data. It reads the Diagrams with their Drift against the code, and plans a new Diagram, edits of one, its export and its Repairs the same way. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
 
 ```console
 $ pnpm build
@@ -266,8 +271,8 @@ The test fixtures are useful for exploring the app. They are test data, so copy 
 | `packages/core/test/fixtures/showcase` | Every Status, supersedes, amends and depends-on, and one Problem |
 | `packages/core/test/fixtures/broken` | Ten Problems, each with its Repair |
 | `packages/core/test/fixtures/madr`, `…/madr-2`, `…/log4brains`, `…/adr-tools` | Foreign formats, offered for Migration |
-| `packages/structure/test/fixtures/shop` | A Cycle between two Components with its weakest Dependency, and one between two files |
-| `packages/structure/test/fixtures/maven-shop` | Java: a Maven project of three modules, with one package spread over two of them |
+| `packages/structure/test/fixtures/shop` | A Cycle between two Components with its weakest Dependency, one between two files, and a class whose methods fall into two groups |
+| `packages/structure/test/fixtures/maven-shop` | Java: a Maven project of three modules, with one package spread over two of them, an interface, and a method that decides four ways; its modules on the main sequence |
 | `packages/structure/test/fixtures/python-shop` | Python: a src layout of three packages, a Cycle between two of them, one import under `if TYPE_CHECKING:`, and its manifests |
 | `packages/structure/test/fixtures/go-shop` | Go: a module with a nested module reached through `replace`, a Cycle between two files, a test file, and one import that is not resolved |
 | `packages/conformance/test/fixtures/layered-shop` | Three layers and two Rules, broken on purpose by one import, and the ADR an Exception for it would name |
@@ -370,16 +375,17 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [`packages/conformance`](packages/conformance) | The core of the Conformance module, on `kernel` and `structure` alone and under the same guard: the Rules and Exceptions of `.arch/rules.yml`, their evaluation against the Dependencies, the Problems of the file, and Rename in it |
 | [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the edits of a Diagram and a new one, each a change of its lines, Rename in them, the Repairs, and the SVG, drawn without a browser, with the Problem of a stale picture |
 | [`packages/review`](packages/review) | The core of the Review module, under the same guard: Annotations with their Anchors, Replies and Traces to ADRs, and how an Anchor is found again across commits, renames and rebases ([ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)). It reads git through the kernel's port; the window follows |
-| [`packages/cli`](packages/cli) | The command line, `adr lint`, `adr check` and `adr export`, built on the cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)). `@adr-tool/cli/git` is the one way the suite runs git, for the app as well; `@adr-tool/cli/code` reads the code as the command does, for the MCP server, which `bundle.ts` builds into one file the same way |
-| [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core` and `diagrams` into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
+| [`packages/assessment`](packages/assessment) | The core of the Assessment module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Assessments with their Quality Scenarios, Findings and Snapshots, the registers of Risks and Technical Debt Items, the Traces of their evidence, and Rename in them ([ADR-0021](docs/adr/0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file.md)). The window follows |
+| [`packages/cli`](packages/cli) | The command line, `adr lint`, `adr check` and `adr export`, built on the cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)). `@adr-tool/cli/git` is the one way the suite runs git, for the app as well; `@adr-tool/cli/analysis` analyses a repository as the command does, for the MCP server, which `command.config.ts` builds into one file the same way |
+| [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core`, `diagrams` and Structure's analysis into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
 ### Conventions
 
-- **Language.** Code and documents use the terms of [CONTEXT.md](CONTEXT.md) (Decisions), [docs/contexts/structure/CONTEXT.md](docs/contexts/structure/CONTEXT.md) (Structure) and the glossaries of the other modules under [docs/contexts/](docs/contexts/), Review's among them. [CONTEXT-MAP.md](CONTEXT-MAP.md) maps them.
+- **Language.** Code and documents use the terms of [CONTEXT.md](CONTEXT.md) (Decisions), [docs/contexts/structure/CONTEXT.md](docs/contexts/structure/CONTEXT.md) (Structure) and the glossaries of the other modules under [docs/contexts/](docs/contexts/), Review's and Assessment's among them. [CONTEXT-MAP.md](CONTEXT-MAP.md) maps them.
 - **Decisions.** Every decision of consequence is recorded as an ADR in [docs/adr/](docs/adr/), written in the suite's own format.
 - **Bytes.** Prettier never formats Markdown in this repository. The fixtures under `packages/core/test/fixtures` are exempt from git's line-ending normalization. The tool promises never to change a byte it was not asked to change, and this repository is its first test case.
-- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.en.ts` and `wording.en.ts`, with the German beside them (`strings.de.ts`, `wording.de.ts`); the main process has its own in `packages/app/src/main/strings.ts`. What `core`, `structure`, `diagrams` and `review` say in sentences carries a code, and the window words it by that code. Tests check that no component carries text of its own and that nothing English is left in the German.
+- **Text.** All text of the window lives in `packages/app/src/renderer/src/lib/strings.en.ts` and `wording.en.ts`, with the German beside them (`strings.de.ts`, `wording.de.ts`); the main process has its own in `packages/app/src/main/strings.ts`. What `core`, `structure`, `diagrams`, `review` and `assessment` say in sentences carries a code, and the window words it by that code. Tests check that no component carries text of its own and that nothing English is left in the German.
 
 ## Documentation
 
@@ -397,6 +403,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [docs/structure-format.md](docs/structure-format.md) | The contract of the Structure module: declaration, Dependencies, levels, metrics |
 | [docs/conformance-format.md](docs/conformance-format.md) | The contract of the Conformance module: Rules, Violations and their fingerprint, Exceptions, the Problems of `.arch/rules.yml` |
 | [docs/review-format.md](docs/review-format.md) | The contract of the Review module: Annotations, their Anchors and Replies, how an Anchor is found again, and the Problems |
+| [docs/assessment-format.md](docs/assessment-format.md) | The contract of the Assessment module: Assessments with their Quality Scenarios, Findings and evidence, the Snapshot, Risks and Technical Debt Items, and the Problems |
 | [docs/diagrams-format.md](docs/diagrams-format.md) | The contract of the Diagrams module: the file of a Diagram, its view levels, suggested connections and Drift, its Problems, how the suite edits it, and the SVG |
 | [docs/configuration.md](docs/configuration.md) | The contract of `.arch/config.yml`, the suite's settings: one key per module, and what happens when the file cannot be read |
 | [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` and `adr check` with their output, codes and exit codes — the Diagrams' among them —, and `adr export` |
@@ -432,7 +439,7 @@ Changes go through pull requests against `main`, and CI must pass. Before you op
 1. Run the five CI checks locally: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test` and `pnpm build`.
 2. Use the terms of the glossaries.
 3. Write down a decision of consequence as an ADR.
-4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md), [docs/structure-format.md](docs/structure-format.md), [docs/conformance-format.md](docs/conformance-format.md), [docs/diagrams-format.md](docs/diagrams-format.md), [docs/review-format.md](docs/review-format.md) or [docs/configuration.md](docs/configuration.md).
+4. Update the specification of the format first when behaviour changes. That is [docs/file-format.md](docs/file-format.md), [docs/structure-format.md](docs/structure-format.md), [docs/conformance-format.md](docs/conformance-format.md), [docs/diagrams-format.md](docs/diagrams-format.md), [docs/review-format.md](docs/review-format.md), [docs/assessment-format.md](docs/assessment-format.md) or [docs/configuration.md](docs/configuration.md).
 
 ## License
 

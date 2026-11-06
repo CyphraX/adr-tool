@@ -6,6 +6,7 @@ The contract of the suite's settings for a repository: `.arch/config.yml`, besid
 # .arch/config.yml
 diagrams: design/diagrams
 annotations: design/reviews
+assessments: design/assessments
 ```
 
 That the modules share one file, each with a key of its own, is recorded in [ADR-0018](adr/0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it.md).
@@ -39,6 +40,9 @@ A key whose value its module cannot use is a Problem of that module, at the line
 | ---------- | -------- | ------------------------------------------------------------- | ----------------------------- | ------------------------------------------------- |
 | `diagrams` | Diagrams | The directory of the Diagrams: a relative path inside the repository | `docs/architecture/diagrams` | [diagrams-format.md](diagrams-format.md), section 1 |
 | `annotations` | Review | The directory of the Annotations: a relative path inside the repository, written as a text | `docs/architecture/annotations` | [review-format.md](review-format.md), section 1 |
+| `assessments` | Assessment | The directory of the Assessments and their Snapshots: a relative path inside the repository, written as a text | `docs/architecture/assessments` | [assessment-format.md](assessment-format.md), section 1 |
+| `risks` | Assessment | The directory of the Risks, the same | `docs/architecture/risks` | [assessment-format.md](assessment-format.md), section 1 |
+| `debt` | Assessment | The directory of the Technical Debt Items, the same | `docs/architecture/debt` | [assessment-format.md](assessment-format.md), section 1 |
 
 A module that gets a setting adds its key here.
 

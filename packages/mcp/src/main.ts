@@ -2,6 +2,7 @@ import { Console } from 'node:console'
 import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { serve } from './protocol'
+import { metricTools } from './metrics'
 import { toolsFor } from './tools'
 
 const USAGE = `Usage: adr-mcp [path]
@@ -38,7 +39,7 @@ async function main(args: readonly string[]): Promise<number> {
       version: '0.0.0',
       instructions: instructionsFor(root)
     },
-    toolsFor({ root }),
+    [...toolsFor({ root }), ...metricTools({ root })],
     (text) => process.stderr.write(`adr-mcp: ${text}\n`)
   )
   return 0
@@ -52,7 +53,8 @@ export function instructionsFor(root: string): string {
     'Every write takes two steps. A plan_* tool returns the change — each file as a diff, and warnings — and writes nothing. Show it to the person; apply_change writes it, discard_change drops it.',
     'To edit the text of an ADR, read it with read_adr first and pass the revision it returns to plan_edit_body: an edit of a body that changed since is refused.',
     'The tool decides IDs, numbers and Metadata, and keeps Relations and Back-references consistent. Do not write ADR files directly.',
-    'The Diagrams of the architecture are read with list_diagrams and read_diagram, which compares one with the code (its Drift); plan_new_diagram, plan_diagram_change, plan_diagram_export and plan_diagram_repair plan their changes the same way. Do not write Diagram files or their SVG pictures directly.'
+    'The Diagrams of the architecture are read with list_diagrams and read_diagram, which compares one with the code (its Drift); plan_new_diagram, plan_diagram_change, plan_diagram_export and plan_diagram_repair plan their changes the same way. Do not write Diagram files or their SVG pictures directly.',
+    'component_metrics measures the code of a Component: abstractness, distance, the propagation cost of the level below it, its most complex functions and least cohesive classes.'
   ].join('\n')
 }
 

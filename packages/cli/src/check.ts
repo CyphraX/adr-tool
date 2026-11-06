@@ -7,12 +7,23 @@ import {
   type ConformanceReport,
   type Decisions
 } from '@adr-tool/conformance'
-import { openStructure, type Dependencies } from '@adr-tool/structure'
-import { DECLARATION_PATH, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
+import {
+  analyseDependencies,
+  openStructure,
+  type Dependencies,
+  type NotAnalysed,
+  type NotMeasured
+} from '@adr-tool/structure'
+import {
+  DECLARATION_PATH,
+  isPositional,
+  wordingOf,
+  type StructureProblem
+} from '@adr-tool/structure/model'
 import { openDiagrams } from '@adr-tool/diagrams'
 import { openConfig, type UnreadableConfig } from '@adr-tool/kernel'
+import { extractorFor } from './analysis'
 import { checkDiagrams, diagramsNeedModel, type DiagramsCheck } from './check-diagrams'
-import { notAnalysed, readCode } from './code'
 import { lintRepository, type LintReport } from './lint'
 
 /** A Problem of `.arch/components.yml`, as the command reports it. */
@@ -68,13 +79,26 @@ export async function check(
   const notes = [...(lint?.notes ?? [])]
   const structure = await openStructure(fs, files)
   const rules = readRules(rulesText)
+  for (const exception of rules.exceptions) {
+    if (exception.name !== undefined && isPositional(exception.name)) {
+      notes.push(
+        `${RULES_PATH}:${exception.line}: The Exception of ${exception.rule} names ${exception.name} by its position among the functions of that name in ${exception.file ?? 'its file'}: it moves to another one when a function of that name is added or removed before it.`
+      )
+    }
+  }
 
   // The code is analysed only for Rules that are checked, and for Drift where a Diagram can
   // have it: it takes a moment on a large repository.
   let model: Dependencies | undefined
   if (needsModel(rules, structure) || diagramsNeedModel(found, structure)) {
-    model = await readCode(fs, files, structure)
+    model = await analyseDependencies(
+      fs,
+      files,
+      structure.sourceFiles,
+      await extractorFor(structure)
+    )
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
+    if (model.notMeasured.length > 0) notes.push(notMeasured(model.notMeasured))
   }
 
   const decisions: Decisions = {
@@ -100,4 +124,22 @@ export async function check(
     diagrams,
     notes
   }
+}
+
+/** The note about Source Files that cannot be parsed: they have no Dependencies of their own. */
+function notAnalysed(files: readonly NotAnalysed[]): string {
+  const shown = files
+    .slice(0, 3)
+    .map((file) => (file.line === undefined ? file.file : `${file.file}:${file.line}`))
+  const more = files.length > shown.length ? `, and ${files.length - shown.length} more` : ''
+  const count = files.length === 1 ? '1 Source File' : `${files.length} Source Files`
+  return `${count} cannot be parsed and ${files.length === 1 ? 'has' : 'have'} no Dependencies of ${files.length === 1 ? 'its' : 'their'} own: ${shown.join(', ')}${more}.`
+}
+
+/** The note about Source Files that could not be measured: no metric of their inside counts them. */
+function notMeasured(files: readonly NotMeasured[]): string {
+  const shown = files.slice(0, 3).map((file) => `${file.file} (${file.message})`)
+  const more = files.length > shown.length ? `, and ${files.length - shown.length} more` : ''
+  const count = files.length === 1 ? '1 Source File' : `${files.length} Source Files`
+  return `${count} could not be measured inside: ${files.length === 1 ? 'its' : 'their'} functions and classes count towards no Rule on complexity, LCOM4, abstractness or distance: ${shown.join(', ')}${more}.`
 }

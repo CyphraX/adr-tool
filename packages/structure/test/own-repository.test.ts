@@ -43,6 +43,7 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
   const top = structure.components.map((component) => component.id)
   expect(top).toEqual([
     'app',
+    'assessment',
     'cli',
     'conformance',
     'core',
@@ -173,18 +174,26 @@ it('computes the metrics of this repository as their definitions say', async () 
   const fs = nodeFileSystem(root)
   const files = repositoryFiles(root)
   const structure = await openStructure(fs, files)
-  const { dependencies, lineCounts } = await analyseDependencies(fs, files, structure.sourceFiles)
+  const { dependencies, lineCounts, measures } = await analyseDependencies(
+    fs,
+    files,
+    structure.sourceFiles
+  )
 
-  const metrics = metricsOf(structure, dependencies, lineCounts)
-  // The directories below a Component without children are checked by the same definitions.
+  const metrics = metricsOf(structure, dependencies, lineCounts, {}, measures)
+  // The directories below a Component without children are checked by the same definitions,
+  // abstractness and distance (part 13) too.
   const explored = withDirectories(structure)
-  expect(metrics).toEqual(metricsByDefinition(explored, dependencies, lineCounts, false))
+  expect(metrics).toEqual(metricsByDefinition(explored, dependencies, lineCounts, false, measures))
+  expect(metrics.get('kernel')!.abstractness).toBeGreaterThan(0)
   expect([...metrics.keys()]).toContain('app/renderer/lib')
   // The kernel depends on nothing else here, and nothing here depends on the app: the two ends
   // of the scale.
   expect(metrics.get('kernel')!.instability).toBe(0)
   expect(metrics.get('app')!.instability).toBe(1)
   // It uses the cores of Decisions, Structure, Conformance, Diagrams and Review, the git and
-  // the export of the command line, and the kernel for the settings of `.arch/config.yml`.
-  expect(metrics.get('app')).toMatchObject({ fanOut: 7, fanIn: 0 })
+  // the export of the command line, the sentences of Assessment for its German, and the kernel
+  // for the settings of `.arch/config.yml`.
+  expect(metrics.get('app')).toMatchObject({ fanOut: 8, fanIn: 0 })
+  // The whole repository is analysed and measured, beside the tests of the other packages.
 }, 30_000)

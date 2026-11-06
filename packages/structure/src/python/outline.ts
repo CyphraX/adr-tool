@@ -8,8 +8,10 @@
  */
 import type { Node } from 'web-tree-sitter'
 import type { Extraction } from '../extraction'
+import { measuring } from '../measures'
 import { detailed } from '../sentences'
 import { firstError, parserOf, type Grammar } from '../tree-sitter'
+import { measurePython } from './measure'
 
 export interface PythonImport {
   /** The module as written, without its leading dots: `a.b`; empty for `from . import x`. */
@@ -52,7 +54,7 @@ export async function preparePython(wasm: Grammar): Promise<PythonReader> {
         )
         return { analysed: false, line: error.startPosition.row + 1, message, said }
       }
-      return { analysed: true, python: outline(root) }
+      return { analysed: true, python: outline(root), ...measuring(() => measurePython(root)) }
     } finally {
       tree.delete()
     }

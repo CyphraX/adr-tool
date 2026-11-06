@@ -313,9 +313,9 @@ describe('the Problems of the file (docs/conformance-format.md, section 5)', () 
       '2: invalid-rule: The Rule a cannot be checked: it must have either "among" or "inside".'
     ])
     expect(
-      rule('id: a', 'why: W.', 'kind: threshold', 'metric: complexity', 'max: 3', 'of: x')
+      rule('id: a', 'why: W.', 'kind: threshold', 'metric: maintainability', 'max: 3', 'of: x')
     ).toEqual([
-      '5: invalid-rule: The Rule a cannot be checked: "complexity" is no metric the suite knows; a metric is one of files, lines, efferent-coupling, afferent-coupling, instability, fan-out, fan-in, relational-cohesion, internal-share.'
+      '5: invalid-rule: The Rule a cannot be checked: "maintainability" is no metric the suite knows; a metric is one of files, lines, efferent-coupling, afferent-coupling, instability, fan-out, fan-in, relational-cohesion, internal-share, abstractness, distance, complexity, lcom4, propagation-cost.'
     ])
     expect(
       rule('id: a', 'why: W.', 'kind: threshold', 'metric: lines', 'max: "2000"', 'of: x')

@@ -56,7 +56,9 @@ export const METRICS = [
   'fanOut',
   'fanIn',
   'cohesion',
-  'internalShare'
+  'internalShare',
+  'abstractness',
+  'distance'
 ] as const
 export type MetricKey = (typeof METRICS)[number]
 
@@ -538,7 +540,8 @@ export const en = {
       label: 'Show this level as',
       graph: 'Graph',
       matrix: 'Matrix',
-      metrics: 'Metrics'
+      metrics: 'Metrics',
+      sequence: 'Main sequence'
     },
 
     metric: {
@@ -592,13 +595,28 @@ export const en = {
         long: 'Internal share',
         definition:
           'Internal share: the Dependencies among the files inside, divided by all Dependencies that start or end inside. Undefined when there are none.'
+      },
+      abstractness: {
+        short: 'A',
+        long: 'Abstractness, A',
+        definition:
+          'Abstractness, A: the abstract declarations among all it declares — interfaces, abstract classes, type aliases — against classes, enums and functions. 0 is entirely concrete, 1 entirely abstract. Undefined when it declares nothing.'
+      },
+      distance: {
+        short: 'D',
+        long: 'Distance from the main sequence, D',
+        definition:
+          'Distance from the main sequence, D = |A + I − 1|: 0 on the line from stable and abstract to unstable and concrete, 1 in a corner — stable and concrete, hard to change; or unstable and abstract, of no use. Undefined where A or I is.'
       }
     } satisfies Record<MetricKey, MetricWording>,
     /** A metric's value as a cell or the page shows it. */
     value: (key: MetricKey, value: number | undefined): string =>
       value === undefined
         ? '–'
-        : key === 'instability' || key === 'cohesion'
+        : key === 'instability' ||
+            key === 'cohesion' ||
+            key === 'abstractness' ||
+            key === 'distance'
           ? value.toFixed(2)
           : key === 'internalShare'
             ? `${Math.round(value * 100)} %`
@@ -615,7 +633,30 @@ export const en = {
         python:
           "Python's imports made by calling something are not seen: where there is Python, these numbers are a lower bound.",
         go: "Go's method calls through values and build constraints are not followed: where there is Go, these numbers are a lower bound."
-      } satisfies Record<LowerBound, string>
+      } satisfies Record<LowerBound, string>,
+      propagationCost: (value: number | undefined): string =>
+        value === undefined
+          ? 'Propagation cost of this level: undefined, it has fewer than two nodes.'
+          : `Propagation cost of this level: ${Math.round(value * 100)} %.`,
+      propagationCostDefinition:
+        'Propagation cost: of all ordered pairs of nodes of this level, Unassigned left out, the share where the first reaches the second through Dependencies — how far a change can travel. A node does not count as reaching itself.'
+    },
+
+    sequence: {
+      label: 'Abstractness against instability of the Components of this level',
+      howToRead:
+        'Each Component is a point: to the right the more unstable, to the top the more abstract. The main sequence is the diagonal from stable and abstract to unstable and concrete; the further a Component lies from it, the larger its distance D. Bottom left lies the zone of pain — stable and concrete, hard to change; top right the zone of uselessness — abstract and used by nothing.',
+      instability: 'Instability, I',
+      abstractness: 'Abstractness, A',
+      line: 'Main sequence',
+      pain: 'Zone of pain',
+      uselessness: 'Zone of uselessness',
+      list: 'Furthest from the main sequence first',
+      point: (name: string, a: string, i: string, d: string): string =>
+        `${name}: A ${a}, I ${i}, D ${d}`,
+      none: 'No Component of this level has both an abstractness and an instability.',
+      missing: (names: string): string =>
+        `Not drawn, for want of an abstractness or an instability: ${names}.`
     },
 
     matrix: {
@@ -634,11 +675,12 @@ export const en = {
 
     viewer: {
       label: 'Source File',
-      back: (show: 'graph' | 'matrix' | 'metrics'): string =>
+      back: (show: 'graph' | 'matrix' | 'metrics' | 'sequence'): string =>
         ({
           graph: 'Back to the graph',
           matrix: 'Back to the matrix',
-          metrics: 'Back to the metrics'
+          metrics: 'Back to the metrics',
+          sequence: 'Back to the main sequence'
         })[show],
       marked: (lines: readonly number[]): string =>
         `${many(lines.length, 'Line', 'Lines')} ${lines.join(', ')} marked`,
@@ -669,6 +711,19 @@ export const en = {
       files: 'Source Files',
       filesIn: (directory: string): string => `In \`${directory}\`:`,
       metrics: 'Metrics',
+      functions: 'Most complex functions',
+      functionsHint:
+        'By cyclomatic complexity: 1 and one more for each decision, each language counted as its usual tool counts it — ESLint for TypeScript and JavaScript (if, loop, case, catch, ?:, &&, ||, ??, ?., &&=, ||=, ??=, a default value), Checkstyle for Java, radon for Python, gocyclo for Go. Open one to read it.',
+      firstFunctions: (shown: number, total: number): string =>
+        `The ${shown} most complex of ${count(total)}.`,
+      complexity: (value: number): string => `complexity ${value}`,
+      noFunction: 'No function in its Source Files.',
+      classes: 'Classes whose methods fall apart',
+      classesHint:
+        'LCOM4: the groups of methods that share no field and call no one of another group. More than one, and the class could be split.',
+      groups: (lcom4: number, methods: number): string => `${lcom4} groups of ${methods} methods`,
+      notMeasured: (files: string): string =>
+        `Not measured inside, and so missing here: ${files}. Measuring failed there; its Dependencies are counted all the same.`,
       cycles: 'Cycles it is part of',
       noCycle: 'None at its level.',
       atItsLevel: 'At its own level, among the Components beside it.',

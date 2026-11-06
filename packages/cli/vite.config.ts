@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
-import { oneFile } from './bundle'
+import { commandConfig } from './command.config'
 
-// The command is one file that Node.js runs as it is (`bundle.ts`): `core`, `structure`,
-// `conformance`, `diagrams`, TypeScript, tree-sitter and `yaml` are bundled into it.
-export default defineConfig(oneFile('src/main.ts', 'adr.mjs'))
+// `adr`: `core`, `structure`, `conformance`, `diagrams`, TypeScript, tree-sitter and `yaml` in
+// one file.
+export default defineConfig(commandConfig('adr.mjs'))

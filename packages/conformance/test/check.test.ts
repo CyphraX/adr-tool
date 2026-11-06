@@ -175,6 +175,49 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
     ])
   })
 
+  it('of a function or a class name its Source File and its name, of a level its Component or *', async () => {
+    const files = {
+      '.arch/components.yml':
+        'components:\n  a:\n    paths: [src/a/**]\n  b:\n    paths: [src/b/**]\n',
+      'src/a/a.ts': [
+        "import { b } from '../b/b'",
+        'export function decide(x: number): number { return x > 0 ? b(x) : x < 0 ? -1 : 0 }',
+        'export class Two { x = 1; y = 2; one(): number { return this.x } two(): number { return this.y } }',
+        ''
+      ].join('\n'),
+      'src/b/b.ts': 'export const b = (x: number): number => (x > 1 ? x : 1)\n'
+    }
+    const report = await checked(
+      files,
+      yaml(
+        'rules:',
+        "  - {id: simple, why: W., kind: threshold, metric: complexity, max: 1, of: '*'}",
+        "  - {id: cohesive, why: W., kind: threshold, metric: lcom4, max: 1, of: '*'}",
+        '  - {id: loose, why: W., kind: threshold, metric: propagation-cost, max: 0.4, of: /}',
+        'exceptions:',
+        '  - {rule: simple, file: src/a/a.ts, name: decide, reason: R.}',
+        '  - {rule: cohesive, file: src/a/a.ts, name: Two, reason: R.}',
+        '  - {rule: loose, component: /, reason: R.}',
+        '  - {rule: simple, component: a, reason: R.}',
+        '  - {rule: simple, file: src/a/a.ts, reason: R.}',
+        '  - {rule: loose, file: src/a/a.ts, name: decide, reason: R.}',
+        '  - {rule: simple, file: src/a/a.ts, name: gone, reason: R.}'
+      )
+    )
+    expect(found(report)).toEqual([
+      'simple: decide in src/a/a.ts (accepted)',
+      'simple: b in src/b/b.ts',
+      'cohesive: Two in src/a/a.ts (accepted)',
+      'loose: / (accepted)'
+    ])
+    expect(problems(report)).toEqual([
+      '9: invalid-exception: An Exception from the Rule simple cannot be read: an Exception from a Rule of the kind threshold names its Violation by "file" and "name".',
+      '10: invalid-exception: An Exception from the Rule simple cannot be read: an Exception from a Rule of the kind threshold names its Violation by "file" and "name".',
+      '11: invalid-exception: An Exception from the Rule loose cannot be read: an Exception from a Rule of the kind threshold names its Violation by "component", or "*" for the top level.',
+      '12: unmatched-exception: The Exception simple: gone in src/a/a.ts matches no Violation any more. Remove it, or name the Violation as it is now.'
+    ])
+  })
+
   it('of a Cycle accept a Cycle that shrank, with a note, and not one that grew', async () => {
     // The review's probe: a uses b, b uses a and c; c uses nothing. The Cycle is a and b.
     const files = {

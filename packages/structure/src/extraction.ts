@@ -5,6 +5,7 @@
  */
 import type { GoOutline, GoReader } from './go/outline'
 import type { JavaOutline, JavaReader } from './java/outline'
+import type { FileMeasures } from './measures'
 import type { PythonOutline, PythonReader } from './python/outline'
 import type { StructureSaid } from './sentences'
 import { languageOf } from './source-files'
@@ -14,17 +15,25 @@ import { extractUses, type Use } from './typescript/extract'
  * Changes whenever the same text would be extracted differently. What was cached under
  * another version is extracted again.
  */
-export const EXTRACTION_VERSION = 4
+export const EXTRACTION_VERSION = 5
+
+/** What is measured inside a file that was read (section 5, "Inside a Source File"). */
+export interface Measured {
+  /** Its functions, classes and declarations. */
+  readonly measures?: FileMeasures
+  /** Why it could not be measured, where it could not: the file keeps its uses. */
+  readonly notMeasured?: string
+}
 
 export type Extraction =
   /** TypeScript, JavaScript, Svelte: the module specifiers the code uses, as written. */
-  | { readonly analysed: true; readonly uses: readonly Use[] }
+  | ({ readonly analysed: true; readonly uses: readonly Use[] } & Measured)
   /** Java: what the file declares and uses, for the symbol table of its packages. */
-  | { readonly analysed: true; readonly java: JavaOutline }
+  | ({ readonly analysed: true; readonly java: JavaOutline } & Measured)
   /** Python: its imports, as written, for the source roots of the repository. */
-  | { readonly analysed: true; readonly python: PythonOutline }
+  | ({ readonly analysed: true; readonly python: PythonOutline } & Measured)
   /** Go: its package, its imports, what it declares and uses, for the packages of its modules. */
-  | { readonly analysed: true; readonly go: GoOutline }
+  | ({ readonly analysed: true; readonly go: GoOutline } & Measured)
   /**
    * The file cannot be parsed. It keeps its Component and has no Dependencies of its own
    * (section 2, "Files that cannot be read"). `line` and `message` are the parser's first

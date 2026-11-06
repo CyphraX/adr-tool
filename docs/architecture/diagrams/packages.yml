@@ -17,6 +17,8 @@ elements:
     at: [480, 580]
   - component: review
     at: [480, 200]
+  - component: assessment
+    at: [200, 560]
   - component: mcp
     at: [700, 120]
   - component: cli
@@ -51,6 +53,10 @@ connections:
   - from: review
     to: structure
     label: Source Files
+  - from: assessment
+    to: kernel
+  - from: assessment
+    to: structure
   - from: mcp
     to: core
     label: serves ADRs
@@ -58,7 +64,7 @@ connections:
     to: structure
   - from: mcp
     to: cli
-    label: runs git, reads code
+    label: runs git, analyses
   - from: mcp
     to: diagrams
     label: plans Diagrams
@@ -99,6 +105,9 @@ connections:
     label: the settings
   - from: app
     to: review
+    label: German sentences
+  - from: app
+    to: assessment
     label: German sentences
   - from: app
     to: git

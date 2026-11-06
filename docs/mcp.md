@@ -59,6 +59,14 @@ Every call reads the repository afresh: what a person or git changed in between 
 | `list_templates` | — | `templates`: the repository's own under `.adr/templates`, then the built-in ones, each with `name` and `source`; `default`, the one a new ADR is made from when none is named. |
 | `list_components` | — | `components`: the Components `.arch/components.yml` declares, with `id`, `name` and `description` — what an ADR can name in `affects` ([structure-format.md](structure-format.md)). |
 
+### Measuring the code (part 13)
+
+| Tool | Takes | Answers |
+| --- | --- | --- |
+| `component_metrics` | `component`?, `tests`? | Structure's metrics ([structure-format.md, section 5](structure-format.md#5-metrics-parts-5-and-13)) of the Component, or of the whole repository when `component` is left out, as data: `metrics`, the Component's size, coupling, instability, abstractness and distance from the main sequence; `level`, the level below it — `below` is its ID, or `null` for the top level —, with its `propagationCost` and each node's `kind`, `id`, number of `files`, and the `abstractness`, `instability` and `distance` of each Component or directory; `functions`, its 20 most complex, each with `file`, `name`, `line`, `endLine` and `complexity`, and how many there are as `functionCount`; `splitClasses`, only the classes whose methods fall into more than one group by LCOM4, the 10 with the most groups, each with `methods` and `lcom4`, `splitClassCount` how many such classes there are, and `classCount` how many classes were measured at all. A metric that is undefined — nothing to divide by, nothing declared — is `null`. `origin` says whether the Components are declared or the Draft. `notes` says, for each of Java, Python and Go that is there, what its reader does not see, and that only the metrics built on Dependencies are touched by it: coupling, fan-in, fan-out and propagation cost are lower bounds, instability and distance can be off either way, complexity, LCOM4 and abstractness are not affected; and names the Source Files that could not be measured inside. Test files count when `tests` is `true`. |
+
+`component_metrics` analyses the code each time it is called, as `adr check` does — the files git lists, the Components, every import, TypeScript, JavaScript, Svelte, Java, Python and Go — and it takes a moment on a large repository. It reads; it runs nothing of the repository and writes nothing.
+
 ## Planning a change
 
 Each of these reads the repository, plans the operation with `core` exactly as the app plans it, and answers with the planned change. Nothing is written.
