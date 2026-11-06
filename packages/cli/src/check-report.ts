@@ -129,13 +129,13 @@ function entries(report: CheckReport): Entry[] {
 
 /**
  * A Violation at each line of each import behind it — where Jonas reads it — with the reason
- * the Rule gives; a Violation without an import, at its Rule.
+ * the Rule gives; of a function or a class, at its line; a Violation of neither, at its Rule.
  */
 function violationEntries(violation: CheckedViolation): Entry[] {
   const { rule } = violation
   if (violation.dependencies.length === 0) {
     const message = `${sentenceAt(violation)} ${rule.why}`
-    return [{ path: RULES_PATH, line: rule.line, code: rule.id, message }]
+    return [{ ...placeOf(violation), code: rule.id, message }]
   }
   return violation.dependencies.flatMap((dependency) =>
     dependency.lines.map((line) => ({
@@ -146,6 +146,12 @@ function violationEntries(violation: CheckedViolation): Entry[] {
     }))
   )
 }
+
+/** Where a Violation without imports is: its function or class, or else its Rule. */
+const placeOf = (violation: CheckedViolation): { path: string; line: number } =>
+  violation.file !== undefined && violation.line !== undefined
+    ? { path: violation.file, line: violation.line }
+    : { path: RULES_PATH, line: violation.rule.line }
 
 const said = (entry: Entry): string =>
   oneLine(
@@ -297,8 +303,8 @@ function json(report: CheckReport): object {
         why: violation.rule.why,
         fingerprint: violation.fingerprint,
         fingerprintText: fingerprintText(violation.fingerprint),
-        path: first?.from ?? RULES_PATH,
-        line: first ? first.lines[0] : violation.rule.line,
+        ...(first ? { path: first.from, line: first.lines[0] } : placeOf(violation)),
+        ...(violation.value !== undefined && { value: violation.value }),
         dependencies: violation.dependencies,
         ...(exception && {
           exception: {

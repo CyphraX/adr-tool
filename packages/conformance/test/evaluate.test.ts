@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { distanceOf } from '@adr-tool/structure/model'
 import { sentenceAt } from '../src'
 import { checked, found, shop, yaml } from './repository'
 
@@ -399,5 +400,171 @@ describe('threshold', () => {
       )
     )
     expect(found(report)).toEqual(['small: billing', 'share: billing', 'share: features'])
+  })
+})
+
+describe('threshold on what is measured inside the code (part 13)', () => {
+  // cart uses pricing; pricing declares an interface, an abstract class and a function.
+  const measured = {
+    '.arch/components.yml':
+      'components:\n  cart:\n    paths: [src/cart/**]\n  pricing:\n    paths: [src/pricing/**]\n',
+    'src/cart/cart.ts': [
+      "import { price, type Priced } from '../pricing/price'", // 1
+      'export class Cart {', // 2
+      '  private lines: Priced[] = []',
+      "  private note = ''",
+      '  add(line: Priced): void { this.lines.push(line) }',
+      '  total(): number { return this.lines.reduce((sum, line) => sum + price(line), 0) }',
+      '  remark(text: string): void { this.note = text }',
+      '}',
+      'export function discount(total: number, code?: string): number {', // 9
+      '  if (code === undefined) return total',
+      "  if (code === 'HALF') return total / 2",
+      '  return total > 100 ? total - 10 : total',
+      '}',
+      ''
+    ].join('\n'),
+    'src/cart/cart.test.ts':
+      'export const odd = (x: number): boolean => (x > 0 && x < 10) || x === 99 || x === 7\n',
+    'src/pricing/price.ts': [
+      'export interface Priced { cents: number }',
+      'export abstract class Base implements Priced { abstract cents: number }',
+      'export function price(line: Priced): number { return line.cents }',
+      ''
+    ].join('\n')
+  }
+
+  it('checks the complexity of each function in the matched Components, at its line', async () => {
+    const report = await checked(
+      measured,
+      rules(
+        rule('simple', 'kind: threshold', 'metric: complexity', 'max: 3', "of: '*'"),
+        rule(
+          'simple-tests',
+          'kind: threshold',
+          'metric: complexity',
+          'max: 3',
+          'of: cart',
+          'tests: included'
+        )
+      )
+    )
+    expect(report.problems).toEqual([])
+    expect(found(report)).toEqual([
+      'simple: discount in src/cart/cart.ts',
+      'simple-tests: odd in src/cart/cart.test.ts',
+      'simple-tests: discount in src/cart/cart.ts'
+    ])
+    const [discount] = report.violations
+    expect(discount).toMatchObject({
+      file: 'src/cart/cart.ts',
+      line: 9,
+      name: 'discount',
+      value: 4
+    })
+    expect(discount!.fingerprint).toEqual({
+      kind: 'function',
+      rule: 'simple',
+      file: 'src/cart/cart.ts',
+      name: 'discount'
+    })
+    expect(discount!.dependencies).toEqual([])
+    expect(sentenceAt(discount!)).toBe(
+      'The metric complexity of the function discount at src/cart/cart.ts:9 is 4, above the maximum of 3.'
+    )
+  })
+
+  it('checks the LCOM4 of each class, and passes over a class without methods', async () => {
+    const report = await checked(
+      measured,
+      rules(rule('cohesive', 'kind: threshold', 'metric: lcom4', 'max: 1', "of: ['**']"))
+    )
+    expect(found(report)).toEqual(['cohesive: Cart in src/cart/cart.ts'])
+    expect(sentenceAt(report.violations[0]!)).toBe(
+      'The metric lcom4 of the class Cart at src/cart/cart.ts:2 is 2, above the maximum of 1.'
+    )
+  })
+
+  it('checks abstractness and distance per Component', async () => {
+    const report = await checked(
+      measured,
+      rules(
+        rule('concrete', 'kind: threshold', 'metric: abstractness', 'max: 0.5', "of: '*'"),
+        rule('on-the-sequence', 'kind: threshold', 'metric: distance', 'max: 0.2', "of: '*'")
+      )
+    )
+    expect(found(report)).toEqual(['concrete: pricing', 'on-the-sequence: pricing'])
+    // pricing: two of three declarations abstract, used and using nothing: D = |2/3 + 0 - 1|,
+    // rounded where Structure rounds it.
+    expect(report.violations.map((violation) => violation.value)).toEqual([
+      2 / 3,
+      distanceOf(2 / 3, 0)
+    ])
+    expect(sentenceAt(report.violations[1]!)).toBe(
+      'The metric distance of pricing is 0.33, above the maximum of 0.2.'
+    )
+  })
+
+  it('checks the propagation cost of the top level, named /, and of the level below a Component', async () => {
+    const report = await checked(
+      measured,
+      rules(
+        rule('loose', 'kind: threshold', 'metric: propagation-cost', 'max: 0.4', 'of: [/, cart]'),
+        rule(
+          'loose-tests',
+          'kind: threshold',
+          'metric: propagation-cost',
+          'max: 0',
+          'of: cart',
+          'tests: included'
+        )
+      )
+    )
+    // cart reaches pricing: one of the two pairs. Below cart there is one file, and so no
+    // propagation cost; with its test, two that do not use each other.
+    expect(found(report)).toEqual(['loose: /'])
+    expect(report.violations[0]).toMatchObject({ component: '/', value: 0.5 })
+    expect(report.problems).toEqual([])
+    expect(sentenceAt(report.violations[0]!)).toBe(
+      'The metric propagation-cost of the top level is 0.5, above the maximum of 0.4.'
+    )
+    const below = await checked(
+      measured,
+      rules(
+        rule(
+          'tight',
+          'kind: threshold',
+          'metric: propagation-cost',
+          'min: 0.5',
+          'of: cart',
+          'tests: included'
+        )
+      )
+    )
+    expect(found(below)).toEqual(['tight: cart'])
+    expect(sentenceAt(below.violations[0]!)).toBe(
+      'The metric propagation-cost of the level below cart is 0, below the minimum of 0.5.'
+    )
+    // `*` matches every top-level Component, as for every other metric: the levels below them.
+    const each = await checked(
+      measured,
+      rules(
+        rule(
+          'each',
+          'kind: threshold',
+          'metric: propagation-cost',
+          'min: 0.5',
+          "of: '*'",
+          'tests: included'
+        )
+      )
+    )
+    expect(found(each)).toEqual(['each: cart'])
+    // `/` names no Component, and the top level only for propagation cost.
+    const elsewhere = await checked(
+      measured,
+      rules(rule('files', 'kind: threshold', 'metric: files', 'max: 9', 'of: /'))
+    )
+    expect(elsewhere.problems.map((problem) => problem.kind)).toEqual(['unknown-component'])
   })
 })

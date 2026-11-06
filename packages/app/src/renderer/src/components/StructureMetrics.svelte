@@ -70,6 +70,9 @@
   </div>
 
   <footer>
+    <p title={t.structure.metrics.propagationCostDefinition}>
+      {t.structure.metrics.propagationCost(view.propagationCost)}
+    </p>
     <p>{t.structure.metrics.howToRead}</p>
     {#each lowerBound as language (language)}
       <p>{t.structure.metrics.lowerBound[language]}</p>

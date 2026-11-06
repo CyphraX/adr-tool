@@ -78,12 +78,15 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
     const { structure, analysis, packages } = await own()
     const suggested = suggestConnections(packages, structure, analysis)
     expect(pairs(suggested)).toEqual([
+      'app > assessment',
       'app > cli',
       'app > conformance',
       'app > core',
       'app > diagrams',
       'app > review',
       'app > structure',
+      'assessment > kernel',
+      'assessment > structure',
       'cli > conformance',
       'cli > core',
       'cli > kernel',
@@ -104,10 +107,12 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
       'structure > kernel'
     ])
     expect(suggested.every((connection) => connection.drawn)).toBe(true)
-    // The window's German takes the sentences of Diagrams as types only; Review it runs.
-    expect(suggested.find((one) => one.from === 'app' && one.to === 'diagrams')).toMatchObject({
-      typeOnly: true
-    })
+    // The window's German takes the sentences of Diagrams and Assessment as types only; Review it runs.
+    for (const to of ['diagrams', 'assessment']) {
+      expect(suggested.find((one) => one.from === 'app' && one.to === to)).toMatchObject({
+        typeOnly: true
+      })
+    }
     expect(suggested.find((one) => one.from === 'app' && one.to === 'review')).toMatchObject({
       typeOnly: false
     })
@@ -185,7 +190,7 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
     expect(
       problems.map((problem) => `${problem.path}:${problem.line}: ${wordingOf(problem)}`)
     ).toEqual([
-      'docs/architecture/diagrams/packages.yml:20: The Diagram shows mcp, which is not a declared Component.'
+      'docs/architecture/diagrams/packages.yml:22: The Diagram shows mcp, which is not a declared Component.'
     ])
 
     // Planned against the repository as it is: this test never writes into it.

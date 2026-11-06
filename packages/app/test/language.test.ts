@@ -46,7 +46,9 @@ const SAME_IN_GERMAN = new Set([
   'Review',
   'Annotation',
   'Text',
-  'Markdown'
+  'Markdown',
+  'A',
+  'D'
 ])
 
 /** Arguments to try a text that is a function with: a name or a count, a list, an object. */
@@ -75,7 +77,9 @@ const SAME_AT = new Set([
   'structure.value',
   'structure.page.filesIn',
   'annotations.about',
-  'annotations.detail.written'
+  'annotations.detail.written',
+  // The symbols of the metrics, and their values.
+  'structure.sequence.point'
 ])
 
 /** Every text of `english` that `german` says the same, by where it stands. */

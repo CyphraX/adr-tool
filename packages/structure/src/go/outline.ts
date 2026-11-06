@@ -9,8 +9,10 @@
  */
 import type { Node } from 'web-tree-sitter'
 import type { Extraction } from '../extraction'
+import { measuring } from '../measures'
 import { detailed } from '../sentences'
 import { firstError, parserOf, type Grammar } from '../tree-sitter'
+import { measureGo } from './measure'
 
 export interface GoImport {
   /** The import path, unquoted: `example.com/shop/cart`, `fmt`. */
@@ -80,7 +82,7 @@ export async function prepareGo(wasm: Grammar): Promise<GoReader> {
         )
         return { analysed: false, line: error.startPosition.row + 1, message, said }
       }
-      return { analysed: true, go: outline(root) }
+      return { analysed: true, go: outline(root), ...measuring(() => measureGo(root)) }
     } finally {
       tree.delete()
     }

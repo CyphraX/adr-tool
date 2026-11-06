@@ -241,6 +241,27 @@ export interface StructureNeighbour {
   readonly typeOnly: boolean
 }
 
+/**
+ * A function as the Component page lists it: where its name is, and its cyclomatic complexity
+ * (docs/structure-format.md, section 5, "Inside a Source File").
+ */
+export interface StructureFunction {
+  readonly file: string
+  /** Qualified by what contains it: `Cart.total`, `Cart.add(Product)`. */
+  readonly name: string
+  readonly line: number
+  readonly complexity: number
+}
+
+/** A class as the Component page lists it: where its name is, its methods and their groups. */
+export interface StructureClass {
+  readonly file: string
+  readonly name: string
+  readonly line: number
+  readonly methods: number
+  readonly lcom4: number
+}
+
 /** What the Component page shows of one Component: the declaration, the metrics, the Dependencies. */
 /** The page of a Component, or of a directory below a Component without children. */
 export interface StructureComponent {
@@ -267,6 +288,13 @@ export interface StructureComponent {
   readonly lowerBound: readonly LowerBound[]
   /** `undefined` when it contains no Source File. */
   readonly metrics?: Metrics
+  /** Its most complex functions, the most complex first: the first few of `functionCount`. */
+  readonly functions: readonly StructureFunction[]
+  readonly functionCount: number
+  /** Its classes whose methods fall into more than one group, the most groups first: the first few. */
+  readonly classes: readonly StructureClass[]
+  /** The Source Files inside that could not be measured: their functions and classes are missing. */
+  readonly notMeasured: readonly string[]
   /** At its own level: what it depends on, and what depends on it. */
   readonly dependsOn: readonly StructureNeighbour[]
   readonly usedBy: readonly StructureNeighbour[]
@@ -319,6 +347,12 @@ export interface StructureView {
   readonly nodes: readonly StructureNode[]
   readonly edges: readonly StructureEdge[]
   readonly cycles: readonly Cycle[]
+  /**
+   * The propagation cost of the level (structure-format.md, section 5): the share of ordered
+   * pairs of its nodes, Unassigned left out, where the one reaches the other. `undefined` for
+   * fewer than two nodes.
+   */
+  readonly propagationCost: number | undefined
   readonly matrix: StructureMatrix
   /** The Components the level and the matrix show, for their pages. */
   readonly components: readonly StructureComponent[]

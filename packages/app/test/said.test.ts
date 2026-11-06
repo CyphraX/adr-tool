@@ -3,6 +3,7 @@ import { SENTENCES, type CoreSaid, type Said } from '@adr-tool/core'
 import { REVIEW_SENTENCES } from '@adr-tool/review'
 import { STRUCTURE_SENTENCES, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
 import { DIAGRAMS_SENTENCES } from '@adr-tool/diagrams'
+import { ASSESSMENT_SENTENCES } from '@adr-tool/assessment'
 import { DE, inGerman } from '../src/renderer/src/lib/said.de'
 import { wordIn, wordOf, wordStructureProblem, wordWarnings } from '../src/renderer/src/lib/said'
 
@@ -56,11 +57,16 @@ const MODULES = [
     name: 'review',
     sentences: REVIEW_SENTENCES,
     detail: { code: 'frontmatter-yaml', values: { message: '‹detail-message›' } }
+  },
+  {
+    name: 'assessment',
+    sentences: ASSESSMENT_SENTENCES,
+    detail: { code: 'frontmatter-not-valid-yaml', values: { message: '‹detail-message›' } }
   }
 ] as const
 
 describe('German', () => {
-  it('has a sentence for every code of core, structure, diagrams and review', () => {
+  it('has a sentence for every code of core, structure, diagrams, review and assessment', () => {
     // The compiler asks for them (`DE` is typed by the tables); this says so where it runs.
     for (const { sentences } of MODULES) {
       for (const code of Object.keys(sentences)) expect(Object.keys(DE), code).toContain(code)

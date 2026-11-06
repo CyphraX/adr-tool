@@ -21,11 +21,13 @@ export {
   isRuleId,
   METRICS,
   readRules,
+  SUBJECT_OF,
   type AppliedPattern,
   type CyclesRule,
   type DependencyRule,
   type LayersRule,
   type MetricName,
+  type MetricSubject,
   type Naming,
   type Rule,
   type RuleKind,
@@ -33,7 +35,7 @@ export {
   type ThresholdRule,
   type WrittenException
 } from './rules'
-export { evaluate, type Model, type Violation } from './evaluate'
+export { evaluate, TOP_LEVEL, type Model, type Violation } from './evaluate'
 export {
   adrExists,
   checkConformance,
