@@ -323,6 +323,7 @@ describe('this repository', () => {
           '    to: structure',
           '    to: structure',
           '    to: structure',
+          '    to: structure',
           '    to: structure'
         ]
       },
