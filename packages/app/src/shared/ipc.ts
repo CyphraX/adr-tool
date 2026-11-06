@@ -25,6 +25,7 @@ import type {
 } from '@adr-tool/conformance'
 import type { DiagramsApi } from './diagrams'
 import type { Language as WindowLanguage } from './language'
+import type { Annotation, AnnotationType, Found, ReviewProblem } from '@adr-tool/review'
 import type {
   Cycle,
   Dependency,
@@ -591,6 +592,71 @@ export type ApplyResult =
       readonly inPart?: true
     }
 
+/**
+ * An Annotation as the window shows it (docs/review-format.md), with what became of its Anchor
+ * when it was last looked for: unchanged, moved, or orphaned. Absent for one whose Anchor cannot
+ * be read: a Problem says why.
+ */
+export interface AnnotationView extends Annotation {
+  readonly found?: Found
+}
+
+/**
+ * The Annotations of a repository and their Problems, read in the main process with their
+ * Anchors found again in the code as it is on disk (docs/plan-vision.md, part 9). Derived: it is
+ * read again when HEAD, the Annotations or the files they are about change.
+ */
+export interface ReviewOverview {
+  readonly repositoryId: string
+  /** The directory of the Annotations; `undefined` while it cannot be used. */
+  readonly directory: string | undefined
+  /** `.arch/config.yml` cannot be read: no Annotation is read until it is fixed. */
+  readonly configUnreadable: boolean
+  /** By their IDs. */
+  readonly annotations: readonly AnnotationView[]
+  /** Every Problem of Review: of the files, of the Traces to ADRs, and the orphaned. */
+  readonly problems: readonly ReviewProblem[]
+  /** The commit HEAD pointed at when the Anchors were looked for; `undefined` without one. */
+  readonly head: string | undefined
+  /** When they were looked for, in milliseconds since the epoch. */
+  readonly foundAt: number
+  /** They are looked for again, or soon will be: what is shown is the last result. */
+  readonly finding: boolean
+  /** The last look failed, and why: what is shown is the result before it. */
+  readonly failed?: string
+}
+
+export type ReviewResult =
+  | { readonly ok: true; readonly overview: ReviewOverview }
+  | { readonly ok: false; readonly reason: string }
+
+/** Lines of a Source File as a person selected them: the first and the last, counted from 1. */
+export interface SelectedLines {
+  readonly path: string
+  readonly start: number
+  readonly end: number
+}
+
+/**
+ * A write to the Annotations, as the window asks for it (docs/review-format.md, section 5).
+ * `review` plans it against the disk as it is; what the window says of an Anchor is never taken
+ * for it: the lines are read from the disk, and a moved Anchor is looked for again.
+ */
+export type ReviewRequest =
+  | ({
+      readonly kind: 'create'
+      readonly type: AnnotationType
+      readonly text: string
+      readonly author: string
+      /** ADRs, as `cites` names them. */
+      readonly cites: readonly string[]
+    } & SelectedLines)
+  | { readonly kind: 'reply'; readonly id: string; readonly text: string; readonly author: string }
+  | { readonly kind: 'state'; readonly id: string; readonly state: 'open' | 'resolved' }
+  | { readonly kind: 'update-anchor'; readonly id: string }
+  | ({ readonly kind: 'attach'; readonly id: string } & SelectedLines)
+  | { readonly kind: 'cite' | 'uncite'; readonly id: string; readonly adr: string }
+
 export interface Api extends DiagramsApi {
   /** `win32`, `darwin` or `linux`. */
   readonly platform: string
@@ -726,6 +792,19 @@ export interface Api extends DiagramsApi {
   onCloseRequested(listener: () => void): () => void
   /** What the person said: close the window, whatever it holds — or keep it, and forget that anything was to quit. */
   answerCloseRequest(close: boolean): Promise<void>
+
+  // Review (docs/plan-vision.md, part 9)
+  /**
+   * The Annotations of the repository with their Anchors as last found again: the last result
+   * while they are looked for again, in the background, after HEAD or the files changed.
+   */
+  reviewOverview(repositoryId: string): Promise<ReviewResult>
+  /** Called when the Annotations of a repository are looked for again, and once they are found. */
+  onReviewChanged(listener: (repositoryId: string) => void): () => void
+  /** Plan a write to the Annotations. Nothing is written until the change is applied. */
+  planReview(repositoryId: string, request: ReviewRequest): Promise<PlanResult>
+  /** Who git says the person is, `user.name`: the author a new Annotation or Reply proposes. */
+  gitUserName(repositoryId: string): Promise<string | undefined>
 }
 
 export const CHANNEL = {
@@ -769,5 +848,9 @@ export const CHANNEL = {
   setLanguage: 'window:set-language',
   reloadWindow: 'window:reload',
   closeRequested: 'window:close-requested',
-  answerCloseRequest: 'window:answer-close-request'
+  answerCloseRequest: 'window:answer-close-request',
+  reviewOverview: 'review:overview',
+  reviewChanged: 'review:changed',
+  planReview: 'review:plan',
+  gitUserName: 'review:user-name'
 } as const

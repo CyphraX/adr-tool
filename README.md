@@ -15,17 +15,18 @@ A desktop app for the architecture that lives in a git repository: its Architect
 
 Softarch Suite reads ADRs where they already are: Markdown files in a repository, written by people, by agents or by other tools. It lists them, shows how they relate, finds what is inconsistent, and writes new ones and changes to existing ones. Every change is shown as a diff before it is written, and nothing is changed beyond the lines it was asked to change. Markdown is never re-serialized ([ADR-0002](docs/adr/0002-never-reserialize-markdown.md)).
 
-The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Three of them are built, and the core of one more:
+The suite is planned as one workbench of several modules for software architects ([vision](docs/vision.md)). Four of them are built, and the core of one more:
 
 - **Decisions** covers the ADRs. It was called ADR Tool until the suite got its name.
 - **Structure** shows the Components of the code and the Dependencies between them, and links them to the ADRs that affect them.
 - **Conformance** checks the code against Rules the architect writes down. Its core and `adr check` are built; its window is next.
 - **Diagrams** draws pictures of the architecture whose boxes are Components, and says where a picture and the code drift apart.
+- **Review** keeps remarks on lines of code — notes, questions, concerns — beside the code, and finds them again when the code changes.
 
 The app runs locally: there is no backend, no account and no telemetry.
 
 > [!NOTE]
-> Early development. The Decisions, Structure and Diagrams modules are built, and so is the rest of the roadmap; the other modules of the suite are being built part by part ([plan-vision.md](docs/plan-vision.md)). There are no installers yet: the app runs from source.
+> Early development. The Decisions, Structure, Diagrams and Review modules are built, and so is the rest of the roadmap; the other modules of the suite are being built part by part ([plan-vision.md](docs/plan-vision.md)). There are no installers yet: the app runs from source.
 
 ## Table of Contents
 
@@ -34,6 +35,7 @@ The app runs locally: there is no backend, no account and no telemetry.
   - [Structure](#structure)
   - [Conformance](#conformance)
   - [Diagrams](#diagrams)
+  - [Review](#review)
 - [Install](#install)
 - [Usage](#usage)
   - [Checking ADRs in CI](#checking-adrs-in-ci)
@@ -185,6 +187,20 @@ The Rules are checked in the background on Structure's analysis, through the sam
 - **Export SVG.** The picture is written beside the Diagram, `<id>.svg`, with what it says as its text for a screen reader, and an ADR embeds it as any image. A picture that no longer matches its Diagram is a Problem, whose Repair exports it again. A Component that is gone from the declaration is one too, whose Repair takes it out of the Diagram.
 - **Rename.** A Rename of a Component rewrites the Diagrams that show it in the same previewed change, and draws again each picture that was current.
 
+### Review
+
+- **Annotations on lines of code.** Select lines in the code viewer and write a `note`, a `question` or a `concern` about them, in Markdown, under your name from git. An Annotation is a file of its own under `docs/architecture/annotations/`, never a comment in the code, and quotes the lines it is about ([review-format.md](docs/review-format.md)). A mark in the gutter shows each one beside its lines, amber while it is open, and a click opens it with its Replies, **Resolve** and **Reopen**.
+
+  ![An Annotation beside its line in the code viewer, open in the detail](docs/screenshots/readme/review-code.png)
+
+- **Review** in the module switcher. The sidebar filters by state, Anchor, type, Component and author, with counts; the centre lists the Annotations; the detail shows the quoted lines, the Replies and the ADRs an Annotation cites, each a **Trace**. The page of an ADR lists the Annotations that cite it, the page of a Component its open Annotations, and <kbd>Ctrl</kbd> <kbd>K</kbd> finds them by their text and ID.
+
+- **They survive the code changing.** Each Anchor is found again in the background when HEAD or a file changes — by its quoted lines and git's history, across inserted lines, edits, renames and rebases ([ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)). A moved Annotation is shown at its new lines, with **Update the Anchor**. One whose lines are gone is **orphaned**, among the Repository Problems, and **Attach again** lets you select the lines it is about now.
+
+  ![A moved Annotation with Update the Anchor, and an orphaned one in the list](docs/screenshots/readme/review-moved.png)
+
+Every write — a new Annotation, a Reply, Resolve, Update the Anchor, Attach again, Cite — is previewed as a diff first. `adr check` checks the Annotations too, and the MCP server gives them to agents.
+
 ## Install
 
 Requirements:
@@ -235,7 +251,7 @@ The command is one file with nothing beside it, for any repository: `--format gi
 
 ### Checking the code against its Rules and Diagrams
 
-`adr check` does what `adr lint` does, and checks `.arch/components.yml` and the Rules of `.arch/rules.yml` against the code. Each Violation is printed at the line of the import that causes it, with the reason its Rule gives; the command exits with 1 on a Problem or on a Violation without an Exception:
+`adr check` does what `adr lint` does, and checks `.arch/components.yml` and the Rules of `.arch/rules.yml` against the code. Each Violation is printed at the line of the import that causes it, with the reason its Rule gives; the command exits with 1 on a Problem or on a Violation without an Exception. It checks the Annotations of Review as well: a Trace to an ADR that is not there fails, and an orphaned Annotation is a note that fails nothing:
 
 ```console
 $ node packages/cli/dist/adr.mjs check packages/conformance/test/fixtures/layered-shop
@@ -274,7 +290,7 @@ Exported 14 ADRs of 1 Decision Log to /home/me/decisions. Open /home/me/decision
 
 ### Agents over MCP
 
-`adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. `component_metrics` gives it the metrics of a Component's code as data. It reads the Diagrams with their Drift against the code, and plans a new Diagram, edits of one, its export and its Repairs the same way. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
+`adr-mcp` serves the Decision Logs of a repository to an agent over the [Model Context Protocol](https://modelcontextprotocol.io). The agent reads ADRs, Problems and Templates, and writes through the same operations as the app — create, accept, edit, repair, migrate — each planned first and answered as diffs. `component_metrics` gives it the metrics of a Component's code as data. It reads the Diagrams with their Drift against the code, and plans a new Diagram, edits of one, its export and its Repairs the same way. It reads and writes the Annotations of Review the same way too: where their lines are now, their Replies, and a new Annotation, a Reply, Resolve, Cite. Nothing is written until `apply_change`, so the person sees every change before it lands ([ADR-0013](docs/adr/0013-agents-write-adrs-through-the-mcp-server-as-previewed-change.md)).
 
 ```console
 $ pnpm build
@@ -395,10 +411,10 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [`packages/structure`](packages/structure) | The core of the Structure module, under the same guard: Components, Source Files, the Draft, Dependencies, Cycles, the metrics and the matrix. Java, Python and Go are read with the grammars of tree-sitter as WebAssembly. Its entry `@adr-tool/structure/model` holds everything except the parsers |
 | [`packages/conformance`](packages/conformance) | The core of the Conformance module, on `kernel` and `structure` alone and under the same guard: the Rules and Exceptions of `.arch/rules.yml`, their evaluation against the Dependencies, the Problems of the file, and Rename in it |
 | [`packages/diagrams`](packages/diagrams) | The core of the Diagrams module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Diagrams and their Problems, suggested connections and Drift, the edits of a Diagram and a new one, each a change of its lines, Rename in them, the Repairs, and the SVG, drawn without a browser, with the Problem of a stale picture |
-| [`packages/review`](packages/review) | The core of the Review module, under the same guard: Annotations with their Anchors, Replies and Traces to ADRs, and how an Anchor is found again across commits, renames and rebases ([ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)). It reads git through the kernel's port; the window follows |
+| [`packages/review`](packages/review) | The core of the Review module, under the same guard: Annotations with their Anchors, Replies and Traces to ADRs, and how an Anchor is found again across commits, renames and rebases ([ADR-0019](docs/adr/0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history.md)). It reads git through the kernel's port |
 | [`packages/assessment`](packages/assessment) | The core of the Assessment module, on `kernel` and `@adr-tool/structure/model` alone and under the same guard: Assessments with their Quality Scenarios, Findings and Snapshots, the registers of Risks and Technical Debt Items, the Traces of their evidence, and Rename in them ([ADR-0021](docs/adr/0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file.md)). The window follows |
 | [`packages/cli`](packages/cli) | The command line, `adr lint`, `adr check` and `adr export`, built on the cores into one file that Node.js runs ([docs/cli.md](docs/cli.md)). `@adr-tool/cli/git` is the one way the suite runs git, for the app as well; `@adr-tool/cli/analysis` analyses a repository as the command does, for the MCP server, which `command.config.ts` builds into one file the same way |
-| [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core`, `diagrams` and Structure's analysis into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
+| [`packages/mcp`](packages/mcp) | The MCP server for agents, `adr-mcp`, built on `core`, `diagrams`, `review` and Structure's analysis into one file that Node.js runs ([docs/mcp.md](docs/mcp.md)) |
 | [`packages/app`](packages/app) | The Electron + Svelte 5 desktop app ([ADR-0001](docs/adr/0001-electron-svelte-typescript-throughout.md)). The renderer is sandboxed and reaches the main process only through the preload bridge. The analysis runs in a worker thread |
 
 ### Conventions

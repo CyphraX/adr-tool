@@ -40,6 +40,9 @@
   --code-marked: #fbf0d2;
   --code-marked-edge: #e2aa4f;
 
+  /* What waits for a person: an open Annotation (docs/design.md, "Colour has a meaning"). */
+  --waiting: #a2650f;
+
   --ui: 'IBM Plex Sans', system-ui, sans-serif;
   --document: 'IBM Plex Serif', Georgia, serif;
   --code: 'IBM Plex Mono', ui-monospace, monospace;
@@ -82,6 +85,8 @@
     --code-literal: #e2aa4f;
     --code-marked: #3a3322;
     --code-marked-edge: #a2650f;
+
+    --waiting: #e2aa4f;
   }
 }
 

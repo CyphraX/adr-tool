@@ -56,6 +56,7 @@ export function instructionsFor(root: string): string {
     'To edit the text of an ADR, read it with read_adr first and pass the revision it returns to plan_edit_body: an edit of a body that changed since is refused.',
     'The tool decides IDs, numbers and Metadata, and keeps Relations and Back-references consistent. Do not write ADR files or .arch/rules.yml directly: plan_rule and plan_exception write the Rules and Exceptions.',
     'The Diagrams of the architecture are read with list_diagrams and read_diagram, which compares one with the code (its Drift); plan_new_diagram, plan_diagram_change, plan_diagram_export and plan_diagram_repair plan their changes the same way. Do not write Diagram files or their SVG pictures directly.',
+    'Annotations are remarks of people on lines of Source Files. Read them with list_annotations and read_annotation, which say where their lines are in the code as it is now; plan_annotation, plan_reply, plan_annotation_state, plan_update_anchor, plan_attach, plan_cite and plan_uncite plan their writes, applied as every other change. Name the file and the lines: the tool quotes them.',
     'component_metrics measures the code of a Component: abstractness, distance, the propagation cost of the level below it, its most complex functions and least cohesive classes.'
   ].join('\n')
 }

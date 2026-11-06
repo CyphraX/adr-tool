@@ -43,6 +43,10 @@ const SAME_IN_GERMAN = new Set([
   'H',
   'Fan-in',
   'Fan-out',
+  'Review',
+  'Annotation',
+  'Text',
+  'Markdown',
   'A',
   'D',
   // The Diagrams module: a word of the glossary, a key of the file, and one German has too.
@@ -76,6 +80,8 @@ const SAME_AT = new Set([
   'structure.graph.directory',
   'structure.value',
   'structure.page.filesIn',
+  'annotations.about',
+  'annotations.detail.written',
   // The symbols of the metrics, and their values.
   'structure.sequence.point'
 ])

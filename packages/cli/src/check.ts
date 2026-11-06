@@ -13,9 +13,11 @@ import {
   type StructureProblem
 } from '@adr-tool/structure/model'
 import { openDiagrams } from '@adr-tool/diagrams'
-import { openConfig, type UnreadableConfig } from '@adr-tool/kernel'
+import { openConfig, type Git, type UnreadableConfig } from '@adr-tool/kernel'
+import { adrReferencesOf } from '@adr-tool/review'
 import { dependenciesOf } from './analysis'
 import { checkDiagrams, diagramsNeedModel, type DiagramsCheck } from './check-diagrams'
+import { checkReview, type ReviewCheck } from './check-review'
 import { conformanceOf } from './conformance'
 import { lintRepository, type LintReport } from './lint'
 
@@ -40,6 +42,8 @@ export interface CheckReport {
   readonly config: UnreadableConfig | undefined
   readonly conformance: ConformanceReport
   readonly diagrams: DiagramsCheck
+  /** The Annotations of Review: their Problems, and the orphaned ones as notes. */
+  readonly review: ReviewCheck
   /** What was not checked, and why: for standard error, not part of the result. */
   readonly notes: readonly string[]
 }
@@ -47,26 +51,31 @@ export interface CheckReport {
 /**
  * Check the repository behind `fs`, whose files are `files` (`listRepository`): its Decision
  * Logs as `adr lint` does, its declaration of Components, its Rules against the code, and its
- * Diagrams — their Problems, their pictures, and their Drift against the code.
- * `undefined` when there is nothing to check: no Decision Log, no declaration, no Rules, no
- * Diagram, and nothing wrong with `.arch/config.yml`.
+ * Diagrams — their Problems, their pictures, and their Drift against the code —, and its
+ * Annotations, whose Anchors are found again with `git`. `undefined` when there is nothing to
+ * check: no Decision Log, no declaration, no Rules, no Diagram, no Annotation, and nothing wrong
+ * with `.arch/config.yml`.
  */
 export async function check(
   fs: FileSystem,
-  files: readonly string[]
+  files: readonly string[],
+  git: Git
 ): Promise<CheckReport | undefined> {
   const { report: lint, repository } = await lintRepository(fs)
   const rulesText = await fs.readText(RULES_PATH)
   const declared = (await fs.readText(DECLARATION_PATH)) !== undefined
   const config = await openConfig(fs)
   const found = await openDiagrams(fs, config)
+  const review = await checkReview(fs, git, adrReferencesOf(repository.logs))
   const nothing =
     lint === undefined &&
     rulesText === undefined &&
     !declared &&
     config.readable &&
     found.problems.length === 0 &&
-    found.diagrams.length === 0
+    found.diagrams.length === 0 &&
+    review.annotations === 0 &&
+    review.problems.length === 0
   if (nothing) return undefined
 
   const notes = [...(lint?.notes ?? [])]
@@ -108,6 +117,7 @@ export async function check(
     config: config.readable ? undefined : config.problem,
     conformance,
     diagrams,
+    review,
     notes
   }
 }

@@ -71,6 +71,9 @@ connections:
     to: diagrams
     label: plans Diagrams
   - from: mcp
+    to: review
+    label: serves Annotations
+  - from: mcp
     to: kernel
     label: the settings
   - from: cli
@@ -87,6 +90,9 @@ connections:
   - from: cli
     to: kernel
     label: the git port
+  - from: cli
+    to: review
+    label: checks the Annotations
   - from: app
     to: core
     label: Decisions
@@ -107,7 +113,7 @@ connections:
     label: the settings
   - from: app
     to: review
-    label: German sentences
+    label: Review
   - from: app
     to: assessment
     label: German sentences

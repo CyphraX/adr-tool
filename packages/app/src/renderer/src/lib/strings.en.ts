@@ -1,5 +1,6 @@
 import type { Rule, RuleKind } from '@adr-tool/conformance'
 import type { RelationState, RelationType } from '@adr-tool/core'
+import type { AnnotationState, AnnotationType } from '@adr-tool/review'
 import type { Decision, LowerBound } from '../../../shared/ipc'
 import { DIAGRAMS_EN } from './strings.diagrams.en'
 import type { Refusal } from './views'
@@ -35,6 +36,19 @@ export interface ReviewWording {
 }
 
 const many = (count: number, one: string, more: string): string => (count === 1 ? one : more)
+
+/** A text with its first letter in capitals: a sentence's start. */
+const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** Lines of a Source File: the first and the last, counted from 1. */
+interface Span {
+  readonly start: number
+  readonly end: number
+}
+
+/** Lines as a sentence names them: "line 12", "lines 12–14". */
+const linesWord = (lines: Span): string =>
+  lines.start === lines.end ? `line ${lines.start}` : `lines ${lines.start}–${lines.end}`
 
 /** A count as the window writes it: 9,115. */
 const count = (value: number): string => value.toLocaleString('en')
@@ -113,7 +127,8 @@ export const en = {
     decisions: 'Decisions',
     structure: 'Structure',
     conformance: 'Conformance',
-    diagrams: 'Diagrams'
+    diagrams: 'Diagrams',
+    review: 'Review'
   },
 
   tabs: {
@@ -185,7 +200,7 @@ export const en = {
     /** The row in the sidebar of every module that leads there. */
     entry: 'Repository Problems',
     entryHint:
-      'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, of the Traces between them, and of its Rules',
+      'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, of the Traces between them, of its Rules and of its Annotations',
     counting: 'Structure is still analysing the code: its Problems are counted once it is done.',
     /** Structure is not open, so its files are not watched: the count may be older than they are. */
     asOf: (at: number): string =>
@@ -199,6 +214,7 @@ export const en = {
     noneHere: 'No Problems.',
     traces: 'Traces from ADRs to Components',
     backToStructure: 'Back to the Components',
+    backToAnnotations: 'Back to the Annotations',
     declaration: 'The declaration',
     component: 'Component',
     reading: 'Structure is analysing the code. Its Problems follow once it is done.',
@@ -1073,15 +1089,18 @@ export const en = {
   },
 
   searching: {
-    label: 'Search ADRs, Components and Source Files',
-    placeholder: 'Search ADRs, Components, Source Files — or type the number of an ADR',
+    label: 'Search ADRs, Components, Source Files and Annotations',
+    placeholder:
+      'Search ADRs, Components, Source Files, Annotations — or type the number of an ADR',
     found: 'Found',
     adrs: 'ADRs',
     components: 'Components',
     sourceFiles: 'Source Files',
+    annotations: 'Annotations',
     /** Beside each hit: what kind of thing it is. */
     component: 'Component',
     sourceFile: 'Source File',
+    annotation: 'Annotation',
     draft: 'Draft',
     unassigned: 'Unassigned',
     more: (shown: number, all: number): string =>
@@ -1094,6 +1113,238 @@ export const en = {
       'Structure is analysing the code again: its Components and Source Files are searched as it last found them.',
     notAnalysed: (reason: string): string =>
       `Components and Source Files are not searched: ${reason}`
+  },
+
+  /**
+   * Review: Annotations on lines of Source Files, and their Replies (docs/plan-vision.md, part
+   * 9). Under this name, since `review` is the dialog that shows a change.
+   */
+  annotations: {
+    /** What an Annotation is called where its type is not known. */
+    kind: 'Annotation',
+    sidebar: 'Annotations and filters',
+    heading: 'Annotations',
+    all: 'All',
+    reading: 'Reading the Annotations …',
+    finding:
+      'The code changed: the Anchors are being found again. Until then the Annotations stand where they were found last.',
+    lookFailed: (reason: string): string =>
+      `The Anchors could not be found again (${reason}). The Annotations stand where they were found last; the next change to the code looks again.`,
+    stateHeading: 'State',
+    states: { open: 'Open', resolved: 'Resolved' } satisfies Record<AnnotationState, string>,
+    anchorHeading: 'Anchors',
+    moved: 'Moved',
+    movedHint:
+      'Found again, but not as their Anchor says: at other lines, in a renamed Source File, or with other text. Update the Anchor writes their new place.',
+    orphaned: 'Orphaned',
+    orphanedHint:
+      'Their Anchor can no longer be found in the code: each one is attached again by hand.',
+    typeHeading: 'Type',
+    types: { note: 'Note', question: 'Question', concern: 'Concern' } satisfies Record<
+      AnnotationType,
+      string
+    >,
+    componentHeading: 'Component',
+    componentsFollow: 'The Components follow once Structure has analysed the code.',
+    noComponent: 'No Component',
+    authorHeading: 'Author',
+    nobody: 'Nobody named',
+    noText: 'Without text',
+    /** Who wrote it, when, and how many Replies it has, as far as it says. */
+    about: (author: string | undefined, date: string | undefined, replies: number): string =>
+      [author, date, replies > 0 ? many(replies, 'one Reply', `${replies} Replies`) : undefined]
+        .filter((part) => part !== undefined && part !== '')
+        .join(' · '),
+    /** What a screen reader says of an Annotation beside its lines. */
+    card: (type: string, lines: Span, text: string): string =>
+      `${type} on ${linesWord(lines)}: ${text}`,
+    annotateHint:
+      'Write a note, a question or a concern about the selected lines. You see the file before it is written.',
+    annotate: (lines: Span): string => `Annotate ${linesWord(lines)}`,
+    selectToAnnotate: 'Select lines to annotate them',
+    attachingHint: (id: string): string =>
+      `Attach ${id} again: select the lines it is about now. Drag over the code, or click a line number and Shift-click another.`,
+    attachTo: (lines: Span): string => `Attach again to ${linesWord(lines)}`,
+    attachAgain: 'Attach again',
+    backToList: 'Back to the Annotations',
+    lines: (lines: Span): string => capital(linesWord(lines)),
+
+    list: {
+      label: 'The Annotations',
+      count: (shown: number, all: number): string =>
+        shown === all
+          ? many(all, 'One Annotation', `${count(all)} Annotations`)
+          : `${count(shown)} of ${count(all)} Annotations`,
+      showAll: 'Show all',
+      annotateFile: 'Annotate a Source File',
+      annotateFileHint: 'Open a Source File here and select the lines to annotate',
+      none: 'No Annotation yet. Open a Source File, select the lines you want to say something about, and annotate them.',
+      noneFiltered: 'No Annotation passes these filters.',
+      failed: (reason: string): string => `The Annotations could not be read: ${reason}`,
+      configUnreadable:
+        '`.arch/config.yml` cannot be read, so no Annotation is read. Its Problem is among the Problems of the repository.',
+      replies: (count: number): string => many(count, 'one Reply', `${count} Replies`),
+      moved: 'moved',
+      orphaned: 'orphaned',
+      resolved: 'resolved',
+      noAnchor: 'no Anchor'
+    },
+
+    /** The middle of Review, to pick the Source File to open: to annotate it, or to attach again. */
+    picker: {
+      heading: 'Annotate a Source File',
+      lead: 'Pick a Source File: it opens here, and the lines you select in it can be annotated.',
+      attachHeading: (id: string): string => `Attach ${id} again`,
+      attachLead: (path: string): string =>
+        `\`${path}\` is gone, under a new name too. Pick the Source File it is about now: it opens here, and you select its lines in it.`,
+      label: 'Source File',
+      placeholder: 'Words of its path',
+      noneLeft: 'Structure knows no Source File.',
+      analysing: 'Structure is analysing the code: its Source Files can be picked once it is done.',
+      failed: (reason: string): string => `No Source File can be picked: ${reason}`
+    },
+
+    detail: {
+      label: 'The Annotation',
+      select: 'Select an Annotation to read it, with its Replies.',
+      written: (author: string | undefined, date: string | undefined): string =>
+        author !== undefined && date !== undefined
+          ? `${author}, ${date}`
+          : (author ?? date ?? 'Nobody named'),
+      reply: 'Reply',
+      resolve: 'Resolve',
+      reopen: 'Reopen',
+      showCode: 'Show in the code',
+      showCodeHint: 'Open its Source File here, at its lines',
+      updateAnchor: 'Update the Anchor',
+      updateAnchorHint:
+        'Write the place it is found at now into its Anchor. You see the file before it is written.',
+      attachAgainHint:
+        'Select the lines it is about now in its Source File. You see the file before it is written.',
+      attaching: 'Select its new lines in the code viewer, in the middle.',
+      notWritable:
+        'Its file cannot be read, so the suite does not write to it. Fix it in an editor; the view follows.',
+      code: 'Code',
+      movedTo: (written: Span, found: Span): string =>
+        `Moved: written for ${linesWord(written)}, found again at ${linesWord(found)}.`,
+      renamedFrom: (path: string): string => `Its Source File was renamed from \`${path}\`.`,
+      similarity: (similarity: number): string =>
+        `The lines found are ${Math.round(similarity * 100)} % like the quoted lines.`,
+      orphanedThere: (path: string, lines: Span): string =>
+        `Orphaned: the quoted ${linesWord(lines)} ${lines.start === lines.end ? 'is' : 'are'} no longer found in \`${path}\`.`,
+      orphanedGone: (path: string): string =>
+        `Orphaned: \`${path}\` is gone, under a new name too.`,
+      noAnchor: 'Its Anchor cannot be read: its Problem says why.',
+      quoted: 'The quoted lines',
+      now: 'The lines as they are now',
+      replies: 'Replies',
+      noReplies: 'No Reply yet.',
+      yourReply: 'Your Reply',
+      author: 'Author',
+      authorHint: 'As git names you. Change it where it should say something else.',
+      textPlaceholder: 'Markdown',
+      preview: 'Preview',
+      cites: 'Cited ADRs',
+      noCites: 'It cites no ADR.',
+      notThere: 'no ADR of this repository',
+      uncite: 'Uncite',
+      unciteLabel: (adr: string): string => `Uncite ${adr}`,
+      cite: 'Cite an ADR',
+      citePlaceholder: 'Number or words of its title',
+      noAdrLeft: 'No ADR is left to cite.',
+      problems: 'Problems',
+      repair: 'Repair'
+    },
+
+    /** The dialog that describes a new Annotation, on the lines selected in a code viewer. */
+    dialog: {
+      type: 'Type',
+      text: 'Text',
+      textHint: 'Markdown. Its first words make the ID of the Annotation.',
+      textPlaceholder: 'What do you want to say about these lines?',
+      author: 'Author',
+      cites: 'Cited ADRs',
+      citesHint: 'If these lines are about ADRs: each one is a Trace.',
+      remove: (adr: string): string => `Remove ${adr}`,
+      preview: 'Preview'
+    },
+
+    /** The Problems of Review among the Problems of the repository. */
+    problems: {
+      annotation: 'Annotation',
+      file: 'File',
+      reading: 'The Annotations are being read. Their Problems follow.',
+      again: 'The Anchors are being found again: these are the Problems of the last time.',
+      failed: (reason: string): string => `The Annotations could not be read: ${reason}`,
+      configUnreadable:
+        '`.arch/config.yml` cannot be read, so no Annotation is read. Its Problem is under Settings.',
+      byHand:
+        'The suite cannot know what was meant here. Fix the file in an editor; the view follows.'
+    },
+
+    /** The Annotations that cite an ADR, on its page. */
+    adr: {
+      citedBy: 'Cited by',
+      label: 'The Annotations that cite this ADR',
+      show: (id: string): string => `Show ${id} in Review`
+    },
+
+    /** The open Annotations of a Component, on its page. */
+    component: {
+      heading: 'Open Annotations',
+      none: 'No open Annotation on its Source Files.',
+      follow: 'The Annotations follow once they are read.'
+    },
+
+    change: {
+      create: {
+        action: 'Annotate',
+        title: (path: string, start: number, end: number): string =>
+          `Annotate ${linesWord({ start, end })} of ${path}`,
+        refused: 'The Annotation cannot be written'
+      },
+      reply: {
+        action: 'Reply',
+        title: (id: string): string => `Reply to ${id}`,
+        refused: (id: string): string => `Cannot reply to ${id}`
+      },
+      resolve: {
+        action: 'Resolve',
+        title: (id: string): string => `Resolve ${id}`,
+        refused: (id: string): string => `Cannot resolve ${id}`
+      },
+      reopen: {
+        action: 'Reopen',
+        title: (id: string): string => `Reopen ${id}`,
+        refused: (id: string): string => `Cannot reopen ${id}`
+      },
+      updateAnchor: {
+        action: 'Update the Anchor',
+        title: (id: string): string => `Update the Anchor of ${id}`,
+        refused: (id: string): string => `Cannot update the Anchor of ${id}`
+      },
+      attach: {
+        action: 'Attach again',
+        title: (id: string, path: string, start: number, end: number): string =>
+          `Attach ${id} again to ${linesWord({ start, end })} of ${path}`,
+        refused: (id: string): string => `Cannot attach ${id} again`
+      },
+      cite: {
+        action: 'Cite',
+        title: (id: string, adr: string): string => `Cite ${adr} in ${id}`,
+        refused: (id: string, adr: string): string => `Cannot cite ${adr} in ${id}`
+      },
+      uncite: {
+        action: 'Uncite',
+        title: (id: string, adr: string): string => `Uncite ${adr} in ${id}`,
+        refused: (id: string, adr: string): string => `Cannot uncite ${adr} in ${id}`
+      },
+      repair: {
+        action: 'Repair',
+        title: (id: string, adr: string): string => `Repair ${id}: uncite ${adr}`,
+        refused: (id: string, adr: string): string => `Cannot uncite ${adr} in ${id}`
+      }
+    }
   },
 
   /** The dialog that shows a change before it is written, a refusal, or a question. */

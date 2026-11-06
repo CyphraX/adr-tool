@@ -1,5 +1,5 @@
 /**
- * What `core` and `structure` say — why an operation is refused, what its preview warns of,
+ * What `core`, `structure` and `review` say — why an operation is refused, what its preview warns of,
  * what is wrong with a file, why a foreign file has no Migration — in the language of the
  * window (docs/plan-roadmap.md, part 12). Each of them says it as a code, with its English
  * sentence beside it; in English the window shows that sentence, in German it words the code.
@@ -15,6 +15,11 @@ import {
   type ConformanceSaid
 } from '@adr-tool/conformance'
 import type { Said } from '@adr-tool/core'
+import {
+  saidOf as reviewSaidOf,
+  wordingOf as reviewWordingOf,
+  type ReviewProblem
+} from '@adr-tool/review'
 import { saidOf, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
 import type { Language } from '../../../shared/language'
 import type { PlannedChange } from '../../../shared/ipc'
@@ -40,6 +45,11 @@ export function wordWarnings(change: Pick<PlannedChange, 'warnings' | 'warned'>)
 /** What a Problem of Structure says, in the language of the window. */
 export function wordStructureProblem(problem: StructureProblem): string {
   return wordOf(saidOf(problem), wordingOf(problem))
+}
+
+/** What a Problem of Review says, in the language of the window. */
+export function wordReviewProblem(problem: ReviewProblem): string {
+  return wordOf(reviewSaidOf(problem), reviewWordingOf(problem))
 }
 
 /** What `conformance` said — what a Violation is, why a Rule cannot be written — in the language of the window. */

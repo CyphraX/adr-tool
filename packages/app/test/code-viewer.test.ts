@@ -1,6 +1,11 @@
-import { Text } from '@codemirror/state'
+import { EditorState, Text } from '@codemirror/state'
 import { describe, expect, it } from 'vitest'
-import { languageFor, markLines } from '../src/renderer/src/lib/code-viewer'
+import {
+  languageFor,
+  markLines,
+  quotedLines,
+  viewedText
+} from '../src/renderer/src/lib/code-viewer'
 
 describe('the code viewer', () => {
   it('highlights each language of the Structure format by its extension', () => {
@@ -31,5 +36,16 @@ describe('the code viewer', () => {
       starts.push(from)
     })
     expect(starts).toEqual([doc.line(2).from, doc.line(4).from])
+  })
+
+  // A carriage return that ends no line shifted every line after it: the viewer counted it as a
+  // line break, the Anchor does not, and line 3 selected here was line 4 there.
+  it('counts lines as an Anchor counts them: LF and CRLF end a line, a lone CR does not', () => {
+    const lines = (text: string): string[] =>
+      EditorState.create({ doc: viewedText(text) }).doc.toJSON()
+    expect(lines('a\rb\nc\nd\n')).toEqual(['a\u240db', 'c', 'd', ''])
+    expect(lines('a\r\nb\r\nc')).toEqual(['a', 'b', 'c'])
+    expect(quotedLines('a\rb\nc\nd\n', 3, 3)).toEqual(['d'])
+    expect(quotedLines('a\r\nb\r\nc\r\n', 2, 3)).toEqual(['b', 'c'])
   })
 })

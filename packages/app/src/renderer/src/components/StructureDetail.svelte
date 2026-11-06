@@ -12,6 +12,8 @@
   import { wordConformance, wordOf } from '../lib/said'
   import { app, statusKey } from '../lib/state.svelte'
   import { METRICS, t } from '../lib/strings'
+  import { firstLine, linesOf, openOf, ownersOf, placeOf } from '../lib/review'
+  import { reviewing } from '../lib/reviewing.svelte'
   import { commonDirectory, nodeLabel, opens } from '../lib/structure'
   import { codeSpans, prefixOf } from '../lib/wording'
   import ComponentDiagrams from './ComponentDiagrams.svelte'
@@ -63,6 +65,12 @@
 
   const nameOfComponent = (id: string): string =>
     app.active?.repository.components?.find((component) => component.id === id)?.name ?? id
+
+  // The open Annotations on the Source Files of a Component and of those inside it (part 9).
+  const review = $derived(app.active?.review)
+  const owners = $derived(ownersOf(app.active?.outline.known))
+  const openAnnotations = (id: string): ReturnType<typeof openOf> =>
+    openOf(id, review?.known?.annotations ?? [], owners)
 
   const selection = $derived(app.active?.structure.selection)
   // What the code viewer shows, so that its link reads as the one that is open.
@@ -267,6 +275,39 @@
   {/if}
 
   <ComponentDiagrams id={page.id} />
+
+  <h3>{t.annotations.component.heading}</h3>
+  {@const annotations = openAnnotations(page.id)}
+  {#if !review?.known}
+    <p class="faint">{t.annotations.component.follow}</p>
+  {:else if annotations.length === 0}
+    <p class="faint">{t.annotations.component.none}</p>
+  {:else}
+    <ul class="annotations">
+      {#each annotations as annotation (annotation.id)}
+        {@const place = placeOf(annotation)}
+        <li>
+          <button
+            class="link"
+            title={t.annotations.adr.show(annotation.id)}
+            onclick={() => reviewing.open(annotation.id)}
+          >
+            <span class="type"
+              >{annotation.type ? t.annotations.types[annotation.type] : t.annotations.kind}</span
+            >
+            {firstLine(annotation.text) || annotation.id}
+          </button>
+          {#if place}
+            <span class="path faint"
+              >{place.path.slice(place.path.lastIndexOf('/') + 1)}:{linesOf(place)}</span
+            >
+          {:else}
+            <span class="tag orphaned">{t.annotations.list.orphaned}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   <h3>{t.structure.page.patterns}</h3>
   <dl class="patterns">
@@ -709,6 +750,28 @@
 
   .decisions .prefix {
     color: var(--ink-soft);
+  }
+
+  .annotations li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+  }
+
+  .annotations .link {
+    color: var(--ink);
+  }
+
+  .annotations .type {
+    margin-right: 4px;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  .tag.orphaned {
+    border-color: var(--problem);
+    color: var(--problem);
   }
 
   .rules li,

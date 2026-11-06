@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { devNull, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { run } from '../src/run'
 
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
@@ -558,6 +559,188 @@ describe('adr check (docs/cli.md)', () => {
     const { code, out } = await adr('check', '--help')
     expect(code).toBe(0)
     expect(out).toContain('adr check [path] [--format text|json|github]')
+  })
+})
+
+describe('adr check of the Annotations (docs/cli.md; docs/plan-vision.md, part 9)', () => {
+  // No configuration of the machine's: neither the helpers' git nor the command's sees any.
+  beforeAll(() => {
+    vi.stubEnv('GIT_CONFIG_GLOBAL', devNull)
+    vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1')
+  })
+  afterAll(() => vi.unstubAllEnvs())
+
+  const CART = [
+    'export class Cart {',
+    '  private lines: Line[] = []',
+    '',
+    '  add(line: Line): void {',
+    '    this.lines.push(line)',
+    '  }',
+    '',
+    '  total(): number {',
+    '    return this.lines.reduce((sum, line) => sum + line.price * line.quantity, 0)',
+    '  }',
+    '',
+    '  count(): number {',
+    '    return this.lines.length',
+    '  }',
+    '}'
+  ]
+  const ADR =
+    '---\nstatus: accepted\ncreated: 2026-11-02\ndecided: 2026-11-02\n---\n\n# Keep the cart in memory\n'
+  const DIRECTORY = 'docs/architecture/annotations'
+
+  /** An Annotation on lines `from` to `to` of `src/cart.ts`, quoting them, at `commit`. */
+  const annotation = (from: number, to: number, cites: string[], commit: string): string =>
+    [
+      '---',
+      'type: concern',
+      'state: open',
+      'author: Aylin Demir',
+      'date: 2026-11-02',
+      'anchor:',
+      '  path: src/cart.ts',
+      `  lines: ${from}-${to}`,
+      `  commit: ${commit}`,
+      ...(cites.length > 0 ? ['cites:', ...cites.map((adr) => `  - ${adr}`)] : []),
+      '---',
+      '',
+      '```ts',
+      ...CART.slice(from - 1, to),
+      '```',
+      '',
+      'Is this the place for it?',
+      ''
+    ].join('\n')
+
+  /** A git repository of an example person: the cart, an ADR, and what `files` adds. */
+  function repository(files: Record<string, string> = {}): {
+    root: string
+    git: (...args: string[]) => string
+  } {
+    const root = copyOf(undefined, {
+      'src/cart.ts': `${CART.join('\n')}\n`,
+      'docs/adr/0001-keep-the-cart-in-memory.md': ADR,
+      ...files
+    })
+    const git = (...args: string[]): string =>
+      execFileSync('git', args, {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Aylin Demir',
+          GIT_AUTHOR_EMAIL: 'aylin@example.com',
+          GIT_COMMITTER_NAME: 'Aylin Demir',
+          GIT_COMMITTER_EMAIL: 'aylin@example.com'
+        }
+      }).trim()
+    git('init', '-q', '-b', 'trunk')
+    git('config', 'commit.gpgsign', 'false')
+    git('add', '-A')
+    git('commit', '-q', '-m', 'The cart')
+    return { root, git }
+  }
+
+  it('notes an orphaned Annotation, and fails on a Trace to no ADR and on a file it cannot read', async () => {
+    const { root, git } = repository()
+    const head = git('rev-parse', 'HEAD')
+    const write = (name: string, text: string): void =>
+      writeFileSync(join(root, DIRECTORY, name), text)
+    mkdirSync(join(root, DIRECTORY), { recursive: true })
+    write('20261102-the-total.md', annotation(8, 10, ['0001-keep-the-cart-in-memory'], head))
+    write('20261102-the-count.md', annotation(12, 14, ['0009-count-lazily'], head))
+    write('20261102-broken.md', 'No frontmatter.\n')
+    // The total goes: its Annotation is orphaned.
+    writeFileSync(
+      join(root, 'src/cart.ts'),
+      `${[...CART.slice(0, 7), ...CART.slice(11)].join('\n')}\n`
+    )
+    git('commit', '-q', '-am', 'No total in the cart')
+
+    const at = (name: string): string => `${DIRECTORY}/${name}`
+    const { code, out, err } = await adrIn(root, 'check')
+    expect([code, err]).toEqual([1, ''])
+    expect(lines(out)).toEqual([
+      `${at('20261102-broken.md')}: unreadable-annotation: ${at('20261102-broken.md')} cannot be read: it has no frontmatter.`,
+      `${at('20261102-the-count.md')}: unknown-adr: ${at('20261102-the-count.md')} cites 0009-count-lazily, which is no ADR of this repository.`,
+      `${at('20261102-the-total.md')}: orphaned: 20261102-the-total is orphaned: the quoted lines 8-10 of src/cart.ts are no longer found in it. Attach it again to the lines it is about.`,
+      '',
+      'No Problems in 1 Decision Log.',
+      'No Rules: .arch/rules.yml is not there.',
+      '3 Annotations: 2 Problems, 1 orphaned.'
+    ])
+
+    const github = lines((await adrIn(root, 'check', '--format', 'github')).out)
+    expect(github.slice(0, 3).map((line) => line.split(' ')[0])).toEqual([
+      '::error',
+      '::error',
+      '::notice'
+    ])
+    expect(github[2]).toMatch(
+      /^::notice file=docs\/architecture\/annotations\/20261102-the-total\.md,title=orphaned::/
+    )
+
+    const report = JSON.parse((await adrIn(root, 'check', '--format', 'json')).out)
+    expect(report.annotations).toEqual({ directory: DIRECTORY, count: 3 })
+    expect(
+      report.problems.map((one: { module: string; code: string }) => [one.module, one.code])
+    ).toEqual([
+      ['review', 'unreadable-annotation'],
+      ['review', 'unknown-adr']
+    ])
+    expect(report.notes).toEqual([
+      expect.objectContaining({
+        module: 'review',
+        code: 'orphaned',
+        path: at('20261102-the-total.md'),
+        note: expect.objectContaining({ annotation: '20261102-the-total', file: 'there' })
+      })
+    ])
+
+    // Once the Problems are repaired, the orphaned Annotation alone fails nothing.
+    rmSync(join(root, DIRECTORY, '20261102-broken.md'))
+    write('20261102-the-count.md', annotation(12, 14, [], head))
+    expect(await adrIn(root, 'check')).toEqual({
+      code: 0,
+      out: [
+        `${at('20261102-the-total.md')}: orphaned: 20261102-the-total is orphaned: the quoted lines 8-10 of src/cart.ts are no longer found in it. Attach it again to the lines it is about.`,
+        '',
+        'No Problems in 1 Decision Log.',
+        'No Rules: .arch/rules.yml is not there.',
+        '2 Annotations: no Problem, 1 orphaned.',
+        ''
+      ].join('\n'),
+      err: ''
+    })
+  })
+
+  it('finds a moved Annotation, which is no Problem, and checks a repository of Annotations alone', async () => {
+    const { root, git } = repository()
+    const head = git('rev-parse', 'HEAD')
+    rmSync(join(root, 'docs/adr'), { recursive: true })
+    mkdirSync(join(root, DIRECTORY), { recursive: true })
+    writeFileSync(join(root, DIRECTORY, '20261102-the-count.md'), annotation(12, 14, [], head))
+    // Two lines above the count: it moves to 14-16.
+    writeFileSync(
+      join(root, 'src/cart.ts'),
+      `${['// The cart of a session.', '', ...CART].join('\n')}\n`
+    )
+    git('commit', '-q', '-am', 'Say what the cart is')
+    expect(await adrIn(root, 'check')).toEqual({
+      code: 0,
+      out: 'No Decision Log.\nNo Rules: .arch/rules.yml is not there.\n1 Annotation: no Problem, none orphaned.\n',
+      err: ''
+    })
+  })
+
+  it('reads no Annotation while "annotations" is no directory inside the repository', async () => {
+    const { root } = repository({ '.arch/config.yml': 'annotations: ../elsewhere\n' })
+    const { code, out } = await adrIn(root, 'check')
+    expect(code).toBe(1)
+    expect(lines(out)[0]).toMatch(/^\.arch\/config\.yml:1: invalid-annotations-directory: /)
+    expect(lines(out).at(-1)).toBe('No Annotation is read: 1 Problem in .arch/config.yml.')
   })
 })
 

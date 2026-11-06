@@ -56,7 +56,8 @@ export function renderCheck(report: CheckReport, format: Format, checkout = ''):
 
 /**
  * Whether the check fails: a Problem of any module — a picture of a Diagram that is not
- * current among them —, or a Violation without an Exception. Drift fails nothing.
+ * current among them —, or a Violation without an Exception. Drift fails nothing, and neither
+ * does an orphaned Annotation.
  */
 export function fails(report: CheckReport): boolean {
   return (
@@ -65,7 +66,8 @@ export function fails(report: CheckReport): boolean {
     report.declaration.length > 0 ||
     report.conformance.problems.length > 0 ||
     report.conformance.violations.some((violation) => violation.exception === undefined) ||
-    report.diagrams.problems.length > 0
+    report.diagrams.problems.length > 0 ||
+    report.review.problems.length > 0
   )
 }
 
@@ -75,10 +77,11 @@ const configMessage = (problem: UnreadableConfig): string =>
 
 /**
  * The Problems of the settings, of the declaration and of the Rules, every import of a
- * Violation that fails, then the Problems of the Diagrams and their Drift, as notes.
+ * Violation that fails, then the Problems of the Diagrams and their Drift, as notes, and the
+ * Problems of the Annotations and the orphaned ones, as notes.
  */
 function entries(report: CheckReport): Entry[] {
-  const { conformance, config, diagrams } = report
+  const { conformance, config, diagrams, review } = report
   return [
     ...(config
       ? [
@@ -116,6 +119,18 @@ function entries(report: CheckReport): Entry[] {
     ...diagrams.drift.map(({ path, line, code, message }) => ({
       path,
       line,
+      code,
+      message,
+      note: true as const
+    })),
+    ...review.problems.map(({ path, line, code, message }) => ({
+      path,
+      ...(line !== undefined && { line }),
+      code,
+      message
+    })),
+    ...review.orphaned.map(({ path, code, message }) => ({
+      path,
       code,
       message,
       note: true as const
@@ -168,7 +183,8 @@ const counted = (count: number, word: string): string => `${count} ${word}${coun
 
 /**
  * The last lines: one for the Decision Logs, one for the settings and one for the declaration
- * if needed, one for the Rules, and one for the Diagrams where there are any.
+ * if needed, one for the Rules, and one for the Diagrams and one for the Annotations where there
+ * are any.
  */
 function summaries(report: CheckReport): string[] {
   const lines = [report.lint ? lintSummary(report.lint) : 'No Decision Log.']
@@ -179,7 +195,30 @@ function summaries(report: CheckReport): string[] {
   lines.push(rulesSummary(report))
   const diagrams = diagramsSummary(report)
   if (diagrams) lines.push(diagrams)
+  const review = reviewSummary(report)
+  if (review) lines.push(review)
   return lines
+}
+
+/**
+ * The line of the Annotations: how many there are, their Problems, and how many are orphaned.
+ * None where there is no Annotation and nothing is wrong with where they are.
+ */
+function reviewSummary(report: CheckReport): string | undefined {
+  const { directory, annotations, problems, orphaned } = report.review
+  if (directory === undefined) {
+    return problems.length === 0
+      ? undefined
+      : `No Annotation is read: ${counted(problems.length, 'Problem')} in ${CONFIG_PATH}.`
+  }
+  if (annotations === 0) {
+    return problems.length === 0
+      ? undefined
+      : `No Annotation: ${counted(problems.length, 'Problem')} in ${directory}.`
+  }
+  const found = problems.length === 0 ? 'no Problem' : counted(problems.length, 'Problem')
+  const lost = orphaned.length === 0 ? 'none orphaned' : `${orphaned.length} orphaned`
+  return `${counted(annotations, 'Annotation')}: ${found}, ${lost}.`
 }
 
 /** The line of the Rules. */
@@ -227,9 +266,8 @@ function diagramsSummary(report: CheckReport): string | undefined {
 
 /** The document of `--format json` (docs/cli.md, "adr check"). */
 function json(report: CheckReport): object {
-  const { conformance } = report
+  const { conformance, config, diagrams, review } = report
   const decisions = report.lint ? lintJson(report.lint) : { logs: [], problems: [] }
-  const { config, diagrams } = report
   return {
     logs: decisions.logs,
     problems: [
@@ -262,7 +300,8 @@ function json(report: CheckReport): object {
         line: problem.line,
         problem
       })),
-      ...diagrams.problems.map((problem) => ({ module: 'diagrams', ...problem }))
+      ...diagrams.problems.map((problem) => ({ module: 'diagrams', ...problem })),
+      ...review.problems.map((problem) => ({ module: 'review', ...problem }))
     ],
     notes: [
       ...conformance.notes.map((note) => ({
@@ -273,9 +312,18 @@ function json(report: CheckReport): object {
         line: note.line,
         note
       })),
-      ...diagrams.drift.map((drift) => ({ module: 'diagrams', ...drift }))
+      ...diagrams.drift.map((drift) => ({ module: 'diagrams', ...drift })),
+      ...review.orphaned.map(({ problem, ...entry }) => ({
+        module: 'review',
+        ...entry,
+        note: problem
+      }))
     ],
     diagrams: diagrams.diagrams,
+    annotations:
+      review.directory === undefined
+        ? null
+        : { directory: review.directory, count: review.annotations },
     rules: conformance.rules.map(({ id, kind, why, line }) => ({
       id,
       kind,

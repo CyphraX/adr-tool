@@ -13,6 +13,7 @@ import {
   type DiagramsKnown,
   type DiagramsSection
 } from './diagrams-problems'
+import { reviewSection, type ReviewKnown, type ReviewSection } from './review'
 import { problemsAcross, type Placed, type PlacedGroup } from './together'
 
 /**
@@ -39,6 +40,8 @@ export interface RepositoryProblems {
   readonly conformance: ConformanceSection
   /** The Problems of the Diagrams, and of `.arch/config.yml` (lib/diagrams-problems.ts). */
   readonly diagrams: DiagramsSection
+  /** The Problems of the Annotations: of their files, of their Traces, and the orphaned. */
+  readonly review: ReviewSection
   /** Every Problem known, each root cause once: what every sidebar shows. A note is none. */
   readonly count: number
 }
@@ -129,7 +132,8 @@ export function repositoryProblems(
   repository: OpenRepository,
   outline: OutlineKnown,
   conformance: ConformanceKnown = { view: undefined, reading: true, failed: undefined },
-  diagramsKnown: DiagramsKnown = { overview: undefined, reading: false, failed: undefined }
+  diagramsKnown: DiagramsKnown = { overview: undefined, reading: false, failed: undefined },
+  review?: ReviewKnown
 ): RepositoryProblems {
   const [across] = problemsAcross([repository])
   const logOf = (path: string): DecisionLog | undefined =>
@@ -159,13 +163,23 @@ export function repositoryProblems(
   const rulesCount =
     rules.state === 'known' ? rules.entries.filter((entry) => !entry.note).length : 0
   const diagrams = diagramsSection(diagramsKnown)
+  // `.arch/config.yml` that cannot be read is counted once, with the Diagrams' settings.
+  const annotations = reviewSection(review)
+  const reviewCount = annotations.state === 'known' ? annotations.entries.length : 0
   return {
     decisions: { own: across!.own, logs },
     traces,
     structure,
     conformance: rules,
     diagrams,
-    count: decisionsCount + traces.length + structureCount + rulesCount + diagramsCount(diagrams)
+    review: annotations,
+    count:
+      decisionsCount +
+      traces.length +
+      structureCount +
+      rulesCount +
+      diagramsCount(diagrams) +
+      reviewCount
   }
 }
 

@@ -19,6 +19,7 @@
     "@adr-tool/core": "workspace:*",
     "@adr-tool/diagrams": "workspace:*",
     "@adr-tool/kernel": "workspace:*",
+    "@adr-tool/review": "workspace:*",
     "@adr-tool/structure": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@types/node": "^24.13.5",
