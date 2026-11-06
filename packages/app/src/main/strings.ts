@@ -61,6 +61,42 @@ const en = {
         textAt === undefined ? `${path}, which is new` : `${path}, whose text is now in ${textAt}`
       )
     )}. Put them back by hand before you try again.`,
+  /** The menu of the app (menu.ts); `name` is the name of the app. */
+  menu: {
+    about: (name: string): string => `About ${name}`,
+    hide: (name: string): string => `Hide ${name}`,
+    hideOthers: 'Hide Others',
+    unhide: 'Show All',
+    quit: (name: string): string => `Quit ${name}`,
+    file: 'File',
+    exit: 'Exit',
+    edit: 'Edit',
+    undo: 'Undo',
+    redo: 'Redo',
+    cut: 'Cut',
+    copy: 'Copy',
+    paste: 'Paste',
+    delete: 'Delete',
+    selectAll: 'Select All',
+    view: 'View',
+    resetZoom: 'Actual Size',
+    zoomIn: 'Zoom In',
+    zoomOut: 'Zoom Out',
+    fullScreen: 'Toggle Full Screen',
+    window: 'Window',
+    minimize: 'Minimize',
+    zoom: 'Zoom',
+    front: 'Bring All to Front',
+    close: 'Close Window'
+  },
+  /** The window is to unload — a reload, or a close nobody asked about — while it holds text. */
+  unload: {
+    message: 'Discard what is not saved?',
+    detail:
+      'The window holds text that has not been saved: in the editor, or in a dialog. Going on now loses it.',
+    discard: 'Discard',
+    keep: 'Keep editing'
+  },
   commit: {
     noGit: 'This folder is not in a git repository, so there is nothing to commit to.',
     noAdr: (id: string): string => `There is no ADR ${id} in this Decision Log any more.`,
@@ -128,6 +164,40 @@ const de: typeof en = {
           : `${path} (der frühere Text steht jetzt in ${textAt})`
       )
     )}. Stellen Sie sie von Hand wieder her, bevor Sie es noch einmal versuchen.`,
+  menu: {
+    about: (name: string): string => `Über ${name}`,
+    hide: (name: string): string => `${name} ausblenden`,
+    hideOthers: 'Andere ausblenden',
+    unhide: 'Alle einblenden',
+    quit: (name: string): string => `${name} beenden`,
+    file: 'Datei',
+    exit: 'Beenden',
+    edit: 'Bearbeiten',
+    undo: 'Rückgängig',
+    redo: 'Wiederholen',
+    cut: 'Ausschneiden',
+    copy: 'Kopieren',
+    paste: 'Einsetzen',
+    delete: 'Löschen',
+    selectAll: 'Alles auswählen',
+    view: 'Darstellung',
+    resetZoom: 'Originalgröße',
+    zoomIn: 'Vergrößern',
+    zoomOut: 'Verkleinern',
+    fullScreen: 'Vollbild ein/aus',
+    window: 'Fenster',
+    minimize: 'Minimieren',
+    zoom: 'Zoomen',
+    front: 'Alle nach vorne bringen',
+    close: 'Fenster schließen'
+  },
+  unload: {
+    message: 'Verwerfen, was nicht gespeichert ist?',
+    detail:
+      'Das Fenster enthält Text, der nicht gespeichert ist: im Editor oder in einem Dialog. Wenn Sie jetzt weitermachen, geht er verloren.',
+    discard: 'Verwerfen',
+    keep: 'Weiter bearbeiten'
+  },
   commit: {
     noGit:
       'Dieser Ordner liegt in keinem git-Repository, es gibt also nichts, wohin committet werden könnte.',

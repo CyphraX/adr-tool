@@ -49,6 +49,10 @@ pnpm links each package's dependencies into `node_modules` from a store; followi
 
 The app's archive is about 27 MB; Electron makes up the rest of each installer, about 100 to 130 MB.
 
+### The menu
+
+The app sets a menu of its own, in the language of the window (`packages/app/src/main/menu.ts`): on a Mac the app menu with About, Hide and Quit; File; Edit, without which the keys of the clipboard do nothing on a Mac; View with the zoom and full screen; and Window. Electron's default menu is not shipped: its View menu reloads the window, which loses the text of the editor, and opens the developer tools, and its Help menu points to Electron. A reload that comes another way, while the window holds text that is not saved, asks first.
+
 ### The icon
 
 `packages/app/build/icon.svg` is the source: four Components and the Dependencies between them, drawn as the window draws a graph ([design.md](design.md)), on the window's ink. `packages/app/build/render-icon.mjs` draws it into `icon.png`, 1024 px square, in Electron's Chromium; electron-builder derives the `.ico` of Windows and the `.icns` of macOS from the PNG. After a change to the SVG, from `packages/app` (on Linux without a display, under `xvfb-run -a`):

@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, protocol, session, shell, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, Menu, protocol, session, shell, BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
@@ -40,6 +40,7 @@ import {
 } from './requests'
 import { reviewRequest } from './review-requests'
 import { readSession, writeSession } from './session-store'
+import { menuTemplate } from './menu'
 import { setLanguage, t } from './strings'
 import { AnalysisDropped, Structures, cacheName } from './structures'
 
@@ -78,10 +79,16 @@ let activeRoot: string | undefined
 const unsaved = new Set<number>()
 /** The windows that do not answer at the moment, and so cannot be asked anything. */
 const hung = new Set<number>()
+/** The windows whose text the person chose to discard when asked, which now close. */
+const discarded = new Set<number>()
 /** The app is quitting: its windows are being closed for that reason. */
 let quitting = false
 /** The app was quitting when a window held it up to ask. */
 let quitHeldUp = false
+
+/** The menu of the app, in the language the window speaks (menu.ts). */
+const setMenu = (): void =>
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(process.platform, app.name)))
 
 const sessionFile = (): string => join(app.getPath('userData'), 'session.json')
 const saveSession = (): Promise<void> =>
@@ -451,7 +458,9 @@ function registerIpc(): void {
   })
 
   ipcMain.handle(CHANNEL.setLanguage, (_, language: unknown) => {
-    if (isLanguage(language)) setLanguage(language)
+    if (!isLanguage(language)) return
+    setLanguage(language)
+    setMenu()
   })
 
   // A reload from the page is a navigation, which the window refuses (`will-navigate` below).
@@ -503,6 +512,7 @@ function registerIpc(): void {
     quitHeldUp = false
     if (close !== true) return
     unsaved.delete(event.sender.id)
+    discarded.add(event.sender.id)
     BrowserWindow.fromWebContents(event.sender)?.close()
     if (resumeQuit) app.quit()
   })
@@ -614,8 +624,28 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     unsaved.delete(id)
     hung.delete(id)
+    discarded.delete(id)
   })
   contents.on('did-start-loading', () => unsaved.delete(id))
+
+  // A reload throws the page away, and with it the text that is not saved. While the window
+  // holds some, it refuses to unload (`beforeunload`, App.svelte), and the person is asked
+  // here, before anything is lost. A close they were asked about already goes ahead.
+  contents.on('will-prevent-unload', (event) => {
+    if (!discarded.has(id)) {
+      const answer = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        message: t.unload.message,
+        detail: t.unload.detail,
+        buttons: [t.unload.discard, t.unload.keep],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true
+      })
+      if (answer !== 0) return
+    }
+    event.preventDefault()
+  })
 
   // Nothing ever opens or navigates inside the app: web links go to the system
   // browser, everything else is dropped.
@@ -645,6 +675,7 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+  setMenu()
 
   protocol.handle(
     ASSET_SCHEME,
