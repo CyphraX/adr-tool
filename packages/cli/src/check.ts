@@ -1,14 +1,6 @@
 import type { FileSystem } from '@adr-tool/core'
+import { needsModel, readRules, RULES_PATH, type ConformanceReport } from '@adr-tool/conformance'
 import {
-  checkConformance,
-  needsModel,
-  readRules,
-  RULES_PATH,
-  type ConformanceReport,
-  type Decisions
-} from '@adr-tool/conformance'
-import {
-  analyseDependencies,
   openStructure,
   type Dependencies,
   type NotAnalysed,
@@ -22,8 +14,9 @@ import {
 } from '@adr-tool/structure/model'
 import { openDiagrams } from '@adr-tool/diagrams'
 import { openConfig, type UnreadableConfig } from '@adr-tool/kernel'
-import { extractorFor } from './analysis'
+import { dependenciesOf } from './analysis'
 import { checkDiagrams, diagramsNeedModel, type DiagramsCheck } from './check-diagrams'
+import { conformanceOf } from './conformance'
 import { lintRepository, type LintReport } from './lint'
 
 /** A Problem of `.arch/components.yml`, as the command reports it. */
@@ -87,25 +80,18 @@ export async function check(
     }
   }
 
-  // The code is analysed only for Rules that are checked, and for Drift where a Diagram can
-  // have it: it takes a moment on a large repository.
+  // The code is analysed as analyseRepository analyses it (./analysis.ts), and only for Rules
+  // that are checked and for Drift where a Diagram can have it: it takes a moment on a large
+  // repository.
   let model: Dependencies | undefined
   if (needsModel(rules, structure) || diagramsNeedModel(found, structure)) {
-    model = await analyseDependencies(
-      fs,
-      files,
-      structure.sourceFiles,
-      await extractorFor(structure)
-    )
+    model = await dependenciesOf(fs, files, structure)
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
     if (model.notMeasured.length > 0) notes.push(notMeasured(model.notMeasured))
   }
 
-  const decisions: Decisions = {
-    logs: repository.logs.map((log) => log.path),
-    adrs: repository.logs.flatMap((log) => log.adrs.map((adr) => ({ log: log.path, id: adr.id })))
-  }
-  const conformance = checkConformance(rules, structure, model, decisions)
+  // The same composition as the app's and the MCP server's (src/conformance.ts).
+  const conformance = conformanceOf(rules, structure, model, repository)
   const diagrams = await checkDiagrams(fs, found, structure, model)
 
   return {

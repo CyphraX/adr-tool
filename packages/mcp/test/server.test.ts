@@ -119,12 +119,17 @@ describe('the MCP server (docs/mcp.md)', () => {
       'list_problems',
       'list_templates',
       'list_components',
+      'read_structure',
+      'list_rules',
+      'list_violations',
       'plan_create_adr',
       'plan_decision',
       'plan_edit_body',
       'plan_edit_metadata',
       'plan_repair',
       'plan_migration',
+      'plan_rule',
+      'plan_exception',
       'list_diagrams',
       'read_diagram',
       'plan_new_diagram',
@@ -334,6 +339,392 @@ describe('the MCP server (docs/mcp.md)', () => {
     } finally {
       rmSync(empty, { recursive: true, force: true })
     }
+  })
+})
+
+describe('the Structure and the Rules (docs/plan-vision.md, part 4)', () => {
+  let shop: string
+  beforeEach(() => {
+    // A shop with a Decision Log to justify an Exception by: web uses billing, billing persistence.
+    shop = mkdtempSync(join(tmpdir(), 'adr-tool-mcp-shop-'))
+    cpSync(join(repository, 'docs/adr'), join(shop, 'docs/adr'), { recursive: true })
+    const files: Record<string, string> = {
+      '.arch/components.yml': [
+        'components:',
+        '  web:',
+        '    paths: [src/web/**]',
+        '  billing:',
+        '    paths: [src/billing/**]',
+        '  persistence:',
+        '    paths: [src/persistence/**]',
+        ''
+      ].join('\n'),
+      'src/web/page.ts': "import { invoice } from '../billing/invoice'\n",
+      'src/billing/invoice.ts':
+        "import { save } from '../persistence/db'\nexport const invoice = 1\n",
+      'src/persistence/db.ts': 'export const save = 1\n'
+    }
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(join(shop, path, '..'), { recursive: true })
+      writeFileSync(join(shop, path), text)
+    }
+  })
+  afterEach(() => rmSync(shop, { recursive: true, force: true }))
+
+  const ADR = 'docs/adr/0004-operations-return-change-sets'
+
+  it('lets the agent see a Rule before it writes the code, and the person accept what it breaks', async () => {
+    const { client, close } = await connect(shop)
+    const rules = join(shop, '.arch/rules.yml')
+
+    // Lena's Rule, planned and applied: the file is started.
+    const rule = await call(client, 'plan_rule', {
+      id: 'persistence-alone',
+      why: 'What is stored knows nothing of the domain.',
+      kind: 'may-only-depend',
+      from: ['persistence'],
+      to: []
+    })
+    expect(rule.files[0]).toMatchObject({ path: '.arch/rules.yml', creates: true })
+    expect(rule.files[0].diff).toContain('+  - id: persistence-alone')
+    expect(existsSync(rules)).toBe(false)
+    await call(client, 'apply_change', { changeId: rule.changeId })
+
+    const listed = await call(client, 'list_rules')
+    expect(listed.rules).toEqual([
+      {
+        id: 'persistence-alone',
+        why: 'What is stored knows nothing of the domain.',
+        kind: 'may-only-depend',
+        from: ['persistence'],
+        to: [],
+        line: 2,
+        violations: 0,
+        accepted: 0
+      }
+    ])
+
+    // The agent asks before it writes an import, by the specifier it would write.
+    const asked = await call(client, 'list_violations', {
+      from: 'src/persistence/db.ts',
+      to: '../billing/invoice'
+    })
+    expect(asked.import).toEqual({
+      from: 'src/persistence/db.ts',
+      to: 'src/billing/invoice.ts',
+      written: '../billing/invoice',
+      fromComponent: 'persistence',
+      toComponent: 'billing',
+      exists: false
+    })
+    expect(asked.breaks).toBe(1)
+    expect(asked.violations[0]).toMatchObject({
+      rule: 'persistence-alone',
+      sentence: 'persistence may depend on no other Component, and depends on billing.',
+      fingerprint: { rule: 'persistence-alone', from: 'persistence', to: 'billing' }
+    })
+    // From a file that is not written yet, and an import that breaks nothing.
+    const fresh = await call(client, 'list_violations', {
+      from: 'src/persistence/cache.ts',
+      to: 'src/web/page.ts'
+    })
+    expect(fresh.violations[0].fingerprint).toEqual({
+      rule: 'persistence-alone',
+      from: 'persistence',
+      to: 'web'
+    })
+    const fine = await call(client, 'list_violations', {
+      from: 'src/web/page.ts',
+      to: 'src/persistence/db.ts'
+    })
+    expect(fine).toMatchObject({ breaks: 0, violations: [], next: 'The import breaks no Rule.' })
+    const library = await call(client, 'list_violations', {
+      from: 'src/persistence/db.ts',
+      to: 'yaml'
+    })
+    expect(library.note).toContain('is the Library yaml')
+
+    // It is written all the same, and the person accepts it, citing an ADR.
+    writeFileSync(
+      join(shop, 'src/persistence/db.ts'),
+      "import { invoice } from '../billing/invoice'\nexport const save = 1\n"
+    )
+    const found = await call(client, 'list_violations', { component: 'billing' })
+    expect(found.breaks).toBe(1)
+    expect(found.violations[0].imports).toEqual([
+      { file: 'src/persistence/db.ts', line: 1, imports: 'src/billing/invoice.ts' }
+    ])
+    expect(
+      await refusal(client, 'plan_exception', {
+        ...found.violations[0].fingerprint,
+        reason: 'For now.',
+        justifiedBy: 'docs/adr/9999-none'
+      })
+    ).toContain('which is not an ADR of this repository')
+    const exception = await call(client, 'plan_exception', {
+      ...found.violations[0].fingerprint,
+      reason: 'The invoice is saved as it is printed, until part 5.',
+      justifiedBy: ADR
+    })
+    expect(exception.files[0].diff).toContain('+exceptions:')
+    expect(exception.files[0].diff).toContain(`+    justified-by: ${ADR}`)
+    await call(client, 'apply_change', { changeId: exception.changeId })
+    const accepted = await call(client, 'list_violations')
+    expect(accepted.breaks).toBe(0)
+    expect(accepted.violations[0].acceptedBy).toEqual({
+      line: 8,
+      reason: 'The invoice is saved as it is printed, until part 5.',
+      justifiedBy: ADR
+    })
+
+    // The Structure as data: the Dependencies, the Cycle, the metrics.
+    const structure = await call(client, 'read_structure')
+    expect(structure.components).toBe('declared')
+    expect(structure.nodes.map((node: { id: string }) => node.id)).toEqual([
+      'web',
+      'billing',
+      'persistence'
+    ])
+    expect(structure.nodes[0]).toMatchObject({ files: 1, fanOut: 1, fanIn: 0, instability: 1 })
+    expect(
+      structure.dependencies.map((edge: { from: string; to: string }) => `${edge.from}->${edge.to}`)
+    ).toEqual(['billing->persistence', 'persistence->billing', 'web->billing'])
+    expect(structure.cycles[0].members).toEqual(['billing', 'persistence'])
+
+    // The import goes again: the Exception matches nothing, and its Repair takes it out.
+    writeFileSync(join(shop, 'src/persistence/db.ts'), 'export const save = 1\n')
+    const stale = await call(client, 'list_rules')
+    expect(stale.problems).toHaveLength(1)
+    expect(stale.problems[0]).toMatchObject({ code: 'unmatched-exception', line: 8 })
+    const repair = await call(client, 'plan_exception', stale.problems[0].repair.arguments)
+    await call(client, 'apply_change', { changeId: repair.changeId })
+    expect((await call(client, 'list_rules')).problems).toEqual([])
+
+    // A change keeps what it does not name; a removal takes the Rule's lines.
+    const changed = await call(client, 'plan_rule', {
+      action: 'change',
+      id: 'persistence-alone',
+      to: ['billing']
+    })
+    expect(changed.files[0].diff).toContain('+    to: [billing]')
+    expect(changed.files[0].diff).not.toContain('-    why:')
+    const removed = await call(client, 'plan_rule', { action: 'remove', id: 'persistence-alone' })
+    expect(removed.files[0].diff).toContain('-  - id: persistence-alone')
+    await close()
+  })
+
+  it('plans a Rule about Libraries, lists its Violation at each import, and accepts it (part 15)', async () => {
+    const { client, close } = await connect(shop)
+    writeFileSync(
+      join(shop, 'src/web/page.ts'),
+      "import { invoice } from '../billing/invoice'\nimport { Pool } from 'pg'\n"
+    )
+    const rule = await call(client, 'plan_rule', {
+      id: 'only-persistence-uses-pg',
+      why: 'The database is the business of persistence.',
+      kind: 'library',
+      library: ['pg'],
+      'only-in': ['persistence']
+    })
+    expect(rule.files[0].diff).toContain('+    library: pg')
+    expect(rule.files[0].diff).toContain('+    only-in: persistence')
+    await call(client, 'apply_change', { changeId: rule.changeId })
+    expect((await call(client, 'list_rules')).rules).toEqual([
+      {
+        id: 'only-persistence-uses-pg',
+        why: 'The database is the business of persistence.',
+        kind: 'library',
+        library: ['pg'],
+        'only-in': ['persistence'],
+        line: 2,
+        violations: 1,
+        accepted: 0
+      }
+    ])
+    const { violations } = await call(client, 'list_violations')
+    expect(violations).toMatchObject([
+      {
+        rule: 'only-persistence-uses-pg',
+        kind: 'library',
+        fingerprint: { rule: 'only-persistence-uses-pg', component: 'web', library: 'pg' },
+        component: 'web',
+        library: 'pg',
+        imports: [{ file: 'src/web/page.ts', line: 2, imports: 'pg' }]
+      }
+    ])
+    const accepted = await call(client, 'plan_exception', {
+      ...violations[0].fingerprint,
+      reason: 'The page reads one report itself, for now.'
+    })
+    expect(accepted.files[0].diff).toContain('+    library: pg')
+    await call(client, 'apply_change', { changeId: accepted.changeId })
+    expect((await call(client, 'list_rules')).rules[0]).toMatchObject({
+      violations: 0,
+      accepted: 1
+    })
+    // Changed to not-in, its only-in is gone.
+    const changed = await call(client, 'plan_rule', {
+      action: 'change',
+      id: 'only-persistence-uses-pg',
+      'not-in': ['web']
+    })
+    expect(changed.files[0].diff).toContain('+    not-in: web')
+    expect(changed.files[0].diff).toContain('-    only-in: persistence')
+    await close()
+  })
+
+  it('refuses what it cannot plan, in words the agent can act on', async () => {
+    const { client, close } = await connect(shop)
+    expect(await refusal(client, 'plan_rule', { id: 'x', why: 'X.' })).toBe(
+      'A new Rule needs a "kind": one of must-not-depend, may-only-depend, layers, no-cycles, threshold, library.'
+    )
+    expect(
+      await refusal(client, 'plan_rule', {
+        id: 'x',
+        why: 'X.',
+        kind: 'must-not-depend',
+        from: ['web']
+      })
+    ).toBe('A Rule of the kind must-not-depend needs "to".')
+    expect(await refusal(client, 'plan_rule', { action: 'change', id: 'x', why: 'X.' })).toBe(
+      '.arch/rules.yml has no Rule x. Look at the file again.'
+    )
+    expect(await refusal(client, 'list_violations', { from: 'src/web/page.ts' })).toBe(
+      'A planned import needs both "from" and "to".'
+    )
+    expect(
+      await refusal(client, 'list_violations', { from: 'README.md', to: 'src/web/page.ts' })
+    ).toContain('README.md is no Source File')
+    expect(
+      await refusal(client, 'list_violations', { from: 'src/web/page.ts', to: './nowhere' })
+    ).toContain('./nowhere cannot be resolved from src/web/page.ts')
+    expect(await refusal(client, 'plan_exception', { rule: 'x', from: 'web', reason: 'R.' })).toBe(
+      'An Exception from x names its Violation by "from" and "to", as list_violations gives them in "fingerprint".'
+    )
+    expect(await refusal(client, 'read_structure', { component: 'nowhere' })).toContain(
+      'There is no Component nowhere.'
+    )
+    await close()
+  })
+
+  it('plans an import of a file not written yet, measures no own files, and accepts the Violation of a function', async () => {
+    writeFileSync(
+      join(shop, '.arch/components.yml'),
+      [
+        'components:',
+        '  web:',
+        '    paths: [src/web/**]',
+        '  billing:',
+        '    paths: [src/billing/**]',
+        '    components:',
+        '      tax:',
+        '        paths: [src/billing/tax/**]',
+        '  persistence:',
+        '    paths: [src/persistence/**]',
+        ''
+      ].join('\n')
+    )
+    mkdirSync(join(shop, 'src/billing/tax'), { recursive: true })
+    writeFileSync(
+      join(shop, 'src/billing/tax/rate.ts'),
+      [
+        'export function rate(country: string): number {',
+        "  if (country === 'de') return 0.19",
+        "  if (country === 'at') return 0.2",
+        '  return 0',
+        '}',
+        ''
+      ].join('\n')
+    )
+    writeFileSync(
+      join(shop, '.arch/rules.yml'),
+      [
+        'rules:',
+        '  - id: persistence-alone',
+        '    why: What is stored knows nothing of the domain.',
+        '    kind: may-only-depend',
+        '    from: persistence',
+        '    to: []',
+        '  - id: simple',
+        '    why: A function is read in one go.',
+        '    kind: threshold',
+        '    metric: complexity',
+        '    max: 2',
+        '    of: billing',
+        ''
+      ].join('\n')
+    )
+    const { client, close } = await connect(shop)
+
+    // An import of a file that is not there yet, named by its path: a Source File, no Library.
+    const planned = await call(client, 'list_violations', {
+      from: 'src/persistence/db.ts',
+      to: 'src/web/chart.ts'
+    })
+    expect(planned.import).toMatchObject({
+      from: 'src/persistence/db.ts',
+      to: 'src/web/chart.ts',
+      toComponent: 'web',
+      exists: false
+    })
+    expect(planned.violations.map((one: { fingerprint: unknown }) => one.fingerprint)).toEqual([
+      { rule: 'persistence-alone', from: 'persistence', to: 'web' }
+    ])
+
+    // The own files of billing have a size, and no metric of the Component they stand beside.
+    const level = await call(client, 'read_structure', { component: 'billing' })
+    const own = level.nodes.find((node: { kind: string }) => node.kind === 'own-files')
+    expect(own).toEqual({ id: 'billing', kind: 'own-files', files: 1, lines: 2 })
+    expect(level.nodes.find((node: { id: string }) => node.id === 'billing/tax')).toHaveProperty(
+      'fanOut'
+    )
+
+    // The Violation of a function is named by its file and its name, and accepted by them.
+    const found = await call(client, 'list_violations', { component: 'billing' })
+    expect(found.violations[0]).toMatchObject({
+      rule: 'simple',
+      file: 'src/billing/tax/rate.ts',
+      name: 'rate',
+      line: 1,
+      value: 3,
+      fingerprint: { rule: 'simple', file: 'src/billing/tax/rate.ts', name: 'rate' }
+    })
+    expect(
+      await refusal(client, 'plan_exception', {
+        rule: 'simple',
+        component: 'billing',
+        reason: 'R.'
+      })
+    ).toBe(
+      'An Exception from simple names its Violation by "file" and "name", as list_violations gives them in "fingerprint".'
+    )
+    const exception = await call(client, 'plan_exception', {
+      ...found.violations[0].fingerprint,
+      reason: 'The rates are a table, read as one.'
+    })
+    expect(exception.files[0].diff).toContain('+    file: src/billing/tax/rate.ts')
+    expect(exception.files[0].diff).toContain('+    name: rate')
+    await call(client, 'apply_change', { changeId: exception.changeId })
+    const accepted = await call(client, 'list_violations', { component: 'billing' })
+    expect(accepted.breaks).toBe(0)
+    expect(accepted.violations[0].acceptedBy).toMatchObject({
+      reason: 'The rates are a table, read as one.'
+    })
+
+    // A change merges what it names into the Rule: of the same family of kinds, its keys stay.
+    const turned = await call(client, 'plan_rule', {
+      action: 'change',
+      id: 'persistence-alone',
+      kind: 'must-not-depend',
+      to: ['web']
+    })
+    expect(turned.files[0].diff).toContain('+    kind: must-not-depend')
+    expect(turned.files[0].diff).toContain('+    to: [web]')
+    expect(turned.files[0].diff).not.toContain('-    from:')
+    const bounded = await call(client, 'plan_rule', { action: 'change', id: 'simple', min: 1 })
+    expect(bounded.files[0].diff).toContain('-    max: 2')
+    expect(bounded.files[0].diff).toContain('+    min: 1')
+    await close()
   })
 })
 

@@ -1,6 +1,12 @@
+import {
+  repairOf,
+  type ConformanceNote,
+  type ConformanceProblem,
+  type ConformanceRepair
+} from '@adr-tool/conformance'
 import { repairsOf, type DecisionLog, type Problem, type Repair } from '@adr-tool/core'
 import { hasRepair, type StructureProblem } from '@adr-tool/structure/model'
-import type { OpenRepository, StructureOutline } from '../../../shared/ipc'
+import type { ConformanceView, OpenRepository, StructureOutline } from '../../../shared/ipc'
 import {
   diagramsCount,
   diagramsSection,
@@ -29,10 +35,37 @@ export interface RepositoryProblems {
   readonly traces: readonly TraceProblem[]
   /** The Problems of the declaration of Components, as far as Structure knows them. */
   readonly structure: StructureSection
+  /** The Problems of `.arch/rules.yml`, and its notes, as far as Conformance knows them. */
+  readonly conformance: ConformanceSection
   /** The Problems of the Diagrams, and of `.arch/config.yml` (lib/diagrams-problems.ts). */
   readonly diagrams: DiagramsSection
-  /** Every Problem known, each root cause once: what every sidebar shows. */
+  /** Every Problem known, each root cause once: what every sidebar shows. A note is none. */
   readonly count: number
+}
+
+/** A Problem or a note of the Rules file, at its line, with its Repair where there is one. */
+export interface ConformanceEntry {
+  readonly found: ConformanceProblem | ConformanceNote
+  /** What could be better and fails nothing (docs/conformance-format.md, section 5). */
+  readonly note: boolean
+  readonly repair: ConformanceRepair | undefined
+}
+
+export type ConformanceSection =
+  | { readonly state: 'reading' }
+  | { readonly state: 'failed'; readonly reason: string }
+  | {
+      readonly state: 'known'
+      readonly entries: readonly ConformanceEntry[]
+      /** The Rules are checked again: what is shown is the last answer. */
+      readonly again: boolean
+    }
+
+/** What the window knows of the Rules of the repository: the last answer, and whether one is asked for. */
+export interface ConformanceKnown {
+  readonly view: ConformanceView | undefined
+  readonly reading: boolean
+  readonly failed: string | undefined
 }
 
 /** A Problem of a Decision Log, with the Repairs that `core` offers for it. */
@@ -95,6 +128,7 @@ const isTrace = (problem: Problem): problem is TraceProblem['problem'] =>
 export function repositoryProblems(
   repository: OpenRepository,
   outline: OutlineKnown,
+  conformance: ConformanceKnown = { view: undefined, reading: true, failed: undefined },
   diagramsKnown: DiagramsKnown = { overview: undefined, reading: false, failed: undefined }
 ): RepositoryProblems {
   const [across] = problemsAcross([repository])
@@ -119,15 +153,37 @@ export function repositoryProblems(
     .filter(({ groups }) => groups.length > 0)
 
   const structure = structureSection(outline)
+  const rules = conformanceSection(conformance)
   const decisionsCount = across!.own.length + logs.reduce((sum, log) => sum + log.groups.length, 0)
   const structureCount = structure.state === 'known' ? structure.entries.length : 0
+  const rulesCount =
+    rules.state === 'known' ? rules.entries.filter((entry) => !entry.note).length : 0
   const diagrams = diagramsSection(diagramsKnown)
   return {
     decisions: { own: across!.own, logs },
     traces,
     structure,
+    conformance: rules,
     diagrams,
-    count: decisionsCount + traces.length + structureCount + diagramsCount(diagrams)
+    count: decisionsCount + traces.length + structureCount + rulesCount + diagramsCount(diagrams)
+  }
+}
+
+function conformanceSection({ view, reading, failed }: ConformanceKnown): ConformanceSection {
+  if (!view) {
+    return failed !== undefined && !reading
+      ? { state: 'failed', reason: failed }
+      : { state: 'reading' }
+  }
+  // In the order of their lines, notes among the Problems.
+  const found = [
+    ...view.problems.map((problem) => ({ found: problem, note: false })),
+    ...view.notes.map((note) => ({ found: note, note: true }))
+  ].sort((a, b) => a.found.line - b.found.line)
+  return {
+    state: 'known',
+    entries: found.map((entry) => ({ ...entry, repair: repairOf(entry.found) })),
+    again: reading
   }
 }
 

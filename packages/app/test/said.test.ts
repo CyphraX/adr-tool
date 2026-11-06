@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { CONFORMANCE_SENTENCES, type ConformanceSaid } from '@adr-tool/conformance'
 import { SENTENCES, type CoreSaid, type Said } from '@adr-tool/core'
 import { REVIEW_SENTENCES } from '@adr-tool/review'
 import { STRUCTURE_SENTENCES, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
@@ -7,7 +8,7 @@ import { ASSESSMENT_SENTENCES } from '@adr-tool/assessment'
 import { DE, inGerman } from '../src/renderer/src/lib/said.de'
 import { wordIn, wordOf, wordStructureProblem, wordWarnings } from '../src/renderer/src/lib/said'
 
-// The window in English: what `core`, `structure` and `diagrams` say comes as they say it.
+// The window in English: what the modules say comes as they say it.
 vi.mock('../src/renderer/src/lib/language', () => ({ language: 'en' }))
 
 type Sentence = (values: unknown) => string
@@ -16,7 +17,11 @@ type Sentence = (values: unknown) => string
  * Values for any sentence, by the name of the value: a sentence takes what it needs. What one
  * says of another is a code of its own module.
  */
-function some(detail: Said): Record<string, unknown> {
+function some(
+  detail: Said,
+  why: Said = { code: 'not-a-list', values: { key: '‹why-key›' } },
+  own: Record<string, unknown> = {}
+): Record<string, unknown> {
   // Each value stands out in the sentence, so that a sentence that drops one is seen to.
   const known: Record<string, unknown> = {
     format: 'madr-2',
@@ -31,8 +36,25 @@ function some(detail: Said): Record<string, unknown> {
     reasons: [
       { code: 'waits-for-successor', values: { adr: '‹reason›', successor: '‹successor›' } }
     ],
-    why: { code: 'not-a-list', values: { key: '‹why-key›' } },
-    detail
+    why,
+    // Of Conformance: what it names takes lists and Said values of its own.
+    kinds: ['‹kind-1›', '‹kind-2›'],
+    allowed: ['‹allowed-1›', '‹allowed-2›'],
+    members: ['‹member-1›', '‹member-2›', '‹member-3›'],
+    roundTrip: ['‹member-1›', '‹member-2›', '‹member-3›'],
+    weakest: ['‹weak-from›', '‹weak-to›'],
+    metrics: ['‹metric-1›'],
+    keys: ['‹key-1›', '‹key-2›'],
+    by: 'rule',
+    where: 'above',
+    bound: 'max',
+    change: 'add-rule',
+    value: 417,
+    limit: 731,
+    line: 913,
+    violation: { code: 'must-not-depend', values: { from: '‹v-from›', to: '‹v-to›' } },
+    detail,
+    ...own
   }
   return new Proxy(known, { get: (values, key: string) => values[key] ?? `‹${key}›` })
 }
@@ -49,6 +71,12 @@ const MODULES = [
     detail: { code: 'top-not-map', values: {} }
   },
   {
+    name: 'conformance',
+    sentences: CONFORMANCE_SENTENCES,
+    detail: { code: 'missing-key', values: { key: '‹detail-key›' } },
+    why: { code: 'list-in-brackets', values: { key: '‹why-key›' } }
+  },
+  {
     name: 'diagrams',
     sentences: DIAGRAMS_SENTENCES,
     detail: { code: 'diagram-not-map', values: {} }
@@ -61,12 +89,29 @@ const MODULES = [
   {
     name: 'assessment',
     sentences: ASSESSMENT_SENTENCES,
-    detail: { code: 'frontmatter-not-valid-yaml', values: { message: '‹detail-message›' } }
+    detail: { code: 'frontmatter-not-valid-yaml', values: { message: '‹detail-message›' } },
+    // What a Finding cites is named, not said: a Violation by its fingerprint as text.
+    own: { violation: '‹violation›' }
   }
 ] as const
 
+/**
+ * The codes the modules take from the kernel: those of every operation and of why
+ * `.arch/config.yml` cannot be read (`KERNEL_SENTENCES`), and why a file in YAML cannot be read
+ * (`YAML_SENTENCES`), for the two that read one.
+ */
+const KERNEL_CODES = [
+  'already-exists',
+  'no-longer-exists',
+  'unreadable-config',
+  'config-not-yaml',
+  'config-not-map',
+  'not-yaml',
+  'top-not-map'
+]
+
 describe('German', () => {
-  it('has a sentence for every code of core, structure, diagrams, review and assessment', () => {
+  it('has a sentence for every code of core, structure, conformance, diagrams, review and assessment', () => {
     // The compiler asks for them (`DE` is typed by the tables); this says so where it runs.
     for (const { sentences } of MODULES) {
       for (const code of Object.keys(sentences)) expect(Object.keys(DE), code).toContain(code)
@@ -75,27 +120,26 @@ describe('German', () => {
     expect(Object.keys(DE).filter((code) => !codes.has(code))).toEqual([])
   })
 
-  it('gives each module codes of its own: only the kernel’s are shared', () => {
+  it('gives every module codes of its own: only the kernel’s are shared', () => {
     for (const one of MODULES) {
       for (const other of MODULES) {
         if (one === other) continue
         const shared = Object.keys(one.sentences).filter((code) => code in other.sentences)
-        // What any operation may refuse, and why .arch/config.yml cannot be read.
-        expect(shared.sort(), `${one.name} and ${other.name}`).toEqual([
-          'already-exists',
-          'config-not-map',
-          'config-not-yaml',
-          'no-longer-exists',
-          'unreadable-config'
-        ])
+        for (const code of shared)
+          expect(KERNEL_CODES, `${one.name}, ${other.name}`).toContain(code)
       }
     }
   })
 
   it('says every sentence in German, not in English, and leaves no value out', () => {
-    for (const { sentences, detail } of MODULES) {
+    for (const module of MODULES) {
+      const { sentences, detail } = module
       for (const [code, english] of Object.entries(sentences)) {
-        const values = some(detail)
+        const values = some(
+          detail,
+          'why' in module ? module.why : undefined,
+          'own' in module ? module.own : undefined
+        )
         const german = (DE as unknown as Record<string, Sentence>)[code]!(values)
         expect(german, code).not.toBe((english as Sentence)(values))
         expect(german, code).not.toMatch(/undefined|\[object Object\]|‹(format|type|why|detail)›/)
@@ -130,6 +174,32 @@ describe('German', () => {
         ''
       )
     ).toBe('0002-b kann nicht migriert werden: a parser said so')
+  })
+
+  it('words a Violation at its import, and why a Rule cannot be written', () => {
+    const at: ConformanceSaid = {
+      code: 'violation-at',
+      values: {
+        violation: { code: 'must-not-depend', values: { from: 'structure', to: 'core' } },
+        file: 'packages/structure/src/model.ts',
+        line: 3,
+        imports: 'packages/core/src/index.ts'
+      }
+    }
+    expect(inGerman(at)).toBe(
+      'structure darf nicht von core abhängen: packages/structure/src/model.ts:3 importiert packages/core/src/index.ts.'
+    )
+    const refused: ConformanceSaid = {
+      code: 'cannot-write-rules',
+      values: {
+        path: '.arch/rules.yml',
+        change: 'add-rule',
+        why: { code: 'list-in-brackets', values: { key: 'rules' } }
+      }
+    }
+    expect(inGerman(refused)).toBe(
+      '.arch/rules.yml ist so geschrieben, dass die Suite keine Regel hinzufügen kann, ohne mehr davon neu zu schreiben: „rules“ ist in eckigen Klammern geschrieben. Das muss in einem Editor geändert werden.'
+    )
   })
 
   it('is what a window in German shows, where there is a code', () => {

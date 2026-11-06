@@ -30,6 +30,7 @@ export {
 export { PendingFiles, Refusal, plan } from './change/pending'
 export {
   KERNEL_SENTENCES,
+  YAML_SENTENCES,
   sentenceOf,
   type KernelSaid,
   type Said,

@@ -61,19 +61,136 @@ export function fingerprintText(fingerprint: Fingerprint): string {
 
 /** What two fingerprints are compared by: equal exactly when they name the same Violation. */
 export function fingerprintKey(fingerprint: Fingerprint): string {
+  return [
+    fingerprint.kind,
+    fingerprint.rule,
+    ...fingerprintKeysOf(fingerprint).flatMap(([, value]) => value)
+  ].join('\n')
+}
+
+/**
+ * The keys an Exception names a Violation by, for each kind of fingerprint, in the order it
+ * writes them (docs/conformance-format.md, section 4): a name, or the members of a Cycle. A
+ * fingerprint of a new kind is one entry here, and every reader and writer of Exceptions —
+ * the file's, the window's, the MCP server's — knows it.
+ */
+export const FINGERPRINT_SHAPES: {
+  readonly [K in Fingerprint['kind']]: readonly (readonly [
+    key: string,
+    value: 'name' | 'members'
+  ])[]
+} = {
+  dependency: [
+    ['from', 'name'],
+    ['to', 'name']
+  ],
+  cycle: [['cycle', 'members']],
+  component: [['component', 'name']],
+  function: [
+    ['file', 'name'],
+    ['name', 'name']
+  ],
+  class: [
+    ['file', 'name'],
+    ['name', 'name']
+  ],
+  library: [
+    ['component', 'name'],
+    ['library', 'name']
+  ]
+}
+
+/** Every key a fingerprint names a Violation by, of whichever kind. */
+export const FINGERPRINT_KEY_NAMES: readonly string[] = [
+  ...new Set(Object.values(FINGERPRINT_SHAPES).flatMap((shape) => shape.map(([key]) => key)))
+]
+
+/** The kinds of fingerprints, in the order of the format. */
+export const FINGERPRINT_KINDS = Object.keys(FINGERPRINT_SHAPES) as Fingerprint['kind'][]
+
+const isMembers = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) && value.length > 1 && value.every((item) => typeof item === 'string')
+
+/**
+ * The fingerprint of `kind` that the keys of `written` name for the Rule `rule`; `undefined` where a key of
+ * the kind is missing or not what it must be — a Cycle has two members at least —, or, with
+ * `only`, where a key of another kind is there as well.
+ */
+export function readFingerprint(
+  kind: Fingerprint['kind'],
+  rule: string,
+  written: object,
+  only = false
+): Fingerprint | undefined {
+  const keys = written as Readonly<Record<string, unknown>>
+  const shape = FINGERPRINT_SHAPES[kind]
+  const values: Record<string, unknown> = {}
+  for (const [key, type] of shape) {
+    const value = keys[key]
+    if (type === 'members' ? !isMembers(value) : typeof value !== 'string') return undefined
+    values[key] = value
+  }
+  if (only && FINGERPRINT_KEY_NAMES.some((key) => !(key in values) && keys[key] !== undefined)) {
+    return undefined
+  }
+  return { kind, rule, ...values } as Fingerprint
+}
+
+/** The keys of a fingerprint as an Exception writes them, in order: a Cycle's members sorted. */
+export function fingerprintKeysOf(fingerprint: Fingerprint): [string, string | string[]][] {
+  const values = fingerprint as unknown as Record<string, string | readonly string[]>
+  return FINGERPRINT_SHAPES[fingerprint.kind].map(([key, type]) => [
+    key,
+    type === 'members' ? membersOf(values[key] as readonly string[]) : (values[key] as string)
+  ])
+}
+
+/**
+ * A fingerprint as it comes from outside — from the window over IPC, from an agent —: its
+ * `kind`, its `rule` and the keys of that kind. `undefined` for anything else.
+ */
+export function fingerprintFrom(value: unknown): Fingerprint | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const { kind, rule } = value as Record<string, unknown>
+  if (typeof rule !== 'string' || !FINGERPRINT_KINDS.includes(kind as Fingerprint['kind'])) {
+    return undefined
+  }
+  return readFingerprint(kind as Fingerprint['kind'], rule, value as Record<string, unknown>)
+}
+
+/**
+ * The kind of fingerprint the keys of an Exception are of, for a Rule that is not there to say:
+ * of the kinds whose keys are all there, the one with the most — `component` and `library` are
+ * a Library's, not a Component's —, `dependency` where none is. A function and a class are
+ * named alike, and taken for a function.
+ */
+export function fingerprintKindOfKeys(written: object): Fingerprint['kind'] {
+  const keys = written as Readonly<Record<string, unknown>>
+  let found: Fingerprint['kind'] = 'dependency'
+  let most = 0
+  for (const kind of FINGERPRINT_KINDS) {
+    const shape = FINGERPRINT_SHAPES[kind]
+    if (shape.length > most && shape.every(([key]) => keys[key] !== undefined)) {
+      found = kind
+      most = shape.length
+    }
+  }
+  return found
+}
+
+/** What a fingerprint names, without its Rule, for a title: `billing → web`, `a ⇄ b`, `parse (src/a.ts)`. */
+export function fingerprintNames(fingerprint: Fingerprint): string {
   switch (fingerprint.kind) {
     case 'dependency':
-      return [fingerprint.kind, fingerprint.rule, fingerprint.from, fingerprint.to].join('\n')
+      return `${fingerprint.from} → ${fingerprint.to}`
     case 'cycle':
-      return [fingerprint.kind, fingerprint.rule, ...membersOf(fingerprint.cycle)].join('\n')
+      return membersOf(fingerprint.cycle).join(' ⇄ ')
     case 'component':
-      return [fingerprint.kind, fingerprint.rule, fingerprint.component].join('\n')
+      return fingerprint.component
     case 'library':
-      return [fingerprint.kind, fingerprint.rule, fingerprint.component, fingerprint.library].join(
-        '\n'
-      )
+      return `${fingerprint.library} (${fingerprint.component})`
     case 'function':
     case 'class':
-      return [fingerprint.kind, fingerprint.rule, fingerprint.file, fingerprint.name].join('\n')
+      return `${fingerprint.name} (${fingerprint.file})`
   }
 }

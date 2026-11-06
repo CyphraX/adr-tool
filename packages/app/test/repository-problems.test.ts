@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem, openRepository } from '@adr-tool/core'
-import type { OpenRepository, StructureOutline } from '../src/shared/ipc'
+import type { ConformanceView, OpenRepository, StructureOutline } from '../src/shared/ipc'
 import { repositoryProblems } from '../src/renderer/src/lib/repository-problems'
 
 // docs/plan-vision.md, part 2: the Problems of the repository, of every module, in one list.
@@ -158,5 +158,75 @@ describe('the Problems of the repository', () => {
         repairable: false
       }
     ])
+  })
+})
+
+describe('the Problems of the Rules file in the list of the repository', () => {
+  const fingerprint = {
+    kind: 'cycle' as const,
+    rule: 'features-apart',
+    cycle: ['features/a', 'features/b', 'features/c']
+  }
+  const view: ConformanceView = {
+    repositoryId: 'r1',
+    present: true,
+    evaluated: true,
+    origin: 'declared',
+    rules: [],
+    exceptions: [],
+    violations: [],
+    problems: [
+      {
+        kind: 'unmatched-exception',
+        line: 14,
+        fingerprint: { kind: 'dependency', rule: 'billing-not-web', from: 'billing', to: 'web' }
+      },
+      { kind: 'exception-unknown-rule', line: 3, rule: 'gone' }
+    ],
+    notes: [
+      { kind: 'exception-can-shrink', line: 9, fingerprint, members: ['features/a', 'features/b'] }
+    ],
+    current: true,
+    analysedAt: 0
+  }
+  const outline = { known: OUTLINE, reading: false, failed: undefined }
+
+  it('stand in the order of their lines, with their Repairs, and a note does not count', async () => {
+    const problems = repositoryProblems(await opened(), outline, {
+      view,
+      reading: false,
+      failed: undefined
+    })
+    const without = repositoryProblems(await opened(), outline)
+    expect(problems.count).toBe(without.count + 2)
+    expect(problems.conformance).toMatchObject({ state: 'known', again: false })
+    if (problems.conformance.state !== 'known') return
+    expect(problems.conformance.entries.map(({ found, note }) => [found.line, note])).toEqual([
+      [3, false],
+      [9, true],
+      [14, false]
+    ])
+    expect(problems.conformance.entries.map(({ repair }) => repair)).toEqual([
+      undefined,
+      { kind: 'narrow-exception', line: 9, fingerprint, members: ['features/a', 'features/b'] },
+      {
+        kind: 'remove-exception',
+        line: 14,
+        fingerprint: { kind: 'dependency', rule: 'billing-not-web', from: 'billing', to: 'web' }
+      }
+    ])
+  })
+
+  it('say that the Rules are being checked, again, or why they could not be', async () => {
+    const repository = await opened()
+    expect(repositoryProblems(repository, outline).conformance).toEqual({ state: 'reading' })
+    expect(
+      repositoryProblems(repository, outline, { view: undefined, reading: false, failed: 'gone' })
+        .conformance
+    ).toEqual({ state: 'failed', reason: 'gone' })
+    expect(
+      repositoryProblems(repository, outline, { view, reading: true, failed: undefined })
+        .conformance
+    ).toMatchObject({ state: 'known', again: true })
   })
 })

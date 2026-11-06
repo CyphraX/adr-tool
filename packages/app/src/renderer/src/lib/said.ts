@@ -6,6 +6,14 @@
  * What has no code — what the main process says of its own, a parser's message — is shown as
  * it comes.
  */
+import {
+  conformanceEnglishOf,
+  saidOf as conformanceSaidOf,
+  wordingOf as conformanceWordingOf,
+  type ConformanceNote,
+  type ConformanceProblem,
+  type ConformanceSaid
+} from '@adr-tool/conformance'
 import type { Said } from '@adr-tool/core'
 import { saidOf, wordingOf, type StructureProblem } from '@adr-tool/structure/model'
 import type { Language } from '../../../shared/language'
@@ -32,4 +40,14 @@ export function wordWarnings(change: Pick<PlannedChange, 'warnings' | 'warned'>)
 /** What a Problem of Structure says, in the language of the window. */
 export function wordStructureProblem(problem: StructureProblem): string {
   return wordOf(saidOf(problem), wordingOf(problem))
+}
+
+/** What `conformance` said — what a Violation is, why a Rule cannot be written — in the language of the window. */
+export function wordConformance(said: ConformanceSaid): string {
+  return wordOf(said, conformanceEnglishOf(said))
+}
+
+/** What a Problem or a note of the Rules file says, in the language of the window. */
+export function wordConformanceProblem(problem: ConformanceProblem | ConformanceNote): string {
+  return wordOf(conformanceSaidOf(problem), conformanceWordingOf(problem))
 }

@@ -7,6 +7,9 @@
   import BranchList from './components/BranchList.svelte'
   import ChangeDialog from './components/ChangeDialog.svelte'
   import CommitDialog from './components/CommitDialog.svelte'
+  import ConformanceCenter from './components/ConformanceCenter.svelte'
+  import ConformanceDetail from './components/ConformanceDetail.svelte'
+  import ConformanceSidebar from './components/ConformanceSidebar.svelte'
   import DashboardView from './components/DashboardView.svelte'
   import DiagramDetail from './components/DiagramDetail.svelte'
   import DiagramsCenter from './components/DiagramsCenter.svelte'
@@ -52,6 +55,7 @@
   const FRAMES: Record<Module, Snippet<[Active]>> = {
     decisions: decisionsFrame,
     structure: structureFrame,
+    conformance: conformanceFrame,
     diagrams: diagramsFrame
   }
 
@@ -67,9 +71,11 @@
   const STORED_SIZES = 'pane-sizes'
   let sizes = $state<PaneSizes>(readStoredSizes())
   let panesWidth = $state(0)
-  // The graph, the timeline, the board and the dashboard want room: they share one width.
+  // The graph, the timeline, the board and the dashboard want room: they share one width,
+  // and so do the centres of Structure and Conformance, which draw.
   const wide = $derived(
-    ['graph', 'timeline', 'board', 'dashboard'].includes(app.active?.view ?? 'adrs')
+    app.active?.module !== 'decisions' ||
+      ['graph', 'timeline', 'board', 'dashboard'].includes(app.active.view)
   )
   const middlePane = $derived<MiddlePane>(wide ? 'graph' : 'list')
   // Before the window has been measured there is nothing to fit a width into.
@@ -146,12 +152,40 @@
   <ChangeDialog />
 {/if}
 
+<!-- The dividers between the panes of Structure and Conformance, as in Decisions. -->
+{#snippet sidebarDivider()}
+  <PaneDivider
+    label={t.panes.sidebar}
+    min={LIMITS.sidebar.min}
+    max={fitSidebar(LIMITS.sidebar.max, panesWidth)}
+    onresize={(width) => resize('sidebar', fitSidebar(width, panesWidth))}
+    onreset={() => resize('sidebar', undefined)}
+  />
+{/snippet}
+
+{#snippet middleDivider()}
+  <PaneDivider
+    label={t.panes.middle}
+    min={LIMITS.middle.min}
+    max={maxMiddle(panesWidth, sidebarWidth, middlePane)}
+    onresize={(width) => resize(middlePane, fitMiddle(width, panesWidth, sidebarWidth, middlePane))}
+    onreset={() => resize(middlePane, undefined)}
+  />
+{/snippet}
+
 {#snippet structureFrame(active: Active)}
   {@const structure = active.structure}
   <!-- The sidebar stands from the start: the Problems of the repository are reached from it
        while the level is still being analysed, or could not be. -->
-  <div class="panes structure" style:--sidebar="{sidebarWidth}px">
+  <div
+    class="panes drawing"
+    bind:clientWidth={panesWidth}
+    style:--sidebar="{sidebarWidth}px"
+    style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
+    style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
+  >
     <StructureSidebar />
+    {@render sidebarDivider()}
     {#if structure.problems}
       <RepositoryProblems />
     {:else if structure.view}
@@ -166,8 +200,44 @@
         <p>{t.structure.analysing}</p>
       </main>
     {/if}
+    {#key structure.problems}{@render middleDivider()}{/key}
     {#if structure.view}
       <StructureDetail view={structure.view} />
+    {:else}
+      <aside class="no-detail"></aside>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet conformanceFrame(active: Active)}
+  {@const conformance = active.conformance}
+  <!-- As Structure's: the sidebar stands from the start, while the Rules are checked. -->
+  <div
+    class="panes drawing"
+    bind:clientWidth={panesWidth}
+    style:--sidebar="{sidebarWidth}px"
+    style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
+    style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
+  >
+    <ConformanceSidebar />
+    {@render sidebarDivider()}
+    {#if conformance.problems}
+      <RepositoryProblems />
+    {:else if conformance.view}
+      <ConformanceCenter view={conformance.view} />
+    {:else if conformance.failed !== undefined && !conformance.reading}
+      <main class="message">
+        <h1>{t.conformance.failed}</h1>
+        <p>{conformance.failed}</p>
+      </main>
+    {:else}
+      <main class="message">
+        <p>{t.conformance.analysing}</p>
+      </main>
+    {/if}
+    {#key conformance.problems}{@render middleDivider()}{/key}
+    {#if conformance.view}
+      <ConformanceDetail view={conformance.view} />
     {:else}
       <aside class="no-detail"></aside>
     {/if}
@@ -367,18 +437,14 @@
     min-height: 0;
   }
 
-  /* The Structure view: what was found, the level as drawing, matrix or table, and what the
-     selection stands for. */
-  .panes.structure {
-    grid-template-columns: var(--sidebar) minmax(0, 2fr) minmax(300px, 1fr);
-  }
-
   /* The Diagrams: the canvas wants the room; the detail is there to be glanced at. */
   .panes.diagrams {
     grid-template-columns: var(--sidebar) minmax(0, 3fr) minmax(260px, 1fr);
   }
 
-  /* A drawing needs room; the ADR next to it is there to be glanced at. */
+  /* A drawing needs room; the ADR next to it is there to be glanced at. So it is in Structure —
+     the level as drawing, matrix or table — and in Conformance, beside what is selected. */
+  .panes.drawing,
   .panes.wide-middle {
     grid-template-columns:
       var(--sidebar) 0 var(--middle, minmax(0, 2fr))

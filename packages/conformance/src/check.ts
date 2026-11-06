@@ -5,9 +5,15 @@
  */
 import { normalizePath, type FileSystem } from '@adr-tool/kernel'
 import { everyComponent, type Structure } from '@adr-tool/structure/model'
-import { hasWildcard, matcherOf } from './component-patterns'
+import { hasWildcard, matcherOf, TOP_LEVEL } from './component-patterns'
 import { evaluate, type Model, type Violation } from './evaluate'
-import { fingerprintKey, membersOf, type Fingerprint } from './fingerprint'
+import {
+  FINGERPRINT_SHAPES,
+  fingerprintKey,
+  membersOf,
+  readFingerprint,
+  type Fingerprint
+} from './fingerprint'
 import { RULES_PATH, type ConformanceNote, type ConformanceProblem } from './problems'
 import {
   readRules,
@@ -143,7 +149,7 @@ export function checkConformance(
         rule: rule.id,
         detail: {
           code: 'fingerprint-of-kind',
-          values: { kind: rule.kind, keys: keysOf(rule) }
+          values: fingerprintKeysSaid(rule)
         },
         line: exception.line
       })
@@ -224,74 +230,49 @@ export async function openConformance(
   return checkConformance(readRules(await fs.readText(RULES_PATH)), structure, model, decisions)
 }
 
-/** What names a Violation of each kind in an Exception, in words. */
-const FINGERPRINT_KEYS: Record<Rule['kind'], string> = {
-  'must-not-depend': '"from" and "to"',
-  'may-only-depend': '"from" and "to"',
-  layers: '"from" and "to"',
-  'no-cycles': '"cycle", the list of its members',
-  threshold: '"component"',
-  library: '"component" and "library"'
-}
-
-/** What names a Violation of a Rule in an Exception: a threshold's by the subject of its metric. */
-function keysOf(rule: Rule): string {
-  if (rule.kind !== 'threshold') return FINGERPRINT_KEYS[rule.kind]
-  switch (SUBJECT_OF[rule.metric]) {
-    case 'function':
-    case 'class':
-      return '"file" and "name"'
-    case 'level':
-      return '"component", or "*" for the top level'
-    case 'component':
-      return FINGERPRINT_KEYS.threshold
-  }
-}
-
-/** The fingerprint an Exception names, when its keys — and no others — fit its Rule. */
-function fingerprintOf(exception: WrittenException, rule: Rule): Fingerprint | undefined {
-  const { from, to, cycle, component, library, file, name } = exception
-  const only = (...keys: readonly (keyof WrittenException)[]): boolean =>
-    FINGERPRINT_KEYS_WRITTEN.every((key) => (exception[key] !== undefined) === keys.includes(key))
+/**
+ * The kind of fingerprint a Rule names its Violations by (docs/conformance-format.md,
+ * section 3): a threshold's by the subject of its metric.
+ */
+export function fingerprintKindOf(rule: Rule): Fingerprint['kind'] {
   switch (rule.kind) {
     case 'must-not-depend':
     case 'may-only-depend':
     case 'layers':
-      return only('from', 'to')
-        ? { kind: 'dependency', rule: rule.id, from: from!, to: to! }
-        : undefined
+      return 'dependency'
     case 'no-cycles':
-      return only('cycle') && cycle!.length > 1
-        ? { kind: 'cycle', rule: rule.id, cycle: cycle! }
-        : undefined
+      return 'cycle'
     case 'threshold': {
       const subject = SUBJECT_OF[rule.metric]
-      if (subject === 'function' || subject === 'class') {
-        return only('file', 'name')
-          ? { kind: subject, rule: rule.id, file: file!, name: name! }
-          : undefined
-      }
-      return only('component')
-        ? { kind: 'component', rule: rule.id, component: component! }
-        : undefined
+      return subject === 'function' || subject === 'class' ? subject : 'component'
     }
     case 'library':
-      return only('component', 'library')
-        ? { kind: 'library', rule: rule.id, component: component!, library: library! }
-        : undefined
+      return 'library'
   }
 }
 
-/** The keys of an Exception that may name its Violation. */
-const FINGERPRINT_KEYS_WRITTEN = [
-  'from',
-  'to',
-  'cycle',
-  'component',
-  'library',
-  'file',
-  'name'
-] as const
+/** What an Exception names a Violation of a Rule by, as a sentence says it. */
+export function fingerprintKeysSaid(rule: Rule): {
+  kind: string
+  keys: readonly string[]
+  /** Of propagation cost: what names the top level. */
+  topLevel?: string
+} {
+  const keys = FINGERPRINT_SHAPES[fingerprintKindOf(rule)].map(([key]) => key)
+  const level = rule.kind === 'threshold' && SUBJECT_OF[rule.metric] === 'level'
+  return { kind: rule.kind, keys, ...(level && { topLevel: TOP_LEVEL }) }
+}
+
+/** The fingerprint an Exception names, when its keys — and no others — fit its Rule. */
+export function fingerprintOf(
+  exception: Pick<
+    WrittenException,
+    'from' | 'to' | 'cycle' | 'component' | 'library' | 'file' | 'name'
+  >,
+  rule: Rule
+): Fingerprint | undefined {
+  return readFingerprint(fingerprintKindOf(rule), rule.id, exception, true)
+}
 
 /** A web address, or anything else with a scheme and `//`: no name of an ADR. */
 const URL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//
@@ -341,4 +322,67 @@ export function adrExists(reference: string, decisions: Decisions): boolean {
   const log = written === undefined ? decisions.logs[0] : written === '.' ? '' : written
   if (written === undefined && decisions.logs.length !== 1) return false
   return decisions.adrs.some((adr) => adr.log === log && adr.id === id)
+}
+
+/** An import that is not written yet: from one Source File to another. */
+export interface PlannedImport {
+  readonly from: string
+  readonly to: string
+  /** An `import type`, which a Rule that ignores type-only Dependencies does not count. */
+  readonly typeOnly?: boolean
+  /** The line it will stand on; 1 when it is left out. */
+  readonly line?: number
+}
+
+/**
+ * The Violations an import would be part of, before it is written (docs/mcp.md,
+ * `list_violations`): the Rules are checked with the import added to the Dependencies, and
+ * what is found with it behind is returned — accepted by an Exception or not —, and a
+ * threshold it would cross. A threshold crossed already is not its doing. An import that is
+ * there already is checked as it is; an import of a value beside an `import type` is new.
+ * `structure` has to know `from` as a Source File, a file that is not written yet included:
+ * whoever calls lists it among the files of the repository.
+ */
+export function checkPlannedImport(
+  file: RulesFile,
+  structure: Pick<Structure, 'origin' | 'components' | 'sourceFiles'>,
+  model: Omit<Model, 'structure'>,
+  planned: PlannedImport,
+  decisions?: Decisions
+): ConformanceReport & { readonly exists: boolean } {
+  const { from, to } = planned
+  const typeOnly = planned.typeOnly ?? false
+  const line = planned.line ?? 1
+  const found = model.dependencies.find((one) => one.from === from && one.to === to)
+  // Beside an `import type` between the same two files, an import of a value is new: from it on,
+  // the Dependency counts for a Rule that leaves type-only ones out.
+  const there = found && !(found.typeOnly && !typeOnly) ? found : undefined
+  const dependencies = there
+    ? model.dependencies
+    : found
+      ? model.dependencies.map((one) =>
+          one === found
+            ? {
+                ...one,
+                typeOnly: false,
+                lines: [...new Set([...one.lines, line])].sort((a, b) => a - b),
+                typeOnlyLines: one.lines.filter((other) => other !== line)
+              }
+            : one
+        )
+      : [...model.dependencies, { from, to, typeOnly, lines: [line] }]
+  const before = there ? undefined : checkConformance(file, structure, model, decisions)
+  const known = new Set(before?.violations.map((one) => fingerprintKey(one.fingerprint)))
+  const report = checkConformance(file, structure, { ...model, dependencies }, decisions)
+  return {
+    ...report,
+    violations: report.violations.filter(
+      (violation) =>
+        violation.dependencies.some((one) => one.from === from && one.to === to) ||
+        (violation.fingerprint.kind === 'component' &&
+          before !== undefined &&
+          !known.has(fingerprintKey(violation.fingerprint)))
+    ),
+    exists: there !== undefined
+  }
 }
