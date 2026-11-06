@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -403,6 +403,21 @@ describe('a Source File for the code viewer', () => {
     ]) {
       expect(await readSourceFile(root, path, analysis)).toMatchObject({ ok: false })
     }
+  })
+
+  it('is the Rules file too, read only where it is inside the repository', async () => {
+    write('.arch/rules.yml', 'rules: []\n')
+    expect(await readSourceFile(root, '.arch/rules.yml', analysis)).toEqual({
+      ok: true,
+      file: { path: '.arch/rules.yml', text: 'rules: []\n' }
+    })
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), 'adr-tool-outside-')))
+    writeFileSync(join(outside, 'rules.yml'), 'rules: [secret]\n')
+    rmSync(join(root, '.arch/rules.yml'))
+    symlinkSync(join(outside, 'rules.yml'), join(root, '.arch/rules.yml'))
+    expect(await readSourceFile(root, '.arch/rules.yml', analysis)).toMatchObject({ ok: false })
+    rmSync(join(root, '.arch/rules.yml'))
+    rmSync(outside, { recursive: true, force: true })
   })
 
   it('is refused when it is too large to show, or gone since the analysis', async () => {

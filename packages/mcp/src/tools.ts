@@ -35,6 +35,7 @@ import {
 } from '@adr-tool/core'
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
 import { gitIn } from '@adr-tool/cli/git'
+import { architectureTools } from './architecture'
 import { repositoryFiles } from './files'
 import { diagramToolsFor } from './diagrams'
 import { PLAN, READ, list, object, required, text } from './kit'
@@ -85,7 +86,8 @@ const ID = required(
 
 /**
  * The tools of the server (docs/mcp.md): reading the Decision Logs, their ADRs and Problems,
- * and every write as a change set — planned and shown first, written only by `apply_change`.
+ * the Structure, the Rules and their Violations, and every write as a change set — planned and
+ * shown first, written only by `apply_change`.
  * Each call reads the repository afresh, as the app does before it plans.
  */
 export function toolsFor(options: ToolOptions): Tool[] {
@@ -199,6 +201,13 @@ export function toolsFor(options: ToolOptions): Tool[] {
         ...(plan.ok && plan.renamed && { renamed: plan.renamed })
       }
     )
+
+  const architecture = architectureTools({
+    root: options.root,
+    fs,
+    repository: async () => (await open()).repository,
+    preview: (plan) => hold(plan)
+  })
 
   return [
     {
@@ -361,6 +370,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
         }
       }
     },
+    ...architecture.reads,
     {
       name: 'plan_create_adr',
       title: 'Plan a new ADR',
@@ -594,6 +604,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return preview(log, await planMigration(fs, log, id))
       }
     },
+    ...architecture.plans,
     // The Diagrams: read as data with their Drift, and planned as every write is.
     ...diagramToolsFor({ root: options.root, fs, hold }),
     {

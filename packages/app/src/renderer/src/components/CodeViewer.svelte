@@ -6,12 +6,19 @@
 
   // A Source File, read-only, with the lines of the Dependency it was opened from marked and
   // the one asked for in view. It stands where the level was; the details stay beside it, so
-  // that one line after another can be opened from there.
-  let { code }: { code: CodeView } = $props()
+  // that one line after another can be opened from there. Conformance opens it as well, at an
+  // import or at the line of a Rule, and says where its button leads back to.
+  let {
+    code,
+    back
+  }: { code: CodeView; back?: { readonly label: string; readonly go: () => void } } = $props()
 
   let host: HTMLDivElement
   let viewer = $state<CodeViewer>()
   const show = $derived(app.active?.structure.show ?? 'graph')
+  const backTo = $derived(
+    back ?? { label: t.structure.viewer.back(show), go: () => app.closeSourceFile() }
+  )
 
   onMount(() => {
     viewer = createCodeViewer(host)
@@ -27,9 +34,9 @@
 
 <section class="code" aria-label={t.structure.viewer.label}>
   <div class="head">
-    <button class="back" onclick={() => app.closeSourceFile()}>
+    <button class="back" onclick={() => backTo.go()}>
       <span aria-hidden="true">←</span>
-      {t.structure.viewer.back(show)}
+      {backTo.label}
     </button>
     <span class="path">{code.path}</span>
     {#if code.marks.length > 0}

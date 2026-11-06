@@ -15,7 +15,7 @@ export {
 } from './declaration'
 export type { OwnedSourceFile } from './ownership'
 export { isDirectoryNode, withDirectories, type DirectoryNode } from './directories'
-export type { Language, SourceFile } from './source-files'
+export { languageOf, type Language, type SourceFile } from './source-files'
 export {
   DECLARATION_PATH,
   saidOf,

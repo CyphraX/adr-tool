@@ -13,6 +13,13 @@ export const list = (description: string): Schema => ({
   description,
   items: { type: 'string' }
 })
+export const number = (description: string): Schema => ({ type: 'number', description })
+export const flag = (description: string): Schema => ({ type: 'boolean', description })
+export const oneOf = (values: readonly string[], description: string): Schema => ({
+  type: 'string',
+  enum: values,
+  description
+})
 export const object = (properties: Record<string, Schema>, needed: string[] = []): Schema => ({
   type: 'object',
   properties,

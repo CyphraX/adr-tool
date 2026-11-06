@@ -1,14 +1,32 @@
 <script lang="ts">
   import type { StructureEdge, StructureView } from '../../../shared/ipc'
+  import { edgeKey, type ViolationsOnLevel } from '../lib/conformance'
   import { NODE, layoutGraph, pathOf } from '../lib/graph-layout'
-  import { app } from '../lib/state.svelte'
+  import type { StructureSelection } from '../lib/state.svelte'
   import { nodeLabel, opens } from '../lib/structure'
   import { t } from '../lib/strings'
+  import { wordConformance } from '../lib/said'
 
   // One level of the Components as a drawing: left to right is "depends on", so what is used
   // stands left of what uses it. The members of a Cycle share a column, and the lines that
-  // close it are red. The boxes are buttons over the lines; the lines are one SVG underneath.
-  let { view }: { view: StructureView } = $props()
+  // close it are red. The boxes are buttons over the lines, in reading order; the lines are one
+  // SVG underneath, and a list beside it says each of them as a sentence for a screen reader.
+  // Conformance draws the same level with its Violations in red instead of the Cycles.
+  let {
+    view,
+    selection,
+    onselect,
+    onopen,
+    violations
+  }: {
+    view: StructureView
+    selection: StructureSelection | undefined
+    onselect: (selection: StructureSelection) => void
+    /** A double click on a Component or a directory: the level below it. */
+    onopen: (id: string) => void
+    /** The lines and boxes of the Violations no Exception accepts, drawn red. */
+    violations?: ViolationsOnLevel
+  } = $props()
 
   const layout = $derived(
     layoutGraph(
@@ -20,12 +38,32 @@
   const nodeOf = $derived(new Map(view.nodes.map((node) => [node.id, node])))
   // The keyboard goes through the drawing as the eye does: column by column, top to bottom.
   const placed = $derived(layout.nodes.toSorted((a, b) => a.layer - b.layer || a.y - b.y))
-  const selection = $derived(app.active?.structure.selection)
 
+  // On Conformance's drawing red is a Violation: a Cycle is red there where a Rule forbids it.
   const inCycle = (edge: StructureEdge): boolean =>
+    !violations &&
     view.cycles.some(({ members }) => members.includes(edge.from) && members.includes(edge.to))
   const isWeakest = (edge: StructureEdge): boolean =>
+    !violations &&
     view.cycles.some(({ weakest }) => weakest?.from === edge.from && weakest.to === edge.to)
+  const violating = (edge: StructureEdge): boolean => violations?.edges.has(edgeKey(edge)) ?? false
+
+  /** A line as a sentence: what depends on what, how much, and what is wrong with it. */
+  function spoken(edge: StructureEdge): string {
+    const label = (id: string): string => {
+      const node = nodeOf.get(id)
+      return node ? nodeLabel(node) : id
+    }
+    const broken = violations?.edges.get(edgeKey(edge)) ?? []
+    return t.structure.graph.line(
+      label(edge.from),
+      label(edge.to),
+      edge.weight,
+      edge.typeOnly,
+      inCycle(edge),
+      broken.map((violation) => wordConformance(violation.said))
+    )
+  }
   /** The lines of the round trip of the Cycle that is selected. */
   const onRoundTrip = (edge: StructureEdge): boolean => {
     if (selection?.kind !== 'cycle') return false
@@ -40,13 +78,69 @@
     selection?.kind === 'node' && (edge.from === selection.id || edge.to === selection.id)
   /** Heavier Dependencies are drawn heavier, without drowning the light ones. */
   const strokeOf = (weight: number): number => 1.2 + Math.min(4, Math.log2(weight)) * 0.6
+
+  // On Conformance's drawing what breaks a Rule is drawn over the rest, never under it, and
+  // heavy enough to be seen however few imports stand behind it; the rest steps back.
+  const lines = $derived(
+    violations
+      ? layout.edges.toSorted((a, b) => Number(violating(a.edge)) - Number(violating(b.edge)))
+      : layout.edges
+  )
+  const widthOf = (edge: StructureEdge): number =>
+    violating(edge) ? Math.max(2.6, strokeOf(edge.weight)) : strokeOf(edge.weight)
+
+  // A level that is drawn anew shows what is selected on it, or else the first thing that
+  // breaks a Rule, wherever it lies in the drawing — a line with the boxes at its two ends.
+  // It is scrolled only when the level or the selection changed, not on every refresh, and
+  // only where it is not in sight already: up or down to the middle, sideways as little as
+  // it takes, so that the boxes beside it stay where they are.
+  let canvas = $state<HTMLDivElement>()
+  let shownFor: string | undefined
+  $effect(() => {
+    if (!violations || !canvas) return
+    const at = `${view.parent ?? ''}\n${JSON.stringify(selection ?? null)}`
+    if (at === shownFor) return
+    shownFor = at
+    const target =
+      canvas.querySelector<HTMLElement | SVGElement>(
+        '.node.selected, .line.violating.highlighted'
+      ) ?? canvas.querySelector<HTMLElement | SVGElement>('.line.violating, .node.violating')
+    if (!target) return
+    const ends = [target.dataset.from, target.dataset.to].flatMap((id) =>
+      id === undefined ? [] : [canvas!.querySelector(`.node[data-id="${CSS.escape(id)}"]`)]
+    )
+    const boxes = [target, ...ends].flatMap((one) => (one ? [one.getBoundingClientRect()] : []))
+    const left = Math.min(...boxes.map((box) => box.left))
+    const right = Math.max(...boxes.map((box) => box.right))
+    const top = Math.min(...boxes.map((box) => box.top))
+    const bottom = Math.max(...boxes.map((box) => box.bottom))
+    const frame = canvas.getBoundingClientRect()
+    const seen = {
+      left: frame.left,
+      top: frame.top,
+      right: frame.left + canvas.clientWidth,
+      bottom: frame.top + canvas.clientHeight
+    }
+    const margin = 16
+    const down =
+      top >= seen.top && bottom <= seen.bottom
+        ? 0
+        : (top + bottom) / 2 - (seen.top + seen.bottom) / 2
+    const across =
+      left < seen.left
+        ? left - seen.left - margin
+        : right > seen.right
+          ? Math.min(right - seen.right + margin, left - seen.left - margin)
+          : 0
+    if (down !== 0 || across !== 0) canvas.scrollBy({ left: across, top: down })
+  })
 </script>
 
 <div class="graph">
   {#if layout.nodes.length === 0}
     <p class="empty">{t.structure.graph.empty}</p>
   {:else}
-    <div class="canvas">
+    <div class="canvas" bind:this={canvas}>
       <div class="drawing" style:width="{layout.width}px" style:height="{layout.height}px">
         <svg width={layout.width} height={layout.height} aria-hidden="true">
           <defs>
@@ -62,16 +156,20 @@
               <path class="arrowhead" d="M0 0.5L7.5 4L0 7.5z" />
             </marker>
           </defs>
-          {#each layout.edges as line (`${line.edge.from}\n${line.edge.to}`)}
+          {#each lines as line (`${line.edge.from}\n${line.edge.to}`)}
             {@const edge = line.edge}
             {@const d = pathOf(line)}
             <path
               class="line"
+              data-from={edge.from}
+              data-to={edge.to}
               class:type-only={edge.typeOnly}
-              class:in-cycle={inCycle(edge)}
+              class:in-cycle={inCycle(edge) || violating(edge)}
+              class:violating={violating(edge)}
+              class:quiet={violations && !violating(edge)}
               class:weakest={isWeakest(edge)}
               class:highlighted={isSelected(edge) || touchesSelected(edge) || onRoundTrip(edge)}
-              style:stroke-width={strokeOf(edge.weight)}
+              style:stroke-width={widthOf(edge)}
               {d}
               marker-end="url(#dependency-arrow)"
             />
@@ -81,7 +179,7 @@
             <path
               class="hit"
               {d}
-              onclick={() => app.selectInStructure({ kind: 'edge', from: edge.from, to: edge.to })}
+              onclick={() => onselect({ kind: 'edge', from: edge.from, to: edge.to })}
             >
               <title>{t.structure.graph.weight(edge.weight)}</title>
             </path>
@@ -93,7 +191,9 @@
           {#if node}
             <button
               class="node {node.kind}"
+              data-id={node.id}
               class:draft={view.origin === 'draft'}
+              class:violating={violations?.nodes.has(node.id)}
               class:selected={selection?.kind === 'node' && selection.id === node.id}
               style:left="{placedNode.x}px"
               style:top="{placedNode.y}px"
@@ -101,8 +201,8 @@
               style:height="{NODE.height}px"
               title={node.kind === 'source-file' ? node.id : nodeLabel(node)}
               aria-pressed={selection?.kind === 'node' && selection.id === node.id}
-              onclick={() => app.selectInStructure({ kind: 'node', id: node.id })}
-              ondblclick={() => opens(node) && app.openComponent(node.id)}
+              onclick={() => onselect({ kind: 'node', id: node.id })}
+              ondblclick={() => opens(node) && onopen(node.id)}
             >
               <span class="name">{nodeLabel(node)}</span>
               {#if node.kind !== 'source-file'}
@@ -115,33 +215,69 @@
     </div>
   {/if}
 
+  {#if layout.nodes.length > 0}
+    <!-- What the drawing shows, read out: each line as a sentence. -->
+    <ul class="spoken" aria-label={t.structure.graph.spoken}>
+      {#each layout.edges as line (edgeKey(line.edge))}
+        <li>{spoken(line.edge)}</li>
+      {:else}
+        <li>{t.structure.graph.noLine}</li>
+      {/each}
+    </ul>
+  {/if}
+
   <footer>
-    <p class="reading">{t.structure.graph.howToRead}</p>
+    <p class="reading">
+      {violations ? t.conformance.center.howToRead : t.structure.graph.howToRead}
+    </p>
     <ul class="legend" aria-label={t.structure.graph.legend}>
       <li>
         <svg width="34" height="10" aria-hidden="true">
-          <path class="line" d="M1 5H32" marker-end="url(#dependency-arrow)" />
+          <path
+            class="line"
+            class:quiet={violations}
+            d="M1 5H32"
+            marker-end="url(#dependency-arrow)"
+          />
         </svg>
         {t.structure.graph.dependency}
       </li>
       <li>
         <svg width="34" height="10" aria-hidden="true">
-          <path class="line type-only" d="M1 5H32" marker-end="url(#dependency-arrow)" />
+          <path
+            class="line type-only"
+            class:quiet={violations}
+            d="M1 5H32"
+            marker-end="url(#dependency-arrow)"
+          />
         </svg>
         {t.structure.graph.typeOnly}
       </li>
-      <li>
-        <svg width="34" height="10" aria-hidden="true">
-          <path class="line in-cycle" d="M1 5H32" marker-end="url(#dependency-arrow)" />
-        </svg>
-        {t.structure.graph.inCycle}
-      </li>
-      <li>
-        <svg width="34" height="10" aria-hidden="true">
-          <path class="line in-cycle weakest" d="M1 5H32" marker-end="url(#dependency-arrow)" />
-        </svg>
-        {t.structure.graph.weakest}
-      </li>
+      {#if violations}
+        <li>
+          <svg width="34" height="10" aria-hidden="true">
+            <path class="line in-cycle" d="M1 5H32" marker-end="url(#dependency-arrow)" />
+          </svg>
+          {t.structure.graph.violation}
+        </li>
+        <li>
+          <span class="swatch violating" aria-hidden="true"></span>
+          {t.structure.graph.thresholdViolation}
+        </li>
+      {:else}
+        <li>
+          <svg width="34" height="10" aria-hidden="true">
+            <path class="line in-cycle" d="M1 5H32" marker-end="url(#dependency-arrow)" />
+          </svg>
+          {t.structure.graph.inCycle}
+        </li>
+        <li>
+          <svg width="34" height="10" aria-hidden="true">
+            <path class="line in-cycle weakest" d="M1 5H32" marker-end="url(#dependency-arrow)" />
+          </svg>
+          {t.structure.graph.weakest}
+        </li>
+      {/if}
     </ul>
   </footer>
 </div>
@@ -195,6 +331,10 @@
     stroke: var(--problem);
   }
 
+  .quiet {
+    stroke: var(--line-strong);
+  }
+
   .weakest {
     stroke-dasharray: 2 3;
     stroke-linecap: round;
@@ -239,6 +379,32 @@
   .node.selected {
     border-color: var(--focus);
     background: var(--selected);
+  }
+
+  .node.violating,
+  .swatch.violating {
+    border-color: var(--problem);
+    box-shadow: inset 0 0 0 1px var(--problem);
+  }
+
+  .swatch {
+    display: inline-block;
+    width: 22px;
+    height: 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    background: var(--paper);
+  }
+
+  .spoken {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .node.own-files,

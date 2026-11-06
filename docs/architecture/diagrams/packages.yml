@@ -66,6 +66,8 @@ connections:
     to: cli
     label: runs git, analyses
   - from: mcp
+    to: conformance
+  - from: mcp
     to: diagrams
     label: plans Diagrams
   - from: mcp
@@ -93,7 +95,7 @@ connections:
     label: Structure
   - from: app
     to: conformance
-    label: renames in the Rules
+    label: Conformance
   - from: app
     to: cli
     label: the export
