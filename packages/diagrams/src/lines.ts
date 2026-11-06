@@ -58,7 +58,7 @@ export function endOfValueLine(text: string, end: number): number | undefined {
 
 /**
  * The lines of one item of a block list: from the start of the line of its `-` to the end of
- * the line of its last key. `undefined` where they hold anything else: a comment, a tag or an
+ * the line of its last key, with the comments below it that are indented as its keys are. `undefined` where they hold anything else: a comment, a tag or an
  * anchor before the item on the line of its `-`, or more than a comment behind it.
  */
 export function itemLines(text: string, item: unknown): { start: number; end: number } | undefined {
@@ -71,7 +71,22 @@ export function itemLines(text: string, item: unknown): { start: number; end: nu
   const lead = text.slice(start, dash) + text.slice(dash + 1, valueStart)
   if (lead.trim() !== '') return undefined
   const end = endOfValueLine(text, valueEnd)
-  return end === undefined ? undefined : { start, end }
+  return end === undefined ? undefined : { start, end: pastItemComments(text, end, dash - start) }
+}
+
+/**
+ * Behind the comment lines at `offset` that are indented deeper than the `-` of an item at
+ * `dashColumn`: they belong to the item above them, and stay with it.
+ */
+export function pastItemComments(text: string, offset: number, dashColumn: number): number {
+  let at = offset
+  while (at < text.length) {
+    const end = lineEnd(text, at)
+    const indent = /^([ \t]*)#/.exec(text.slice(at, end))?.[1]
+    if (indent === undefined || indent.length <= dashColumn) break
+    at = end
+  }
+  return at
 }
 
 /** The column a node starts in. */
@@ -80,12 +95,23 @@ export function columnOf(text: string, node: unknown): number | undefined {
   return range ? range[0] - lineStart(text, range[0]) : undefined
 }
 
+/**
+ * Whether a value of `text` can be replaced where it stands, and nothing else with it: written
+ * on one line, so that no comment lies inside it, and without an anchor, so that no alias to it
+ * changes along.
+ */
+export function isReplaceable(text: string, node: unknown): boolean {
+  const range = rangeOf(node)
+  if (!range || (node as { anchor?: string }).anchor) return false
+  return !/[\r\n]/.test(text.slice(range[0], range[1]))
+}
+
 /** Whether a scalar is written on one line, plain or quoted: what can be replaced in place. */
-export const isInline = (node: unknown): boolean =>
+export const isInline = (text: string, node: unknown): boolean =>
   isScalar(node) &&
   node.type !== 'BLOCK_LITERAL' &&
   node.type !== 'BLOCK_FOLDED' &&
-  rangeOf(node) !== undefined
+  isReplaceable(text, node)
 
 /**
  * A Diagram as two readings of it are compared: without lines and Problems, which move, and

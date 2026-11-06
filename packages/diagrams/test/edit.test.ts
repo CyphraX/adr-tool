@@ -80,6 +80,17 @@ describe('moving an element', () => {
       code: 'cannot-edit-diagram',
       values: { path: PATH, edit: { code: 'editing-move', values: { id: 'web' } } }
     })
+    // In brackets, but over two lines, with a comment between them that would go.
+    const broken = lines('elements:', '  - component: web', '    at: [0, # stays put', '      0]')
+    expect(
+      refusedWith(broken, { kind: 'move-element', id: 'web', at: { x: 20, y: 20 } }).code
+    ).toBe('cannot-edit-diagram')
+    // An anchor: what an alias of it says would change with it. (A Diagram with an alias where
+    // the suite reads cannot be read at all.)
+    const anchored = lines('elements:', '  - component: web', '    at: &start [0, 0]')
+    expect(
+      refusedWith(anchored, { kind: 'move-element', id: 'web', at: { x: 20, y: 20 } }).code
+    ).toBe('cannot-edit-diagram')
     expect(
       refusedWith(shop, { kind: 'move-element', id: 'web', at: { x: 2_000_000, y: 0 } }).code
     ).toBe('invalid-position')
@@ -335,6 +346,68 @@ describe('connections', () => {
       code: 'cannot-edit-diagram',
       values: { path: PATH, edit: { code: 'editing-label', values: { from: 'a', to: 'b' } } }
     })
+    // A label over two lines, or one with an anchor.
+    const twoLines = lines(
+      'elements:',
+      '  - component: a',
+      '    at: [0, 0]',
+      '  - component: b',
+      '    at: [1, 1]',
+      'connections:',
+      '  - from: a',
+      '    to: b',
+      '    label: shows the',
+      '      invoices',
+      '  - from: b',
+      '    to: a',
+      '    label: &same reads'
+    )
+    expect(
+      refusedWith(twoLines, { kind: 'relabel-connection', from: 'a', to: 'b', label: 'bills' }).code
+    ).toBe('cannot-edit-diagram')
+    expect(
+      refusedWith(twoLines, { kind: 'relabel-connection', from: 'b', to: 'a', label: 'writes' })
+        .code
+    ).toBe('cannot-edit-diagram')
+  })
+})
+
+describe('the lines around an item', () => {
+  const commented = lines(
+    'level: container',
+    'elements:',
+    '  - component: web',
+    '    at: [0, 0]',
+    '    # more about web',
+    '  # the end of the elements',
+    'connections:'
+  )
+
+  it('a new item is written as the one before it, with the room after its "-"', () => {
+    const wide = lines('elements:', '  -   component: web', '      at: [0, 0]')
+    expect(
+      edited(wide, {
+        kind: 'add-element',
+        element: { kind: 'component', id: 'billing', at: { x: 200, y: 0 } }
+      })
+    ).toBe(wide + lines('  -   component: billing', '      at: [200, 0]'))
+  })
+
+  it('its comments stay with it: a new item goes below them, and they go with it', () => {
+    expect(
+      edited(commented, {
+        kind: 'add-element',
+        element: { kind: 'external', id: 'bank', at: { x: 0, y: 100 } }
+      })
+    ).toBe(
+      commented.replace(
+        '    # more about web\n',
+        '    # more about web\n  - external: bank\n    at: [0, 100]\n'
+      )
+    )
+    expect(edited(commented, { kind: 'remove-element', id: 'web' })).toBe(
+      lines('level: container', 'elements:', '  # the end of the elements', 'connections:')
+    )
   })
 })
 

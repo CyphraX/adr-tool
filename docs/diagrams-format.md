@@ -127,7 +127,7 @@ So that the suite can change one element or one connection without touching any 
 
 **The grid.** The window places and moves boxes on a grid of 20 px: a box dragged stands where the pointer leaves it, rounded to the nearest 20 px; the arrow keys move a selected box by 20 px, by 100 px with Shift. A file may hold any position; the grid is how the window writes them, not a rule of the format. A box the window adds stands at the first place on the grid, read top to bottom and left to right, that keeps 40 px from every box; a new Diagram of a container or component view starts with the Components of its level, placed in columns as Structure lays out its graph — what is used left of what uses it — and every connection the code has between them drawn, and a system context with the repository alone.
 
-A person may write any YAML that reads as the same Diagram. Where the suite cannot change what is asked without rewriting more — a list in flow style, an item with a comment on the line of its `-`, an anchor — it refuses, and says so.
+A person may write any YAML that reads as the same Diagram. Where the suite cannot change what is asked without rewriting more — a list in flow style, an item with a comment on the line of its `-`, a value written over several lines or as a block, an anchor — it refuses, and says so. A comment below an item, indented as its keys, is the item's: a new item goes below it, and it goes with the item that is taken out.
 
 ### What a valid Diagram is
 
@@ -223,7 +223,7 @@ A Repair is offered only where exactly one change is right. An element whose Com
 - the lines of the element's item, from its `-` to the end of the line of its last key, for every element that names the Component;
 - the lines of the item of every connection whose `from` or `to` is the Component ID — unless another element of the Diagram, an External System say, keeps that ID.
 
-A comment inside an item, or behind it on its last line, goes with it; nothing else in the file changes, and comments above and below an item stay where they are. Where an item does not have its lines to itself — a list in flow style, a comment, a tag or an anchor on the line of its `-` in front of it, anything but a comment behind it — the Repair is refused with the advice to use an editor. Whatever the suite hands out has been checked to read back as the same Diagram without those items.
+A comment inside an item, behind it on its last line, or below it indented as its keys, goes with it; nothing else in the file changes, and comments above and below an item stay where they are. Where an item does not have its lines to itself — a list in flow style, a comment, a tag or an anchor on the line of its `-` in front of it, anything but a comment behind it — the Repair is refused with the advice to use an editor. Whatever the suite hands out has been checked to read back as the same Diagram without those items.
 
 ### Of a Diagram's picture (part 7)
 

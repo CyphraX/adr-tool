@@ -22,12 +22,14 @@ import {
   comparable,
   endOfValueLine,
   isInline,
+  isReplaceable,
   itemLines,
   lineBreakOf,
   lineStart,
   listOf,
   mapsOf,
   pairOf,
+  pastItemComments,
   rangeOf,
   textAt
 } from './lines'
@@ -193,7 +195,7 @@ function editOnce(path: string, text: string, edit: DiagramEdit): string {
       checkPoint(edit.at)
       const item = elementItem(edit.id) ?? gone(edit.id)
       const at = pairOf(item, 'at')?.value
-      if (!isSeq(at) || !at.flow) throw cannot
+      if (!isSeq(at) || !at.flow || !isReplaceable(text, at)) throw cannot
       const [start, end] = rangeOf(at) ?? writer.cannot()
       edits = [{ start, end, insert: pointText(edit.at) }]
       const first = before.elements.findIndex((element) => element.id === edit.id)
@@ -394,7 +396,7 @@ class Writer {
       keys
         .map(
           (line, index) =>
-            `${' '.repeat(index === 0 ? dash : indent)}${index === 0 ? '- ' : ''}${line}${lineBreak}`
+            `${index === 0 ? `${' '.repeat(dash)}-${' '.repeat(Math.max(1, indent - dash - 1))}` : ' '.repeat(indent)}${line}${lineBreak}`
         )
         .join('')
     const topColumn = top === null ? 0 : (columnOf(text, (top as YAMLMap).items[0]?.key) ?? 0)
@@ -409,7 +411,7 @@ class Writer {
       const dashColumn = dash - lineStart(text, dash)
       const keyColumn = firstStart - lineStart(text, firstStart)
       const [, lastEnd] = rangeOf(last) ?? this.cannot()
-      const at = endOfValueLine(text, lastEnd) ?? this.cannot()
+      const at = pastItemComments(text, endOfValueLine(text, lastEnd) ?? this.cannot(), dashColumn)
       const lead = at === text.length && !text.endsWith('\n') ? lineBreak : ''
       return [{ start: at, end: at, insert: lead + items(dashColumn, keyColumn) }]
     }
@@ -482,7 +484,7 @@ class Writer {
         const end = nodeRange && nodeRange[1] > nodeRange[0] ? nodeRange[1] : colon + 1
         return [{ start: colon + 1, end, insert: ` ${written}` }]
       }
-      if (!isInline(node)) this.cannot()
+      if (!isInline(text, node)) this.cannot()
       const [start, end] = rangeOf(node)!
       return [{ start, end, insert: written }]
     }
