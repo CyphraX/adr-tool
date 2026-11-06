@@ -33,7 +33,7 @@ In a client configured by JSON (Claude Desktop, Cursor and others):
 }
 ```
 
-It is not published to npm yet; that comes with distribution (roadmap, "Before the first public release").
+It is not published to npm. The `adr-mcp.mjs` of a release goes in place of the path in `packages/mcp/dist`.
 
 ## The protocol
 

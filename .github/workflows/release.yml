@@ -100,8 +100,8 @@ jobs:
           sha256sum -- * > ../SHA256SUMS
           mv ../SHA256SUMS .
           cat SHA256SUMS
-      # The notes are the tag's section of CHANGELOG.md, without its heading, and what has to be
-      # known about an unsigned build.
+      # The notes are the tag's section of CHANGELOG.md, without its heading, its links into the
+      # repository made absolute at the tag, and what has to be known about an unsigned build.
       - name: Notes
         env:
           TAG: ${{ github.ref_name }}
@@ -116,6 +116,7 @@ jobs:
             echo "::error file=CHANGELOG.md::CHANGELOG.md has no section ## [${version}]."
             exit 1
           fi
+          sed -i -E "s#\]\((docs/|README\.md|CHANGELOG\.md)#](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/\1#g" notes.md
           cat >> notes.md <<'EOF'
 
           ---
