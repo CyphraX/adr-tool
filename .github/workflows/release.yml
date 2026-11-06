@@ -3,11 +3,18 @@ name: Release
 # Builds the installers of the desktop app on Linux, Windows and macOS, and the two commands,
 # and publishes them as the GitHub release of the tag that was pushed (docs/release.md).
 # Started by hand on a branch, it builds everything and keeps it as the run's artifacts, and
-# publishes nothing; started by hand on a tag, it publishes that tag's release.
+# publishes nothing; started by hand on a tag, it publishes that tag's release. Started by hand
+# on main with `publish`, it tags the commit with its version and publishes that release: for
+# whoever can start a workflow but not push a tag.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'On main: tag this commit v<version of packages/app/package.json> and publish its release'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -94,12 +101,23 @@ jobs:
   release:
     name: Release
     needs: [check, package]
-    if: github.ref_type == 'tag'
+    if: >-
+      github.ref_type == 'tag' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
+      # The tag that was pushed, or, started by hand on main, the one the version names.
+      - name: The tag
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p "require('./packages/app/package.json').version")"
+          fi
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v7
         with:
           path: release
@@ -114,8 +132,6 @@ jobs:
       # The notes are the tag's section of CHANGELOG.md, without its heading, its links into the
       # repository made absolute at the tag, and what has to be known about an unsigned build.
       - name: Notes
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
           # The section is headed `## [0.2.0] — 2026-12-01` once it is released; until then it
@@ -147,10 +163,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" release/* --clobber
-          else
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
             gh release create "$TAG" release/* --title "$TAG" --notes-file notes.md --verify-tag
+          else
+            # Started by hand on main: the tag is made here, on this commit. One that exists
+            # already has to name this commit, or nothing is published.
+            tagged="$(git ls-remote --tags origin "refs/tags/${TAG}" "refs/tags/${TAG}^{}" | sort -k2 | tail -n 1 | cut -f1)"
+            if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
+              echo "::error::The tag ${TAG} names ${tagged}, not ${GITHUB_SHA}, the commit of this run."
+              exit 1
+            fi
+            gh release create "$TAG" release/* --title "$TAG" --notes-file notes.md --target "$GITHUB_SHA"
           fi
