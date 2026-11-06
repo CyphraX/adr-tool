@@ -10,6 +10,7 @@
   } from '@adr-tool/diagrams'
   import type { DiagramSelection } from '../lib/diagrams-tab.svelte'
   import { GRID, boxAt, readingOrder, snapPoint } from '../lib/diagram-canvas'
+  import { tick } from 'svelte'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
 
@@ -187,22 +188,46 @@
     if (move && box) {
       event.preventDefault()
       edit({ kind: 'move-element', id, at: snapPoint({ x: box.x + move.x, y: box.y + move.y }) })
+      // A box that moves past another in reading order is moved in the page, which drops its
+      // focus: it is given back, so that the keys go on moving it.
+      void refocus(id)
     } else if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
-      edit({ kind: 'remove-element', id })
+      if (edit({ kind: 'remove-element', id })) void refocus(undefined)
     }
   }
 
+  /** Give the focus back to a box after an edit, or to the canvas where the box is gone. */
+  async function refocus(id: string | undefined): Promise<void> {
+    await tick()
+    const box =
+      id === undefined
+        ? undefined
+        : view?.querySelector<HTMLElement>(`[data-element="${CSS.escape(id)}"]`)
+    ;(box ?? view)?.focus({ preventScroll: true })
+  }
+
   function onKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && selection) app.diagrams.select(undefined)
+  }
+
+  /**
+   * Undo takes back the last edit wherever the focus is in the module, but in a field, which
+   * has an undo of its own, and while a dialog is open.
+   */
+  function onWindowKey(event: KeyboardEvent): void {
     const mac = window.api.platform === 'darwin'
     const chord = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
-    if (chord && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'z') {
-      if (event.target instanceof HTMLInputElement) return
-      event.preventDefault()
-      app.diagrams.undo()
-    } else if (event.key === 'Escape' && selection) {
-      app.diagrams.select(undefined)
-    }
+    if (!chord || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'z') return
+    const target = event.target
+    const field =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    if (field || event.defaultPrevented || document.querySelector('dialog[open]')) return
+    event.preventDefault()
+    app.diagrams.undo()
   }
 
   function startLabelling(from: string, to: string): void {
@@ -255,8 +280,11 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="canvas" bind:this={view} onkeydown={onKey}>
+<svelte:window onkeydown={onWindowKey} />
+
+<!-- The canvas itself takes the focus where a box it had is gone, so that the keys still work. -->
+<!-- svelte-ignore a11y_no_static_element_interactions, a11y_no_noninteractive_tabindex -->
+<div class="canvas" bind:this={view} tabindex="-1" onkeydown={onKey}>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     class="drawing"
@@ -394,8 +422,9 @@
           class="handle"
           style:left="{box.x - origin.x + box.width - 6}px"
           style:top="{box.y - origin.y + box.height / 2 - 6}px"
+          tabindex="-1"
+          aria-hidden="true"
           title={t.diagrams.connectFrom(box.name)}
-          aria-label={t.diagrams.connectFrom(box.name)}
           onpointerdown={(event) => startConnecting(event, box.id)}
         ></button>
       {/if}
@@ -434,6 +463,15 @@
     min-height: 0;
     overflow: auto;
     background: var(--panel-raised);
+  }
+
+  .canvas:focus {
+    outline: none;
+  }
+
+  .canvas:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
   }
 
   /* The grid the boxes snap to, faint. */
