@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { readFile, stat } from 'node:fs/promises'
-import { join, resolve, sep } from 'node:path'
+import { stat } from 'node:fs/promises'
+import { resolve, sep } from 'node:path'
 import { watch, type FSWatcher } from 'chokidar'
+import { RULES_PATH } from '@adr-tool/conformance'
 import {
   everyComponent,
   isDirectoryNode,
@@ -31,6 +32,7 @@ import {
   type StructureView
 } from '../shared/ipc'
 import type { Analysis } from './analysis'
+import { nodeFileSystem } from './node-file-system'
 import { t } from './strings'
 
 /** Editors, formatters and git touch many files at once; one analysis covers them all. */
@@ -142,6 +144,26 @@ export class Structures {
       current: entry.watcher !== undefined,
       analysedAt: entry.analysedAt ?? Date.now()
     })
+  }
+
+  /**
+   * The analysis Conformance checks its Rules on. `watch` keeps it current from now on, as
+   * an open Structure does; without it, the last one serves, or one is made as for the outline.
+   */
+  async rulesAnalysisOf(
+    repositoryId: string,
+    root: string,
+    watch: boolean
+  ): Promise<{ analysis: Analysis; current: boolean; analysedAt: number }> {
+    const entry = this.entryOf(repositoryId, root)
+    const analysis = watch
+      ? await this.opened(repositoryId, root)
+      : (entry.analysis ?? (await this.run(repositoryId, entry, 'outline')))
+    return {
+      analysis,
+      current: entry.watcher !== undefined,
+      analysedAt: entry.analysedAt ?? Date.now()
+    }
   }
 
   /** A Source File's text for the code viewer, if the analysis lists it as one. */
@@ -556,9 +578,10 @@ function insideOf(
 }
 
 /**
- * The text of a Source File, read only when the analysis lists `path` as one: the window names
- * a file by the path the analysis gave it, and cannot make the main process read anything
- * else. Read as the disk has it now, which may be newer than the analysis.
+ * The text of a Source File, read only when the analysis lists `path` as one — or of
+ * `.arch/rules.yml`: the window names a file by the path the analysis gave it, and cannot make
+ * the main process read anything else. Read as the disk has it now, which may be newer than
+ * the analysis.
  */
 export async function readSourceFile(
   root: string,
@@ -570,13 +593,18 @@ export async function readSourceFile(
   const full = resolve(root, path)
   // The analysis never lists a path outside the root; this holds should that ever change.
   const inside = full.startsWith(resolve(root) + sep)
-  if (file === undefined || !inside) return { ok: false, reason: t.notASourceFile(path) }
+  // The Rules file is the one other file the viewer shows: where a Rule is written.
+  const rules = path === RULES_PATH
+  if ((file === undefined && !rules) || !inside)
+    return { ok: false, reason: t.notASourceFile(path) }
   try {
     if ((await stat(full)).size > limit) {
       return { ok: false, reason: t.sourceFileTooLarge(path, Math.round(limit / 1024 / 1024)) }
     }
-    const text = await readFile(join(root, path), 'utf8')
-    return { ok: true, file: { path, language: file.language, text } }
+    // Read as every other file of the repository is read: not through a link that leads out.
+    const text = await nodeFileSystem(root).readText(path)
+    if (text === undefined) return { ok: false, reason: t.sourceFileUnreadable(path) }
+    return { ok: true, file: { path, ...(file && { language: file.language }), text } }
   } catch {
     return { ok: false, reason: t.sourceFileUnreadable(path) }
   }

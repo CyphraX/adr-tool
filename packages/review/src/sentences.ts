@@ -64,7 +64,9 @@ export const SENTENCES = {
   orphaned: (v: { annotation: string; path: string; lines: string; file: string }): string =>
     v.file === 'gone'
       ? `${v.annotation} is orphaned: ${v.path} is gone, and no file it was renamed to has its quoted lines. Attach it again to the lines it is about.`
-      : `${v.annotation} is orphaned: the quoted lines ${v.lines} of ${v.path} are no longer found in it. Attach it again to the lines it is about.`,
+      : v.lines.includes('-')
+        ? `${v.annotation} is orphaned: the quoted lines ${v.lines} of ${v.path} are no longer found in it. Attach it again to the lines it is about.`
+        : `${v.annotation} is orphaned: the quoted line ${v.lines} of ${v.path} is no longer found in it. Attach it again to the lines it is about.`,
   'unreadable-reply': (v: About): string => `${v.path} cannot be read: ${english(v.detail)}.`,
   'replies-without-annotation': (v: { path: string; annotation: string }): string =>
     `${v.path} holds Replies to ${v.annotation}, and there is no Annotation ${v.annotation}.`,

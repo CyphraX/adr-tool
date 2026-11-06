@@ -1,3 +1,4 @@
+import type { Rule } from '@adr-tool/conformance'
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 import type { MetricKey, MetricWording, ReviewWording, en } from './strings.en'
@@ -13,6 +14,26 @@ import type { Refusal } from './views'
  */
 
 const many = (count: number, one: string, more: string): string => (count === 1 ? one : more)
+
+/** A text with its first letter in capitals: a sentence's start. */
+const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** Lines of a Source File: the first and the last, counted from 1. */
+interface Span {
+  readonly start: number
+  readonly end: number
+}
+
+/** Lines as a sentence names them: „Zeile 12“, „Zeilen 12–14“. */
+const linesWord = (lines: Span): string =>
+  lines.start === lines.end ? `Zeile ${lines.start}` : `Zeilen ${lines.start}–${lines.end}`
+
+/** Komponentenmuster, wie ein Satz sie schreibt: `a`, `a und b`, `a, b und c`. */
+const listed = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} und ${items.at(-1)}`
+
+/** A number of a threshold as German writes it: 0,5. */
+const decimal = (value: number | undefined): string => (value ?? 0).toLocaleString('de')
 
 /** A count as the window writes it: 9.115. */
 const count = (value: number): string => value.toLocaleString('de')
@@ -58,7 +79,9 @@ export const de: typeof en = {
     label: 'Module',
     decisions: 'Entscheidungen',
     structure: 'Struktur',
-    diagrams: 'Diagramme'
+    conformance: 'Konformität',
+    diagrams: 'Diagramme',
+    review: 'Review'
   },
 
   tabs: {
@@ -126,7 +149,7 @@ export const de: typeof en = {
   repositoryProblems: {
     entry: 'Repository-Probleme',
     entryHint:
-      'Alle Probleme dieses Repositorys in einer Liste: seiner Decision Logs, der Deklaration seiner Komponenten und der Traces dazwischen',
+      'Alle Probleme dieses Repositorys in einer Liste: seiner Decision Logs, der Deklaration seiner Komponenten, der Traces dazwischen, seiner Regeln und seiner Annotationen',
     counting:
       'Die Struktur analysiert den Code noch; ihre Probleme werden gezählt, sobald sie fertig ist.',
     asOf: (at: number): string =>
@@ -140,6 +163,7 @@ export const de: typeof en = {
     noneHere: 'Keine Probleme.',
     traces: 'Traces von ADRs zu Komponenten',
     backToStructure: 'Zurück zu den Komponenten',
+    backToAnnotations: 'Zurück zu den Annotationen',
     declaration: 'Die Deklaration',
     component: 'Komponente',
     reading:
@@ -149,7 +173,16 @@ export const de: typeof en = {
     draft:
       'Noch ist nichts deklariert: Was die Prüfungen am Entwurf finden, sind Hinweise, die die Struktur neben ihm zeigt.',
     byHand:
-      'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie `.arch/components.yml` in einem Editor; die Ansicht folgt.'
+      'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie `.arch/components.yml` in einem Editor; die Ansicht folgt.',
+    backToConformance: 'Zurück zu den Verstößen',
+    rulesFile: 'Die Regeldatei',
+    atLine: (line: number): string => `Zeile ${line}`,
+    note: 'Hinweis',
+    rulesReading: 'Konformität prüft die Regeln. Ihre Probleme folgen, sobald sie fertig ist.',
+    rulesAgain: 'Die Regeln werden erneut geprüft: Dies sind die Probleme der letzten Prüfung.',
+    rulesFailed: (reason: string): string => `Die Regeln konnten nicht geprüft werden: ${reason}`,
+    rulesByHand:
+      'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie `.arch/rules.yml` in einem Editor; die Ansicht folgt.'
   },
 
   diagram: {
@@ -483,7 +516,20 @@ export const de: typeof en = {
           count,
           'Eine Abhängigkeit zwischen Quelldateien',
           `${count} Abhängigkeiten zwischen Quelldateien`
-        )
+        ),
+      spoken: 'Die Abhängigkeiten in der Zeichnung',
+      line: (
+        from: string,
+        to: string,
+        weight: number,
+        typeOnly: boolean,
+        inCycle: boolean,
+        violations: readonly string[]
+      ): string =>
+        `${from} hängt von ${to} ab: ${many(weight, 'eine Abhängigkeit zwischen Quelldateien', `${weight} Abhängigkeiten zwischen Quelldateien`)}${typeOnly ? ', nur Typen' : ''}${inCycle ? ', in einem Zyklus' : ''}.${violations.map((violation) => ` Verstoß: ${violation}.`).join('')}`,
+      noLine: 'Keine Abhängigkeit zwischen den Knoten dieser Ebene.',
+      violation: 'verstößt gegen eine Regel',
+      thresholdViolation: 'außerhalb eines Schwellenwerts'
     },
 
     views: {
@@ -689,7 +735,7 @@ export const de: typeof en = {
       rename: 'Umbenennen',
       renameLabel: (name: string): string => `Neues Segment für ${name}`,
       renameHint: (id: string): string =>
-        `Die ID ${id} ändert sich, und mit ihr die IDs der Komponenten darin. Jedes ADR, das eine davon nennt, wird in derselben Änderung umgeschrieben.`,
+        `Die ID ${id} ändert sich, und mit ihr die IDs der Komponenten darin. Was eine davon nennt – jedes ADR, jede Regel und jede Ausnahme in .arch/rules.yml –, wird in derselben Änderung umgeschrieben.`,
       notASegment:
         'Kleinbuchstaben, Ziffern und Bindestriche, am Anfang und Ende ein Buchstabe oder eine Ziffer.',
       preview: 'Vorschau'
@@ -722,6 +768,232 @@ export const de: typeof en = {
         'Sie behalten ihre Komponente und haben keine eigenen Abhängigkeiten, bis sie sich parsen lassen.',
       unreadable: 'konnte nicht gelesen werden',
       none: 'Keine.'
+    }
+  },
+
+  conformance: {
+    label: 'Regeln, Ausnahmen und was die Prüfung gefunden hat',
+    metric: {
+      complexity: {
+        long: 'Zyklomatische Komplexität einer Funktion',
+        definition:
+          'Zyklomatische Komplexität: 1 und eins mehr für jede Entscheidung in einer Funktion, jede Sprache gezählt, wie ihr übliches Werkzeug sie zählt — ESLint, Checkstyle, radon, gocyclo. Geprüft für jede Funktion in den Quelldateien der Komponenten, die die Regel nennt.'
+      },
+      lcom4: {
+        long: 'LCOM4 einer Klasse',
+        definition:
+          'LCOM4: die Gruppen von Methoden einer Klasse, die kein Feld teilen und keine Methode einer anderen Gruppe aufrufen. Mehr als eine, und die Klasse ließe sich teilen. Geprüft für jede Klasse in den Quelldateien der Komponenten, die die Regel nennt.'
+      },
+      'propagation-cost': {
+        long: 'Ausbreitungskosten einer Ebene',
+        definition:
+          'Ausbreitungskosten: unter allen geordneten Paaren von Knoten einer Ebene der Anteil, in dem der erste den zweiten über Abhängigkeiten erreicht. Geprüft für die Ebene unter jeder Komponente, die die Regel nennt, / für die oberste Ebene.'
+      }
+    },
+    rules: 'Regeln',
+    all: 'Alle Verstöße',
+    allHint: 'Die Verstöße aller Regeln',
+    exceptions: 'Ausnahmen',
+    exceptionsHint: 'Die Verstöße, die akzeptiert sind, jeder mit seiner Begründung',
+    file: 'Die Regeldatei',
+    open: '.arch/rules.yml öffnen',
+    newRule: 'Neue Regel',
+    newRuleHint:
+      'Eine Regel in .arch/rules.yml schreiben. Sie sehen die Änderung, bevor sie geschrieben wird.',
+    noFile:
+      'Es gibt noch keine `.arch/rules.yml`. Die erste Regel, die Sie hier schreiben, legt sie an.',
+    draft:
+      'Die Komponenten sind ein Entwurf, deshalb werden die Regeln nicht geprüft. Sie werden es, sobald die Komponenten deklariert sind: Übernehmen Sie den Entwurf in der Struktur.',
+    notEvaluated:
+      'Die Regeln werden nicht geprüft, solange `.arch/rules.yml` nicht gelesen werden kann. Das Problem steht in der Liste des Repositorys.',
+    analysing: 'Die Regeln werden gegen den Code geprüft …',
+    again: 'Die Regeln werden erneut geprüft. Dies ist das letzte Ergebnis.',
+    asOf: (at: number): string =>
+      `Stand der Analyse des Codes um ${new Date(at).toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })} Uhr.`,
+    failed: 'Die Regeln konnten nicht geprüft werden',
+    problems: 'Probleme der Regeldatei',
+    notes: 'Hinweise zur Regeldatei',
+
+    center: {
+      all: 'Alle Verstöße',
+      ofRule: (id: string): string => `Verstöße gegen ${id}`,
+      exceptions: 'Ausnahmen',
+      show: 'Die Verstöße zeigen als',
+      list: 'Liste',
+      graph: 'Graph',
+      accepted: 'Als Ausnahmen akzeptiert',
+      none: 'Kein Verstoß: Der Code hält sich an jede Regel.',
+      noneOfRule: 'Kein Verstoß: Der Code hält sich an diese Regel.',
+      allAccepted: 'Jeder Verstoß ist als Ausnahme akzeptiert.',
+      noRules:
+        'Noch keine Regel. Eine Regel sagt, welche Komponenten von welchen abhängen dürfen, dass es keinen Zyklus gibt oder wie weit eine Metrik gehen darf. Schreiben Sie die erste mit „Neue Regel“.',
+      noExceptions:
+        'Keine Ausnahme. Ein Verstoß, der mit einer Begründung akzeptiert wird, wird zu einer: Wählen Sie ihn aus und dann „Als Ausnahme akzeptieren“.',
+      howToRead:
+        'Die Zeichnung der Struktur für diese Ebene, von links nach rechts zu lesen. Rot ist, was gegen eine Regel verstößt, die keine Ausnahme akzeptiert. Ein Doppelklick auf eine Komponente oder ein Verzeichnis zeigt seine Teile.',
+      back: (show: 'list' | 'graph' | 'exceptions'): string =>
+        ({
+          list: 'Zurück zu den Verstößen',
+          graph: 'Zurück zum Graphen',
+          exceptions: 'Zurück zu den Ausnahmen'
+        })[show]
+    },
+
+    detail: {
+      label: 'Details',
+      violation: 'Verstoß',
+      rule: 'Regel',
+      exception: 'Ausnahme',
+      hint: 'Wählen Sie einen Verstoß, um die Importe dahinter zu sehen, oder eine Regel, um zu sehen, was sie sagt und wo sie steht.',
+      graphHint:
+        'Wählen Sie eine rote Linie oder einen roten Kasten, um den Verstoß dahinter zu sehen.',
+      breaksNothing: 'Dies verstößt gegen keine Regel.',
+      accept: 'Als Ausnahme akzeptieren',
+      acceptHint:
+        'In .arch/rules.yml festhalten, dass dieser Verstoß akzeptiert ist, und warum. Sie sehen die Änderung, bevor sie geschrieben wird.',
+      acceptedBy: 'Akzeptiert durch eine Ausnahme',
+      reason: 'Begründung',
+      reasonPlaceholder: 'Warum dieser Verstoß akzeptiert wird',
+      justifiedBy: 'Begründet durch',
+      justifiedByOptional: 'Begründet durch ein ADR – optional',
+      adrPlaceholder: 'Ein ADR: Nummer oder Titel',
+      noAdrLeft: 'Kein ADR zum Zitieren',
+      notAnAdr: (reference: string): string => `${reference} – kein ADR dieses Repositorys`,
+      preview: 'Vorschau',
+      imports: 'Abhängigkeiten zwischen Quelldateien',
+      noImports:
+        'Hinter einem Schwellenwert steht kein Import: Gemessen wird, worauf er sich bezieht, als Ganzes.',
+      inCode: 'Im Code',
+      roundTrip: 'Zum Beispiel',
+      weakest: 'Schwächste Abhängigkeit',
+      value: 'Wert',
+      why: 'Warum',
+      says: 'Was sie sagt',
+      kind: 'Art',
+      written: 'Wo sie steht',
+      options: 'Optionen',
+      testsIncluded: 'Testdateien zählen mit.',
+      typeOnlyIgnored: 'Abhängigkeiten nur über Typen zählen nicht.',
+      violations: 'Ihre Verstöße',
+      noViolations: 'Keine: Der Code hält sich an sie.',
+      exceptions: 'Ihre Ausnahmen',
+      accepts: 'Akzeptiert',
+      acceptsNothing: 'Keinen Verstoß: Sie steht in den Problemen des Repositorys.',
+      change: 'Ändern',
+      remove: 'Entfernen',
+      showViolations: 'Ihre Verstöße zeigen',
+      removeException: 'Entfernen'
+    },
+
+    kinds: {
+      'must-not-depend': {
+        name: 'darf nicht abhängen von',
+        about:
+          'Eine Abhängigkeit von einer der Komponenten in `from` zu einer der Komponenten in `to` ist ein Verstoß.'
+      },
+      'may-only-depend': {
+        name: 'darf nur abhängen von',
+        about:
+          'Die Komponenten in `from` dürfen von denen in `to` abhängen und von nichts anderem; jede andere Abhängigkeit ist ein Verstoß.'
+      },
+      layers: {
+        name: 'Schichten',
+        about:
+          'Eine Schicht darf von den Schichten unter ihr abhängen, nicht von denen über ihr; strikt nur von der direkt darunter.'
+      },
+      'no-cycles': {
+        name: 'keine Zyklen',
+        about:
+          'Ein Zyklus zwischen den Komponenten, die sie nennt, oder zwischen den Quelldateien in jeder von ihnen ist ein Verstoß.'
+      },
+      threshold: {
+        name: 'Schwellenwert',
+        about:
+          'Eine Komponente, die sie nennt und deren Metrik außerhalb der Grenzen liegt, ist ein Verstoß.'
+      }
+    },
+
+    says: (rule: Rule, metric: string): string => {
+      switch (rule.kind) {
+        case 'must-not-depend':
+          return `${listed(rule.from)} ${rule.from.length > 1 ? 'dürfen' : 'darf'} nicht von ${listed(rule.to)} abhängen`
+        case 'may-only-depend':
+          return rule.to.length === 0
+            ? `${listed(rule.from)} ${rule.from.length > 1 ? 'dürfen' : 'darf'} von keiner anderen Komponente abhängen`
+            : `${listed(rule.from)} ${rule.from.length > 1 ? 'dürfen' : 'darf'} nur von ${listed(rule.to)} abhängen`
+        case 'layers':
+          return `${rule.mode === 'strict' ? 'Strikte Schichten' : 'Schichten'}, von oben nach unten: ${rule.layers.map((layer) => layer.join(', ')).join(' › ')}`
+        case 'no-cycles':
+          return `Kein Zyklus ${rule.scope === 'among' ? 'zwischen' : 'innerhalb von'} ${listed(rule.components)}`
+        case 'threshold':
+          return `${metric} von ${listed(rule.of)} ${
+            rule.max !== undefined && rule.min !== undefined
+              ? `zwischen ${decimal(rule.min)} und ${decimal(rule.max)}`
+              : rule.max !== undefined
+                ? `höchstens ${decimal(rule.max)}`
+                : `mindestens ${decimal(rule.min)}`
+          }`
+      }
+    },
+
+    component: {
+      rules: 'Regeln',
+      noRule: 'Keine Regel nennt sie.',
+      violations: 'Verstöße',
+      noViolation: (accepted: number): string =>
+        accepted === 0
+          ? 'Keine.'
+          : accepted === 1
+            ? 'Nur einer, den eine Ausnahme akzeptiert.'
+            : `Nur ${accepted}, die Ausnahmen akzeptieren.`,
+      alsoAccepted: (accepted: number): string =>
+        accepted === 1
+          ? 'Dazu einer, den eine Ausnahme akzeptiert.'
+          : `Dazu ${accepted}, die Ausnahmen akzeptieren.`,
+      checking: 'Die Regeln werden geprüft …'
+    },
+    adr: {
+      exceptions: 'Ausnahmen, die es begründet',
+      justifies: 'Begründet',
+      exception: (rule: string, names: string): string => `die Ausnahme von ${rule}: ${names}`
+    },
+
+    form: {
+      newTitle: 'Neue Regel',
+      changeTitle: 'Regel ändern',
+      id: 'ID',
+      idHint:
+        'Kleinbuchstaben, Ziffern und Bindestriche. Ausnahmen und adr check nennen die Regel damit.',
+      why: 'Warum',
+      whyPlaceholder: 'Warum sich der Code daran halten muss, als Satz',
+      kind: 'Art',
+      from: 'Von',
+      fromAbout: 'Die Komponenten, deren Abhängigkeiten sie einschränkt.',
+      to: 'Zu',
+      toAbout: 'Die Komponenten, von denen sie nicht abhängen dürfen.',
+      allowed: 'Darf abhängen von',
+      allowedAbout: 'Nichts hier: von keiner anderen Komponente.',
+      layers: 'Schichten, von oben nach unten',
+      layer: (position: number): string => `Schicht ${position}`,
+      addLayer: 'Schicht hinzufügen',
+      removeLayer: (position: number): string => `Schicht ${position} entfernen`,
+      strict: 'Strikt: Eine Schicht darf nur von der direkt darunter abhängen',
+      scope: 'Wo',
+      among: 'Zwischen den Komponenten',
+      inside: 'Innerhalb jeder Komponente, zwischen ihren Quelldateien',
+      components: 'Komponenten',
+      metric: 'Metrik',
+      max: 'Höchstens',
+      min: 'Mindestens',
+      of: 'Der Komponenten',
+      tests: 'Testdateien zählen mit',
+      ignoreTypeOnly: 'Abhängigkeiten nur über Typen zählen nicht',
+      patternPlaceholder: 'Eine Komponenten-ID oder ein Muster, dann Enter',
+      patterns:
+        'Komponenten über ihre ID, wie deklariert; `*` steht für ein Segment, `**` für beliebig viele: `ui/**`, `features/*`.',
+      missing: (keys: readonly string[]): string => `Es fehlt noch: ${keys.join(', ')}.`,
+      notANumber: 'Keine Zahl.',
+      preview: 'Vorschau'
     }
   },
 
@@ -765,14 +1037,17 @@ export const de: typeof en = {
   },
 
   searching: {
-    label: 'ADRs, Komponenten und Quelldateien durchsuchen',
-    placeholder: 'ADRs, Komponenten, Quelldateien suchen — oder die Nummer eines ADRs eingeben',
+    label: 'ADRs, Komponenten, Quelldateien und Annotationen durchsuchen',
+    placeholder:
+      'ADRs, Komponenten, Quelldateien, Annotationen suchen — oder die Nummer eines ADRs eingeben',
     found: 'Gefunden',
     adrs: 'ADRs',
     components: 'Komponenten',
     sourceFiles: 'Quelldateien',
+    annotations: 'Annotationen',
     component: 'Komponente',
     sourceFile: 'Quelldatei',
+    annotation: 'Annotation',
     draft: 'Entwurf',
     unassigned: 'Nicht zugeordnet',
     more: (shown: number, all: number): string =>
@@ -785,6 +1060,234 @@ export const de: typeof en = {
       'Die Struktur analysiert den Code erneut; ihre Komponenten und Quelldateien werden durchsucht, wie sie sie zuletzt gefunden hat.',
     notAnalysed: (reason: string): string =>
       `Komponenten und Quelldateien werden nicht durchsucht: ${reason}`
+  },
+
+  annotations: {
+    kind: 'Annotation',
+    sidebar: 'Annotationen und Filter',
+    heading: 'Annotationen',
+    all: 'Alle',
+    reading: 'Die Annotationen werden gelesen …',
+    finding:
+      'Der Code hat sich geändert: Die Anker werden neu gesucht. Bis dahin stehen die Annotationen, wo sie zuletzt gefunden wurden.',
+    lookFailed: (reason: string): string =>
+      `Die Anker ließen sich nicht neu finden (${reason}). Die Annotationen stehen, wo sie zuletzt gefunden wurden; die nächste Änderung am Code sucht sie erneut.`,
+    stateHeading: 'Zustand',
+    states: { open: 'Offen', resolved: 'Erledigt' },
+    anchorHeading: 'Anker',
+    moved: 'Verschoben',
+    movedHint:
+      'Wiedergefunden, aber nicht, wie ihr Anker es sagt: in anderen Zeilen, in einer umbenannten Quelldatei oder mit anderem Text. „Anker aktualisieren“ schreibt ihren neuen Ort.',
+    orphaned: 'Verwaist',
+    orphanedHint:
+      'Ihr Anker wird im Code nicht mehr gefunden: Jede von ihnen wird von Hand neu angeheftet.',
+    typeHeading: 'Art',
+    types: { note: 'Notiz', question: 'Frage', concern: 'Bedenken' },
+    componentHeading: 'Komponente',
+    componentsFollow: 'Die Komponenten folgen, sobald die Struktur den Code analysiert hat.',
+    noComponent: 'Keine Komponente',
+    authorHeading: 'Verfasst von',
+    nobody: 'Niemand genannt',
+    noText: 'Ohne Text',
+    about: (author: string | undefined, date: string | undefined, replies: number): string =>
+      [
+        author,
+        date,
+        replies > 0 ? many(replies, 'eine Antwort', `${replies} Antworten`) : undefined
+      ]
+        .filter((part) => part !== undefined && part !== '')
+        .join(' · '),
+    card: (type: string, lines: Span, text: string): string =>
+      `${type} zu ${linesWord(lines)}: ${text}`,
+    annotateHint:
+      'Eine Notiz, eine Frage oder Bedenken zu den gewählten Zeilen schreiben. Sie sehen die Datei, bevor sie geschrieben wird.',
+    annotate: (lines: Span): string => `${capital(linesWord(lines))} annotieren`,
+    selectToAnnotate: 'Zeilen wählen, um sie zu annotieren',
+    attachingHint: (id: string): string =>
+      `${id} neu anheften: Wählen Sie die Zeilen, um die es jetzt geht. Ziehen Sie über den Code, oder klicken Sie eine Zeilennummer und mit Umschalt eine weitere.`,
+    attachTo: (lines: Span): string => `An ${linesWord(lines)} neu anheften`,
+    attachAgain: 'Neu anheften',
+    backToList: 'Zurück zu den Annotationen',
+    lines: (lines: Span): string => capital(linesWord(lines)),
+
+    list: {
+      label: 'Die Annotationen',
+      count: (shown: number, all: number): string =>
+        shown === all
+          ? many(all, 'Eine Annotation', `${count(all)} Annotationen`)
+          : `${count(shown)} von ${count(all)} Annotationen`,
+      showAll: 'Alle zeigen',
+      annotateFile: 'Eine Quelldatei annotieren',
+      annotateFileHint: 'Eine Quelldatei hier öffnen und die Zeilen wählen, die annotiert werden',
+      none: 'Noch keine Annotation. Öffnen Sie eine Quelldatei, wählen Sie die Zeilen, zu denen Sie etwas sagen wollen, und annotieren Sie sie.',
+      noneFiltered: 'Keine Annotation passt zu diesen Filtern.',
+      failed: (reason: string): string =>
+        `Die Annotationen konnten nicht gelesen werden: ${reason}`,
+      configUnreadable:
+        '`.arch/config.yml` kann nicht gelesen werden, darum wird keine Annotation gelesen. Sein Problem steht bei den Problemen des Repositorys.',
+      replies: (count: number): string => many(count, 'eine Antwort', `${count} Antworten`),
+      moved: 'verschoben',
+      orphaned: 'verwaist',
+      resolved: 'erledigt',
+      noAnchor: 'kein Anker'
+    },
+
+    picker: {
+      heading: 'Eine Quelldatei annotieren',
+      lead: 'Wählen Sie eine Quelldatei: Sie öffnet sich hier, und die Zeilen, die Sie darin wählen, können annotiert werden.',
+      attachHeading: (id: string): string => `${id} neu anheften`,
+      attachLead: (path: string): string =>
+        `\`${path}\` gibt es nicht mehr, auch nicht unter einem neuen Namen. Wählen Sie die Quelldatei, um die es jetzt geht: Sie öffnet sich hier, und Sie wählen darin ihre Zeilen.`,
+      label: 'Quelldatei',
+      placeholder: 'Wörter ihres Pfads',
+      noneLeft: 'Die Struktur kennt keine Quelldatei.',
+      analysing:
+        'Die Struktur analysiert den Code: Ihre Quelldateien können gewählt werden, sobald sie fertig ist.',
+      failed: (reason: string): string => `Keine Quelldatei kann gewählt werden: ${reason}`
+    },
+
+    detail: {
+      label: 'Die Annotation',
+      select: 'Wählen Sie eine Annotation, um sie mit ihren Antworten zu lesen.',
+      written: (author: string | undefined, date: string | undefined): string =>
+        author !== undefined && date !== undefined
+          ? `${author}, ${date}`
+          : (author ?? date ?? 'Niemand genannt'),
+      reply: 'Antworten',
+      resolve: 'Erledigen',
+      reopen: 'Wieder öffnen',
+      showCode: 'Im Code zeigen',
+      showCodeHint: 'Ihre Quelldatei hier öffnen, bei ihren Zeilen',
+      updateAnchor: 'Anker aktualisieren',
+      updateAnchorHint:
+        'Den Ort, an dem sie jetzt gefunden wird, in ihren Anker schreiben. Sie sehen die Datei, bevor sie geschrieben wird.',
+      attachAgainHint:
+        'Die Zeilen, um die es jetzt geht, in ihrer Quelldatei wählen. Sie sehen die Datei, bevor sie geschrieben wird.',
+      attaching: 'Wählen Sie ihre neuen Zeilen im Code in der Mitte.',
+      notWritable:
+        'Ihre Datei kann nicht gelesen werden, darum schreibt die Suite nicht hinein. Korrigieren Sie sie in einem Editor; die Ansicht folgt.',
+      code: 'Quelltext',
+      movedTo: (written: Span, found: Span): string =>
+        `Verschoben: geschrieben für ${linesWord(written)}, wiedergefunden in ${linesWord(found)}.`,
+      renamedFrom: (path: string): string => `Ihre Quelldatei hieß vorher \`${path}\`.`,
+      similarity: (similarity: number): string =>
+        `Die gefundenen Zeilen gleichen den zitierten Zeilen zu ${Math.round(similarity * 100)} %.`,
+      orphanedThere: (path: string, lines: Span): string =>
+        `Verwaist: Die zitierten ${linesWord(lines)} ${lines.start === lines.end ? 'wird' : 'werden'} in \`${path}\` nicht mehr gefunden.`,
+      orphanedGone: (path: string): string =>
+        `Verwaist: \`${path}\` gibt es nicht mehr, auch nicht unter einem neuen Namen.`,
+      noAnchor: 'Ihr Anker kann nicht gelesen werden; ihr Problem sagt, warum.',
+      quoted: 'Die zitierten Zeilen',
+      now: 'Die Zeilen, wie sie jetzt sind',
+      replies: 'Antworten',
+      noReplies: 'Noch keine Antwort.',
+      yourReply: 'Ihre Antwort',
+      author: 'Verfasst von',
+      authorHint: 'Wie git Sie nennt. Ändern Sie es, wo es etwas anderes sagen soll.',
+      textPlaceholder: 'Markdown',
+      preview: 'Vorschau',
+      cites: 'Verweist auf',
+      noCites: 'Sie verweist auf kein ADR.',
+      notThere: 'kein ADR dieses Repositorys',
+      uncite: 'Verweis entfernen',
+      unciteLabel: (adr: string): string => `Verweis auf ${adr} entfernen`,
+      cite: 'Auf ein ADR verweisen',
+      citePlaceholder: 'Nummer oder Wörter seines Titels',
+      noAdrLeft: 'Es bleibt kein ADR, auf das verwiesen werden kann.',
+      problems: 'Probleme',
+      repair: 'Reparieren'
+    },
+
+    dialog: {
+      type: 'Art',
+      text: 'Text',
+      textHint: 'Markdown. Seine ersten Wörter ergeben die ID der Annotation.',
+      textPlaceholder: 'Was wollen Sie zu diesen Zeilen sagen?',
+      author: 'Verfasst von',
+      cites: 'Verweist auf',
+      citesHint: 'Wenn es bei diesen Zeilen um ADRs geht: Jeder Verweis ist ein Trace.',
+      remove: (adr: string): string => `${adr} entfernen`,
+      preview: 'Vorschau'
+    },
+
+    problems: {
+      annotation: 'Annotation',
+      file: 'Datei',
+      reading: 'Die Annotationen werden gelesen. Ihre Probleme folgen.',
+      again: 'Die Anker werden neu gesucht: Dies sind die Probleme vom letzten Mal.',
+      failed: (reason: string): string =>
+        `Die Annotationen konnten nicht gelesen werden: ${reason}`,
+      configUnreadable:
+        '`.arch/config.yml` kann nicht gelesen werden, darum wird keine Annotation gelesen. Sein Problem steht unter Einstellungen.',
+      byHand:
+        'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie die Datei in einem Editor; die Ansicht folgt.'
+    },
+
+    adr: {
+      citedBy: 'Darauf verweisen',
+      label: 'Die Annotationen, die auf dieses ADR verweisen',
+      show: (id: string): string => `${id} im Review zeigen`
+    },
+
+    component: {
+      heading: 'Offene Annotationen',
+      none: 'Keine offene Annotation zu ihren Quelldateien.',
+      follow: 'Die Annotationen folgen, sobald sie gelesen sind.'
+    },
+
+    change: {
+      create: {
+        action: 'Annotieren',
+        title: (path: string, start: number, end: number): string =>
+          `${capital(linesWord({ start, end }))} von ${path} annotieren`,
+        refused: 'Die Annotation kann nicht geschrieben werden'
+      },
+      reply: {
+        action: 'Antworten',
+        title: (id: string): string => `Auf ${id} antworten`,
+        refused: (id: string): string => `Auf ${id} kann nicht geantwortet werden`
+      },
+      resolve: {
+        action: 'Erledigen',
+        title: (id: string): string => `${id} erledigen`,
+        refused: (id: string): string => `${id} kann nicht erledigt werden`
+      },
+      reopen: {
+        action: 'Wieder öffnen',
+        title: (id: string): string => `${id} wieder öffnen`,
+        refused: (id: string): string => `${id} kann nicht wieder geöffnet werden`
+      },
+      updateAnchor: {
+        action: 'Anker aktualisieren',
+        title: (id: string): string => `Den Anker von ${id} aktualisieren`,
+        refused: (id: string): string => `Der Anker von ${id} kann nicht aktualisiert werden`
+      },
+      attach: {
+        action: 'Neu anheften',
+        title: (id: string, path: string, start: number, end: number): string =>
+          `${id} an ${linesWord({ start, end })} von ${path} neu anheften`,
+        refused: (id: string): string => `${id} kann nicht neu angeheftet werden`
+      },
+      cite: {
+        action: 'Verweisen',
+        title: (id: string, adr: string): string => `In ${id} auf ${adr} verweisen`,
+        refused: (id: string, adr: string): string =>
+          `In ${id} kann nicht auf ${adr} verwiesen werden`
+      },
+      uncite: {
+        action: 'Verweis entfernen',
+        title: (id: string, adr: string): string => `Den Verweis auf ${adr} aus ${id} entfernen`,
+        refused: (id: string, adr: string): string =>
+          `Der Verweis auf ${adr} kann nicht aus ${id} entfernt werden`
+      },
+      repair: {
+        action: 'Reparieren',
+        title: (id: string, adr: string): string =>
+          `${id} reparieren: den Verweis auf ${adr} entfernen`,
+        refused: (id: string, adr: string): string =>
+          `Der Verweis auf ${adr} kann nicht aus ${id} entfernt werden`
+      }
+    }
   },
 
   review: {
@@ -875,6 +1378,32 @@ export const de: typeof en = {
         advice:
           'Wenn es ändert, was entschieden wurde, brechen Sie ab und schreiben Sie ein neues ADR, das dieses ergänzt oder ersetzt. Wenn nicht, speichern Sie.'
       }
+    },
+    rule: {
+      add: 'Hinzufügen',
+      addTitle: (id: string): string => `Regel ${id} hinzufügen`,
+      addRefused: (id: string): string => `Regel ${id} kann nicht hinzugefügt werden`,
+      change: 'Ändern',
+      changeTitle: (id: string): string => `Regel ${id} ändern`,
+      changeRefused: (id: string): string => `Regel ${id} kann nicht geändert werden`,
+      remove: 'Entfernen',
+      removeTitle: (id: string): string => `Regel ${id} entfernen`,
+      removeRefused: (id: string): string => `Regel ${id} kann nicht entfernt werden`
+    },
+    exception: {
+      action: 'Akzeptieren',
+      title: (rule: string): string => `Einen Verstoß gegen ${rule} als Ausnahme akzeptieren`,
+      refused: (rule: string): string => `Der Verstoß gegen ${rule} kann nicht akzeptiert werden`
+    },
+    removeException: {
+      action: 'Entfernen',
+      title: (rule: string): string => `Eine Ausnahme von ${rule} entfernen`,
+      refused: (rule: string): string => `Die Ausnahme von ${rule} kann nicht entfernt werden`
+    },
+    narrowException: {
+      action: 'Eingrenzen',
+      title: (rule: string): string => `Eine Ausnahme von ${rule} auf ihre Zyklen eingrenzen`,
+      refused: (rule: string): string => `Die Ausnahme von ${rule} kann nicht eingegrenzt werden`
     },
     notWritten: 'Die Änderung wurde nicht geschrieben',
     writtenInPart: 'Einige Dateien sind nicht, wie sie waren',

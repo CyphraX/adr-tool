@@ -10,8 +10,22 @@ import type {
   Said,
   Templates
 } from '@adr-tool/core'
+import type {
+  ConformanceNote,
+  ConformanceProblem,
+  ConformanceRepair,
+  ConformanceSaid,
+  ExceptionDraft,
+  Fingerprint,
+  Rule,
+  RuleDraft,
+  RuleKind,
+  Violation,
+  WrittenException
+} from '@adr-tool/conformance'
 import type { DiagramsApi } from './diagrams'
 import type { Language as WindowLanguage } from './language'
+import type { Annotation, AnnotationType, Found, ReviewProblem } from '@adr-tool/review'
 import type {
   Cycle,
   Dependency,
@@ -409,13 +423,85 @@ export type StructureResult =
   | { readonly ok: true; readonly view: StructureView }
   | { readonly ok: false; readonly reason: string }
 
-/** The text of one Source File, as the code viewer shows it. */
+/** The text of one Source File, as the code viewer shows it, or of the Rules file. */
 export interface SourceFileText {
   /** As the analysis names it: relative to the repository root. */
   readonly path: string
-  readonly language: Language
+  /** Absent for `.arch/rules.yml`, which is no Source File. */
+  readonly language?: Language
   readonly text: string
 }
+
+/** A Violation as the window shows it (docs/conformance-format.md, section 3). */
+export interface ConformanceViolation {
+  /** What tells it apart from every other one: its fingerprint as a key. */
+  readonly key: string
+  /** The ID of its Rule. */
+  readonly rule: string
+  readonly kind: RuleKind
+  readonly fingerprint: Fingerprint
+  /** What it is, as a code: the kind of its Rule, with the values of its sentence. */
+  readonly said: ConformanceSaid
+  readonly from?: string
+  readonly to?: string
+  readonly cycle?: Violation['cycle']
+  readonly component?: string
+  readonly value?: number
+  /** Of a threshold on a function or a class: its Source File, the line of its name, its name. */
+  readonly file?: string
+  readonly line?: number
+  readonly name?: string
+  /** Of a threshold on a function or a class: the Component its Source File lies in. */
+  readonly owner?: string
+  /** The Source File Dependencies behind it, with the lines of their imports. */
+  readonly dependencies: readonly Dependency[]
+  /** The Exception that accepts it, if one does. */
+  readonly exception?: WrittenException
+}
+
+/** An Exception of `.arch/rules.yml`, with what it accepts. */
+export interface ConformanceException extends WrittenException {
+  /** What it names, where its keys fit the kind of its Rule. */
+  readonly fingerprint?: Fingerprint
+  /** The Violations it accepts. */
+  readonly accepts: readonly string[]
+}
+
+/**
+ * The Rules of a repository checked against the last analysis of its code: derived, never
+ * stored. Read afresh from `.arch/rules.yml` every time it is asked for.
+ */
+export interface ConformanceView {
+  readonly repositoryId: string
+  /** Whether `.arch/rules.yml` is there. */
+  readonly present: boolean
+  /** Whether the Rules were evaluated: not on a Draft, and not while the file cannot be read. */
+  readonly evaluated: boolean
+  /** Whether the Components are declared, or the Draft. */
+  readonly origin: 'declared' | 'draft'
+  /** The Rules that can be read, in the order of the file. */
+  readonly rules: readonly Rule[]
+  readonly exceptions: readonly ConformanceException[]
+  /** In the order of the Rules, each Rule's in the order of their fingerprints. */
+  readonly violations: readonly ConformanceViolation[]
+  readonly problems: readonly ConformanceProblem[]
+  readonly notes: readonly ConformanceNote[]
+  /** Kept current: the files are watched. Otherwise as of `analysedAt`. */
+  readonly current: boolean
+  readonly analysedAt: number
+}
+
+export type ConformanceResult =
+  | { readonly ok: true; readonly view: ConformanceView }
+  | { readonly ok: false; readonly reason: string }
+  /** Another tab came to the front before the analysis began: ask again when this one does. */
+  | { readonly ok: false; readonly dropped: true }
+
+/** A Rule to add, a Rule to change into a draft, or a Rule to remove with its Exceptions. */
+export type RuleRequest =
+  | { readonly action: 'add'; readonly draft: RuleDraft }
+  | { readonly action: 'change'; readonly id: string; readonly draft: RuleDraft }
+  | { readonly action: 'remove'; readonly id: string }
 
 export type SourceFileResult =
   | { readonly ok: true; readonly file: SourceFileText }
@@ -505,6 +591,71 @@ export type ApplyResult =
       /** Undoing failed as well: some files are not as they were (ADR-0015). */
       readonly inPart?: true
     }
+
+/**
+ * An Annotation as the window shows it (docs/review-format.md), with what became of its Anchor
+ * when it was last looked for: unchanged, moved, or orphaned. Absent for one whose Anchor cannot
+ * be read: a Problem says why.
+ */
+export interface AnnotationView extends Annotation {
+  readonly found?: Found
+}
+
+/**
+ * The Annotations of a repository and their Problems, read in the main process with their
+ * Anchors found again in the code as it is on disk (docs/plan-vision.md, part 9). Derived: it is
+ * read again when HEAD, the Annotations or the files they are about change.
+ */
+export interface ReviewOverview {
+  readonly repositoryId: string
+  /** The directory of the Annotations; `undefined` while it cannot be used. */
+  readonly directory: string | undefined
+  /** `.arch/config.yml` cannot be read: no Annotation is read until it is fixed. */
+  readonly configUnreadable: boolean
+  /** By their IDs. */
+  readonly annotations: readonly AnnotationView[]
+  /** Every Problem of Review: of the files, of the Traces to ADRs, and the orphaned. */
+  readonly problems: readonly ReviewProblem[]
+  /** The commit HEAD pointed at when the Anchors were looked for; `undefined` without one. */
+  readonly head: string | undefined
+  /** When they were looked for, in milliseconds since the epoch. */
+  readonly foundAt: number
+  /** They are looked for again, or soon will be: what is shown is the last result. */
+  readonly finding: boolean
+  /** The last look failed, and why: what is shown is the result before it. */
+  readonly failed?: string
+}
+
+export type ReviewResult =
+  | { readonly ok: true; readonly overview: ReviewOverview }
+  | { readonly ok: false; readonly reason: string }
+
+/** Lines of a Source File as a person selected them: the first and the last, counted from 1. */
+export interface SelectedLines {
+  readonly path: string
+  readonly start: number
+  readonly end: number
+}
+
+/**
+ * A write to the Annotations, as the window asks for it (docs/review-format.md, section 5).
+ * `review` plans it against the disk as it is; what the window says of an Anchor is never taken
+ * for it: the lines are read from the disk, and a moved Anchor is looked for again.
+ */
+export type ReviewRequest =
+  | ({
+      readonly kind: 'create'
+      readonly type: AnnotationType
+      readonly text: string
+      readonly author: string
+      /** ADRs, as `cites` names them. */
+      readonly cites: readonly string[]
+    } & SelectedLines)
+  | { readonly kind: 'reply'; readonly id: string; readonly text: string; readonly author: string }
+  | { readonly kind: 'state'; readonly id: string; readonly state: 'open' | 'resolved' }
+  | { readonly kind: 'update-anchor'; readonly id: string }
+  | ({ readonly kind: 'attach'; readonly id: string } & SelectedLines)
+  | { readonly kind: 'cite' | 'uncite'; readonly id: string; readonly adr: string }
 
 export interface Api extends DiagramsApi {
   /** `win32`, `darwin` or `linux`. */
@@ -615,6 +766,19 @@ export interface Api extends DiagramsApi {
    * Nothing is written until the change is applied.
    */
   planRename(repositoryId: string, component: string, segment: string): Promise<PlanResult>
+  /**
+   * The Rules of `.arch/rules.yml` checked against the code, on the analysis Structure keeps.
+   * `watch` keeps it current from then on, as an open Structure does; without it, the last
+   * analysis serves, or one is made — for the Problems of the repository, the Component page,
+   * an ADR's Exceptions.
+   */
+  conformanceView(repositoryId: string, watch: boolean): Promise<ConformanceResult>
+  /** Plan adding, changing or removing a Rule. Nothing is written until the change is applied. */
+  planRule(repositoryId: string, request: RuleRequest): Promise<PlanResult>
+  /** Plan an Exception that accepts a Violation. Nothing is written until the change is applied. */
+  planException(repositoryId: string, draft: ExceptionDraft): Promise<PlanResult>
+  /** Plan the Repair of a Problem or a note of the Rules file. */
+  planConformanceRepair(repositoryId: string, repair: ConformanceRepair): Promise<PlanResult>
   /** Say whether the window holds text that is not on disk. While it does, closing it asks first. */
   setUnsaved(unsaved: boolean): Promise<void>
   /** Say the language of the window, so that what the main process says is said in it too. */
@@ -628,6 +792,19 @@ export interface Api extends DiagramsApi {
   onCloseRequested(listener: () => void): () => void
   /** What the person said: close the window, whatever it holds — or keep it, and forget that anything was to quit. */
   answerCloseRequest(close: boolean): Promise<void>
+
+  // Review (docs/plan-vision.md, part 9)
+  /**
+   * The Annotations of the repository with their Anchors as last found again: the last result
+   * while they are looked for again, in the background, after HEAD or the files changed.
+   */
+  reviewOverview(repositoryId: string): Promise<ReviewResult>
+  /** Called when the Annotations of a repository are looked for again, and once they are found. */
+  onReviewChanged(listener: (repositoryId: string) => void): () => void
+  /** Plan a write to the Annotations. Nothing is written until the change is applied. */
+  planReview(repositoryId: string, request: ReviewRequest): Promise<PlanResult>
+  /** Who git says the person is, `user.name`: the author a new Annotation or Reply proposes. */
+  gitUserName(repositoryId: string): Promise<string | undefined>
 }
 
 export const CHANNEL = {
@@ -649,6 +826,10 @@ export const CHANNEL = {
   readSourceFile: 'structure:read-source-file',
   structureOutline: 'structure:outline',
   structureChanged: 'structure:changed',
+  conformanceView: 'conformance:view',
+  planRule: 'change:plan-rule',
+  planException: 'change:plan-exception',
+  planConformanceRepair: 'change:plan-conformance-repair',
   listTemplates: 'templates:list',
   history: 'git:history',
   historyChange: 'git:history-change',
@@ -667,5 +848,9 @@ export const CHANNEL = {
   setLanguage: 'window:set-language',
   reloadWindow: 'window:reload',
   closeRequested: 'window:close-requested',
-  answerCloseRequest: 'window:answer-close-request'
+  answerCloseRequest: 'window:answer-close-request',
+  reviewOverview: 'review:overview',
+  reviewChanged: 'review:changed',
+  planReview: 'review:plan',
+  gitUserName: 'review:user-name'
 } as const

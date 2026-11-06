@@ -4,6 +4,8 @@ import { stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import type { FileSystem, Plan } from '@adr-tool/core'
+import { planConformanceRepair } from '@adr-tool/conformance'
 import { planAdopt, planRepair } from '@adr-tool/structure/model'
 import {
   CHANNEL,
@@ -11,24 +13,32 @@ import {
   type Decision,
   type ExportKind,
   type OpenRepository,
+  type PlanResult,
   type Session
 } from '../shared/ipc'
 import { isLanguage } from '../shared/language'
 import { analysisHost } from './analysis-host'
+import { Annotations, planReview } from './annotations'
 import { registerDiagrams } from './diagrams-ipc'
 import { ASSET_SCHEME, assetHandler } from './assets'
+import { conformanceView, planException, planRule } from './conformance'
 import { exportPdf, writeExport } from './export'
+import { gitIn } from './git'
 import { nodeFileSystem } from './node-file-system'
 import { Repositories, localDate } from './repositories'
 import {
+  conformanceRepairRequest,
   createRequest,
   diagramsRequest,
+  exceptionRequest,
   metadataEditRequest,
   migrationRequest,
   renameRequest,
   repairRequest,
+  ruleRequest,
   structureRepairRequest
 } from './requests'
+import { reviewRequest } from './review-requests'
 import { readSession, writeSession } from './session-store'
 import { setLanguage, t } from './strings'
 import { AnalysisDropped, Structures, cacheName } from './structures'
@@ -46,6 +56,8 @@ const repositories = new Repositories((repository) => {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(CHANNEL.repositoryChanged, repository)
   }
+  // An ADR came or went: the Traces of the Annotations are checked again.
+  annotations.refresh(repository.id)
 })
 const analysis = analysisHost((root) =>
   join(app.getPath('userData'), 'structure-cache', cacheName(root))
@@ -53,6 +65,11 @@ const analysis = analysisHost((root) =>
 const structures = new Structures(analysis.analyse, (repositoryId) => {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(CHANNEL.structureChanged, repositoryId)
+  }
+})
+const annotations = new Annotations((repositoryId) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(CHANNEL.reviewChanged, repositoryId)
   }
 })
 let activeRoot: string | undefined
@@ -115,7 +132,7 @@ function registerIpc(): void {
 
   ipcMain.handle(CHANNEL.closeRepository, async (_, id: unknown) => {
     if (typeof id !== 'string') return
-    await Promise.all([repositories.close(id), structures.close(id)])
+    await Promise.all([repositories.close(id), structures.close(id), annotations.close(id)])
     await saveSession()
   })
 
@@ -267,6 +284,60 @@ function registerIpc(): void {
     }
   )
 
+  ipcMain.handle(CHANNEL.conformanceView, async (_, repositoryId: unknown, watch: unknown) => {
+    if (typeof repositoryId !== 'string') return { ok: false, reason: t.notUnderstood }
+    const root = repositories.rootOf(repositoryId)
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    try {
+      const { analysis, current, analysedAt } = await structures.rulesAnalysisOf(
+        repositoryId,
+        root,
+        watch === true
+      )
+      return {
+        ok: true,
+        view: await conformanceView(repositoryId, nodeFileSystem(root), analysis, {
+          current,
+          analysedAt
+        })
+      }
+    } catch (error) {
+      if (error instanceof AnalysisDropped) return { ok: false, dropped: true }
+      return { ok: false, reason: t.analysisFailed(String(error)) }
+    }
+  })
+
+  /**
+   * A plan of the Rules file or of what it names: refused when the request cannot be
+   * understood or the repository is closed, and refused in words, not thrown, where planning
+   * fails for a reason the writer has no refusal for.
+   */
+  const planOfRules =
+    <T>(
+      parse: (request: unknown) => T | undefined,
+      plan: (files: FileSystem, request: T) => Promise<Plan>
+    ) =>
+    async (_: unknown, repositoryId: unknown, request: unknown): Promise<PlanResult> => {
+      const parsed = parse(request)
+      if (parsed === undefined) return { ok: false, reason: t.notUnderstood }
+      const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+      if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+      try {
+        return repositories.hold(repositoryId as string, await plan(nodeFileSystem(root), parsed))
+      } catch (error) {
+        return {
+          ok: false,
+          reason: t.planFailed(error instanceof Error ? error.message : String(error))
+        }
+      }
+    }
+  ipcMain.handle(CHANNEL.planRule, planOfRules(ruleRequest, planRule))
+  ipcMain.handle(CHANNEL.planException, planOfRules(exceptionRequest, planException))
+  ipcMain.handle(
+    CHANNEL.planConformanceRepair,
+    planOfRules(conformanceRepairRequest, planConformanceRepair)
+  )
+
   ipcMain.handle(
     CHANNEL.planRename,
     (_, repositoryId: unknown, component: unknown, segment: unknown) => {
@@ -310,6 +381,8 @@ function registerIpc(): void {
     const result = await repositories.applyChange(changeId)
     // The declaration may have changed: what the Structure view shows is analysed again.
     if (result.applied) structures.refresh(result.repository.id)
+    // An Annotation may have been written: the Anchors are looked for again.
+    if (result.applied) annotations.refresh(result.repository.id)
     return result
   })
 
@@ -387,6 +460,40 @@ function registerIpc(): void {
   ipcMain.handle(CHANNEL.setUnsaved, (event, holdsText: unknown) => {
     if (holdsText === true) unsaved.add(event.sender.id)
     else unsaved.delete(event.sender.id)
+  })
+
+  // Review (docs/plan-vision.md, part 9): the Annotations, looked at in the background.
+  ipcMain.handle(CHANNEL.reviewOverview, async (_, repositoryId: unknown) => {
+    if (typeof repositoryId !== 'string') return { ok: false, reason: t.notUnderstood }
+    const root = repositories.rootOf(repositoryId)
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    try {
+      return { ok: true, overview: await annotations.overview(repositoryId, root) }
+    } catch (error) {
+      return { ok: false, reason: t.annotationsFailed(String(error)) }
+    }
+  })
+
+  ipcMain.handle(CHANNEL.planReview, async (_, repositoryId: unknown, request: unknown) => {
+    const asked = reviewRequest(request)
+    if (!asked) return { ok: false, reason: t.notUnderstood }
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    if (root === undefined) return { ok: false, reason: t.repositoryClosed }
+    // What fails on the way — a file that cannot be read, git that cannot be run — is said in
+    // the window's language, as a refusal, and nothing is held.
+    try {
+      return repositories.hold(repositoryId as string, await planReview(root, asked))
+    } catch (error) {
+      return {
+        ok: false,
+        reason: t.planFailed(error instanceof Error ? error.message : String(error))
+      }
+    }
+  })
+
+  ipcMain.handle(CHANNEL.gitUserName, async (_, repositoryId: unknown) => {
+    const root = typeof repositoryId === 'string' ? repositories.rootOf(repositoryId) : undefined
+    return root === undefined ? undefined : gitIn(root).userName()
   })
 
   // The person was asked. "Discard": the window closes, and a quit it held up goes on —
@@ -567,5 +674,6 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   void repositories.closeAll()
   void structures.closeAll()
+  void annotations.closeAll()
   void analysis.stop()
 })

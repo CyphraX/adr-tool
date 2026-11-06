@@ -57,6 +57,13 @@ const api: Api = {
     ipcRenderer.invoke(CHANNEL.planStructureRepair, repositoryId, problem),
   planRename: (repositoryId, component, segment) =>
     ipcRenderer.invoke(CHANNEL.planRename, repositoryId, component, segment),
+  conformanceView: (repositoryId, watch) =>
+    ipcRenderer.invoke(CHANNEL.conformanceView, repositoryId, watch === true),
+  planRule: (repositoryId, request) => ipcRenderer.invoke(CHANNEL.planRule, repositoryId, request),
+  planException: (repositoryId, draft) =>
+    ipcRenderer.invoke(CHANNEL.planException, repositoryId, draft),
+  planConformanceRepair: (repositoryId, repair) =>
+    ipcRenderer.invoke(CHANNEL.planConformanceRepair, repositoryId, repair),
   setUnsaved: (unsaved) => ipcRenderer.invoke(CHANNEL.setUnsaved, unsaved),
   setLanguage: (language) => ipcRenderer.invoke(CHANNEL.setLanguage, language),
   reloadWindow: () => ipcRenderer.invoke(CHANNEL.reloadWindow),
@@ -66,6 +73,15 @@ const api: Api = {
     return () => ipcRenderer.removeListener(CHANNEL.closeRequested, handler)
   },
   answerCloseRequest: (close) => ipcRenderer.invoke(CHANNEL.answerCloseRequest, close),
+  reviewOverview: (repositoryId) => ipcRenderer.invoke(CHANNEL.reviewOverview, repositoryId),
+  onReviewChanged: (listener) => {
+    const handler = (_: unknown, repositoryId: string): void => listener(repositoryId)
+    ipcRenderer.on(CHANNEL.reviewChanged, handler)
+    return () => ipcRenderer.removeListener(CHANNEL.reviewChanged, handler)
+  },
+  planReview: (repositoryId, request) =>
+    ipcRenderer.invoke(CHANNEL.planReview, repositoryId, request),
+  gitUserName: (repositoryId) => ipcRenderer.invoke(CHANNEL.gitUserName, repositoryId),
   ...diagramsBridge(ipcRenderer)
 }
 

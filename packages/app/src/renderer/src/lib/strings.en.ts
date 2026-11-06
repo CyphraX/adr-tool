@@ -1,4 +1,6 @@
+import type { Rule, RuleKind } from '@adr-tool/conformance'
 import type { RelationState, RelationType } from '@adr-tool/core'
+import type { AnnotationState, AnnotationType } from '@adr-tool/review'
 import type { Decision, LowerBound } from '../../../shared/ipc'
 import { DIAGRAMS_EN } from './strings.diagrams.en'
 import type { Refusal } from './views'
@@ -35,6 +37,19 @@ export interface ReviewWording {
 
 const many = (count: number, one: string, more: string): string => (count === 1 ? one : more)
 
+/** A text with its first letter in capitals: a sentence's start. */
+const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** Lines of a Source File: the first and the last, counted from 1. */
+interface Span {
+  readonly start: number
+  readonly end: number
+}
+
+/** Lines as a sentence names them: "line 12", "lines 12–14". */
+const linesWord = (lines: Span): string =>
+  lines.start === lines.end ? `line ${lines.start}` : `lines ${lines.start}–${lines.end}`
+
 /** A count as the window writes it: 9,115. */
 const count = (value: number): string => value.toLocaleString('en')
 
@@ -45,6 +60,10 @@ const LINE_VERB: Record<RelationType, string> = {
   'depends-on': 'depends on',
   'relates-to': 'relates to'
 }
+
+/** Component patterns as a sentence writes them: `a`, `a and b`, `a, b and c`. */
+const listed = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
 
 /** The metrics of section 5 of the Structure format, as the window names and shows them. */
 export const METRICS = [
@@ -107,7 +126,9 @@ export const en = {
     label: 'Modules',
     decisions: 'Decisions',
     structure: 'Structure',
-    diagrams: 'Diagrams'
+    conformance: 'Conformance',
+    diagrams: 'Diagrams',
+    review: 'Review'
   },
 
   tabs: {
@@ -179,7 +200,7 @@ export const en = {
     /** The row in the sidebar of every module that leads there. */
     entry: 'Repository Problems',
     entryHint:
-      'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, and of the Traces between them',
+      'Every Problem of this repository in one list: of its Decision Logs, of the declaration of its Components, of the Traces between them, of its Rules and of its Annotations',
     counting: 'Structure is still analysing the code: its Problems are counted once it is done.',
     /** Structure is not open, so its files are not watched: the count may be older than they are. */
     asOf: (at: number): string =>
@@ -193,6 +214,7 @@ export const en = {
     noneHere: 'No Problems.',
     traces: 'Traces from ADRs to Components',
     backToStructure: 'Back to the Components',
+    backToAnnotations: 'Back to the Annotations',
     declaration: 'The declaration',
     component: 'Component',
     reading: 'Structure is analysing the code. Its Problems follow once it is done.',
@@ -201,7 +223,18 @@ export const en = {
     draft:
       'Nothing is declared yet: what the checks find on the Draft are hints, which Structure shows beside it.',
     byHand:
-      'The suite cannot know what was meant here. Fix `.arch/components.yml` in an editor; the view follows.'
+      'The suite cannot know what was meant here. Fix `.arch/components.yml` in an editor; the view follows.',
+    backToConformance: 'Back to the Violations',
+    rulesFile: 'The Rules file',
+    /** Of a Problem or a note of the Rules file: where it stands, a click away. */
+    atLine: (line: number): string => `line ${line}`,
+    /** A note fails nothing: it says what could be better. */
+    note: 'Note',
+    rulesReading: 'Conformance is checking the Rules. Its Problems follow once it is done.',
+    rulesAgain: 'The Rules are checked again: these are the Problems of the last check.',
+    rulesFailed: (reason: string): string => `The Rules could not be checked: ${reason}`,
+    rulesByHand:
+      'The suite cannot know what was meant here. Fix `.arch/rules.yml` in an editor; the view follows.'
   },
 
   /** A Mermaid block of an ADR, drawn in the preview and in the live mode. */
@@ -533,7 +566,22 @@ export const en = {
       inCycle: 'in a Cycle',
       weakest: 'weakest Dependency of a Cycle',
       weight: (count: number): string =>
-        many(count, 'One Source File Dependency', `${count} Source File Dependencies`)
+        many(count, 'One Source File Dependency', `${count} Source File Dependencies`),
+      /** The lines, read out: a list a screen reader finds beside the drawing. */
+      spoken: 'The Dependencies in the drawing',
+      line: (
+        from: string,
+        to: string,
+        weight: number,
+        typeOnly: boolean,
+        inCycle: boolean,
+        violations: readonly string[]
+      ): string =>
+        `${from} depends on ${to}: ${many(weight, 'one Source File Dependency', `${weight} Source File Dependencies`)}${typeOnly ? ', type-only' : ''}${inCycle ? ', in a Cycle' : ''}.${violations.map((violation) => ` Violation: ${violation}.`).join('')}`,
+      noLine: 'No Dependency between the nodes of this level.',
+      /** In the legend of Conformance's drawing. */
+      violation: 'breaks a Rule',
+      thresholdViolation: 'outside a threshold'
     },
 
     views: {
@@ -734,7 +782,7 @@ export const en = {
       rename: 'Rename',
       renameLabel: (name: string): string => `New segment for ${name}`,
       renameHint: (id: string): string =>
-        `The ID ${id} changes, and the IDs of the Components inside it with it. Every ADR that names one of them is rewritten in the same change.`,
+        `The ID ${id} changes, and the IDs of the Components inside it with it. Every ADR that names one of them, and every Rule and Exception of .arch/rules.yml that does, is rewritten in the same change.`,
       notASegment:
         'Lowercase letters, digits and dashes, starting and ending with a letter or a digit.',
       preview: 'Preview'
@@ -767,6 +815,235 @@ export const en = {
         'They keep their Component and have no Dependencies of their own until they can be parsed.',
       unreadable: 'could not be read',
       none: 'None.'
+    }
+  },
+
+  /** The Rules of the repository and where the code breaks them (docs/plan-vision.md, part 4). */
+  conformance: {
+    label: 'Rules, Exceptions and what the check found',
+    /** The metrics a threshold can be on that are no column of Structure's table. */
+    metric: {
+      complexity: {
+        long: 'Cyclomatic complexity of a function',
+        definition:
+          'Cyclomatic complexity: 1 and one more for each decision in a function, each language counted as its usual tool counts it — ESLint, Checkstyle, radon, gocyclo. Checked for each function in the Source Files of the Components the Rule names.'
+      },
+      lcom4: {
+        long: 'LCOM4 of a class',
+        definition:
+          'LCOM4: the groups of methods of a class that share no field and call no one of another group. More than one, and the class could be split. Checked for each class in the Source Files of the Components the Rule names.'
+      },
+      'propagation-cost': {
+        long: 'Propagation cost of a level',
+        definition:
+          'Propagation cost: of all ordered pairs of nodes of a level, the share where the first reaches the second through Dependencies. Checked for the level below each Component the Rule names, / for the top level.'
+      }
+    },
+    rules: 'Rules',
+    all: 'All Violations',
+    allHint: 'The Violations of every Rule',
+    exceptions: 'Exceptions',
+    exceptionsHint: 'The Violations that are accepted, each with its reason',
+    file: 'The Rules file',
+    open: 'Open .arch/rules.yml',
+    newRule: 'New Rule',
+    newRuleHint: 'Write a Rule into .arch/rules.yml. You see the change before it is written.',
+    noFile: 'There is no `.arch/rules.yml` yet. The first Rule written here creates it.',
+    draft:
+      'The Components are a Draft, so the Rules are not checked. They are once the Components are declared: adopt the Draft in Structure.',
+    notEvaluated:
+      'The Rules are not checked while `.arch/rules.yml` cannot be read. Its Problem is in the list of the repository.',
+    analysing: 'Checking the Rules against the code …',
+    again: 'Checking the Rules again. This is the last result.',
+    asOf: (at: number): string =>
+      `As of the analysis of the code at ${new Date(at).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}.`,
+    failed: 'The Rules could not be checked',
+    problems: 'Problems of the Rules file',
+    notes: 'Notes on the Rules file',
+
+    center: {
+      all: 'All Violations',
+      ofRule: (id: string): string => `Violations of ${id}`,
+      exceptions: 'Exceptions',
+      show: 'Show the Violations as',
+      list: 'List',
+      graph: 'Graph',
+      accepted: 'Accepted as Exceptions',
+      none: 'No Violation: the code keeps to every Rule.',
+      noneOfRule: 'No Violation: the code keeps to this Rule.',
+      allAccepted: 'Every Violation is accepted as an Exception.',
+      noRules:
+        'No Rule yet. A Rule says which Components may depend on which, that there is no Cycle, or how far a metric may go. Write the first one with New Rule.',
+      noExceptions:
+        'No Exception. A Violation accepted with a reason becomes one: select it and choose Accept as Exception.',
+      howToRead:
+        'Structure’s drawing of this level, read from left to right. Red marks what breaks a Rule that no Exception accepts. Double-click a Component or a directory to see its parts.',
+      back: (show: 'list' | 'graph' | 'exceptions'): string =>
+        ({
+          list: 'Back to the Violations',
+          graph: 'Back to the graph',
+          exceptions: 'Back to the Exceptions'
+        })[show]
+    },
+
+    detail: {
+      label: 'Details',
+      violation: 'Violation',
+      rule: 'Rule',
+      exception: 'Exception',
+      hint: 'Select a Violation to see the imports behind it, or a Rule to see what it says and where it is written.',
+      graphHint: 'Select a red line or box to see the Violation behind it.',
+      breaksNothing: 'This breaks no Rule.',
+      accept: 'Accept as Exception',
+      acceptHint:
+        'Record in .arch/rules.yml that this Violation is accepted, and why. You see the change before it is written.',
+      acceptedBy: 'Accepted by an Exception',
+      reason: 'Reason',
+      reasonPlaceholder: 'Why this Violation is accepted',
+      justifiedBy: 'Justified by',
+      justifiedByOptional: 'Justified by an ADR — optional',
+      adrPlaceholder: 'An ADR: number or title',
+      noAdrLeft: 'No ADR to cite',
+      notAnAdr: (reference: string): string => `${reference} — not an ADR of this repository`,
+      preview: 'Preview',
+      imports: 'Source File Dependencies',
+      noImports: 'A threshold has no import behind it: what it is of is measured as a whole.',
+      /** Of a function or a class: where it begins. */
+      inCode: 'In the code',
+      roundTrip: 'For example',
+      weakest: 'Weakest Dependency',
+      value: 'Value',
+      why: 'Why',
+      says: 'What it says',
+      kind: 'Kind',
+      written: 'Where it is written',
+      options: 'Options',
+      testsIncluded: 'Test files count.',
+      typeOnlyIgnored: 'Type-only Dependencies do not count.',
+      violations: 'Its Violations',
+      noViolations: 'None: the code keeps to it.',
+      exceptions: 'Its Exceptions',
+      accepts: 'Accepts',
+      acceptsNothing: 'No Violation: it is in the Problems of the repository.',
+      change: 'Change',
+      remove: 'Remove',
+      showViolations: 'Show its Violations',
+      removeException: 'Remove'
+    },
+
+    /** Each kind of Rule: its name, short, and what it says, as a sentence. */
+    kinds: {
+      'must-not-depend': {
+        name: 'must not depend on',
+        about:
+          'A Dependency from one of the Components in `from` on one of those in `to` is a Violation.'
+      },
+      'may-only-depend': {
+        name: 'may only depend on',
+        about:
+          'The Components in `from` may depend on those in `to` and on nothing else; any other Dependency is a Violation.'
+      },
+      layers: {
+        name: 'layers',
+        about:
+          'A layer may depend on the layers below it and not on those above; strict, only on the one right below.'
+      },
+      'no-cycles': {
+        name: 'no Cycles',
+        about:
+          'A Cycle among the Components it names, or among the Source Files inside each of them, is a Violation.'
+      },
+      threshold: {
+        name: 'threshold',
+        about: 'A Component it names whose metric is outside the limits is a Violation.'
+      }
+    } satisfies Record<RuleKind, { name: string; about: string }>,
+
+    /** What a Rule says, in words; `metric` is the long name of its metric. */
+    says: (rule: Rule, metric: string): string => {
+      switch (rule.kind) {
+        case 'must-not-depend':
+          return `${listed(rule.from)} must not depend on ${listed(rule.to)}`
+        case 'may-only-depend':
+          return rule.to.length === 0
+            ? `${listed(rule.from)} may depend on no other Component`
+            : `${listed(rule.from)} may only depend on ${listed(rule.to)}`
+        case 'layers':
+          return `${rule.mode === 'strict' ? 'Strict layers' : 'Layers'}, top down: ${rule.layers.map((layer) => layer.join(', ')).join(' › ')}`
+        case 'no-cycles':
+          return `No Cycle ${rule.scope === 'among' ? 'among' : 'inside'} ${listed(rule.components)}`
+        case 'threshold':
+          return `${metric} of ${listed(rule.of)} ${
+            rule.max !== undefined && rule.min !== undefined
+              ? `between ${rule.min} and ${rule.max}`
+              : rule.max !== undefined
+                ? `at most ${rule.max}`
+                : `at least ${rule.min}`
+          }`
+      }
+    },
+
+    /** On the Component page in Structure, and on an ADR. */
+    component: {
+      rules: 'Rules',
+      noRule: 'No Rule names it.',
+      violations: 'Violations',
+      /** None that no Exception accepts, and how many an Exception does accept. */
+      noViolation: (accepted: number): string =>
+        accepted === 0
+          ? 'None.'
+          : accepted === 1
+            ? 'Only one, which an Exception accepts.'
+            : `Only ${accepted}, which Exceptions accept.`,
+      /** Below the Violations no Exception accepts: how many more one does. */
+      alsoAccepted: (accepted: number): string =>
+        accepted === 1
+          ? 'And one more, which an Exception accepts.'
+          : `And ${accepted} more, which Exceptions accept.`,
+      checking: 'Checking the Rules …'
+    },
+    adr: {
+      exceptions: 'Exceptions it justifies',
+      /** In the column of what an ADR says about others. */
+      justifies: 'Justifies',
+      exception: (rule: string, names: string): string => `the Exception of ${rule}: ${names}`
+    },
+
+    form: {
+      newTitle: 'New Rule',
+      changeTitle: 'Change the Rule',
+      id: 'ID',
+      idHint: 'Lowercase letters, digits and dashes. Exceptions and adr check name the Rule by it.',
+      why: 'Why',
+      whyPlaceholder: 'Why the code has to keep to it, as a sentence',
+      kind: 'Kind',
+      from: 'From',
+      fromAbout: 'The Components whose Dependencies it constrains.',
+      to: 'To',
+      toAbout: 'The Components they must not depend on.',
+      allowed: 'May depend on',
+      allowedAbout: 'Nothing here: on no other Component.',
+      layers: 'Layers, top down',
+      layer: (position: number): string => `Layer ${position}`,
+      addLayer: 'Add a layer',
+      removeLayer: (position: number): string => `Remove layer ${position}`,
+      strict: 'Strict: a layer may depend only on the one right below it',
+      scope: 'Where',
+      among: 'Among the Components',
+      inside: 'Inside each Component, among its Source Files',
+      components: 'Components',
+      metric: 'Metric',
+      max: 'At most',
+      min: 'At least',
+      of: 'Of the Components',
+      tests: 'Test files count',
+      ignoreTypeOnly: 'Type-only Dependencies do not count',
+      patternPlaceholder: 'A Component ID or pattern, then Enter',
+      patterns:
+        'Components by ID, as declared; `*` stands for one segment and `**` for any number: `ui/**`, `features/*`.',
+      missing: (keys: readonly string[]): string => `Still missing: ${keys.join(', ')}.`,
+      notANumber: 'Not a number.',
+      preview: 'Preview'
     }
   },
 
@@ -812,15 +1089,18 @@ export const en = {
   },
 
   searching: {
-    label: 'Search ADRs, Components and Source Files',
-    placeholder: 'Search ADRs, Components, Source Files — or type the number of an ADR',
+    label: 'Search ADRs, Components, Source Files and Annotations',
+    placeholder:
+      'Search ADRs, Components, Source Files, Annotations — or type the number of an ADR',
     found: 'Found',
     adrs: 'ADRs',
     components: 'Components',
     sourceFiles: 'Source Files',
+    annotations: 'Annotations',
     /** Beside each hit: what kind of thing it is. */
     component: 'Component',
     sourceFile: 'Source File',
+    annotation: 'Annotation',
     draft: 'Draft',
     unassigned: 'Unassigned',
     more: (shown: number, all: number): string =>
@@ -833,6 +1113,238 @@ export const en = {
       'Structure is analysing the code again: its Components and Source Files are searched as it last found them.',
     notAnalysed: (reason: string): string =>
       `Components and Source Files are not searched: ${reason}`
+  },
+
+  /**
+   * Review: Annotations on lines of Source Files, and their Replies (docs/plan-vision.md, part
+   * 9). Under this name, since `review` is the dialog that shows a change.
+   */
+  annotations: {
+    /** What an Annotation is called where its type is not known. */
+    kind: 'Annotation',
+    sidebar: 'Annotations and filters',
+    heading: 'Annotations',
+    all: 'All',
+    reading: 'Reading the Annotations …',
+    finding:
+      'The code changed: the Anchors are being found again. Until then the Annotations stand where they were found last.',
+    lookFailed: (reason: string): string =>
+      `The Anchors could not be found again (${reason}). The Annotations stand where they were found last; the next change to the code looks again.`,
+    stateHeading: 'State',
+    states: { open: 'Open', resolved: 'Resolved' } satisfies Record<AnnotationState, string>,
+    anchorHeading: 'Anchors',
+    moved: 'Moved',
+    movedHint:
+      'Found again, but not as their Anchor says: at other lines, in a renamed Source File, or with other text. Update the Anchor writes their new place.',
+    orphaned: 'Orphaned',
+    orphanedHint:
+      'Their Anchor can no longer be found in the code: each one is attached again by hand.',
+    typeHeading: 'Type',
+    types: { note: 'Note', question: 'Question', concern: 'Concern' } satisfies Record<
+      AnnotationType,
+      string
+    >,
+    componentHeading: 'Component',
+    componentsFollow: 'The Components follow once Structure has analysed the code.',
+    noComponent: 'No Component',
+    authorHeading: 'Author',
+    nobody: 'Nobody named',
+    noText: 'Without text',
+    /** Who wrote it, when, and how many Replies it has, as far as it says. */
+    about: (author: string | undefined, date: string | undefined, replies: number): string =>
+      [author, date, replies > 0 ? many(replies, 'one Reply', `${replies} Replies`) : undefined]
+        .filter((part) => part !== undefined && part !== '')
+        .join(' · '),
+    /** What a screen reader says of an Annotation beside its lines. */
+    card: (type: string, lines: Span, text: string): string =>
+      `${type} on ${linesWord(lines)}: ${text}`,
+    annotateHint:
+      'Write a note, a question or a concern about the selected lines. You see the file before it is written.',
+    annotate: (lines: Span): string => `Annotate ${linesWord(lines)}`,
+    selectToAnnotate: 'Select lines to annotate them',
+    attachingHint: (id: string): string =>
+      `Attach ${id} again: select the lines it is about now. Drag over the code, or click a line number and Shift-click another.`,
+    attachTo: (lines: Span): string => `Attach again to ${linesWord(lines)}`,
+    attachAgain: 'Attach again',
+    backToList: 'Back to the Annotations',
+    lines: (lines: Span): string => capital(linesWord(lines)),
+
+    list: {
+      label: 'The Annotations',
+      count: (shown: number, all: number): string =>
+        shown === all
+          ? many(all, 'One Annotation', `${count(all)} Annotations`)
+          : `${count(shown)} of ${count(all)} Annotations`,
+      showAll: 'Show all',
+      annotateFile: 'Annotate a Source File',
+      annotateFileHint: 'Open a Source File here and select the lines to annotate',
+      none: 'No Annotation yet. Open a Source File, select the lines you want to say something about, and annotate them.',
+      noneFiltered: 'No Annotation passes these filters.',
+      failed: (reason: string): string => `The Annotations could not be read: ${reason}`,
+      configUnreadable:
+        '`.arch/config.yml` cannot be read, so no Annotation is read. Its Problem is among the Problems of the repository.',
+      replies: (count: number): string => many(count, 'one Reply', `${count} Replies`),
+      moved: 'moved',
+      orphaned: 'orphaned',
+      resolved: 'resolved',
+      noAnchor: 'no Anchor'
+    },
+
+    /** The middle of Review, to pick the Source File to open: to annotate it, or to attach again. */
+    picker: {
+      heading: 'Annotate a Source File',
+      lead: 'Pick a Source File: it opens here, and the lines you select in it can be annotated.',
+      attachHeading: (id: string): string => `Attach ${id} again`,
+      attachLead: (path: string): string =>
+        `\`${path}\` is gone, under a new name too. Pick the Source File it is about now: it opens here, and you select its lines in it.`,
+      label: 'Source File',
+      placeholder: 'Words of its path',
+      noneLeft: 'Structure knows no Source File.',
+      analysing: 'Structure is analysing the code: its Source Files can be picked once it is done.',
+      failed: (reason: string): string => `No Source File can be picked: ${reason}`
+    },
+
+    detail: {
+      label: 'The Annotation',
+      select: 'Select an Annotation to read it, with its Replies.',
+      written: (author: string | undefined, date: string | undefined): string =>
+        author !== undefined && date !== undefined
+          ? `${author}, ${date}`
+          : (author ?? date ?? 'Nobody named'),
+      reply: 'Reply',
+      resolve: 'Resolve',
+      reopen: 'Reopen',
+      showCode: 'Show in the code',
+      showCodeHint: 'Open its Source File here, at its lines',
+      updateAnchor: 'Update the Anchor',
+      updateAnchorHint:
+        'Write the place it is found at now into its Anchor. You see the file before it is written.',
+      attachAgainHint:
+        'Select the lines it is about now in its Source File. You see the file before it is written.',
+      attaching: 'Select its new lines in the code viewer, in the middle.',
+      notWritable:
+        'Its file cannot be read, so the suite does not write to it. Fix it in an editor; the view follows.',
+      code: 'Code',
+      movedTo: (written: Span, found: Span): string =>
+        `Moved: written for ${linesWord(written)}, found again at ${linesWord(found)}.`,
+      renamedFrom: (path: string): string => `Its Source File was renamed from \`${path}\`.`,
+      similarity: (similarity: number): string =>
+        `The lines found are ${Math.round(similarity * 100)} % like the quoted lines.`,
+      orphanedThere: (path: string, lines: Span): string =>
+        `Orphaned: the quoted ${linesWord(lines)} ${lines.start === lines.end ? 'is' : 'are'} no longer found in \`${path}\`.`,
+      orphanedGone: (path: string): string =>
+        `Orphaned: \`${path}\` is gone, under a new name too.`,
+      noAnchor: 'Its Anchor cannot be read: its Problem says why.',
+      quoted: 'The quoted lines',
+      now: 'The lines as they are now',
+      replies: 'Replies',
+      noReplies: 'No Reply yet.',
+      yourReply: 'Your Reply',
+      author: 'Author',
+      authorHint: 'As git names you. Change it where it should say something else.',
+      textPlaceholder: 'Markdown',
+      preview: 'Preview',
+      cites: 'Cited ADRs',
+      noCites: 'It cites no ADR.',
+      notThere: 'no ADR of this repository',
+      uncite: 'Uncite',
+      unciteLabel: (adr: string): string => `Uncite ${adr}`,
+      cite: 'Cite an ADR',
+      citePlaceholder: 'Number or words of its title',
+      noAdrLeft: 'No ADR is left to cite.',
+      problems: 'Problems',
+      repair: 'Repair'
+    },
+
+    /** The dialog that describes a new Annotation, on the lines selected in a code viewer. */
+    dialog: {
+      type: 'Type',
+      text: 'Text',
+      textHint: 'Markdown. Its first words make the ID of the Annotation.',
+      textPlaceholder: 'What do you want to say about these lines?',
+      author: 'Author',
+      cites: 'Cited ADRs',
+      citesHint: 'If these lines are about ADRs: each one is a Trace.',
+      remove: (adr: string): string => `Remove ${adr}`,
+      preview: 'Preview'
+    },
+
+    /** The Problems of Review among the Problems of the repository. */
+    problems: {
+      annotation: 'Annotation',
+      file: 'File',
+      reading: 'The Annotations are being read. Their Problems follow.',
+      again: 'The Anchors are being found again: these are the Problems of the last time.',
+      failed: (reason: string): string => `The Annotations could not be read: ${reason}`,
+      configUnreadable:
+        '`.arch/config.yml` cannot be read, so no Annotation is read. Its Problem is under Settings.',
+      byHand:
+        'The suite cannot know what was meant here. Fix the file in an editor; the view follows.'
+    },
+
+    /** The Annotations that cite an ADR, on its page. */
+    adr: {
+      citedBy: 'Cited by',
+      label: 'The Annotations that cite this ADR',
+      show: (id: string): string => `Show ${id} in Review`
+    },
+
+    /** The open Annotations of a Component, on its page. */
+    component: {
+      heading: 'Open Annotations',
+      none: 'No open Annotation on its Source Files.',
+      follow: 'The Annotations follow once they are read.'
+    },
+
+    change: {
+      create: {
+        action: 'Annotate',
+        title: (path: string, start: number, end: number): string =>
+          `Annotate ${linesWord({ start, end })} of ${path}`,
+        refused: 'The Annotation cannot be written'
+      },
+      reply: {
+        action: 'Reply',
+        title: (id: string): string => `Reply to ${id}`,
+        refused: (id: string): string => `Cannot reply to ${id}`
+      },
+      resolve: {
+        action: 'Resolve',
+        title: (id: string): string => `Resolve ${id}`,
+        refused: (id: string): string => `Cannot resolve ${id}`
+      },
+      reopen: {
+        action: 'Reopen',
+        title: (id: string): string => `Reopen ${id}`,
+        refused: (id: string): string => `Cannot reopen ${id}`
+      },
+      updateAnchor: {
+        action: 'Update the Anchor',
+        title: (id: string): string => `Update the Anchor of ${id}`,
+        refused: (id: string): string => `Cannot update the Anchor of ${id}`
+      },
+      attach: {
+        action: 'Attach again',
+        title: (id: string, path: string, start: number, end: number): string =>
+          `Attach ${id} again to ${linesWord({ start, end })} of ${path}`,
+        refused: (id: string): string => `Cannot attach ${id} again`
+      },
+      cite: {
+        action: 'Cite',
+        title: (id: string, adr: string): string => `Cite ${adr} in ${id}`,
+        refused: (id: string, adr: string): string => `Cannot cite ${adr} in ${id}`
+      },
+      uncite: {
+        action: 'Uncite',
+        title: (id: string, adr: string): string => `Uncite ${adr} in ${id}`,
+        refused: (id: string, adr: string): string => `Cannot uncite ${adr} in ${id}`
+      },
+      repair: {
+        action: 'Repair',
+        title: (id: string, adr: string): string => `Repair ${id}: uncite ${adr}`,
+        refused: (id: string, adr: string): string => `Cannot uncite ${adr} in ${id}`
+      }
+    }
   },
 
   /** The dialog that shows a change before it is written, a refusal, or a question. */
@@ -921,6 +1433,32 @@ export const en = {
         advice:
           'If it changes what was decided, cancel and write a new ADR that amends or supersedes this one. If it does not, save.'
       }
+    },
+    rule: {
+      add: 'Add',
+      addTitle: (id: string): string => `Add the Rule ${id}`,
+      addRefused: (id: string): string => `Cannot add the Rule ${id}`,
+      change: 'Change',
+      changeTitle: (id: string): string => `Change the Rule ${id}`,
+      changeRefused: (id: string): string => `Cannot change the Rule ${id}`,
+      remove: 'Remove',
+      removeTitle: (id: string): string => `Remove the Rule ${id}`,
+      removeRefused: (id: string): string => `Cannot remove the Rule ${id}`
+    },
+    exception: {
+      action: 'Accept',
+      title: (rule: string): string => `Accept a Violation of ${rule} as an Exception`,
+      refused: (rule: string): string => `Cannot accept the Violation of ${rule}`
+    },
+    removeException: {
+      action: 'Remove',
+      title: (rule: string): string => `Remove an Exception of ${rule}`,
+      refused: (rule: string): string => `Cannot remove the Exception of ${rule}`
+    },
+    narrowException: {
+      action: 'Narrow',
+      title: (rule: string): string => `Narrow an Exception of ${rule} to its Cycles`,
+      refused: (rule: string): string => `Cannot narrow the Exception of ${rule}`
     },
     notWritten: 'The change was not written',
     writtenInPart: 'Some files are not as they were',

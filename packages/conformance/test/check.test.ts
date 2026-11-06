@@ -175,7 +175,7 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
     ])
   })
 
-  it('of a function or a class name its Source File and its name, of a level its Component or *', async () => {
+  it('of a function or a class name its Source File and its name, of a level its Component or /', async () => {
     const files = {
       '.arch/components.yml':
         'components:\n  a:\n    paths: [src/a/**]\n  b:\n    paths: [src/b/**]\n',
@@ -213,7 +213,7 @@ describe('Exceptions (docs/conformance-format.md, section 4)', () => {
     expect(problems(report)).toEqual([
       '9: invalid-exception: An Exception from the Rule simple cannot be read: an Exception from a Rule of the kind threshold names its Violation by "file" and "name".',
       '10: invalid-exception: An Exception from the Rule simple cannot be read: an Exception from a Rule of the kind threshold names its Violation by "file" and "name".',
-      '11: invalid-exception: An Exception from the Rule loose cannot be read: an Exception from a Rule of the kind threshold names its Violation by "component", or "*" for the top level.',
+      '11: invalid-exception: An Exception from the Rule loose cannot be read: an Exception from a Rule of the kind threshold names its Violation by "component", or "/" for the top level.',
       '12: unmatched-exception: The Exception simple: gone in src/a/a.ts matches no Violation any more. Remove it, or name the Violation as it is now.'
     ])
   })

@@ -40,6 +40,7 @@
     <span class="chip">
       {item}
       <button
+        type="button"
         aria-label={t.metadata.remove(item)}
         onclick={() => items.splice(items.indexOf(item), 1)}>×</button
       >

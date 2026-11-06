@@ -355,6 +355,9 @@ importers:
       '@adr-tool/cli':
         specifier: workspace:*
         version: link:../cli
+      '@adr-tool/conformance':
+        specifier: workspace:*
+        version: link:../conformance
       '@adr-tool/core':
         specifier: workspace:*
         version: link:../core
@@ -364,6 +367,9 @@ importers:
       '@adr-tool/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@adr-tool/review':
+        specifier: workspace:*
+        version: link:../review
       '@adr-tool/structure':
         specifier: workspace:*
         version: link:../structure

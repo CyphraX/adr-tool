@@ -134,7 +134,7 @@ We cache it per cart in the next sprint; ADR-0007 has the reasons.
 
 ## 4. Finding the Anchor again
 
-The code goes on changing after an Annotation is written: lines are inserted above it, its lines are edited, moved, deleted, its Source File renamed, its commit rebased away. Whenever the Annotations are read with the code — by the app when it shows them, by the MCP server and `adr check` later —, the suite looks for each Anchor in the Source File as it is on disk, and says one of three things:
+The code goes on changing after an Annotation is written: lines are inserted above it, its lines are edited, moved, deleted, its Source File renamed, its commit rebased away. Whenever the Annotations are read with the code — by the app when it shows them, by the MCP server and by `adr check` —, the suite looks for each Anchor in the Source File as it is on disk, and says one of three things:
 
 - **Unchanged:** the Source File is at `path`, and its lines `lines` are the quoted lines, exactly but for whitespace at the end of a line.
 - **Moved:** the lines are found again, but not as the Anchor has them — at other lines, in a renamed Source File, or with other text. The new place, with the lines as they are now and HEAD's commit, is offered as **Update the Anchor**, a previewed change (section 5). The Annotation is shown at its new place either way; until a person accepts it, nothing is written.
@@ -199,6 +199,7 @@ Review adds these **Problems**. Each has a code and an English sentence; the win
 - A Trace is checked against the Decision Logs the repository has; an item of another repository (`name:log/ID`) is no ADR of this one.
 - **Orphaned** is checked only for an Annotation whose Anchor can be read: an Anchor with a Problem of its form is that Problem first.
 - A moved Annotation is no Problem: it is found, and shown where it is. Update the Anchor is offered beside it.
+- `adr check` fails on every Problem of Review but **orphaned**, which it prints as a note: the code moved on under the remark, which is no mistake of the files ([cli.md](cli.md#adr-check-path---format-textjsongithub)).
 
 ## 7. Examples
 

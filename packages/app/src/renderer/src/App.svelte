@@ -2,11 +2,16 @@
   import { onMount, type Snippet } from 'svelte'
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
+  import AnnotationDetail from './components/AnnotationDetail.svelte'
+  import AnnotationDialog from './components/AnnotationDialog.svelte'
   import BoardView from './components/BoardView.svelte'
   import BranchAdrDetail from './components/BranchAdrDetail.svelte'
   import BranchList from './components/BranchList.svelte'
   import ChangeDialog from './components/ChangeDialog.svelte'
   import CommitDialog from './components/CommitDialog.svelte'
+  import ConformanceCenter from './components/ConformanceCenter.svelte'
+  import ConformanceDetail from './components/ConformanceDetail.svelte'
+  import ConformanceSidebar from './components/ConformanceSidebar.svelte'
   import DashboardView from './components/DashboardView.svelte'
   import DiagramDetail from './components/DiagramDetail.svelte'
   import DiagramsCenter from './components/DiagramsCenter.svelte'
@@ -19,6 +24,8 @@
   import ProblemsList from './components/ProblemsList.svelte'
   import RelationsGraph from './components/RelationsGraph.svelte'
   import RepositoryProblems from './components/RepositoryProblems.svelte'
+  import ReviewCenter from './components/ReviewCenter.svelte'
+  import ReviewSidebar from './components/ReviewSidebar.svelte'
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import StructureDetail from './components/StructureDetail.svelte'
@@ -37,12 +44,16 @@
     type PaneSizes
   } from './lib/panes'
   import type { Module } from './lib/modules'
+  import { reviewing } from './lib/reviewing.svelte'
   import { app } from './lib/state.svelte'
   import { t } from './lib/strings'
   import { wordDiagramProblem } from './lib/diagram-words'
   import { codeSpans, describeProblem } from './lib/wording'
 
-  onMount(() => void app.start())
+  onMount(() => {
+    void app.start()
+    reviewing.start()
+  })
 
   /** The tab in front, with a repository open. */
   type Active = NonNullable<typeof app.active>
@@ -52,7 +63,9 @@
   const FRAMES: Record<Module, Snippet<[Active]>> = {
     decisions: decisionsFrame,
     structure: structureFrame,
-    diagrams: diagramsFrame
+    conformance: conformanceFrame,
+    diagrams: diagramsFrame,
+    review: reviewFrame
   }
 
   // The main process holds the window open while there is something to lose — text in the
@@ -67,9 +80,11 @@
   const STORED_SIZES = 'pane-sizes'
   let sizes = $state<PaneSizes>(readStoredSizes())
   let panesWidth = $state(0)
-  // The graph, the timeline, the board and the dashboard want room: they share one width.
+  // The graph, the timeline, the board and the dashboard want room: they share one width,
+  // and so do the centres of Structure and Conformance, which draw.
   const wide = $derived(
-    ['graph', 'timeline', 'board', 'dashboard'].includes(app.active?.view ?? 'adrs')
+    app.active?.module !== 'decisions' ||
+      ['graph', 'timeline', 'board', 'dashboard'].includes(app.active.view)
   )
   const middlePane = $derived<MiddlePane>(wide ? 'graph' : 'list')
   // Before the window has been measured there is nothing to fit a width into.
@@ -142,16 +157,45 @@
   <HistoryDialog />
   <CommitDialog />
   <NewDiagramDialog />
+  <AnnotationDialog />
   <SearchPalette />
   <ChangeDialog />
 {/if}
+
+<!-- The dividers between the panes of Structure and Conformance, as in Decisions. -->
+{#snippet sidebarDivider()}
+  <PaneDivider
+    label={t.panes.sidebar}
+    min={LIMITS.sidebar.min}
+    max={fitSidebar(LIMITS.sidebar.max, panesWidth)}
+    onresize={(width) => resize('sidebar', fitSidebar(width, panesWidth))}
+    onreset={() => resize('sidebar', undefined)}
+  />
+{/snippet}
+
+{#snippet middleDivider()}
+  <PaneDivider
+    label={t.panes.middle}
+    min={LIMITS.middle.min}
+    max={maxMiddle(panesWidth, sidebarWidth, middlePane)}
+    onresize={(width) => resize(middlePane, fitMiddle(width, panesWidth, sidebarWidth, middlePane))}
+    onreset={() => resize(middlePane, undefined)}
+  />
+{/snippet}
 
 {#snippet structureFrame(active: Active)}
   {@const structure = active.structure}
   <!-- The sidebar stands from the start: the Problems of the repository are reached from it
        while the level is still being analysed, or could not be. -->
-  <div class="panes structure" style:--sidebar="{sidebarWidth}px">
+  <div
+    class="panes drawing"
+    bind:clientWidth={panesWidth}
+    style:--sidebar="{sidebarWidth}px"
+    style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
+    style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
+  >
     <StructureSidebar />
+    {@render sidebarDivider()}
     {#if structure.problems}
       <RepositoryProblems />
     {:else if structure.view}
@@ -166,8 +210,44 @@
         <p>{t.structure.analysing}</p>
       </main>
     {/if}
+    {#key structure.problems}{@render middleDivider()}{/key}
     {#if structure.view}
       <StructureDetail view={structure.view} />
+    {:else}
+      <aside class="no-detail"></aside>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet conformanceFrame(active: Active)}
+  {@const conformance = active.conformance}
+  <!-- As Structure's: the sidebar stands from the start, while the Rules are checked. -->
+  <div
+    class="panes drawing"
+    bind:clientWidth={panesWidth}
+    style:--sidebar="{sidebarWidth}px"
+    style:--detail-beside-graph="{LIMITS.detail.besideGraph}px"
+    style:--middle={middleWidth === undefined ? undefined : `${middleWidth}px`}
+  >
+    <ConformanceSidebar />
+    {@render sidebarDivider()}
+    {#if conformance.problems}
+      <RepositoryProblems />
+    {:else if conformance.view}
+      <ConformanceCenter view={conformance.view} />
+    {:else if conformance.failed !== undefined && !conformance.reading}
+      <main class="message">
+        <h1>{t.conformance.failed}</h1>
+        <p>{conformance.failed}</p>
+      </main>
+    {:else}
+      <main class="message">
+        <p>{t.conformance.analysing}</p>
+      </main>
+    {/if}
+    {#key conformance.problems}{@render middleDivider()}{/key}
+    {#if conformance.view}
+      <ConformanceDetail view={conformance.view} />
     {:else}
       <aside class="no-detail"></aside>
     {/if}
@@ -212,6 +292,20 @@
     {:else}
       <aside class="no-detail"></aside>
     {/if}
+  </div>
+{/snippet}
+
+{#snippet reviewFrame(active: Active)}
+  <!-- What the Annotations are, by state, Anchor, type, Component and author; the ones the
+       filters leave, or a Source File with them beside their lines; and the one selected. -->
+  <div
+    class="panes review"
+    class:code={active.review.code !== undefined}
+    style:--sidebar="{sidebarWidth}px"
+  >
+    <ReviewSidebar />
+    <ReviewCenter />
+    <AnnotationDetail />
   </div>
 {/snippet}
 
@@ -367,18 +461,24 @@
     min-height: 0;
   }
 
-  /* The Structure view: what was found, the level as drawing, matrix or table, and what the
-     selection stands for. */
-  .panes.structure {
-    grid-template-columns: var(--sidebar) minmax(0, 2fr) minmax(300px, 1fr);
-  }
-
   /* The Diagrams: the canvas wants the room; the detail is there to be glanced at. */
   .panes.diagrams {
     grid-template-columns: var(--sidebar) minmax(0, 3fr) minmax(260px, 1fr);
   }
 
-  /* A drawing needs room; the ADR next to it is there to be glanced at. */
+  /* Review: the filters, the Annotations or a Source File, and the Annotation selected. The
+     code viewer wants the room a list does not. */
+  .panes.review {
+    grid-template-columns: var(--sidebar) minmax(0, 1.25fr) minmax(340px, 1fr);
+  }
+
+  .panes.review.code {
+    grid-template-columns: var(--sidebar) minmax(0, 1.8fr) minmax(320px, 1fr);
+  }
+
+  /* A drawing needs room; the ADR next to it is there to be glanced at. So it is in Structure —
+     the level as drawing, matrix or table — and in Conformance, beside what is selected. */
+  .panes.drawing,
   .panes.wide-middle {
     grid-template-columns:
       var(--sidebar) 0 var(--middle, minmax(0, 2fr))
