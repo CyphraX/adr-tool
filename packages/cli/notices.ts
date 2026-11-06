@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { Plugin } from 'vite'
 
 interface Manifest {
@@ -21,17 +21,24 @@ export type NoticesInto = 'file' | 'comment'
 /**
  * The notices of the packages a build bundles: their licences ask that they travel with every
  * copy (ADR-0010). A package is the directory below the last `node_modules` in the path of a
- * module of the build; the workspace's own packages are under the suite's licence and are not
- * listed.
+ * file the build read: a module, or a file a plugin read into one and announced with
+ * `addWatchFile`, as the WebAssembly of tree-sitter (command.config.ts). The workspace's own
+ * packages are under the suite's licence and are not listed.
  */
 export function notices(into: NoticesInto = 'file'): Plugin {
+  // A file a stylesheet points to, a font, is announced relative to the root of the build.
+  let root = process.cwd()
   return {
     name: 'third-party-notices',
     apply: 'build',
+    configResolved(config) {
+      root = config.root
+    },
     generateBundle(_, bundle) {
       const roots = new Set<string>()
-      for (const id of this.getModuleIds()) {
-        const path = id.replace(/^\0/, '').split('?')[0]!.replaceAll('\\', '/')
+      for (const id of new Set([...this.getModuleIds(), ...this.getWatchFiles()])) {
+        const read = id.replace(/^\0/, '').split('?')[0]!
+        const path = resolve(root, read).replaceAll('\\', '/')
         const at = path.lastIndexOf(NODE_MODULES)
         if (at < 0) continue
         const [first, second] = path.slice(at + NODE_MODULES.length).split('/')

@@ -19,17 +19,22 @@ function installed(name: string, licence: string): string {
   return join(root, 'index.js')
 }
 
-/** What the plugin does to a build of `modules` whose one chunk is `code`. */
+/**
+ * What the plugin does to a build of `modules` whose one chunk is `code`; `read` are the files
+ * a plugin read into a module and announced.
+ */
 function build(
   into: NoticesInto,
   modules: string[],
-  code: string
+  code: string,
+  read: string[] = []
 ): { code: string; emitted: string[] } {
   const chunk = { type: 'chunk', fileName: 'adr.mjs', code } as Rollup.OutputChunk
   const bundle: Rollup.OutputBundle = { 'adr.mjs': chunk }
   const emitted: string[] = []
   const context = {
     getModuleIds: () => modules.values(),
+    getWatchFiles: () => [...modules, ...read],
     emitFile: (file: { source: string }) => emitted.push(file.source)
   }
   const hook = notices(into).generateBundle as unknown as (
@@ -61,6 +66,13 @@ describe('the notices of what a build bundles', () => {
     expect(code).toBe('const own = 1\n')
     expect(emitted).toHaveLength(1)
     expect(emitted[0]).toContain('tricky 1.2.3\n\nThe Tricky Licence. */ globalThis.broken')
+  })
+
+  it('name the package of a file a plugin read into the build, as the grammars of tree-sitter', () => {
+    const grammar = installed('tree-sitter-tricky', 'The Grammar Licence.')
+    const { emitted } = build('file', [module], '', [grammar.replace('index.js', 'grammar.wasm')])
+    expect(emitted[0]).toContain('tree-sitter-tricky 1.2.3\n\nThe Grammar Licence.')
+    expect(emitted[0]).toContain('tricky 1.2.3\n\nThe Tricky Licence.')
   })
 
   it('leave a build alone that bundles nothing from node_modules', () => {

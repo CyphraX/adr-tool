@@ -15,21 +15,25 @@ const require = createRequire(import.meta.url)
  */
 export function treeSitterWasm(): Plugin {
   const file = fileURLToPath(new URL('src/tree-sitter-wasm.ts', import.meta.url))
-  const base64 = (path: string): string => readFileSync(require.resolve(path)).toString('base64')
-  const constant = (name: string, path: string): string =>
-    `export const ${name} = () => Buffer.from(${JSON.stringify(base64(path))}, 'base64')`
   return {
     name: 'tree-sitter-wasm',
     enforce: 'pre',
-    load: (id) =>
-      normalize(id.split('?')[0]!) === file
-        ? [
-            constant('runtime', 'web-tree-sitter/web-tree-sitter.wasm'),
-            constant('javaGrammar', 'tree-sitter-java/tree-sitter-java.wasm'),
-            constant('pythonGrammar', 'tree-sitter-python/tree-sitter-python.wasm'),
-            constant('goGrammar', 'tree-sitter-go/tree-sitter-go.wasm')
-          ].join('\n')
-        : undefined
+    load(id) {
+      if (normalize(id.split('?')[0]!) !== file) return undefined
+      // Each file read is announced to the build, whose notices list its package too.
+      const constant = (name: string, path: string): string => {
+        const wasm = require.resolve(path)
+        this.addWatchFile(wasm)
+        const base64 = readFileSync(wasm).toString('base64')
+        return `export const ${name} = () => Buffer.from(${JSON.stringify(base64)}, 'base64')`
+      }
+      return [
+        constant('runtime', 'web-tree-sitter/web-tree-sitter.wasm'),
+        constant('javaGrammar', 'tree-sitter-java/tree-sitter-java.wasm'),
+        constant('pythonGrammar', 'tree-sitter-python/tree-sitter-python.wasm'),
+        constant('goGrammar', 'tree-sitter-go/tree-sitter-go.wasm')
+      ].join('\n')
+    }
   }
 }
 
