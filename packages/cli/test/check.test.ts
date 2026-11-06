@@ -81,11 +81,12 @@ exceptions:
 const lines = (out: string): string[] => out.trimEnd().split('\n')
 
 describe('adr check (docs/cli.md)', () => {
+  // The whole of this repository is analysed, which takes longer than a test usually may.
   it('finds nothing in this repository, and ends with 0', async () => {
     const { code, out, err } = await adr('check')
     expect([code, err]).toEqual([0, ''])
     expect(out).toMatch(/^No Problems in 1 Decision Log\.\n\d+ Rules hold\.\n$/)
-  })
+  }, 30_000)
 
   it('prints each Violation at the line of its import, and ends with 1', async () => {
     const { code, out, err } = await adrIn(shop, 'check')
