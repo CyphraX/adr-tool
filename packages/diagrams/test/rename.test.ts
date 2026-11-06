@@ -70,6 +70,21 @@ describe('a Rename in a Diagram', () => {
     )
   })
 
+  it('reads an ID as it is written, also one that YAML would take for a number', () => {
+    const years = lines(
+      'level: container',
+      'elements:',
+      '  - component: 2024',
+      '    at: [0, 0]',
+      '  - component: web',
+      '    at: [200, 0]',
+      'connections:',
+      '  - from: web',
+      '    to: 2024'
+    )
+    expect(renameInDiagram(PATH, years, '2024', '2025')).toBe(years.replaceAll('2024', '2025'))
+  })
+
   it('leaves a Diagram alone that does not name the Component', () => {
     expect(renameInDiagram(PATH, view, 'billing', 'invoicing')).toBe(view)
   })

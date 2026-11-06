@@ -17,7 +17,7 @@ import {
   type Said,
   type TextEdit
 } from '@adr-tool/kernel'
-import { elementsOf, readDiagram, type Diagram } from './diagram'
+import { elementsOf, readDiagram, scalarText, type Diagram } from './diagram'
 import type { ExportModel } from './export'
 import { comparable, listOf, mapsOf, pairOf, rangeOf } from './lines'
 import { openDiagrams, svgPathOf } from './location'
@@ -119,9 +119,11 @@ function renameEdits(path: string, text: string, from: string, to: string): Text
   // An alias is no text the reader takes: a Diagram that has one where an ID stands cannot be
   // read, and is not rewritten.
   const rename = (node: unknown, names: (id: string) => boolean): void => {
-    if (!isScalar(node) || typeof node.value !== 'string') return
-    const renamed = moved(node.value)
-    if (renamed === undefined || !names(node.value)) return
+    // An ID is read as it is written, also where YAML would take it for a number.
+    const id = isScalar(node) ? scalarText(node) : undefined
+    if (!isScalar(node) || id === undefined) return
+    const renamed = moved(id)
+    if (renamed === undefined || !names(id)) return
     const range = rangeOf(node)
     if (!range || node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED') throw cannot
     const quote = node.type === 'QUOTE_SINGLE' ? "'" : node.type === 'QUOTE_DOUBLE' ? '"' : ''
