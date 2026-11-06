@@ -184,7 +184,7 @@ export const SENTENCES = {
     keys: readonly string[]
     topLevel?: string
   }): string =>
-    `an Exception from a Rule of the kind ${v.kind} names its Violation by ${quoted(v.keys)}${v.topLevel ? `, "${v.topLevel}" for the top level` : ''}`,
+    `an Exception from a Rule of the kind ${v.kind} names its Violation by ${quoted(v.keys)}${v.topLevel ? `, or "${v.topLevel}" for the top level` : ''}`,
   'roles-not-map': (): string => '"roles" must be a map from each role to Component patterns',
 
   // What a Violation is (docs/conformance-format.md, section 3): a code is the kind of its Rule.

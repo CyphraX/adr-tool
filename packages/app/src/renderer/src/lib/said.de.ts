@@ -430,7 +430,7 @@ export const DE: Wording<Codes> = {
   'among-or-inside': () => 'sie braucht entweder „among“ oder „inside“',
   'max-or-min': () => 'sie braucht „max“, „min“ oder beides',
   'fingerprint-of-kind': (v) =>
-    `eine Ausnahme von einer Regel der Art ${v.kind} nennt ihren Verstoß mit ${listed(v.keys.map((key) => `„${key}“`))}${v.topLevel ? `, „${v.topLevel}“ für die oberste Ebene` : ''}`,
+    `eine Ausnahme von einer Regel der Art ${v.kind} nennt ihren Verstoß mit ${listed(v.keys.map((key) => `„${key}“`))}${v.topLevel ? `, oder „${v.topLevel}“ für die oberste Ebene` : ''}`,
   'roles-not-map': () => '„roles“ muss ein Mapping von jeder Rolle auf Komponentenmuster sein',
 
   // What a Violation is: the kind of its Rule.
