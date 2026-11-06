@@ -10,7 +10,7 @@ import { resolveGo } from './go/resolve'
 import type { JavaOutline } from './java/outline'
 import { resolveJava } from './java/resolve'
 import type { FileMeasures, NotMeasured } from './measures'
-import { manifestLibraries, type ManifestLibrary } from './manifests'
+import { manifestLibraries, type ManifestLibrary, type ManifestNotRead } from './manifests'
 import type { PythonOutline } from './python/outline'
 import { pythonProjects } from './python/projects'
 import { resolvePython } from './python/resolve'
@@ -86,10 +86,13 @@ export interface Dependencies {
   readonly notResolved: readonly NotResolved[]
   readonly libraries: readonly LibraryUse[]
   /**
-   * What the manifests of Python and Go declare — `pyproject.toml`, `requirements.txt`,
-   * `go.mod` —, for the Library inventory. Read as text, in the order of their paths.
+   * What the manifests declare — `package.json`, `pom.xml`, `build.gradle`, `pyproject.toml`,
+   * `requirements.txt`, `go.mod` —, for the Library inventory. Read as text, in the order of
+   * their paths.
    */
   readonly manifests: readonly ManifestLibrary[]
+  /** The manifests whose reader failed on them, which name no Library; missing where none did. */
+  readonly manifestsNotRead?: readonly ManifestNotRead[]
   readonly notAnalysed: readonly NotAnalysed[]
   /** How many lines each Source File has that could be read (section 5, Size). */
   readonly lineCounts: ReadonlyMap<string, number>
@@ -286,12 +289,16 @@ export async function analyseDependencies(
     const typeOnlyLines = typeOnly ? [] : lines.filter((line) => typed.get(line))
     return { file, library, lines, typeOnly, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
   })
-  const manifests = await manifestLibraries(fs, files)
+  const manifestsNotRead: ManifestNotRead[] = []
+  const manifests = await manifestLibraries(fs, files, (manifest) =>
+    manifestsNotRead.push(manifest)
+  )
   return {
     dependencies,
     notResolved,
     libraries,
     manifests,
+    ...(manifestsNotRead.length > 0 && { manifestsNotRead }),
     notAnalysed,
     lineCounts,
     measures,

@@ -216,8 +216,14 @@ async function mavenModules(fs: FileSystem, files: readonly string[]): Promise<s
     visited.add(pom)
     if (directory !== '') modules.push(directory)
     // Read by hand, in time linear in the length of the file (src/libraries/maven.ts): the
-    // modules of the project, and those of its profiles.
-    const project = parseXml((await fs.readText(pom)) ?? '')
+    // modules of the project, and those of its profiles. A pom that cannot be read has none.
+    const text = (await fs.readText(pom).catch(() => undefined)) ?? ''
+    let project: ReturnType<typeof parseXml>
+    try {
+      project = parseXml(text)
+    } catch {
+      project = undefined
+    }
     const lists = [
       childOf(project, 'modules'),
       ...(childOf(project, 'profiles')?.children ?? []).map((profile) =>

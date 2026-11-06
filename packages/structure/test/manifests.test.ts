@@ -423,6 +423,97 @@ describe('the Libraries the manifests declare (docs/structure-format.md, section
     expect(performance.now() - started).toBeLessThan(10_000)
   }, 20_000)
 
+  it('leaves a character reference beyond the last code point as written', async () => {
+    expect(
+      await read({
+        'pom.xml':
+          '<project><dependencies><dependency><groupId>g</groupId><artifactId>a</artifactId>' +
+          '<version>&#x110000;&#9999999;&#x41;</version></dependency></dependencies></project>'
+      })
+    ).toEqual([{ manifest: 'pom.xml', name: 'g:a', version: '&#x110000;&#9999999;A', line: 1 }])
+  })
+
+  it('works out each property once, leaves one that names itself, and none longer than a kibibyte', async () => {
+    const pom = (properties: string, version: string): string =>
+      `<project><properties>${properties}</properties><dependencies><dependency>` +
+      `<groupId>g</groupId><artifactId>a</artifactId><version>${version}</version>` +
+      '</dependency></dependencies></project>'
+    const started = performance.now()
+    const [self, fan, chain] = await Promise.all([
+      read({ 'pom.xml': pom(`<a>${'${a}'.repeat(6)}</a>`, '${a}') }),
+      // Each of ten levels names the next one four times: four to the tenth, were it expanded.
+      read({
+        'pom.xml': pom(
+          Array.from({ length: 10 }, (_, n) => `<p${n}>${`\${p${n + 1}}`.repeat(4)}</p${n}>`).join(
+            ''
+          ) + '<p10>x</p10>',
+          '${p0}'
+        )
+      }),
+      read({ 'pom.xml': pom('<a>${b}</a><b>${c}</b><c>1.0</c>', '${a}-${missing}') })
+    ])
+    expect(performance.now() - started).toBeLessThan(2000)
+    expect(self[0]!.version).toBe('${a}'.repeat(6))
+    // Worked out as far as a kibibyte goes; what lies beyond stays as written.
+    expect(fan[0]!.version!.length).toBeLessThanOrEqual(2048)
+    expect(chain[0]!.version).toBe('1.0-${missing}')
+  })
+
+  it('reads deep nesting among closing tags that match nothing in time linear in its length', async () => {
+    const depth = 50_000
+    const started = performance.now()
+    const found = await read({
+      'pom.xml':
+        '<project><dependencies><dependency><groupId>g</groupId><artifactId>a</artifactId>' +
+        '</dependency></dependencies>' +
+        '<a>'.repeat(depth) +
+        '</b>'.repeat(depth) +
+        '</a>'.repeat(depth) +
+        '</project>'
+    })
+    expect(performance.now() - started).toBeLessThan(3000)
+    expect(found).toEqual([{ manifest: 'pom.xml', name: 'g:a', line: 1 }])
+  })
+
+  it('follows a ref of the version catalog one level, so that one naming itself ends', async () => {
+    const found = await read({
+      'build.gradle': 'implementation libs.x\nimplementation libs.y\nimplementation libs.z',
+      'gradle/libs.versions.toml': [
+        '[versions]',
+        'a = { ref = "a" }',
+        'b = "2.0"',
+        '[libraries]',
+        'x = { module = "g:x", version = { ref = "a" } }',
+        'y = { module = "g:y", version.ref = "b" }',
+        'z = { module = "g:z", version.ref = "constructor" }'
+      ].join('\n')
+    })
+    expect(found.map((library) => [library.name, library.version])).toEqual([
+      ['g:x', undefined],
+      ['g:y', '2.0'],
+      ['g:z', undefined]
+    ])
+  })
+
+  it('names nothing from a manifest its reader fails on, says which, and reads the others', async () => {
+    const files = {
+      'build.gradle': "implementation 'g:a:1'",
+      'web/package.json': '{ "dependencies": { "react": "19" } }'
+    }
+    const fs = memoryFileSystem(files)
+    // A reader that fails, as a reader with a fault in it would: the text is not one.
+    const failing = {
+      ...fs,
+      readText: async (path: string, options?: { atMost?: number }) =>
+        path === 'build.gradle' ? (42 as unknown as string) : fs.readText(path, options)
+    }
+    const notRead: unknown[] = []
+    expect(
+      await manifestLibraries(failing, Object.keys(files), (manifest) => notRead.push(manifest))
+    ).toEqual([{ manifest: 'web/package.json', name: 'react', version: '19', line: 1 }])
+    expect(notRead).toEqual([{ manifest: 'build.gradle', message: expect.any(String) }])
+  })
+
   it('names nothing from a manifest it cannot read, and nothing that is never looked at', async () => {
     expect(
       await read({

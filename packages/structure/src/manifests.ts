@@ -47,11 +47,42 @@ const isRequirements = (path: string): boolean =>
 const isPom = (path: string): boolean => fileName(path) === 'pom.xml'
 const isGradle = (path: string): boolean => /^build\.gradle(?:\.kts)?$/.test(fileName(path))
 
-/** Every Library the manifests of a repository declare, manifest by manifest in path order. */
+/** A manifest that could not be read to its end, and why: it names no Library. */
+export interface ManifestNotRead {
+  readonly manifest: string
+  /** What its reader said: the message of the error it failed with. */
+  readonly message: string
+}
+
+/** The message of what a reader failed with. */
+const messageOf = (error: unknown): string =>
+  error instanceof RangeError && /call stack/i.test(error.message)
+    ? 'It is nested too deeply for its reader.'
+    : error instanceof Error
+      ? error.message
+      : String(error)
+
+/**
+ * Every Library the manifests of a repository declare, manifest by manifest in path order. A
+ * manifest whose reader fails on it names nothing and is told to `notRead`; every other one is
+ * read all the same.
+ */
 export async function manifestLibraries(
   fs: FileSystem,
-  files: readonly string[]
+  files: readonly string[],
+  notRead: (manifest: ManifestNotRead) => void = () => {}
 ): Promise<ManifestLibrary[]> {
+  const failed = (manifest: string, error: unknown): void =>
+    notRead({ manifest, message: messageOf(error) })
+  /** What `read` gives, or nothing where it fails: one manifest does not stop the others. */
+  const guarded = <T>(manifest: string, read: () => T): T | undefined => {
+    try {
+      return read()
+    } catch (error) {
+      failed(manifest, error)
+      return undefined
+    }
+  }
   const found: ManifestLibrary[] = []
   const manifests = files.filter((path) => !isNeverLookedAt(path)).sort()
   const read = (path: string): Promise<string | undefined> =>
@@ -74,9 +105,9 @@ export async function manifestLibraries(
   const local = new Set<string>()
   if (manifests.some((path) => fileName(path) === 'package.json')) {
     for (const directory of ['', ...(await workspacePackages(fs, manifests))]) {
-      const name = packageName(
-        await read(directory === '' ? 'package.json' : `${directory}/package.json`)
-      )
+      const path = directory === '' ? 'package.json' : `${directory}/package.json`
+      const text = await read(path)
+      const name = guarded(path, () => packageName(text))
       if (name !== undefined) local.add(name)
     }
   }
@@ -86,30 +117,38 @@ export async function manifestLibraries(
     if (text !== undefined) poms.set(path, text)
   }
   const fromPoms = new Map<string, ManifestLibrary[]>()
-  for (const library of inPoms(poms)) {
+  for (const library of inPoms(poms, failed)) {
     fromPoms.set(library.manifest, [...(fromPoms.get(library.manifest) ?? []), library])
   }
   const catalogText = manifests.includes('gradle/libs.versions.toml')
     ? await read('gradle/libs.versions.toml')
     : undefined
-  const catalog = catalogText === undefined ? undefined : readCatalog(catalogText)
+  const catalog =
+    catalogText === undefined
+      ? undefined
+      : guarded('gradle/libs.versions.toml', () => readCatalog(catalogText))
 
   for (const path of manifests) {
     if (fileName(path) === 'package.json') {
       const text = await read(path)
-      if (text !== undefined) found.push(...inPackageJson(path, text, (name) => local.has(name)))
+      if (text !== undefined) {
+        found.push(...(guarded(path, () => inPackageJson(path, text, (n) => local.has(n))) ?? []))
+      }
     } else if (isPom(path)) {
       found.push(...(fromPoms.get(path) ?? []))
     } else if (isGradle(path)) {
       const text = await read(path)
-      if (text !== undefined) found.push(...inGradle(path, text, catalog))
+      if (text !== undefined)
+        found.push(...(guarded(path, () => inGradle(path, text, catalog)) ?? []))
     } else if (fileName(path) === 'pyproject.toml') {
-      const text = await fs.readText(path).catch(() => undefined)
-      const document = text === undefined ? undefined : parsePyproject(text)
-      if (document) found.push(...inPyproject(path, document, linesOf(text!)))
+      const text = await read(path)
+      const document = text === undefined ? undefined : guarded(path, () => parsePyproject(text))
+      if (document) {
+        found.push(...(guarded(path, () => inPyproject(path, document, linesOf(text!))) ?? []))
+      }
     } else if (isRequirements(path)) {
-      const text = await fs.readText(path).catch(() => undefined)
-      if (text !== undefined) found.push(...inRequirements(path, text))
+      const text = await read(path)
+      if (text !== undefined) found.push(...(guarded(path, () => inRequirements(path, text)) ?? []))
     } else if (go.has(path)) {
       for (const requirement of go.get(path)!.requires) {
         if (goLocal.has(requirement.path)) continue

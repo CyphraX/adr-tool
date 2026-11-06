@@ -8,7 +8,8 @@
  * repository is not read. A module of the repository is no Library.
  *
  * The XML is read by hand, by `indexOf` and one pass over each tag, so that the time is linear
- * in the length of the file whatever it holds.
+ * in the length of the file whatever it holds; a property names others ten levels deep at most,
+ * each worked out once per pom, and a value longer than a kibibyte is left as written.
  */
 import { withinRepository } from '../paths'
 import type { ManifestLibrary } from '../manifests'
@@ -27,11 +28,16 @@ export interface XmlElement {
 
 const ENTITIES: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" }
 
+/** The largest code point there is; a reference beyond it names no character and stays as written. */
+const LAST_CODE_POINT = 0x10ffff
+
 const decode = (text: string): string =>
   text.replace(/&(#x[0-9A-Fa-f]{1,6}|#[0-9]{1,7}|lt|gt|amp|quot|apos);/g, (whole, name: string) => {
-    if (name.startsWith('#x')) return String.fromCodePoint(Number.parseInt(name.slice(2), 16))
-    if (name.startsWith('#')) return String.fromCodePoint(Number.parseInt(name.slice(1), 10))
-    return ENTITIES[name] ?? whole
+    if (!name.startsWith('#')) return ENTITIES[name] ?? whole
+    const code = name.startsWith('#x')
+      ? Number.parseInt(name.slice(2), 16)
+      : Number.parseInt(name.slice(1), 10)
+    return code <= LAST_CODE_POINT ? String.fromCodePoint(code) : whole
   })
 
 /**
@@ -44,6 +50,8 @@ export function parseXml(text: string): XmlElement | undefined {
   const root: XmlElement = { name: '', children: [], text: '', line: 0, empty: false }
   const stack: XmlElement[] = [root]
   const texts: string[][] = [[]]
+  /** How many elements of each name are open: a closing tag that matches none costs nothing. */
+  const open = new Map<string, number>()
   let line = 1
   /** The next line break not counted yet; -1 when there is none. */
   let next = text.indexOf('\n')
@@ -55,9 +63,11 @@ export function parseXml(text: string): XmlElement | undefined {
     }
     return line
   }
-  const close = (): void => {
+  const close = (): XmlElement => {
     const element = stack.pop()!
     element.text = decode(texts.pop()!.join('')).trim()
+    open.set(element.name, open.get(element.name)! - 1)
+    return element
   }
 
   let at = 0
@@ -92,8 +102,8 @@ export function parseXml(text: string): XmlElement | undefined {
       const end = text.indexOf('>', lt + 2)
       const name = localName(text.slice(lt + 2, end === -1 ? undefined : end).trim())
       // Close up to the element of that name; a closing tag that matches none is passed over.
-      const open = stack.findLastIndex((element, index) => index > 0 && element.name === name)
-      if (open > 0) while (stack.length > open) close()
+      // Each element is closed once, so the closing tags of a file take time linear in it.
+      if ((open.get(name) ?? 0) > 0) while (close().name !== name);
       if (end === -1) break
       at = end + 1
     } else {
@@ -123,6 +133,7 @@ export function parseXml(text: string): XmlElement | undefined {
       if (!empty) {
         stack.push(element)
         texts.push([])
+        open.set(element.name, (open.get(element.name) ?? 0) + 1)
       }
       at = end + 1
     }
@@ -215,17 +226,28 @@ const optional = <K extends string>(key: K, value: string | undefined): { [P in 
 
 /** How deep a property may name another one before it is left as written. */
 const DEPTH = 10
+/** The longest value a property is worked out to; a longer one is left as written. */
+const LONGEST = 1024
 
 /**
  * The Libraries of every `pom.xml` among `poms` (paths with their texts). A dependency on a
  * project of the repository — its `groupId:artifactId` is one of a pom here — is no Library.
+ * A pom that cannot be read names nothing and is told to `notRead`; the others are read all
+ * the same.
  */
-export function inPoms(poms: ReadonlyMap<string, string>): ManifestLibrary[] {
+export function inPoms(
+  poms: ReadonlyMap<string, string>,
+  notRead: (path: string, error: unknown) => void = () => {}
+): ManifestLibrary[] {
   const known = new Set(poms.keys())
   const read = new Map<string, Pom>()
   for (const [path, text] of poms) {
-    const pom = pomOf(path, text, known)
-    if (pom) read.set(path, pom)
+    try {
+      const pom = pomOf(path, text, known)
+      if (pom) read.set(path, pom)
+    } catch (error) {
+      notRead(path, error)
+    }
   }
   const local = new Set(
     [...read.values()].flatMap((pom) =>
@@ -236,9 +258,9 @@ export function inPoms(poms: ReadonlyMap<string, string>): ManifestLibrary[] {
   )
   /** The pom and its parents inside the repository, the pom first; a loop ends where it closes. */
   const chainOf = (pom: Pom): Pom[] => {
-    const chain: Pom[] = []
-    for (let at: Pom | undefined = pom; at && !chain.includes(at);) {
-      chain.push(at)
+    const chain = new Set<Pom>()
+    for (let at: Pom | undefined = pom; at && !chain.has(at);) {
+      chain.add(at)
       const parent: Pom | undefined =
         at.parent?.path === undefined ? undefined : read.get(at.parent.path)
       // The parent the pom names is the one that lies there, or it is not in the repository.
@@ -248,92 +270,123 @@ export function inPoms(poms: ReadonlyMap<string, string>): ManifestLibrary[] {
         (at.parent!.groupId === undefined || parent.groupId === at.parent!.groupId)
       at = same ? parent : undefined
     }
-    return chain
+    return [...chain]
   }
 
   const found: ManifestLibrary[] = []
   for (const pom of read.values()) {
-    const chain = chainOf(pom)
-    const value = (name: string, depth: number): string | undefined => {
-      for (const at of chain) {
-        const property = at.properties.get(name)
-        if (property !== undefined) return interpolate(property, depth + 1)
-      }
-      switch (name) {
-        case 'project.version':
-        case 'pom.version':
-        case 'version':
-          return pom.version === undefined ? undefined : interpolate(pom.version, depth + 1)
-        case 'project.groupId':
-        case 'pom.groupId':
-        case 'groupId':
-          return pom.groupId
-        case 'project.artifactId':
-        case 'pom.artifactId':
-        case 'artifactId':
-          return pom.artifactId
-        case 'project.parent.version':
-        case 'parent.version':
-          return pom.parent?.version
-        case 'project.parent.groupId':
-        case 'parent.groupId':
-          return pom.parent?.groupId
-      }
-      return undefined
+    try {
+      found.push(...librariesOf(pom, chainOf(pom), local))
+    } catch (error) {
+      notRead(pom.path, error)
     }
-    /** `${name}` replaced by its value where it is known, by `indexOf`; else left as written. */
-    const interpolate = (written: string, depth = 0): string => {
-      if (depth > DEPTH) return written
-      let result = ''
-      let at = 0
-      for (let start = written.indexOf('${'); start !== -1; start = written.indexOf('${', at)) {
-        const end = written.indexOf('}', start + 2)
-        if (end === -1) break
-        const known = value(written.slice(start + 2, end).trim(), depth)
-        result += written.slice(at, start) + (known ?? written.slice(start, end + 1))
-        at = end + 1
-      }
-      return result + written.slice(at)
-    }
-    const coordinates = (dependency: XmlElement): string | undefined => {
-      const groupId = textOf(dependency, 'groupId')
-      const artifactId = textOf(dependency, 'artifactId')
-      return groupId === undefined || artifactId === undefined
-        ? undefined
-        : `${interpolate(groupId)}:${interpolate(artifactId)}`
-    }
-    // What `<dependencyManagement>` of the pom and its parents pin, the nearest first.
-    const managed = new Map<string, string>()
+  }
+  return found
+}
+
+/** The Libraries one pom declares, with the pom and its parents in `chain`, the pom first. */
+function librariesOf(
+  pom: Pom,
+  chain: readonly Pom[],
+  local: ReadonlySet<string>
+): ManifestLibrary[] {
+  // Each property is worked out once, and one that is being worked out is left as written where
+  // it names itself again: a pom of a few hundred bytes cannot make a value of millions.
+  const worked = new Map<string, string | undefined>()
+  const working = new Set<string>()
+  const value = (name: string): string | undefined => {
+    if (worked.has(name)) return worked.get(name)
+    if (working.has(name) || working.size >= DEPTH) return undefined
+    working.add(name)
+    const result = valueOf(name)
+    working.delete(name)
+    const kept = result !== undefined && result.length > LONGEST ? undefined : result
+    worked.set(name, kept)
+    return kept
+  }
+  const valueOf = (name: string): string | undefined => {
     for (const at of chain) {
-      const list = childOf(childOf(at.project, 'dependencyManagement'), 'dependencies')
-      for (const dependency of childrenOf(list, 'dependency')) {
-        const name = coordinates(dependency)
-        const version = textOf(dependency, 'version')
-        if (name !== undefined && version !== undefined && !managed.has(name)) {
-          managed.set(name, interpolate(version))
-        }
+      const property = at.properties.get(name)
+      if (property !== undefined) return interpolate(property)
+    }
+    switch (name) {
+      case 'project.version':
+      case 'pom.version':
+      case 'version':
+        return pom.version === undefined ? undefined : interpolate(pom.version)
+      case 'project.groupId':
+      case 'pom.groupId':
+      case 'groupId':
+        return pom.groupId
+      case 'project.artifactId':
+      case 'pom.artifactId':
+      case 'artifactId':
+        return pom.artifactId
+      case 'project.parent.version':
+      case 'parent.version':
+        return pom.parent?.version
+      case 'project.parent.groupId':
+      case 'parent.groupId':
+        return pom.parent?.groupId
+    }
+    return undefined
+  }
+  /**
+   * `${name}` replaced by its value where it is known, by `indexOf`; else left as written — and
+   * so is the whole, where it would grow by more than a kibibyte.
+   */
+  const interpolate = (written: string): string => {
+    let result = ''
+    let at = 0
+    for (let start = written.indexOf('${'); start !== -1; start = written.indexOf('${', at)) {
+      const end = written.indexOf('}', start + 2)
+      if (end === -1) break
+      const known = value(written.slice(start + 2, end).trim())
+      result += written.slice(at, start) + (known ?? written.slice(start, end + 1))
+      if (result.length > written.length + LONGEST) return written
+      at = end + 1
+    }
+    return result + written.slice(at)
+  }
+  const coordinates = (dependency: XmlElement): string | undefined => {
+    const groupId = textOf(dependency, 'groupId')
+    const artifactId = textOf(dependency, 'artifactId')
+    return groupId === undefined || artifactId === undefined
+      ? undefined
+      : `${interpolate(groupId)}:${interpolate(artifactId)}`
+  }
+  // What `<dependencyManagement>` of the pom and its parents pin, the nearest first.
+  const managed = new Map<string, string>()
+  for (const at of chain) {
+    const list = childOf(childOf(at.project, 'dependencyManagement'), 'dependencies')
+    for (const dependency of childrenOf(list, 'dependency')) {
+      const name = coordinates(dependency)
+      const version = textOf(dependency, 'version')
+      if (name !== undefined && version !== undefined && !managed.has(name)) {
+        managed.set(name, interpolate(version))
       }
     }
-    for (const dependency of childrenOf(childOf(pom.project, 'dependencies'), 'dependency')) {
-      const name = coordinates(dependency)
-      if (name === undefined || local.has(name)) continue
-      const written = textOf(dependency, 'version')
-      const version = written === undefined ? managed.get(name) : interpolate(written)
-      const scope = interpolate(textOf(dependency, 'scope') ?? 'compile')
-      const group =
-        scope !== 'compile' && scope !== 'runtime'
-          ? scope
-          : textOf(dependency, 'optional') === 'true'
-            ? 'optional'
-            : undefined
-      found.push({
-        manifest: pom.path,
-        name,
-        ...(version === undefined ? {} : { version }),
-        ...(group === undefined ? {} : { group }),
-        line: dependency.line
-      })
-    }
+  }
+  const found: ManifestLibrary[] = []
+  for (const dependency of childrenOf(childOf(pom.project, 'dependencies'), 'dependency')) {
+    const name = coordinates(dependency)
+    if (name === undefined || local.has(name)) continue
+    const written = textOf(dependency, 'version')
+    const version = written === undefined ? managed.get(name) : interpolate(written)
+    const scope = interpolate(textOf(dependency, 'scope') ?? 'compile')
+    const group =
+      scope !== 'compile' && scope !== 'runtime'
+        ? scope
+        : textOf(dependency, 'optional') === 'true'
+          ? 'optional'
+          : undefined
+    found.push({
+      manifest: pom.path,
+      name,
+      ...(version === undefined ? {} : { version }),
+      ...(group === undefined ? {} : { group }),
+      line: dependency.line
+    })
   }
   return found
 }
