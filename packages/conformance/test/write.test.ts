@@ -623,3 +623,310 @@ describe('a Rule as a draft', () => {
     }
   })
 })
+
+describe('what the writer keeps, and where it refuses', () => {
+  const blockTo = yaml(
+    'rules:',
+    '  - id: a',
+    '    why: A.',
+    '    kind: must-not-depend',
+    '    from: ui',
+    '    to:',
+    '      - db',
+    '      - files'
+  )
+  const to = (patterns: string[]): RuleDraft => ({
+    id: 'a',
+    why: 'A.',
+    kind: 'must-not-depend',
+    from: ['ui'],
+    to: patterns
+  })
+
+  it('keeps a block list of one pattern a block list, and writes an emptied one as []', () => {
+    expect(after(blockTo, changeRuleEdits(blockTo, 'a', to(['db'])))).toBe(
+      blockTo.replace('      - files\n', '')
+    )
+    expect(after(blockTo, changeRuleEdits(blockTo, 'a', to([])))).toBe(
+      blockTo.replace('    to:\n      - db\n      - files\n', '    to: []\n')
+    )
+    const commented = blockTo.replace('    to:\n', '    to:   # where it may not go\n')
+    expect(after(commented, changeRuleEdits(commented, 'a', to(['db'])))).toBe(
+      commented.replace('      - files\n', '')
+    )
+    expect(() => changeRuleEdits(commented, 'a', to([]))).toThrow('a comment would be lost')
+  })
+
+  it('refuses an item whose anchor is used elsewhere, instead of failing on the alias', () => {
+    const anchored = yaml(
+      'rules:',
+      '  - id: a',
+      '    why: A.',
+      '    kind: must-not-depend',
+      '    from: &ui ui',
+      '    to: db',
+      '  - id: b',
+      '    why: B.',
+      '    kind: must-not-depend',
+      '    from: *ui',
+      '    to: files'
+    )
+    expect(() => removeRuleEdits(anchored, 'a')).toThrow('the item uses an anchor or an alias')
+  })
+
+  it('changes a Rule whose why is a block scalar, and keeps the line break after it', () => {
+    const folded = yaml(
+      'rules:',
+      '  - id: a',
+      '    why: >',
+      '      A long reason,',
+      '      folded.',
+      '    kind: must-not-depend',
+      '    from: ui',
+      '    to: db',
+      '  - id: b',
+      '    why: B.',
+      '    kind: no-cycles',
+      '    among: x'
+    )
+    const same = { ...to(['db', 'files']), why: 'A long reason, folded.' }
+    expect(after(folded, changeRuleEdits(folded, 'a', same))).toBe(
+      folded.replace('    to: db', '    to: [db, files]')
+    )
+    expect(after(folded, changeRuleEdits(folded, 'a', { ...to(['db']), why: 'Short.' }))).toBe(
+      folded.replace('    why: >\n      A long reason,\n      folded.\n', '    why: Short.\n')
+    )
+    expect(after(folded, removeRuleEdits(folded, 'a'))).toBe(
+      folded.replace(/ {2}- id: a\n[^]*?(?= {2}- id: b)/, '')
+    )
+  })
+
+  it('adds an Exception under "exceptions:" with a comment and nothing in it', () => {
+    const accepted = {
+      fingerprint: { kind: 'dependency' as const, rule: 'a', from: 'ui', to: 'db' },
+      reason: 'R.'
+    }
+    const exception = ['  - rule: a', '    from: ui', '    to: db', '    reason: R.']
+    const rule = ['rules:', '  - id: a', '    why: A.', '    kind: must-not-depend']
+    const noneYet = yaml(
+      ...rule,
+      '    from: ui',
+      '    to: db',
+      'exceptions: # none yet',
+      '',
+      'patterns: []'
+    )
+    expect(after(noneYet, addExceptionEdits(noneYet, accepted))).toBe(
+      noneYet.replace('# none yet\n', `# none yet\n${exception.join('\n')}\n`)
+    )
+    const todo = yaml(...rule, '    from: ui', '    to: db', 'exceptions: # todo', 'patterns: []')
+    expect(after(todo, addExceptionEdits(todo, accepted))).toBe(
+      todo.replace('# todo\n', `# todo\n${exception.join('\n')}\n`)
+    )
+  })
+
+  it('starts "exceptions:" after a blank line where the items are spaced', () => {
+    const spaced = yaml(
+      'rules:',
+      '  - id: a',
+      '    why: A.',
+      '    kind: must-not-depend',
+      '    from: ui',
+      '    to: db',
+      '',
+      '  - id: b',
+      '    why: B.',
+      '    kind: no-cycles',
+      '    among: x'
+    )
+    const accepted = {
+      fingerprint: { kind: 'dependency' as const, rule: 'a', from: 'ui', to: 'db' },
+      reason: 'R.'
+    }
+    expect(after(spaced, addExceptionEdits(spaced, accepted))).toBe(
+      yaml(
+        spaced.trimEnd(),
+        '',
+        'exceptions:',
+        '  - rule: a',
+        '    from: ui',
+        '    to: db',
+        '    reason: R.'
+      )
+    )
+  })
+
+  it('narrows an Exception only to two members or more of its own Cycle', () => {
+    const rules = yaml(
+      'rules:',
+      '  - id: c',
+      '    why: C.',
+      '    kind: no-cycles',
+      '    among: [a, b, c]',
+      'exceptions:',
+      '  - rule: c',
+      '    cycle: [a, b, c]',
+      '    reason: R.'
+    )
+    const fingerprint = { kind: 'cycle' as const, rule: 'c', cycle: ['a', 'b', 'c'] }
+    const narrowed = (members: string[]) =>
+      after(rules, narrowExceptionEdits(rules, { line: 7, fingerprint, members }))
+    expect(narrowed(['b', 'a'])).toBe(rules.replace('[a, b, c]\n    reason', '[a, b]\n    reason'))
+    expect(() => narrowed(['a'])).toThrow('which has two members at least')
+    expect(() => narrowed(['a', 'd'])).toThrow('a and d are not all among them')
+  })
+
+  it('writes an Exception of a function or a class, which then accepts its Violation', async () => {
+    const files = {
+      ...shop,
+      'src/web/render.ts': [
+        'export function render(x: number): number {',
+        '  if (x > 1) return 1',
+        '  if (x > 2) return 2',
+        '  return 3',
+        '}',
+        'export class Page {',
+        '  a = 1',
+        '  b = 2',
+        '  one(): number { return this.a }',
+        '  two(): number { return this.b }',
+        '}',
+        ''
+      ].join('\n')
+    }
+    const rules = yaml(
+      'rules:',
+      '  - id: simple',
+      '    why: Simple functions.',
+      '    kind: threshold',
+      '    metric: complexity',
+      '    max: 2',
+      '    of: web',
+      '  - id: cohesive',
+      '    why: Cohesive classes.',
+      '    kind: threshold',
+      '    metric: lcom4',
+      '    max: 1',
+      '    of: web'
+    )
+    const before = await checked(files, rules)
+    const fingerprints = before.violations.map((violation) => violation.fingerprint)
+    expect(fingerprints).toEqual([
+      { kind: 'function', rule: 'simple', file: 'src/web/render.ts', name: 'render' },
+      { kind: 'class', rule: 'cohesive', file: 'src/web/render.ts', name: 'Page' }
+    ])
+    const fs = memoryFileSystem({ ...files, [RULES_PATH]: rules })
+    for (const fingerprint of fingerprints) {
+      const plan = await planAddException(fs, { fingerprint, reason: 'Being split.' })
+      if (!plan.ok) throw new Error(plan.reason)
+      expect(await applyChangeSet(fs, plan.changeSet)).toEqual({ applied: true })
+    }
+    const written = (await fs.readText(RULES_PATH))!
+    expect(written).toBe(
+      yaml(
+        rules.trimEnd(),
+        'exceptions:',
+        '  - rule: simple',
+        '    file: src/web/render.ts',
+        '    name: render',
+        '    reason: Being split.',
+        '  - rule: cohesive',
+        '    file: src/web/render.ts',
+        '    name: Page',
+        '    reason: Being split.'
+      )
+    )
+    const after = await checked(files, written)
+    expect(after.problems).toEqual([])
+    expect(after.violations.map((violation) => violation.exception?.line)).toEqual([15, 19])
+    expect(() =>
+      addExceptionEdits(rules, {
+        fingerprint: { kind: 'component', rule: 'simple', component: 'web' },
+        reason: 'R.'
+      })
+    ).toThrow('names its Violation by "file" and "name"')
+  })
+
+  it('keeps the line breaks of a CRLF file, and a byte order mark', async () => {
+    const crlf = yaml(
+      ...blockTo.trimEnd().split('\n'),
+      'exceptions:',
+      '  - rule: a',
+      '    from: ui',
+      '    to: db',
+      '    reason: R.'
+    ).replace(/\n/g, '\r\n')
+    expect(after(crlf, changeRuleEdits(crlf, 'a', to(['db', 'net'])))).toBe(
+      crlf.replace('      - files\r\n', '      - net\r\n')
+    )
+    expect(after(crlf, changeRuleEdits(crlf, 'a', to([])))).toBe(
+      crlf.replace('    to:\r\n      - db\r\n      - files\r\n', '    to: []\r\n')
+    )
+    const fs = memoryFileSystem({ [RULES_PATH]: crlf })
+    const removed = await planRemoveRule(fs, 'a')
+    if (!removed.ok) throw new Error(removed.reason)
+    expect(removed.changeSet.files[0]!.after).toBe('rules:\r\nexceptions:\r\n')
+    const bom = `﻿${blockTo}`
+    expect(after(bom, changeRuleEdits(bom, 'a', to(['db', 'net'])))).toBe(
+      bom.replace('      - files', '      - net')
+    )
+  })
+
+  it('refuses a file of several documents, and an item that has a key twice', () => {
+    expect(() => changeRuleEdits(`${blockTo}---\nrules: []\n`, 'a', to(['db', 'net']))).toThrow(
+      'cannot be read, so the suite cannot write into it'
+    )
+    const twice = blockTo.replace('    from: ui\n', '    from: ui\n    from: web\n')
+    expect(() => changeRuleEdits(twice, 'a', to(['net']))).toThrow('the item has "from" twice')
+  })
+
+  it('removes and renames a Rule beside Exceptions in brackets, unless one of them is its own', async () => {
+    const bracketed = yaml(
+      'rules:',
+      '  - id: a',
+      '    why: A.',
+      '    kind: must-not-depend',
+      '    from: ui',
+      '    to: db',
+      '  - id: b',
+      '    why: B.',
+      '    kind: no-cycles',
+      '    among: x',
+      'exceptions: [{rule: a, from: ui, to: db, reason: R.}]'
+    )
+    const fs = memoryFileSystem({ [RULES_PATH]: bracketed })
+    const withoutB = await planRemoveRule(fs, 'b')
+    if (!withoutB.ok) throw new Error(withoutB.reason)
+    expect(withoutB.changeSet.files[0]!.after).toBe(
+      bracketed.replace(/ {2}- id: b\n[^]*?(?=exceptions)/, '')
+    )
+    const b2: RuleDraft = {
+      id: 'b2',
+      why: 'B.',
+      kind: 'no-cycles',
+      scope: 'among',
+      components: ['x']
+    }
+    const renamed = await planChangeRule(fs, 'b', b2)
+    if (!renamed.ok) throw new Error(renamed.reason)
+    expect(renamed.changeSet.files[0]!.after).toBe(bracketed.replace('- id: b\n', '- id: b2\n'))
+    const inBrackets = { code: 'list-in-brackets', values: { key: 'exceptions' } }
+    expect(await planRemoveRule(fs, 'a')).toMatchObject({
+      ok: false,
+      said: { values: { change: 'remove-exception', why: inBrackets } }
+    })
+    expect(await planChangeRule(fs, 'a', { ...to(['db']), id: 'a2' })).toMatchObject({
+      ok: false,
+      said: { values: { change: 'change-exception', why: inBrackets } }
+    })
+  })
+
+  it('escapes what a reader would not see, or would take for a line break', () => {
+    const why = 'A B\u0085C\u007fD\u0007.'
+    const written = after(blockTo, changeRuleEdits(blockTo, 'a', { ...to(['db', 'files']), why }))
+    expect(written).toBe(
+      blockTo.replace('    why: A.', '    why: "A\\u2028B\\u0085C\\u007fD\\u0007."')
+    )
+    expect(readRules(written).rules[0]!.why).toBe(why)
+  })
+})

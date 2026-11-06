@@ -32,13 +32,18 @@ async function planned(
   from: string,
   to: string,
   extra: readonly string[] = [],
-  written = rules
+  written = rules,
+  typeOnly?: boolean
 ) {
   const fs = memoryFileSystem(files)
   const paths = [...Object.keys(files), ...extra]
   const structure = await openStructure(fs, paths)
   const model = await analyseDependencies(fs, paths, structure.sourceFiles)
-  return checkPlannedImport(readRules(written), structure, model, { from, to })
+  return checkPlannedImport(readRules(written), structure, model, {
+    from,
+    to,
+    ...(typeOnly !== undefined && { typeOnly })
+  })
 }
 
 describe('a planned import (docs/mcp.md, list_violations)', () => {
@@ -105,5 +110,27 @@ describe('a planned import (docs/mcp.md, list_violations)', () => {
     ])
     const crossed = await planned(shop, 'src/web/page.ts', 'src/features/a/x.ts', [], thresholds)
     expect(crossed.violations).toEqual([])
+  })
+
+  it('takes an import of a value beside an `import type` as new, where type-only ones are left out', async () => {
+    const typesAside = yaml(
+      'rules:',
+      '  - id: persistence-alone',
+      '    why: What is stored knows nothing of the domain.',
+      '    kind: may-only-depend',
+      '    from: persistence',
+      '    to: []',
+      '    type-only: ignored'
+    )
+    const from = 'src/persistence/db.ts'
+    const to = 'src/web/page.ts'
+    const value = await planned(shop, from, to, [], typesAside, false)
+    expect(value.exists).toBe(false)
+    expect(value.violations.map((violation) => violation.fingerprint)).toEqual([
+      { kind: 'dependency', rule: 'persistence-alone', from: 'persistence', to: 'web' }
+    ])
+    const type = await planned(shop, from, to, [], typesAside, true)
+    expect(type.exists).toBe(true)
+    expect(type.violations).toEqual([])
   })
 })

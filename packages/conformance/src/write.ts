@@ -350,6 +350,17 @@ function hasComment(text: string): boolean {
 }
 
 /** Whether a node, or anything in it, has an anchor or is an alias. */
+/** Refuse an item that has a key twice: which of the two a change is meant for, nobody can say. */
+function noKeyTwice(item: YAMLMap, change: Change): void {
+  const seen = new Set<string>()
+  for (const pair of item.items) {
+    const key = scalarText(pair.key)
+    if (key === undefined) continue
+    if (seen.has(key)) cannot(change, { code: 'key-twice', values: { key } })
+    seen.add(key)
+  }
+}
+
 function hasAnchor(node: unknown): boolean {
   let found = false
   visit(node as Parameters<typeof visit>[0], (_key, inner) => {
@@ -740,6 +751,7 @@ export function changeRuleEdits(text: string, id: string, draft: RuleDraft): Tex
   const item = items[index]
   if (!isMap(item) || item.flow) return cannot(change, { code: 'item-in-braces', values: {} })
   if (hasAnchor(item)) cannot(change, { code: 'anchor-or-alias', values: {} })
+  noKeyTwice(item, change)
 
   const expected = expectedOf(file.doc, change)
   const rules = [...(expected.rules as Record<string, unknown>[])]
@@ -793,6 +805,7 @@ export function renameRuleEdits(text: string, from: string, to: string): TextEdi
   items.forEach((item, index) => {
     const pair = isMap(item) ? findPair(item, 'rule') : undefined
     if (!pair || scalarText(pair.value) !== from) return
+    noKeyTwice(item as YAMLMap, change)
     edits.push(replaceValue(text, pair, to, change).edit)
     exceptions[index] = { ...exceptions[index], rule: to }
   })
@@ -941,6 +954,7 @@ export function narrowExceptionEdits(
   const item = itemsOf(file.top, 'exceptions', change)[index]
   const pair = isMap(item) ? findPair(item, 'cycle') : undefined
   if (!pair) return cannot(change, { code: 'reads-otherwise', values: {} })
+  noKeyTwice(item as YAMLMap, change)
   // Narrowed to a Cycle among the members it names, never wider or to something else.
   const members = membersOf(at.members)
   const written = at.fingerprint.kind === 'cycle' ? new Set(at.fingerprint.cycle) : new Set()
