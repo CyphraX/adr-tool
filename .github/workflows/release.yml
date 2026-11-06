@@ -107,6 +107,13 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
+          # The section is headed `## [0.2.0] — 2026-12-01` once it is released; until then it
+          # says `unreleased`, and a tag of it publishes nothing.
+          heading="$(awk -v heading="## [${version}]" 'index($0, heading) == 1 { print; exit }' CHANGELOG.md)"
+          if printf '%s' "$heading" | grep -qi 'unreleased'; then
+            echo "::error file=CHANGELOG.md::The section of ${version} in CHANGELOG.md is headed \"${heading}\": give it the date of the release."
+            exit 1
+          fi
           awk -v heading="## [${version}]" '
             index($0, heading) == 1 { found = 1; next }
             found && /^## / { exit }

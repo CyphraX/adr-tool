@@ -82,7 +82,7 @@ They are not single-file executables. Node's SEA takes a CommonJS script in Node
    done
    ```
 
-   — and give the release its section in [CHANGELOG.md](../CHANGELOG.md), headed `## [0.2.0] — 2026-12-01`, with the date it is tagged. The workflow takes the release notes from that section and refuses a tag without one. Run the checks of CI, open a pull request, and merge it.
+   — and give the release its section in [CHANGELOG.md](../CHANGELOG.md), headed `## [0.2.0] — 2026-12-01`, with the date it is tagged. Until then the section is headed `## [0.2.0] — unreleased`. The workflow takes the release notes from that section, and refuses a tag without one and a tag whose section still says `unreleased`. Run the checks of CI, open a pull request, and merge it.
 3. **A dry run, if you like.** Under Actions → Release → Run workflow, on `main`: the workflow checks, builds the installers on all three systems and keeps them as the run's artifacts, without publishing anything. Download them and try them.
 4. **The tag.** On the commit of `main` that is released:
 
