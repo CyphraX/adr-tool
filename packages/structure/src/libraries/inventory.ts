@@ -105,6 +105,10 @@ const ECOSYSTEM_OF: Partial<Record<Language, Ecosystem>> = {
   go: 'go'
 }
 
+/** The ecosystem whose Libraries a language uses; `undefined` for one that uses none. */
+export const ecosystemOfLanguage = (language: Language): Ecosystem | undefined =>
+  ECOSYSTEM_OF[language]
+
 const fileName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 const directoryOf = (path: string): string =>
   path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''

@@ -14,6 +14,12 @@ export interface FileSystem {
   readText(path: string, options?: ReadOptions): Promise<string | undefined>
   /** The entries of a directory in no particular order, or `undefined` when there is no such directory. */
   list(path: string): Promise<DirectoryEntry[] | undefined>
+  /**
+   * Whether `path` is there, but only through a symbolic link that leads out of the
+   * repository: as good as not there for reading, and yet installed. Nothing out there is
+   * read. Missing where a file system has no such links.
+   */
+  leadsOutside?(path: string): Promise<boolean>
 }
 
 /**

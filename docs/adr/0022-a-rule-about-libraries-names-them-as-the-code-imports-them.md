@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 created: 2026-11-03
+decided: 2026-11-06
 decision-makers: [Philipp Saal]
 tags: [conformance, file-format]
 depends-on: [0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint]
@@ -12,7 +13,7 @@ affects: [conformance, structure/libraries]
 
 Lena writes "only `persistence` may use `pg`" into `.arch/rules.yml`. Aylin accepts one use of it elsewhere as an Exception. Both stay in the repository for years, so the name by which a Rule and an Exception know a Library is hard to change once written. A Library has two names. One is the name a Manifest declares: `PyYAML`, `org.slf4j:slf4j-api`. The other is the name the code imports: `yaml`, `org.slf4j`. Structure joins the two in the Library inventory, partly by heuristics ([structure-format.md](../structure-format.md), section 3).
 
-So a Rule of the kind `library` names Libraries by the name the code imports them by: an npm package, a Java package, a Python top-level package, a Go module. It names them with Library patterns over the segments of that name, where `/` and `.` separate (`@codemirror/*`, `org.apache.**`). It says which Components may use them, `only-in`, or must not, `not-in` ([conformance-format.md](../conformance-format.md), section 2). A Violation is one Component and one Library. Its fingerprint is `{kind: library, rule, component, library}`, with the Library by its import name. Behind it is every use by that Component's files, each with the lines of its imports.
+So a Rule of the kind `library` names Libraries by the name the code imports them by: an npm package, a Java package, a Python top-level package, a Go module. It names them with Library patterns over the segments of that name, where `/` separates, and `.` as well except in an npm name, whose dots are part of it (`@codemirror/*`, `org.apache.**`, `lodash*` for `lodash.get`). It says which Components may use them, `only-in`, or must not, `not-in` ([conformance-format.md](../conformance-format.md), section 2). A Violation is one Component and one Library. Its fingerprint is `{kind: library, rule, component, library}`, with the Library by its import name. Behind it is every use by that Component's files, each with the lines of its imports.
 
 ## Considered Options
 
@@ -25,7 +26,7 @@ So a Rule of the kind `library` names Libraries by the name the code imports the
 ## Consequences
 
 - The person who writes a Rule writes the import name. The window shows it beside the declared name, under "Imported as", and `list_libraries` in its `imports`. A Python Rule names `yaml`, not `PyYAML`.
-- A pattern without a wildcard is matched exactly. Patterns are matched without regular expressions, in time no more than the product of the lengths of the pattern and the name. A Rule from a pull request cannot make `adr check` hang.
+- A pattern without a wildcard names one Library, matched exactly; in Java and Python it names the packages below it as well, since a package there holds packages: `org.slf4j` is `org.slf4j.event` too, and the window says so under "Imported as". Patterns are matched without regular expressions, in time no more than the product of the lengths of the pattern and the name. A Rule from a pull request cannot make `adr check` hang.
 - Rename rewrites the Components of `only-in` and `not-in`, and the `component` of an Exception. It never rewrites a Library pattern or a Library's name: the suite does not rename Libraries. Suppose an upstream Library changes its name, an npm package moving to a scope or a Java package moving. Its Rules are then edited by hand. Its Exceptions match nothing any more, and say so as a Problem.
 - With `only-in`, an Unassigned file that uses the Library breaks the Rule, as it breaks `may-only-depend`: what no Component claims cannot have been allowed. With `not-in` it never does.
 - `adr check` annotates a Violation at every import behind it, and its JSON carries them as `uses`. The person who wrote the import reads the Rule's reason at that line.

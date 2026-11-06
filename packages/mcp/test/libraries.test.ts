@@ -223,7 +223,7 @@ describe('list_libraries (docs/mcp.md)', () => {
     ])
   })
 
-  it('reads no licence through a link out of the repository, nor one larger than its limit', async () => {
+  it('reads no licence through a link out of the repository, which it names, nor one larger than its limit', async () => {
     const outside = mkdtempSync(join(tmpdir(), 'adr-mcp-outside-'))
     scratch.push(outside)
     writeFileSync(
@@ -244,9 +244,10 @@ describe('list_libraries (docs/mcp.md)', () => {
     })
     symlinkSync(outside, join(root, 'node_modules/react'))
     const libraries = (await list(root)).libraries as Record<string, unknown>[]
+    // Installed through a link that leads out: there, and not read.
     const react = libraries.find((library) => library.name === 'react')!
-    expect(react.installed).toBeUndefined()
-    expect(react.licence).toEqual({ kind: 'unknown', reason: 'not-installed' })
+    expect(react.installed).toEqual({ path: 'node_modules/react' })
+    expect(react.licence).toEqual({ kind: 'unknown', reason: 'outside' })
     expect(libraries.find((library) => library.name === 'big')).toMatchObject({
       installed: { path: 'node_modules/big' },
       licence: { kind: 'unknown', reason: 'unreadable' }

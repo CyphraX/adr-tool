@@ -29,8 +29,9 @@ export type LicenceField = 'license' | 'licenses' | 'License-Expression' | 'Lice
 
 /**
  * Why a licence cannot be told: the Library is not installed inside the repository; it is,
- * and declares none; its metadata cannot be read or is larger than the limit; or it would lie
- * outside the repository, as a Java Library does in the local repository of Maven.
+ * and declares none; its metadata cannot be read or is larger than the limit; or it lies
+ * outside the repository: a Java Library in the local repository of Maven, an npm package
+ * linked from outside (`npm link`).
  */
 export type UnknownLicence = 'not-installed' | 'not-declared' | 'unreadable' | 'outside'
 
@@ -118,7 +119,11 @@ export function npmPackages(
     if (!(await hasNodeModules(directory))) return undefined
     const path = join(join(directory, 'node_modules'), name)
     const there = await fs.list(path).catch(() => undefined)
-    if (there === undefined) return undefined
+    if (there === undefined) {
+      // Linked from outside the repository (`npm link`): installed, and not read.
+      const outside = await fs.leadsOutside?.(path).catch(() => false)
+      return outside ? { path, licence: { kind: 'unknown', reason: 'outside' } } : undefined
+    }
     const source = `${path}/package.json`
     const text = await fs.readText(source, { atMost: LIMITS.packageJson }).catch(() => undefined)
     let manifest: unknown

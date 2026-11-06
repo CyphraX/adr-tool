@@ -146,6 +146,23 @@ describe('library (docs/conformance-format.md, section 2)', () => {
     )
   })
 
+  it('reads an npm name whole between its slashes: lodash* forbids lodash.get and socket.io-client', async () => {
+    const report = await checked(
+      {
+        ...shop,
+        'src/web/util.ts': "import get from 'lodash.get'\nimport { io } from 'socket.io-client'\n"
+      },
+      rules('kind: library', "library: ['lodash*', 'socket*']", 'not-in: web')
+    )
+    expect(found(report)).toEqual([
+      { fingerprint: 'only-persistence-uses-pg: web uses lodash.get', uses: ['src/web/util.ts:1'] },
+      {
+        fingerprint: 'only-persistence-uses-pg: web uses socket.io-client',
+        uses: ['src/web/util.ts:2']
+      }
+    ])
+  })
+
   it('accepts a Violation by an Exception that names its Component and Library', async () => {
     const report = await checked(
       shop,
@@ -279,11 +296,50 @@ describe('Library patterns (docs/conformance-format.md, section 2, "library")', 
     }
   })
 
+  it('separate an npm name at / alone: lodash* matches lodash.get, socket* socket.io', () => {
+    const matches = libraryMatcher(['lodash*', 'socket*', '@scope/*'])
+    for (const name of [
+      'lodash.get',
+      'lodash.debounce',
+      'socket.io',
+      'socket.io-client',
+      '@scope/a.b'
+    ]) {
+      expect(matches(name, 'npm'), name).toBe(true)
+    }
+    expect(matches('@scope/a/b', 'npm')).toBe(false)
+    // In Python and Java a dot separates, and * stays within its segment.
+    expect(matches('socket.io', 'python')).toBe(false)
+    expect(libraryMatcher(['org.*'])('org.slf4j', 'maven')).toBe(true)
+    expect(libraryMatcher(['org.*'])('org.slf4j.event', 'maven')).toBe(false)
+  })
+
+  it('match the packages below a name without a wildcard, in Java and Python', () => {
+    const matches = libraryMatcher(['org.slf4j', 'google.cloud', 'lodash'])
+    expect(matches('org.slf4j', 'maven')).toBe(true)
+    expect(matches('org.slf4j.event', 'maven')).toBe(true)
+    expect(matches('org.slf4jx', 'maven')).toBe(false)
+    expect(matches('google.cloud', 'python')).toBe(true)
+    expect(matches('google.protobuf', 'python')).toBe(false)
+    // An npm package or a Go module holds no other by its name.
+    expect(matches('lodash.get', 'npm')).toBe(false)
+    expect(libraryMatcher(['github.com/aws'])('github.com/aws/aws-sdk-go', 'go')).toBe(false)
+  })
+
   it('take no more time than the product of a pattern and a name, whatever the pattern', () => {
     const pattern = Array.from({ length: 40 }, () => '**/a*a*a*a*').join('/') + '/b'
     const name = Array.from({ length: 200 }, () => 'aaaaaaaaaaaaaaaaaaaa').join('/')
     const started = performance.now()
     expect(libraryMatcher([pattern])(name)).toBe(false)
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
+  it('match a name of thirty thousand segments without running out of stack (PR #60)', () => {
+    const name = Array.from({ length: 30_000 }, () => 'a').join('.')
+    const started = performance.now()
+    expect(libraryMatcher(['**'])(name, 'maven')).toBe(true)
+    expect(libraryMatcher(['**.b'])(name, 'maven')).toBe(false)
+    expect(libraryMatcher(['a.**.a'])(name, 'maven')).toBe(true)
     expect(performance.now() - started).toBeLessThan(1000)
   })
 })

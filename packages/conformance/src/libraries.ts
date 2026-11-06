@@ -3,7 +3,12 @@
  * a Component that uses a Library it may not, with the uses behind it — each Source File with
  * the lines of its imports.
  */
-import { UNASSIGNED, type LibraryUse } from '@adr-tool/structure/model'
+import {
+  ecosystemOfLanguage,
+  UNASSIGNED,
+  type Ecosystem,
+  type LibraryUse
+} from '@adr-tool/structure/model'
 import { matcherOf } from './component-patterns'
 import { chains, type Model, type Violation } from './evaluate'
 import { libraryMatcher } from './library-patterns'
@@ -37,9 +42,15 @@ export function libraryViolations(rule: LibraryRule, model: Model): Violation[] 
   const holdsAllowed = (id: string): boolean =>
     allowed.some((other) => other === id || other.startsWith(`${id}/`))
 
+  const languageOf = new Map(model.structure.sourceFiles.map((file) => [file.path, file.language]))
+  const ecosystemOf = (path: string): Ecosystem | undefined => {
+    const language = languageOf.get(path)
+    return language === undefined ? undefined : ecosystemOfLanguage(language)
+  }
+
   const found = new Map<string, { component: string; library: string; uses: LibraryUse[] }>()
   for (const written of model.libraries) {
-    if (!isLibrary(written.library)) continue
+    if (!isLibrary(written.library, ecosystemOf(written.file))) continue
     if (!rule.tests && test.has(written.file)) continue
     if (rule.ignoreTypeOnly && written.typeOnly) continue
     const chain = ofFile.get(written.file)

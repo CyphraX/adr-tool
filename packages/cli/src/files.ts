@@ -71,6 +71,13 @@ export function repositoryFiles(root: string, warn: (text: string) => void = () 
         })
       )
       return listed.filter((entry) => entry !== undefined)
+    },
+    leadsOutside: async (path) => {
+      const full = resolve(base, path)
+      if (!within(base, full)) return false
+      realBase ??= realpath(base)
+      const target = await realpath(full).catch(() => undefined)
+      return target !== undefined && !within(await realBase, target)
     }
   }
 }

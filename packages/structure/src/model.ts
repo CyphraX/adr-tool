@@ -39,6 +39,7 @@ export type {
 } from './dependencies'
 export type { ManifestLibrary, ManifestNotRead } from './manifests'
 export {
+  ecosystemOfLanguage,
   ecosystemOfManifest,
   librariesIn,
   libraryInventory,

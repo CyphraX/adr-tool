@@ -47,7 +47,7 @@ rules:
     why: Only the window runs in Electron; the cores, the command line and the MCP server run in Node.js alone, wherever they are copied to.
     kind: library
     library: electron
-    only-in: app
+    only-in: [app/main, app/preload]
 
   - id: layered
     why: The window uses the command line and the servers, which use the module cores, which use the kernel.

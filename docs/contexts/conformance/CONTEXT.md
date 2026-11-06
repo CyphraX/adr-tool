@@ -13,7 +13,7 @@ How a Rule names Components: a Component ID, or one with wildcards over IDs — 
 _Avoid_: Glob, path pattern (those match files, as `paths` in the declaration does), selector, wildcard
 
 **Library pattern**:
-How a Rule names Libraries: the name the code imports a Library by, or one with wildcards over its segments, which `/` and `.` separate — `@codemirror/*`, `org.apache.**`. It is matched against the Libraries the code uses, never against what a Manifest declares.
+How a Rule names Libraries: the name the code imports a Library by, or one with wildcards over its segments, which `/` separates, and `.` as well except in an npm name — `@codemirror/*`, `org.apache.**`, `lodash*`. A name without a wildcard names, in Java and Python, the packages below it too. It is matched against the Libraries the code uses, never against what a Manifest declares.
 _Avoid_: Component pattern (that names Components), package pattern, glob
 
 **Pattern**:

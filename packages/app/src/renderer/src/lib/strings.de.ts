@@ -770,11 +770,21 @@ export const de: typeof en = {
         'Eine Bibliothek wird aus den Manifesten gelesen — package.json, pom.xml, build.gradle, Requirements-Dateien, pyproject.toml, go.mod — und aus den Importen der Quelldateien. Ihre Lizenz ist, was ihr installiertes Paket angibt; außerhalb des Repositorys wird nichts nachgeschlagen. Ein Werkzeug, das ausgeführt und nie importiert wird, ist deklariert und nicht verwendet.',
       javaLicence:
         'Die Lizenz einer Java-Bibliothek lässt sich nicht feststellen: Das lokale Repository von Maven liegt außerhalb des Repositorys und wird nicht gelesen.',
+      linkedOutside:
+        'Sie ist über einen Link installiert, der aus dem Repository hinausführt und dem nicht gefolgt wird.',
+      notRead: (count: number): string =>
+        many(
+          count,
+          'Ein Manifest ließ sich nicht lesen und deklariert hier nichts:',
+          `${count} Manifeste ließen sich nicht lesen und deklarieren hier nichts:`
+        ),
 
       kind: (ecosystem: string): string => `Bibliothek · ${ecosystem}`,
       declaredIn: 'Deklariert in',
       notDeclared: 'Kein Manifest deklariert sie.',
       importedAs: 'Importiert als',
+      importedBelow:
+        'Eine Regel über Bibliotheken, die einen dieser Namen nennt, nennt auch die Pakete darunter: org.slf4j ist auch org.slf4j.event.',
       mapping: {
         same: 'unter dem Namen, unter dem sie deklariert ist',
         installed: 'wie ihr installiertes Paket sie aufführt',
@@ -782,6 +792,12 @@ export const de: typeof en = {
         normalised: 'geschätzt: ihr Name als der Name, unter dem sie importiert wird',
         group: 'geschätzt: ihre Group-ID als Präfix ihrer Pakete'
       },
+      testsHidden: (count: number): string =>
+        many(
+          count,
+          'Eine Testdatei verwendet sie, und Testdateien sind ausgeblendet.',
+          `${count} Testdateien verwenden sie, und Testdateien sind ausgeblendet.`
+        ),
       usedByNone: 'Keine Quelldatei verwendet sie.',
       undeclaredFile: 'Kein Manifest in ihrem Verzeichnis oder darüber deklariert die Bibliothek.',
       installed: 'Installiert',

@@ -330,6 +330,13 @@ describe('adr lint (docs/cli.md)', () => {
         expect(await fs.readText('pipe', { atMost: 10 })).toBeUndefined()
         expect(await fs.readText('pipe')).toBeUndefined()
       }
+      // A link that leads out is named as such, and not read.
+      symlinkSync(tmpdir(), join(root, 'linked'), 'junction')
+      expect(await fs.leadsOutside?.('linked')).toBe(true)
+      expect(await fs.readText('linked/x')).toBeUndefined()
+      for (const path of ['ten.txt', 'dir', 'missing', '../x']) {
+        expect(await fs.leadsOutside?.(path), path).toBe(false)
+      }
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

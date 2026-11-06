@@ -822,11 +822,21 @@ export const en = {
         'A Library is read from the manifests — package.json, pom.xml, build.gradle, requirements files, pyproject.toml, go.mod — and from the imports of the Source Files. Its licence is what its installed package declares; nothing is looked up outside the repository. A tool that is run and never imported is declared and not used.',
       javaLicence:
         "The licence of a Java Library cannot be told: Maven's local repository lies outside the repository, and is not read.",
+      linkedOutside:
+        'It is installed through a link that leads out of the repository, which is not followed.',
+      notRead: (count: number): string =>
+        many(
+          count,
+          'One manifest could not be read, and declares nothing here:',
+          `${count} manifests could not be read, and declare nothing here:`
+        ),
 
       kind: (ecosystem: string): string => `Library · ${ecosystem}`,
       declaredIn: 'Declared in',
       notDeclared: 'No manifest declares it.',
       importedAs: 'Imported as',
+      importedBelow:
+        'A Rule about Libraries that names one of these names the packages below it as well: org.slf4j is org.slf4j.event too.',
       mapping: {
         same: 'by the name it is declared by',
         installed: 'as its installed package lists them',
@@ -834,6 +844,12 @@ export const en = {
         normalised: 'a guess: its name taken as the name it is imported by',
         group: 'a guess: its group ID taken as the prefix of its packages'
       } satisfies Record<Mapping, string>,
+      testsHidden: (count: number): string =>
+        many(
+          count,
+          'One test file uses it, and test files are left out.',
+          `${count} test files use it, and test files are left out.`
+        ),
       usedByNone: 'No Source File uses it.',
       undeclaredFile: 'No manifest in its directory or above declares the Library.',
       installed: 'Installed',

@@ -1,7 +1,14 @@
 <script lang="ts">
-  import { librariesIn, type LibraryStatus, type ScopedLibrary } from '@adr-tool/structure/model'
+  import { librariesIn, type LibraryStatus } from '@adr-tool/structure/model'
   import type { StructureView } from '../../../shared/ipc'
-  import { licenceLabel, licenceRank, usersLabel, type LibraryColumn } from '../lib/libraries'
+  import {
+    compareLicences,
+    fileCountOf,
+    licenceLabel,
+    shownUsers,
+    usersLabel,
+    type LibraryColumn
+  } from '../lib/libraries'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
 
@@ -12,7 +19,12 @@
 
   const words = $derived(t.structure.inventory)
   const selection = $derived(app.active?.structure.selection)
-  const all = $derived(librariesIn(view.inventory))
+  // Test files count as the view says: without them, their uses are not counted.
+  const tests = $derived(app.active?.structure.tests ?? false)
+  const all = $derived(
+    librariesIn(view.inventory).map((row) => ({ ...row, shown: shownUsers(row.usedBy, tests) }))
+  )
+  type Row = (typeof all)[number]
 
   type Filter = 'all' | LibraryStatus
   const FILTERS: Filter[] = ['all', 'used', 'unused', 'undeclared']
@@ -24,29 +36,23 @@
 
   const countOf = (which: Filter): number =>
     which === 'all' ? all.length : all.filter((row) => row.status === which).length
-  const filesOf = (row: ScopedLibrary): number =>
-    row.usedBy.reduce((sum, user) => sum + user.files.length, 0)
+  const filesOf = (row: Row): number => fileCountOf(row.shown)
   const compare = (a: string, b: string): number => a.localeCompare(b, undefined, { numeric: true })
 
   /** The value a column sorts by: a text, or a number for the counts. */
-  function order(a: ScopedLibrary, b: ScopedLibrary): number {
+  function order(a: Row, b: Row): number {
     switch (sort.column) {
       case 'library':
         return compare(a.library.name, b.library.name)
       case 'version':
         return compare(a.versions.join(', '), b.versions.join(', '))
       case 'usedBy':
-        return (
-          a.usedBy.length - b.usedBy.length || compare(usersLabel(a.usedBy), usersLabel(b.usedBy))
-        )
+        return a.shown.length - b.shown.length || compare(usersLabel(a.shown), usersLabel(b.shown))
       case 'files':
         return filesOf(a) - filesOf(b)
       case 'licence':
-        // What is declared first, then a licence file, then what cannot be told.
-        return (
-          licenceRank(a.library.licence) - licenceRank(b.library.licence) ||
-          compare(licenceLabel(a.library.licence), licenceLabel(b.library.licence))
-        )
+        // What is declared, then a licence file; what cannot be told last either way.
+        return compareLicences(a.library.licence, b.library.licence, sort.descending)
     }
   }
 
@@ -55,10 +61,12 @@
       .filter((row) => filter === 'all' || row.status === filter)
       .sort(
         (a, b) =>
-          (sort.descending ? -1 : 1) * order(a, b) || compare(a.library.name, b.library.name)
+          (sort.column === 'licence' ? 1 : sort.descending ? -1 : 1) * order(a, b) ||
+          compare(a.library.name, b.library.name)
       )
   )
   const java = $derived(all.some((row) => row.library.ecosystem === 'maven'))
+  const notRead = $derived(view.inventory.notRead ?? [])
   const ecosystems = $derived(new Set(all.map((row) => row.library.ecosystem)).size)
 
   // A Library chosen elsewhere — in the search, on a page — is brought into view.
@@ -78,10 +86,10 @@
 
   /** The columns, and the share of the width each has: a long name ends in an ellipsis. */
   const COLUMNS: { column: LibraryColumn; numeric: boolean; width: string }[] = [
-    { column: 'library', numeric: false, width: '28%' },
+    { column: 'library', numeric: false, width: '27%' },
     { column: 'version', numeric: false, width: '11%' },
-    { column: 'usedBy', numeric: false, width: '31%' },
-    { column: 'files', numeric: true, width: '8%' },
+    { column: 'usedBy', numeric: false, width: '30%' },
+    { column: 'files', numeric: true, width: '10%' },
     { column: 'licence', numeric: false, width: '22%' }
   ]
 </script>
@@ -143,7 +151,7 @@
               selection?.kind === 'library' &&
               selection.ecosystem === library.ecosystem &&
               selection.name === library.name}
-            {@const users = usersLabel(row.usedBy)}
+            {@const users = usersLabel(row.shown)}
             <tr class:selected>
               <th scope="row" class="name">
                 <button
@@ -190,6 +198,14 @@
   <footer>
     <p>{words.howToRead}</p>
     {#if java}<p>{words.javaLicence}</p>{/if}
+    {#if notRead.length > 0}
+      <p class="not-read">
+        {words.notRead(notRead.length)}
+        {#each notRead as { manifest, message }, position (manifest)}{position > 0 ? ', ' : ''}<code
+            title={message}>{manifest}</code
+          >{/each}.
+      </p>
+    {/if}
   </footer>
 </div>
 
@@ -411,5 +427,14 @@
 
   footer p + p {
     margin-top: 4px;
+  }
+
+  footer code {
+    font-family: var(--code);
+    font-size: 11.5px;
+  }
+
+  .not-read {
+    color: var(--proposed);
   }
 </style>

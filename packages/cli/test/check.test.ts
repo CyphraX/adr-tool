@@ -639,7 +639,7 @@ describe('adr check on Rules about Libraries (docs/cli.md)', () => {
     const { code, out, err } = await adrIn(root, 'check', '--format', 'github')
     expect([code, err]).toEqual([1, ''])
     expect(lines(out)[0]).toBe(
-      '::error file=packages/core/src/window.ts,line=1,title=only-the-window-uses-electron::core uses electron, which only app may use: packages/core/src/window.ts:1 imports electron. Only the window runs in Electron; the cores, the command line and the MCP server run in Node.js alone, wherever they are copied to.'
+      '::error file=packages/core/src/window.ts,line=1,title=only-the-window-uses-electron::core uses electron, which only app/main and app/preload may use: packages/core/src/window.ts:1 imports electron. Only the window runs in Electron; the cores, the command line and the MCP server run in Node.js alone, wherever they are copied to.'
     )
     expect(lines(out).at(-1)).toMatch(/^1 Violation of \d+ Rules\.$/)
   }, 30_000)

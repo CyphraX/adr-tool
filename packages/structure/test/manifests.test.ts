@@ -282,6 +282,26 @@ describe('the Libraries the manifests declare (docs/structure-format.md, section
     expect(found).toEqual([{ manifest: 'api/pom.xml', name: 'org.x:y', version: '${v}', line: 4 }])
   })
 
+  it('reads a Gradle declaration after { or ; on its line, and every one of a list (PR #60)', async () => {
+    expect(
+      await read({
+        'build.gradle': [
+          "dependencies { implementation 'x:y:1' }",
+          'dependencies {',
+          "    implementation 'a:b:1', 'c:d:2'; testImplementation 'e:f:3'",
+          '    api("g:h:4") { exclude group: "i" }',
+          '}'
+        ].join('\n')
+      })
+    ).toEqual([
+      { manifest: 'build.gradle', name: 'x:y', version: '1', line: 1 },
+      { manifest: 'build.gradle', name: 'a:b', version: '1', line: 3 },
+      { manifest: 'build.gradle', name: 'c:d', version: '2', line: 3 },
+      { manifest: 'build.gradle', name: 'e:f', version: '3', group: 'testImplementation', line: 3 },
+      { manifest: 'build.gradle', name: 'g:h', version: '4', line: 4 }
+    ])
+  })
+
   it('reads the forms of Gradle on one line, Kotlin and the version catalog, without projects and files', async () => {
     expect(
       await read({

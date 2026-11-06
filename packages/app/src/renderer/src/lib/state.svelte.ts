@@ -532,6 +532,8 @@ class AppState {
     this.searching = undefined
     this.leaveEditor(() => {
       tab.module = 'structure'
+      // A Component is shown in the level that holds it, not in the inventory of Libraries.
+      if (tab.structure.show === 'libraries') tab.structure.show = 'graph'
       tab.structure.parent = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : undefined
       tab.structure.expanded = []
       tab.structure.selection = { kind: 'node', id }

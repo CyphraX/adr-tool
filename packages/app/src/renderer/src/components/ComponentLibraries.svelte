@@ -1,6 +1,6 @@
 <script lang="ts">
   import { librariesIn, type LibraryInventory } from '@adr-tool/structure/model'
-  import { licenceLabel } from '../lib/libraries'
+  import { fileCountOf, licenceLabel, shownUsers } from '../lib/libraries'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
 
@@ -11,6 +11,8 @@
 
   const words = $derived(t.structure.inventory)
   const rows = $derived(librariesIn(inventory, component))
+  // Test files count as the view says.
+  const tests = $derived(app.active?.structure.tests ?? false)
 </script>
 
 {#snippet unbroken(text: string)}
@@ -53,9 +55,7 @@
             {/if}
           </th>
           <td class="version">{row.versions.join(', ')}</td>
-          <td class="numeric"
-            >{row.usedBy.reduce((sum, user) => sum + user.files.length, 0) || ''}</td
-          >
+          <td class="numeric">{fileCountOf(shownUsers(row.usedBy, tests)) || ''}</td>
           <td
             class:unknown={library.licence.kind === 'unknown'}
             title={licenceLabel(library.licence)}

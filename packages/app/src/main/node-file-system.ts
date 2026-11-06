@@ -99,6 +99,12 @@ export function nodeFileSystem(root: string): WritableFileSystem {
       )
       return listed.filter((entry) => entry !== undefined)
     },
+    leadsOutside: async (path) => {
+      const full = resolve(base, path)
+      if (!within(base, full)) return false
+      const target = await realpath(full).catch(() => undefined)
+      return target !== undefined && !within(await baseReally(), target)
+    },
     writeText: async (path, text, options) => {
       const full = await writable(path)
       const like = options?.like === undefined ? undefined : await real(options.like)
