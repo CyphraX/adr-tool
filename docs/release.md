@@ -21,7 +21,7 @@ A release is a [GitHub release](https://github.com/CyphraX/adr-tool/releases) na
 
 The version is the same in every `package.json` of the repository. The app reads it from its own (`app.getVersion()`, which the About panel of macOS shows), and `adr --version` and `adr-mcp --version` print it.
 
-Every installer carries the licence of the suite as `LICENSE.txt` beside the app's archive (in `resources/`, on a Mac in `Contents/Resources/`), and the notices of the packages it bundles: `THIRD-PARTY-NOTICES-main.txt` for the main process and the analysis, `THIRD-PARTY-NOTICES-window.txt` for the window. Each lists a package with its version and the licence text it comes with; each build writes them from the modules it bundled (`packages/app/build/notices.ts`). electron-builder adds `LICENSE.electron.txt` and `LICENSES.chromium.html`. That is what [ADR-0010](adr/0010-the-suite-is-open-source-under-the-mit-licence.md) asks of distribution.
+Every installer carries the licence of the suite as `LICENSE.txt` beside the app's archive (in `resources/`, on a Mac in `Contents/Resources/`), and the notices of the packages it bundles: `THIRD-PARTY-NOTICES-main.txt` for the main process and the analysis, `THIRD-PARTY-NOTICES-window.txt` for the window. Each lists a package with its version and the licence text it comes with; each build writes them from the modules it bundled (`packages/cli/notices.ts`). electron-builder adds `LICENSE.electron.txt` and `LICENSES.chromium.html`. `adr.mjs` and `adr-mcp.mjs` end with the notices of what they bundle, as a comment, so that each stays one file. That is what [ADR-0010](adr/0010-the-suite-is-open-source-under-the-mit-licence.md) asks of distribution.
 
 ### What 0.1 is not yet
 
@@ -65,7 +65,7 @@ and commit both files.
 
 ### The command line and the MCP server
 
-`adr.mjs` and `adr-mcp.mjs` are the files `pnpm build` writes to `packages/cli/dist` and `packages/mcp/dist`, built by the check job of the release. They need Node.js 22.12 or later and nothing else.
+`adr.mjs` and `adr-mcp.mjs` are the files `pnpm build` writes to `packages/cli/dist` and `packages/mcp/dist`, built by the check job of the release. They need Node.js 22.12 or later and nothing else. Each ends with a comment that holds the notices of the packages it bundles — TypeScript, web-tree-sitter, `yaml`, `smol-toml`, the parsers of Markdown and the rest —, the same as the app's notices (`packages/cli/command.config.ts`).
 
 They are not single-file executables. Node's SEA takes a CommonJS script in Node 22, and both commands are modules that wait at their top level; each executable would be a whole Node.js, about 100 MB, built on each system, and on a Mac it would run only once signed again after the script is injected. Unsigned, it would meet the same warnings as the app. A `.mjs` file of 13 MB runs on every system that has Node.js, which is where agents and CI run anyway.
 

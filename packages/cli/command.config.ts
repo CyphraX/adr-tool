@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Plugin, UserConfig } from 'vite'
+import { notices } from './notices'
 
 const require = createRequire(import.meta.url)
 
@@ -50,11 +51,12 @@ const COMMONJS = [
  * How a command that analyses code is built — `adr` and `adr-mcp`: one file that Node.js runs
  * as it is, `src/main.ts` of the package bundled into `dist/<file>`. The workspace packages,
  * TypeScript, tree-sitter and `yaml` are in it, Node's own modules are not; the workspace
- * packages are source-only, as for the app.
+ * packages are source-only, as for the app. The notices of what it bundles end the file, as a
+ * comment, so that it stays one file (ADR-0010).
  */
 export function commandConfig(file: string): UserConfig {
   return {
-    plugins: [treeSitterWasm()],
+    plugins: [treeSitterWasm(), notices('comment')],
     build: {
       ssr: 'src/main.ts',
       outDir: 'dist',
