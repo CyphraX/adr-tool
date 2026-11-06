@@ -248,7 +248,7 @@ export const SENTENCES = {
   'list-in-brackets': (v: { key: string }): string => `"${v.key}" is written in brackets`,
   'item-in-braces': (): string => 'the item is written in braces',
   'anchor-or-alias': (): string => 'the item uses an anchor or an alias',
-  'key-twice': (v: { key: string }): string => `the item has "${v.key}" twice`,
+  'item-key-twice': (v: { key: string }): string => `the item has "${v.key}" twice`,
   'comment-lost': (): string => 'a comment would be lost',
   'reads-otherwise': (): string => 'what it would write does not read back as what was meant',
 

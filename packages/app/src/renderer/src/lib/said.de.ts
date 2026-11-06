@@ -470,7 +470,7 @@ export const DE: Wording<Codes> = {
   'list-in-brackets': (v) => `„${v.key}“ ist in eckigen Klammern geschrieben`,
   'item-in-braces': () => 'der Eintrag ist in geschweiften Klammern geschrieben',
   'anchor-or-alias': () => 'der Eintrag verwendet einen Anker oder einen Alias',
-  'key-twice': (v) => `der Eintrag hat „${v.key}“ zweimal`,
+  'item-key-twice': (v) => `der Eintrag hat „${v.key}“ zweimal`,
   'comment-lost': () => 'ein Kommentar ginge verloren',
   'reads-otherwise': () => 'was sie schreiben würde, liest sich nicht so, wie es gemeint war',
 

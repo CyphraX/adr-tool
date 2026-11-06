@@ -356,7 +356,7 @@ function noKeyTwice(item: YAMLMap, change: Change): void {
   for (const pair of item.items) {
     const key = scalarText(pair.key)
     if (key === undefined) continue
-    if (seen.has(key)) cannot(change, { code: 'key-twice', values: { key } })
+    if (seen.has(key)) cannot(change, { code: 'item-key-twice', values: { key } })
     seen.add(key)
   }
 }
