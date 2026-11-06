@@ -1,0 +1,8 @@
+# The three Maven modules of the shop, each a Component.
+components:
+  cart:
+    paths: [cart/**]
+  catalog:
+    paths: [catalog/**]
+  web:
+    paths: [web/**]

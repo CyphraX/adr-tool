@@ -10,6 +10,8 @@ components:
         paths: [packages/app/src/renderer/**]
       shared:
         paths: [packages/app/src/shared/**]
+  assessment:
+    paths: [packages/assessment/**]
   cli:
     paths: [packages/cli/**]
   conformance:

@@ -8,3 +8,4 @@ pnpm-lock.yaml
 *.md
 packages/core/test/fixtures/
 packages/conformance/test/fixtures/
+packages/assessment/test/fixtures/

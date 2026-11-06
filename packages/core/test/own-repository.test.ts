@@ -56,6 +56,7 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [18, '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it', 'accepted'],
     [19, '0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history', 'accepted'],
     [20, '0020-git-is-a-port-of-the-kernel-implemented-once-for-node', 'accepted'],
+    [21, '0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file', 'accepted'],
     [
       22,
       '0022-a-rule-about-libraries-names-them-as-the-code-imports-them',
@@ -178,6 +179,25 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     ].map((to) => ({
       type: 'relates-to',
       from: '0020-git-is-a-port-of-the-kernel-implemented-once-for-node',
+      to,
+      state: 'in-effect'
+    })),
+    ...[
+      '0002-never-reserialize-markdown',
+      '0003-on-disk-contract',
+      '0009-traces-are-recorded-on-the-source-only-unlike-back'
+    ].map((to) => ({
+      type: 'depends-on',
+      from: '0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file',
+      to,
+      state: 'in-effect'
+    })),
+    ...[
+      '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint',
+      '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it'
+    ].map((to) => ({
+      type: 'relates-to',
+      from: '0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file',
       to,
       state: 'in-effect'
     })),

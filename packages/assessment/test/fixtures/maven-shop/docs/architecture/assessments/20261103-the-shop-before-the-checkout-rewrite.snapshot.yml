@@ -1,0 +1,80 @@
+# The Snapshot of 20261103-the-shop-before-the-checkout-rewrite, taken by the suite: the metric values when it was taken.
+commit: 3f2a9c0e8b1d4f6a7c5e2b9d0f1a3c4e5b6d7f8a
+date: 2026-11-03
+components:
+  /:
+    propagation-cost: 0.5
+  cart:
+    files: 3
+    lines: 43
+    efferent-coupling: 2
+    afferent-coupling: 2
+    instability: 0.5
+    fan-out: 1
+    fan-in: 1
+    relational-cohesion: 1
+    internal-share: 0.3333333333333333
+    abstractness: 0
+    distance: 0.5
+    propagation-cost: 0
+  catalog:
+    files: 3
+    lines: 26
+    efferent-coupling: 0
+    afferent-coupling: 3
+    instability: 0
+    fan-out: 0
+    fan-in: 2
+    relational-cohesion: 1.3333333333333333
+    internal-share: 0.5
+    abstractness: 0.3333333333333333
+    distance: 0.666666666667
+    propagation-cost: 0.5
+  web:
+    files: 3
+    lines: 37
+    efferent-coupling: 2
+    afferent-coupling: 0
+    instability: 1
+    fan-out: 2
+    fan-in: 0
+    relational-cohesion: 0.6666666666666666
+    internal-share: 0.25
+    abstractness: 0
+    distance: 0
+source-files:
+  cart/src/main/java/com/shop/cart/Cart.java:
+    Cart.add(Product):
+      complexity: 1
+    Cart.total():
+      complexity: 1
+    Cart.discount(long):
+      complexity: 5
+    Cart:
+      lcom4: 1
+  cart/src/main/java/com/shop/cart/Line.java:
+    Line.cents():
+      complexity: 1
+    Line:
+      lcom4: 1
+  catalog/src/main/java/com/shop/catalog/Search.java:
+    Search.Search(List):
+      complexity: 1
+    Search.find(String):
+      complexity: 1
+    Search:
+      lcom4: 1
+  web/src/main/java/com/shop/cart/CartView.java:
+    CartView.CartView(Cart):
+      complexity: 1
+    CartView.render():
+      complexity: 1
+    CartView:
+      lcom4: 1
+  web/src/main/java/com/shop/web/Page.java:
+    Page.Page(Search):
+      complexity: 1
+    Page.show(Cart):
+      complexity: 1
+    Page:
+      lcom4: 1

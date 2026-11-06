@@ -310,6 +310,7 @@ describe('this repository, as the window gets it', () => {
     const view = viewOf('repo', analysis, undefined, false)
     expect(view.nodes.map((node) => node.id)).toEqual([
       'app',
+      'assessment',
       'cli',
       'conformance',
       'core',

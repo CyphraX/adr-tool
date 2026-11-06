@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1208" height="672" viewBox="16 20 1208 672" role="img">
   <title>The packages of Softarch Suite</title>
-  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git, analyses. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses review: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
+  <desc>Each package of this repository, which of them uses which, and what lies outside of it. The code stands behind every connection between two packages. core uses kernel. structure uses kernel. conformance uses kernel. conformance uses structure: Components, Dependencies. diagrams uses kernel. diagrams uses structure: Components, Dependencies. review uses kernel. review uses structure: Source Files. assessment uses kernel. assessment uses structure. mcp uses core: serves ADRs. mcp uses structure. mcp uses cli: runs git, analyses. cli uses core: lints and exports. cli uses structure. cli uses conformance: checks the Rules. cli uses kernel: the git port. app uses core: Decisions. app uses structure: Structure. app uses conformance: renames in the Rules. app uses cli: the export. app uses diagrams: German sentences. app uses review: German sentences. app uses assessment: German sentences. app uses git: history and commits. A coding agent uses mcp: plans changes.</desc>
   <style>
     svg { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
     .background, .ground { fill: #eef1f5; }
@@ -38,6 +38,8 @@
     <path class="line" d="M521.14 580L341.33 351.15" marker-end="url(#arrow)"/>
     <path class="line" d="M481.33 248L162.37 378.49" marker-end="url(#arrow)"/>
     <path class="line" d="M487.2 248L376.44 298.34" marker-end="url(#arrow)"/>
+    <path class="line" d="M238.67 560L123.99 430.99" marker-end="url(#arrow)"/>
+    <path class="line" d="M265.54 560L313.56 351.9" marker-end="url(#arrow)"/>
     <path class="line" d="M700 141.27L384 126.91" marker-end="url(#arrow)"/>
     <path class="line" d="M701.33 168L382.37 298.49" marker-end="url(#arrow)"/>
     <path class="line" d="M760 168L760 196" marker-end="url(#arrow)"/>
@@ -51,6 +53,7 @@
     <path class="line" d="M985.33 380L797.96 250.28" marker-end="url(#arrow)"/>
     <path class="line" d="M962.4 428L601.29 578.46" marker-end="url(#arrow)"/>
     <path class="line" d="M960 381.5L603.75 247.9" marker-end="url(#arrow)"/>
+    <path class="line" d="M960 418.21L323.89 568.87" marker-end="url(#arrow)"/>
     <path class="line" d="M998.79 428L884.78 557" marker-end="url(#arrow)"/>
     <path class="line" d="M960 164.63L823.98 150.6" marker-end="url(#arrow)"/>
   </g>
@@ -78,6 +81,10 @@
     <g class="element component">
       <rect class="box" x="480" y="200" width="120" height="48" rx="5"/>
       <text class="name" x="540" y="228.2" text-anchor="middle">review</text>
+    </g>
+    <g class="element component">
+      <rect class="box" x="200" y="560" width="120" height="48" rx="5"/>
+      <text class="name" x="260" y="588.2" text-anchor="middle">assessment</text>
     </g>
     <g class="element component">
       <rect class="box" x="700" y="120" width="120" height="48" rx="5"/>
@@ -132,6 +139,8 @@
     <text class="label" x="780" y="507.6" text-anchor="middle">German sentences</text>
     <rect class="ground" x="720" y="306" width="120" height="16"/>
     <text class="label" x="780" y="317.6" text-anchor="middle">German sentences</text>
+    <rect class="ground" x="580" y="486" width="120" height="16"/>
+    <text class="label" x="640" y="497.6" text-anchor="middle">German sentences</text>
     <rect class="ground" x="874.96" y="486" width="131" height="16"/>
     <text class="label" x="940.46" y="497.6" text-anchor="middle">history and commits</text>
     <rect class="ground" x="842.5" y="149.41" width="95" height="16"/>

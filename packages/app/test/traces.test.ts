@@ -216,7 +216,8 @@ describe('this repository', () => {
       'structure',
       'conformance',
       'diagrams',
-      'review'
+      'review',
+      'assessment'
     ])
   })
 
@@ -233,7 +234,7 @@ describe('this repository', () => {
       { path: '.arch/components.yml', changed: ['  structure:'] },
       {
         path: 'docs/adr/0006-one-core-package-per-module-on-a-shared-kernel.md',
-        changed: ['affects: [kernel, core, structure, conformance, diagrams, review]']
+        changed: ['affects: [kernel, core, structure, conformance, diagrams, review, assessment]']
       },
       {
         path: 'docs/adr/0022-a-rule-about-libraries-names-them-as-the-code-imports-them.md',
@@ -247,7 +248,8 @@ describe('this repository', () => {
           '    to: [kernel, structure]',
           '    to: [kernel, structure]',
           '    to: [kernel, structure]',
-          '    layers: [app, [cli, mcp], [conformance, diagrams, review], [core, structure], kernel]'
+          '    to: [kernel, structure]',
+          '      [app, [cli, mcp], [conformance, diagrams, review, assessment], [core, structure], kernel]'
         ]
       }
     ])
