@@ -10,7 +10,7 @@ import { resolveGo } from './go/resolve'
 import type { JavaOutline } from './java/outline'
 import { resolveJava } from './java/resolve'
 import type { FileMeasures, NotMeasured } from './measures'
-import { manifestLibraries, type ManifestLibrary } from './manifests'
+import { manifestLibraries, type ManifestLibrary, type ManifestNotRead } from './manifests'
 import type { PythonOutline } from './python/outline'
 import { pythonProjects } from './python/projects'
 import { resolvePython } from './python/resolve'
@@ -41,7 +41,7 @@ export interface NotResolved {
   readonly line: number
 }
 
-/** A file that uses a Library, once per file and Library. */
+/** A file that uses a Library, once per file and Library, with the lines of its imports. */
 export interface LibraryUse {
   readonly file: string
   /**
@@ -49,6 +49,23 @@ export interface LibraryUse {
    * the top-level package `requests` in Python, the module `github.com/google/uuid` in Go.
    */
   readonly library: string
+  /** The lines of `file` on which its uses of the Library begin, in order. */
+  readonly lines: readonly number[]
+  /** Every use of the Library in the file exists for the compiler only (`import type`). */
+  readonly typeOnly: boolean
+  /**
+   * Of a use that is not type-only as a whole: those of its lines on which every use is
+   * type-only, in order. Absent where there is none.
+   */
+  readonly typeOnlyLines?: readonly number[]
+}
+
+/** One use of a Library, at the line of its import: what the resolvers of each language find. */
+export interface LibraryUseAt {
+  readonly file: string
+  readonly library: string
+  readonly line: number
+  readonly typeOnly: boolean
 }
 
 /**
@@ -69,10 +86,18 @@ export interface Dependencies {
   readonly notResolved: readonly NotResolved[]
   readonly libraries: readonly LibraryUse[]
   /**
-   * What the manifests of Python and Go declare — `pyproject.toml`, `requirements.txt`,
-   * `go.mod` —, for the Library inventory. Read as text, in the order of their paths.
+   * The uses of Node's built-in modules (`node:fs`), which are no Library, each as the use of
+   * `node` — whose types `@types/node` declares. Missing where there is none.
+   */
+  readonly builtIns?: readonly LibraryUse[]
+  /**
+   * What the manifests declare — `package.json`, `pom.xml`, `build.gradle`, `pyproject.toml`,
+   * `requirements.txt`, `go.mod` —, for the Library inventory. Read as text, in the order of
+   * their paths.
    */
   readonly manifests: readonly ManifestLibrary[]
+  /** The manifests whose reader failed on them, which name no Library; missing where none did. */
+  readonly manifestsNotRead?: readonly ManifestNotRead[]
   readonly notAnalysed: readonly NotAnalysed[]
   /** How many lines each Source File has that could be read (section 5, Size). */
   readonly lineCounts: ReadonlyMap<string, number>
@@ -139,7 +164,22 @@ export async function analyseDependencies(
     }
   >()
   const notResolved: NotResolved[] = []
-  const libraries: LibraryUse[] = []
+  /** Per file and Library: its lines, and per line whether every use on it is type-only. */
+  const libraryUses = new Map<
+    string,
+    { file: string; library: string; typed: Map<number, boolean> }
+  >()
+  const builtInUses: typeof libraryUses = new Map()
+  const usedIn =
+    (uses: typeof libraryUses) =>
+    ({ file, library, line, typeOnly }: LibraryUseAt): void => {
+      const key = `${file}\n${library}`
+      const known = uses.get(key) ?? { file, library, typed: new Map<number, boolean>() }
+      known.typed.set(line, (known.typed.get(line) ?? true) && typeOnly)
+      uses.set(key, known)
+    }
+  const useLibrary = usedIn(libraryUses)
+  const useBuiltIn = usedIn(builtInUses)
   const notAnalysed: NotAnalysed[] = []
   const java = new Map<string, JavaOutline>()
   const measures = new Map<string, FileMeasures>()
@@ -191,7 +231,6 @@ export async function analyseDependencies(
       go.set(path, extraction.go)
       continue
     }
-    const used = new Set<string>()
     for (const use of extraction.uses) {
       const resolution = resolver.resolve(use.specifier, path)
       switch (resolution.kind) {
@@ -203,13 +242,19 @@ export async function analyseDependencies(
           break
         }
         case 'library':
-          if (!used.has(resolution.name)) libraries.push({ file: path, library: resolution.name })
-          used.add(resolution.name)
+          useLibrary({
+            file: path,
+            library: resolution.name,
+            line: use.line,
+            typeOnly: use.typeOnly
+          })
           break
         case 'not-resolved':
           notResolved.push({ file: path, specifier: use.specifier, line: use.line })
           break
         case 'built-in':
+          useBuiltIn({ file: path, library: 'node', line: use.line, typeOnly: use.typeOnly })
+          break
         case 'ignored':
           break
       }
@@ -221,7 +266,7 @@ export async function analyseDependencies(
   const resolved = resolveJava(java)
   for (const use of resolved.uses) if (known.has(use.to)) depend(use.from, use.to, false, use.line)
   notResolved.push(...resolved.notResolved)
-  libraries.push(...resolved.libraries)
+  resolved.libraries.forEach(useLibrary)
 
   // Python and Go as well, against the source roots of the Python projects and the modules of
   // Go. What they read to know those is read only where there is code of theirs to resolve.
@@ -234,13 +279,13 @@ export async function analyseDependencies(
       if (known.has(use.to)) depend(use.from, use.to, use.typeOnly, use.line)
     }
     notResolved.push(...fromPython.notResolved)
-    libraries.push(...fromPython.libraries)
+    fromPython.libraries.forEach(useLibrary)
   }
   if (go.size > 0) {
     const fromGo = resolveGo(go, await goModules(fs, files))
     for (const use of fromGo.uses) if (known.has(use.to)) depend(use.from, use.to, false, use.line)
     notResolved.push(...fromGo.notResolved)
-    libraries.push(...fromGo.libraries)
+    fromGo.libraries.forEach(useLibrary)
   }
 
   const dependencies: Dependency[] = [...pairs.values()]
@@ -250,12 +295,26 @@ export async function analyseDependencies(
       return { ...pair, lines, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
     })
     .sort((a, b) => byPath(a.from, b.from) || byPath(a.to, b.to))
-  const manifests = await manifestLibraries(fs, files)
+  const usesOf = (uses: typeof libraryUses): LibraryUse[] =>
+    [...uses.values()].map(({ file, library, typed }) => {
+      const lines = [...typed.keys()].sort((a, b) => a - b)
+      const typeOnly = lines.every((line) => typed.get(line))
+      const typeOnlyLines = typeOnly ? [] : lines.filter((line) => typed.get(line))
+      return { file, library, lines, typeOnly, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
+    })
+  const libraries = usesOf(libraryUses)
+  const builtIns = usesOf(builtInUses)
+  const manifestsNotRead: ManifestNotRead[] = []
+  const manifests = await manifestLibraries(fs, files, (manifest) =>
+    manifestsNotRead.push(manifest)
+  )
   return {
     dependencies,
     notResolved,
     libraries,
     manifests,
+    ...(manifestsNotRead.length > 0 && { manifestsNotRead }),
+    ...(builtIns.length > 0 && { builtIns }),
     notAnalysed,
     lineCounts,
     measures,

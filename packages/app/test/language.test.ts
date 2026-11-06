@@ -49,6 +49,12 @@ const SAME_IN_GERMAN = new Set([
   'Markdown',
   'A',
   'D',
+  'Version',
+  // The ecosystems of Libraries, by their names.
+  'npm',
+  'Maven',
+  'Python',
+  'Go',
   // The Diagrams module: a word of the glossary, a key of the file, and one German has too.
   'Drift',
   'Scope',

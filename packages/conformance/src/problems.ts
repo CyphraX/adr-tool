@@ -138,5 +138,6 @@ export const RULE_KIND_NAMES = [
   'may-only-depend',
   'layers',
   'no-cycles',
-  'threshold'
+  'threshold',
+  'library'
 ] as const

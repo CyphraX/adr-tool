@@ -1,6 +1,7 @@
 import { Console } from 'node:console'
 import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { libraryTools } from './libraries'
 import { serve } from './protocol'
 import { metricTools } from './metrics'
 import { toolsFor } from './tools'
@@ -40,7 +41,7 @@ async function main(args: readonly string[]): Promise<number> {
       version: '0.0.0',
       instructions: instructionsFor(root)
     },
-    [...toolsFor({ root }), ...metricTools({ root })],
+    [...toolsFor({ root }), ...metricTools({ root }), ...libraryTools({ root })],
     (text) => process.stderr.write(`adr-mcp: ${text}\n`)
   )
   return 0
@@ -57,7 +58,8 @@ export function instructionsFor(root: string): string {
     'The tool decides IDs, numbers and Metadata, and keeps Relations and Back-references consistent. Do not write ADR files or .arch/rules.yml directly: plan_rule and plan_exception write the Rules and Exceptions.',
     'The Diagrams of the architecture are read with list_diagrams and read_diagram, which compares one with the code (its Drift); plan_new_diagram, plan_diagram_change, plan_diagram_export and plan_diagram_repair plan their changes the same way. Do not write Diagram files or their SVG pictures directly.',
     'Annotations are remarks of people on lines of Source Files. Read them with list_annotations and read_annotation, which say where their lines are in the code as it is now; plan_annotation, plan_reply, plan_annotation_state, plan_update_anchor, plan_attach, plan_cite and plan_uncite plan their writes, applied as every other change. Name the file and the lines: the tool quotes them.',
-    'component_metrics measures the code of a Component: abstractness, distance, the propagation cost of the level below it, its most complex functions and least cohesive classes.'
+    'component_metrics measures the code of a Component: abstractness, distance, the propagation cost of the level below it, its most complex functions and least cohesive classes.',
+    'list_libraries lists the Libraries the manifests declare and the code uses, per Component, with their versions and licences.'
   ].join('\n')
 }
 

@@ -185,6 +185,7 @@ export function planRenameInAssessments(fs: FileSystem, from: string, to: string
         case 'cycle':
           return { ...violation, cycle: violation.cycle.map(named) }
         case 'component':
+        case 'library':
           return { ...violation, component: named(violation.component) }
         case 'inside':
           return violation

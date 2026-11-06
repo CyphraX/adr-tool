@@ -120,7 +120,9 @@
     <span class="sentence">{wordConformance(violation.said)}</span>
     <span class="facts">
       <code>{violation.rule}</code>
-      {#if violation.dependencies.length > 0}
+      {#if violation.uses !== undefined}
+        <span>{t.conformance.usesCount(violation.uses.length)}</span>
+      {:else if violation.dependencies.length > 0}
         <span>{t.structure.graph.weight(violation.dependencies.length)}</span>
       {:else if violation.file !== undefined && violation.line !== undefined}
         <span>{violation.file}:{violation.line}</span>

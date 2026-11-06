@@ -65,6 +65,7 @@ const OUTLINE: StructureOutline = {
     { path: 'web/Page.java', component: 'web', test: false },
     { path: 'tools/Gen.java', test: false }
   ],
+  libraries: [],
   problems: [],
   hints: []
 }

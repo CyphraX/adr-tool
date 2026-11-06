@@ -3,6 +3,7 @@ import { applyChangeSet, applyEdits, memoryFileSystem } from '@adr-tool/kernel'
 import {
   draftOf,
   findException,
+  fingerprintKindOfKeys,
   planAddException,
   planAddRule,
   planChangeRule,
@@ -113,6 +114,15 @@ describe('a new Rule (docs/conformance-format.md, section 1, "How it is written"
         from: ['app'],
         to: ['**'],
         ignoreTypeOnly: true
+      },
+      {
+        id: 'g',
+        why: 'G.',
+        kind: 'library',
+        libraries: ['pg', 'mysql*'],
+        scope: 'not-in',
+        components: ['web'],
+        ignoreTypeOnly: true
       }
     ]
     let text = ''
@@ -150,6 +160,12 @@ describe('a new Rule (docs/conformance-format.md, section 1, "How it is written"
         '    kind: may-only-depend',
         '    from: app',
         "    to: ['**']",
+        '    type-only: ignored',
+        '  - id: g',
+        '    why: G.',
+        '    kind: library',
+        '    library: [pg, mysql*]',
+        '    not-in: web',
         '    type-only: ignored'
       )
     )
@@ -613,6 +629,21 @@ describe('finding an Exception', () => {
       findException(read, { kind: 'dependency', rule: 'gone', from: 'a', to: 'b' })?.line
     ).toBe(5)
     expect(findException(read, { kind: 'cycle', rule: 'apart', cycle: ['a', 'c'] })).toBeUndefined()
+  })
+
+  it('takes the keys of a Rule about Libraries for its own, not for a threshold (part 15)', () => {
+    const read = readRules(
+      yaml(
+        'exceptions:',
+        '  - {rule: gone, component: web, library: pg, reason: R.}',
+        '  - {rule: gone, component: web, reason: R.}'
+      )
+    )
+    expect(fingerprintKindOfKeys(read.exceptions[0]!)).toBe('library')
+    expect(fingerprintKindOfKeys(read.exceptions[1]!)).toBe('component')
+    expect(
+      findException(read, { kind: 'library', rule: 'gone', component: 'web', library: 'pg' })?.line
+    ).toBe(2)
   })
 })
 

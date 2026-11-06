@@ -180,7 +180,7 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
   })
 
   it('leaves the standard library out, names a Library by its top-level package, and never guesses', async () => {
-    const { edges, unresolved, used } = await analyse({
+    const { edges, unresolved, used, libraries } = await analyse({
       'src/shop/__init__.py': '',
       'src/shop/app.py': [
         'import os.path',
@@ -189,6 +189,9 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
         'import requests.adapters',
         'from requests import Session',
         'import google.protobuf',
+        // Below a namespace package that many distributions share: by two segments.
+        'from google.cloud import storage',
+        'from google import auth, protobuf',
         // The repository's own package, without the module.
         'import shop.missing',
         // Beneath no source root the suite knows, but the repository has it: not a Library.
@@ -200,10 +203,33 @@ describe('Dependencies in Python (docs/structure-format.md, section 3, "Python")
       'services/backend_app/models.py': ''
     })
     expect(edges).toEqual([])
-    expect(used).toEqual(['src/shop/app.py requests', 'src/shop/app.py google'])
+    expect(used).toEqual([
+      'src/shop/app.py requests',
+      'src/shop/app.py google.protobuf',
+      'src/shop/app.py google.cloud',
+      'src/shop/app.py google.auth'
+    ])
+    expect(libraries.find((use) => use.library === 'requests')?.lines).toEqual([4, 5])
+    expect(libraries.find((use) => use.library === 'google.protobuf')?.lines).toEqual([6, 8])
     expect(unresolved).toEqual([
-      'src/shop/app.py:7 shop.missing',
-      'src/shop/app.py:8 backend_app.models'
+      'src/shop/app.py:9 shop.missing',
+      'src/shop/app.py:10 backend_app.models'
+    ])
+  })
+
+  it('marks a Library imported for the type checker alone as type-only', async () => {
+    const { libraries } = await analyse({
+      'app.py': [
+        'from typing import TYPE_CHECKING',
+        'import requests',
+        'if TYPE_CHECKING:',
+        '    import requests.adapters',
+        '    from boto3 import Session'
+      ]
+    })
+    expect(libraries).toEqual([
+      { file: 'app.py', library: 'requests', lines: [2, 4], typeOnly: false, typeOnlyLines: [4] },
+      { file: 'app.py', library: 'boto3', lines: [5], typeOnly: true }
     ])
   })
 

@@ -21,6 +21,8 @@ export function violationText(violation: NamedViolation): string {
       return `${violation.rule}: ${violation.component}`
     case 'inside':
       return `${violation.rule}: ${violation.name} in ${violation.file}`
+    case 'library':
+      return `${violation.rule}: ${violation.component} uses ${violation.library}`
   }
 }
 
@@ -54,6 +56,12 @@ export function namesViolation(named: NamedViolation, fingerprint: ViolationFing
         fingerprint.file === named.file &&
         fingerprint.name === named.name
       )
+    case 'library':
+      return (
+        fingerprint.kind === 'library' &&
+        fingerprint.component === named.component &&
+        fingerprint.library === named.library
+      )
   }
 }
 
@@ -85,7 +93,9 @@ export function evidenceKey(evidence: NewEvidence): string {
             ? membersOf(violation.cycle)
             : violation.kind === 'component'
               ? [violation.component]
-              : [violation.file, violation.name]
+              : violation.kind === 'library'
+                ? [violation.component, violation.library]
+                : [violation.file, violation.name]
       return ['violation', violation.kind, violation.rule, ...rest].join('\n')
     }
     case 'metric': {

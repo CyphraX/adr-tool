@@ -191,7 +191,7 @@ Each item of `evidence` is a mapping that names one thing by one of six keys —
 
 | Kind | Written as | Names |
 | --- | --- | --- |
-| `violation` | `violation:` the Rule's ID, and the rest of the fingerprint: `from` and `to`; `cycle`; `component`; or `file` and `name` | a Violation, by its fingerprint ([conformance-format.md](conformance-format.md), section 3) |
+| `violation` | `violation:` the Rule's ID, and the rest of the fingerprint: `from` and `to`; `cycle`; `component`; `file` and `name`; or `component` and `library` | a Violation, by its fingerprint ([conformance-format.md](conformance-format.md), section 3) |
 | `metric` | `metric:` the metric's name, and its subject: `component`, or `file` and `name` | a metric value of a Component, or of a function or class in a Source File (part 13) |
 | `annotation` | `annotation:` its ID | an Annotation ([review-format.md](review-format.md), section 1) |
 | `adr` | `adr:` the ADR, as `cites` names one: `docs/adr/0003-x`, or the bare ID where one Decision Log has it ([review-format.md](review-format.md), section 2) | an ADR |
@@ -210,6 +210,9 @@ evidence:
   - violation: functions-stay-simple # a threshold per function (part 13)
     file: cart/src/main/java/com/shop/cart/Cart.java
     name: Cart.discount(long)
+  - violation: no-database-in-the-web # a Rule about Libraries: its Component and the Library (part 15)
+    component: web
+    library: org.hibernate
   - metric: instability
     component: cart
   - metric: complexity # per function (part 13)

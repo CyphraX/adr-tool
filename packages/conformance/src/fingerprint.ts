@@ -20,6 +20,13 @@ export type Fingerprint =
    * whose level below it is — `*` for the top level.
    */
   | { readonly kind: 'component'; readonly rule: string; readonly component: string }
+  /** `library`: the Component that uses the Library, and the Library as the code names it. */
+  | {
+      readonly kind: 'library'
+      readonly rule: string
+      readonly component: string
+      readonly library: string
+    }
   /** `threshold` on complexity: a function, by its Source File and its name there. */
   | {
       readonly kind: 'function'
@@ -44,6 +51,8 @@ export function fingerprintText(fingerprint: Fingerprint): string {
       return `${fingerprint.rule}: ${membersOf(fingerprint.cycle).join(', ')}`
     case 'component':
       return `${fingerprint.rule}: ${fingerprint.component}`
+    case 'library':
+      return `${fingerprint.rule}: ${fingerprint.component} uses ${fingerprint.library}`
     case 'function':
     case 'class':
       return `${fingerprint.rule}: ${fingerprint.name} in ${fingerprint.file}`
@@ -84,6 +93,10 @@ export const FINGERPRINT_SHAPES: {
   class: [
     ['file', 'name'],
     ['name', 'name']
+  ],
+  library: [
+    ['component', 'name'],
+    ['library', 'name']
   ]
 }
 
@@ -147,16 +160,22 @@ export function fingerprintFrom(value: unknown): Fingerprint | undefined {
 
 /**
  * The kind of fingerprint the keys of an Exception are of, for a Rule that is not there to say:
- * the first kind whose keys are all there, `dependency` where none is. A function and a class
- * are named alike, and taken for a function.
+ * of the kinds whose keys are all there, the one with the most — `component` and `library` are
+ * a Library's, not a Component's —, `dependency` where none is. A function and a class are
+ * named alike, and taken for a function.
  */
 export function fingerprintKindOfKeys(written: object): Fingerprint['kind'] {
   const keys = written as Readonly<Record<string, unknown>>
-  return (
-    FINGERPRINT_KINDS.find((kind) =>
-      FINGERPRINT_SHAPES[kind].every(([key]) => keys[key] !== undefined)
-    ) ?? 'dependency'
-  )
+  let found: Fingerprint['kind'] = 'dependency'
+  let most = 0
+  for (const kind of FINGERPRINT_KINDS) {
+    const shape = FINGERPRINT_SHAPES[kind]
+    if (shape.length > most && shape.every(([key]) => keys[key] !== undefined)) {
+      found = kind
+      most = shape.length
+    }
+  }
+  return found
 }
 
 /** What a fingerprint names, without its Rule, for a title: `billing → web`, `a ⇄ b`, `parse (src/a.ts)`. */
@@ -168,6 +187,8 @@ export function fingerprintNames(fingerprint: Fingerprint): string {
       return membersOf(fingerprint.cycle).join(' ⇄ ')
     case 'component':
       return fingerprint.component
+    case 'library':
+      return `${fingerprint.library} (${fingerprint.component})`
     case 'function':
     case 'class':
       return `${fingerprint.name} (${fingerprint.file})`

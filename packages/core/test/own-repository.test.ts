@@ -56,7 +56,12 @@ it('reads the Decision Log of this repository without a Problem', async () => {
     [18, '0018-a-diagram-is-a-yaml-file-and-its-svg-is-committed-beside-it', 'accepted'],
     [19, '0019-an-anchor-is-found-again-by-its-quoted-lines-and-its-history', 'accepted'],
     [20, '0020-git-is-a-port-of-the-kernel-implemented-once-for-node', 'accepted'],
-    [21, '0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file', 'accepted']
+    [21, '0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file', 'accepted'],
+    [
+      22,
+      '0022-a-rule-about-libraries-names-them-as-the-code-imports-them',
+      expect.stringMatching(/^(proposed|accepted)$/)
+    ]
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
   expect(log.adrs[1]!.body.trimStart().startsWith('# The tool never re-serializes Markdown')).toBe(
@@ -195,6 +200,22 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       from: '0021-an-assessment-is-markdown-with-yaml-blocks-each-risk-a-file',
       to,
       state: 'in-effect'
+    })),
+    // What ADR-0022 depends on and relates to is pending until it is accepted.
+    ...(
+      [
+        ['depends-on', '0017-rules-and-exceptions-share-one-file-keyed-by-fingerprint'],
+        ['relates-to', '0007-the-analysis-never-executes-anything-from-the-analysed'],
+        ['relates-to', '0008-dependencies-come-from-parsers-alone-without-a-type-checker']
+      ] as const
+    ).map(([type, to]) => ({
+      type,
+      from: '0022-a-rule-about-libraries-names-them-as-the-code-imports-them',
+      to,
+      state:
+        log.adrs.find((adr) => adr.number === 22)!.metadata.status === 'proposed'
+          ? 'pending'
+          : 'in-effect'
     }))
   ])
 })

@@ -4,6 +4,7 @@
  * file contributes its package and its top-level types, and together they form one symbol
  * table per package, across the whole repository.
  */
+import type { LibraryUseAt } from '../dependencies'
 import type { JavaName, JavaOutline } from './outline'
 
 /** One use of another file of the repository, on the line that makes it. */
@@ -17,8 +18,8 @@ export interface JavaResolution {
   readonly uses: readonly JavaUse[]
   /** What names a type of the repository, or may, and cannot be told apart. */
   readonly notResolved: readonly { file: string; specifier: string; line: number }[]
-  /** The package of each import that no file of the repository declares, once per file. */
-  readonly libraries: readonly { file: string; library: string }[]
+  /** The package of each import that no file of the repository declares, at each import. */
+  readonly libraries: readonly LibraryUseAt[]
 }
 
 /** The Java platform itself, which is not a Library. */
@@ -69,14 +70,11 @@ export function resolveJava(outlines: ReadonlyMap<string, JavaOutline>): JavaRes
 
   const uses: JavaUse[] = []
   const notResolved: { file: string; specifier: string; line: number }[] = []
-  const libraries: { file: string; library: string }[] = []
+  const libraries: LibraryUseAt[] = []
 
   for (const [path, outline] of outlines) {
-    const libraryUsed = new Set<string>()
-    const useLibrary = (library: string): void => {
-      if (PLATFORM.test(library) || libraryUsed.has(library)) return
-      libraryUsed.add(library)
-      libraries.push({ file: path, library })
+    const useLibrary = (library: string, line: number): void => {
+      if (!PLATFORM.test(library)) libraries.push({ file: path, library, line, typeOnly: false })
     }
     const use = (files: readonly string[], specifier: string, line: number): void => {
       if (files.length === 1) {
@@ -92,7 +90,7 @@ export function resolveJava(outlines: ReadonlyMap<string, JavaOutline>): JavaRes
       const found = classOf(qualified)
       if (found?.kind === 'files') use(found.files, written, line)
       else if (found?.kind === 'missing') notResolved.push({ file: path, specifier: written, line })
-      else useLibrary(packageOutside(qualified))
+      else useLibrary(packageOutside(qualified), line)
     }
 
     // Single-type imports bind a simple name before anything else does.
@@ -111,7 +109,7 @@ export function resolveJava(outlines: ReadonlyMap<string, JavaOutline>): JavaRes
         // `import a.b.Outer.*` imports the nested types of a class.
         const found = classOf(entry.name)
         if (found?.kind === 'files') use(found.files, `${entry.name}.*`, entry.line)
-        else useLibrary(entry.name)
+        else useLibrary(entry.name, entry.line)
       }
     }
 

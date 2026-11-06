@@ -87,6 +87,15 @@ export function draftOf(rule: Rule): RuleDraft {
         ...(rule.min !== undefined && { min: rule.min }),
         of: rule.of
       }
+    case 'library':
+      return {
+        ...common,
+        ignoreTypeOnly: rule.ignoreTypeOnly,
+        kind: rule.kind,
+        libraries: rule.libraries,
+        scope: rule.scope,
+        components: rule.components
+      }
   }
 }
 
@@ -156,6 +165,9 @@ const RULE_KEYS = new Set([
   'max',
   'min',
   'of',
+  'library',
+  'only-in',
+  'not-in',
   'tests',
   'type-only'
 ])
@@ -194,6 +206,9 @@ function ruleKeys(draft: RuleDraft): [string, Value][] {
       if (draft.min !== undefined) keys.push(['min', draft.min])
       keys.push(['of', one(draft.of)])
       break
+    case 'library':
+      keys.push(['library', one(draft.libraries)], [draft.scope, one(draft.components)])
+      break
   }
   if (draft.tests) keys.push(['tests', 'included'])
   if (draft.ignoreTypeOnly && draft.kind !== 'threshold') keys.push(['type-only', 'ignored'])
@@ -201,7 +216,16 @@ function ruleKeys(draft: RuleDraft): [string, Value][] {
 }
 
 /** The keys that name Components: one pattern reads as a list of it (section 2). */
-const PATTERN_KEYS = new Set(['from', 'to', 'among', 'inside', 'of'])
+const PATTERN_KEYS = new Set([
+  'from',
+  'to',
+  'among',
+  'inside',
+  'of',
+  'library',
+  'only-in',
+  'not-in'
+])
 
 /**
  * A value as the reader takes it, to compare: `from: billing` and `from: [billing]` say the same,

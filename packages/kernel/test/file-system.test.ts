@@ -13,6 +13,12 @@ describe('memoryFileSystem', () => {
     expect(await fs.readText('docs/nothing.md')).toBeUndefined()
   })
 
+  it('reads a file within a limit of bytes, and one larger as if it were not there', async () => {
+    const umlauts = memoryFileSystem({ 'a.txt': 'ääää' })
+    expect(await umlauts.readText('a.txt', { atMost: 8 })).toBe('ääää')
+    expect(await umlauts.readText('a.txt', { atMost: 7 })).toBeUndefined()
+  })
+
   it('lists files and the directories that exist by having files in them', async () => {
     const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
     expect((await fs.list(''))!.sort(byName)).toEqual([

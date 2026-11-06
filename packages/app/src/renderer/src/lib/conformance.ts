@@ -84,6 +84,9 @@ export interface RuleForm {
   max: string
   min: string
   of: string[]
+  /** Of a Rule about Libraries: its Library patterns, and whether its Components are allowed or not. */
+  libraries: string[]
+  libraryScope: 'only-in' | 'not-in'
   tests: boolean
   ignoreTypeOnly: boolean
 }
@@ -105,6 +108,8 @@ export function ruleFormOf(rule?: Rule): RuleForm {
     max: '',
     min: '',
     of: [],
+    libraries: [],
+    libraryScope: 'only-in',
     tests: rule?.tests ?? false,
     ignoreTypeOnly: rule?.ignoreTypeOnly ?? false
   }
@@ -127,6 +132,13 @@ export function ruleFormOf(rule?: Rule): RuleForm {
         max: rule.max === undefined ? '' : String(rule.max),
         min: rule.min === undefined ? '' : String(rule.min),
         of: [...rule.of]
+      }
+    case 'library':
+      return {
+        ...form,
+        libraries: [...rule.libraries],
+        libraryScope: rule.scope,
+        components: [...rule.components]
       }
     case undefined:
       return form
@@ -172,6 +184,10 @@ export function missingOf(form: RuleForm): string[] {
       if (form.of.length === 0) missing.push('of')
       break
     }
+    case 'library':
+      if (form.libraries.length === 0) missing.push('library')
+      if (form.components.length === 0) missing.push(form.libraryScope)
+      break
   }
   return missing
 }
@@ -214,6 +230,15 @@ export function draftOfForm(form: RuleForm): RuleDraft | undefined {
         of: form.of
       }
     }
+    case 'library':
+      return {
+        ...common,
+        ...typeOnly,
+        kind: 'library',
+        libraries: form.libraries,
+        scope: form.libraryScope,
+        components: form.components
+      }
   }
 }
 

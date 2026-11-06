@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Adr, DecisionLog } from '@adr-tool/core'
-  import { isSegment } from '@adr-tool/structure/model'
+  import { isSegment, librariesIn } from '@adr-tool/structure/model'
   import type {
     StructureComponent,
     StructureEdge,
@@ -16,16 +16,18 @@
   import { reviewing } from '../lib/reviewing.svelte'
   import { commonDirectory, nodeLabel, opens } from '../lib/structure'
   import { codeSpans, prefixOf } from '../lib/wording'
+  import ComponentLibraries from './ComponentLibraries.svelte'
+  import LibraryDetail from './LibraryDetail.svelte'
   import ComponentDiagrams from './ComponentDiagrams.svelte'
   import StatusMark from './StatusMark.svelte'
   import StructureFunctions from './StructureFunctions.svelte'
 
   // What the selection in the Structure view stands for: a Component with its page — the
   // declaration, the ADRs that affect it, the metrics, the Dependencies at its level, its
-  // Cycles —, a directory below a Component with the same page less what only a Component
-  // has, another node with its Dependencies, a line or a cell with the Source File
-  // Dependencies behind it, a Cycle with its example round trip, or one of the lists of what
-  // the analysis could not do.
+  // Cycles, its Libraries —, a directory below a Component with the same page less what only a
+  // Component has, another node with its Dependencies, a line or a cell with the Source File
+  // Dependencies behind it, a Cycle with its example round trip, a Library of the inventory,
+  // or one of the lists of what the analysis could not do.
   let { view }: { view: StructureView } = $props()
 
   /** The new segment being typed for a Component, while its Rename is open. */
@@ -476,6 +478,10 @@
       {/each}
     </ul>
   {/if}
+
+  {#if component}
+    <ComponentLibraries inventory={view.inventory} component={page.id} />
+  {/if}
 {/snippet}
 
 {#snippet cycleList()}
@@ -571,6 +577,11 @@
         {/each}
       </ul>
     {/if}
+  {:else if selection?.kind === 'library'}
+    {@const row = librariesIn(view.inventory).find(
+      ({ library }) => library.ecosystem === selection.ecosystem && library.name === selection.name
+    )}
+    {#if row}<LibraryDetail {row} />{/if}
   {:else if selection?.kind === 'not-analysed'}
     <h2>{t.structure.detail.notAnalysed}</h2>
     <p class="hint">{t.structure.detail.notAnalysedHint}</p>
@@ -596,6 +607,8 @@
         {/each}
       </ul>
     {/if}
+  {:else if app.active?.structure.show === 'libraries' && !app.active.structure.code}
+    <p class="hint">{t.structure.inventory.hint}</p>
   {:else}
     {@render cycleList()}
   {/if}

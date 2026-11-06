@@ -522,10 +522,70 @@ describe('the Structure and the Rules (docs/plan-vision.md, part 4)', () => {
     await close()
   })
 
+  it('plans a Rule about Libraries, lists its Violation at each import, and accepts it (part 15)', async () => {
+    const { client, close } = await connect(shop)
+    writeFileSync(
+      join(shop, 'src/web/page.ts'),
+      "import { invoice } from '../billing/invoice'\nimport { Pool } from 'pg'\n"
+    )
+    const rule = await call(client, 'plan_rule', {
+      id: 'only-persistence-uses-pg',
+      why: 'The database is the business of persistence.',
+      kind: 'library',
+      library: ['pg'],
+      'only-in': ['persistence']
+    })
+    expect(rule.files[0].diff).toContain('+    library: pg')
+    expect(rule.files[0].diff).toContain('+    only-in: persistence')
+    await call(client, 'apply_change', { changeId: rule.changeId })
+    expect((await call(client, 'list_rules')).rules).toEqual([
+      {
+        id: 'only-persistence-uses-pg',
+        why: 'The database is the business of persistence.',
+        kind: 'library',
+        library: ['pg'],
+        'only-in': ['persistence'],
+        line: 2,
+        violations: 1,
+        accepted: 0
+      }
+    ])
+    const { violations } = await call(client, 'list_violations')
+    expect(violations).toMatchObject([
+      {
+        rule: 'only-persistence-uses-pg',
+        kind: 'library',
+        fingerprint: { rule: 'only-persistence-uses-pg', component: 'web', library: 'pg' },
+        component: 'web',
+        library: 'pg',
+        imports: [{ file: 'src/web/page.ts', line: 2, imports: 'pg' }]
+      }
+    ])
+    const accepted = await call(client, 'plan_exception', {
+      ...violations[0].fingerprint,
+      reason: 'The page reads one report itself, for now.'
+    })
+    expect(accepted.files[0].diff).toContain('+    library: pg')
+    await call(client, 'apply_change', { changeId: accepted.changeId })
+    expect((await call(client, 'list_rules')).rules[0]).toMatchObject({
+      violations: 0,
+      accepted: 1
+    })
+    // Changed to not-in, its only-in is gone.
+    const changed = await call(client, 'plan_rule', {
+      action: 'change',
+      id: 'only-persistence-uses-pg',
+      'not-in': ['web']
+    })
+    expect(changed.files[0].diff).toContain('+    not-in: web')
+    expect(changed.files[0].diff).toContain('-    only-in: persistence')
+    await close()
+  })
+
   it('refuses what it cannot plan, in words the agent can act on', async () => {
     const { client, close } = await connect(shop)
     expect(await refusal(client, 'plan_rule', { id: 'x', why: 'X.' })).toBe(
-      'A new Rule needs a "kind": one of must-not-depend, may-only-depend, layers, no-cycles, threshold.'
+      'A new Rule needs a "kind": one of must-not-depend, may-only-depend, layers, no-cycles, threshold, library.'
     )
     expect(
       await refusal(client, 'plan_rule', {
@@ -999,6 +1059,34 @@ describe('what the review found (PR #41)', () => {
     const text = readFileSync(join(root, created.path as string), 'utf8')
     expect(text).toContain('status: accepted')
     expect(text).toContain('# Batched')
+  })
+
+  it('reads a file through one handle: within its limit, a directory as none, a FIFO not waited for', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'adr-read-once-'))
+    try {
+      writeFileSync(join(root, 'ten.txt'), '0123456789')
+      mkdirSync(join(root, 'dir'))
+      const fs = repositoryFiles(root)
+      expect(await fs.readText('ten.txt', { atMost: 10 })).toBe('0123456789')
+      expect(await fs.readText('ten.txt', { atMost: 9 })).toBeUndefined()
+      expect(await fs.readText('ten.txt')).toBe('0123456789')
+      expect(await fs.readText('dir')).toBeUndefined()
+      expect(await fs.readText('dir', { atMost: 10 })).toBeUndefined()
+      if (process.platform !== 'win32') {
+        execFileSync('mkfifo', [join(root, 'pipe')])
+        expect(await fs.readText('pipe', { atMost: 10 })).toBeUndefined()
+        expect(await fs.readText('pipe')).toBeUndefined()
+      }
+      // A link that leads out is named as such, and not read.
+      symlinkSync(tmpdir(), join(root, 'linked'), 'junction')
+      expect(await fs.leadsOutside?.('linked')).toBe(true)
+      expect(await fs.readText('linked/x')).toBeUndefined()
+      for (const path of ['ten.txt', 'dir', 'missing', '../x']) {
+        expect(await fs.leadsOutside?.(path), path).toBe(false)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('writes nothing through a symbolic link that leads nowhere, and says so', async () => {

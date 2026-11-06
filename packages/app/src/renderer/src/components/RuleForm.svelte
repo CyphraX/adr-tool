@@ -30,8 +30,15 @@
     inside: () => words.components,
     max: () => `${words.max} / ${words.min}`,
     min: () => words.min,
-    of: () => words.of
+    of: () => words.of,
+    library: () => words.libraries,
+    'only-in': () => words.components,
+    'not-in': () => words.components
   }
+  // The Libraries the code uses, to choose from.
+  const libraries = $derived(
+    [...new Set((app.active?.outline.known?.libraries ?? []).flatMap((one) => one.imports))].sort()
+  )
 
   function onsubmit(event: SubmitEvent): void {
     event.preventDefault()
@@ -149,6 +156,37 @@
       <label class="check">
         <input type="radio" value="inside" bind:group={form.scope} />
         {words.inside}
+      </label>
+    </fieldset>
+    <div class="field">
+      <span class="name">{words.components}</span>
+      <ChipInput
+        bind:items={form.components}
+        {suggestions}
+        label={words.components}
+        placeholder={words.patternPlaceholder}
+      />
+    </div>
+  {:else if form.kind === 'library'}
+    <div class="field">
+      <span class="name">{words.libraries}</span>
+      <ChipInput
+        bind:items={form.libraries}
+        suggestions={libraries}
+        label={words.libraries}
+        placeholder={words.libraryPlaceholder}
+      />
+      <span class="note">{@render withCode(words.librariesAbout)}</span>
+    </div>
+    <fieldset class="field">
+      <legend class="name">{words.libraryScope}</legend>
+      <label class="check">
+        <input type="radio" value="only-in" bind:group={form.libraryScope} />
+        {words.onlyIn}
+      </label>
+      <label class="check">
+        <input type="radio" value="not-in" bind:group={form.libraryScope} />
+        {words.notIn}
       </label>
     </fieldset>
     <div class="field">

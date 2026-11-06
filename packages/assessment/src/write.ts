@@ -689,6 +689,12 @@ export function evidenceLines(evidence: NewEvidence): string[] {
       return [first, `component: ${text(violation.component)}`]
     case 'inside':
       return [first, `file: ${text(violation.file)}`, `name: ${text(violation.name)}`]
+    case 'library':
+      return [
+        first,
+        `component: ${text(violation.component)}`,
+        `library: ${text(violation.library)}`
+      ]
   }
 }
 
@@ -714,6 +720,8 @@ function isComplete(evidence: NewEvidence): boolean {
       return all(violation.component)
     case 'inside':
       return all(violation.file, violation.name)
+    case 'library':
+      return all(violation.component, violation.library)
   }
 }
 

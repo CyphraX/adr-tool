@@ -48,7 +48,9 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
   expect(analysis.notResolved).toEqual([
     { file: 'web/server.go', specifier: 'example.com/shop/payments', line: 11 }
   ])
-  expect(analysis.libraries).toEqual([{ file: 'cart/line.go', library: 'github.com/google/uuid' }])
+  expect(analysis.libraries).toEqual([
+    { file: 'cart/line.go', library: 'github.com/google/uuid', lines: [5], typeOnly: false }
+  ])
   expect(
     analysis.dependencies.map(
       (dependency) => `${dependency.from} > ${dependency.to} ${dependency.lines.join(',')}`
@@ -140,10 +142,8 @@ it('drafts a Go module and the module nested in it, with their Dependencies and 
     ].toSorted()
   )
 
-  // What its go.mod files require, for the Library inventory.
+  // What its go.mod files require, for the Library inventory: not the modules of the repository.
   expect(analysis.manifests).toEqual([
-    { manifest: 'billing/go.mod', name: 'example.com/shop', version: 'v0.0.0', line: 5 },
-    { manifest: 'go.mod', name: 'example.com/shop/billing', version: 'v0.0.0', line: 6 },
     { manifest: 'go.mod', name: 'github.com/google/uuid', version: 'v1.6.0', line: 7 },
     {
       manifest: 'go.mod',

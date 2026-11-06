@@ -470,6 +470,9 @@ export const DE: Wording<Codes> = {
   'fingerprint-of-kind': (v) =>
     `eine Ausnahme von einer Regel der Art ${v.kind} nennt ihren Verstoß mit ${listed(v.keys.map((key) => `„${key}“`))}${v.topLevel ? `, oder „${v.topLevel}“ für die oberste Ebene` : ''}`,
   'roles-not-map': () => '„roles“ muss ein Mapping von jeder Rolle auf Komponentenmuster sein',
+  'not-library-patterns': () =>
+    '„library“ muss der Name einer Bibliothek sein, wie der Code sie verwendet, oder ein Muster, oder eine Liste davon',
+  'only-in-or-not-in': () => 'sie braucht entweder „only-in“ oder „not-in“',
 
   // What a Violation is: the kind of its Rule.
   'must-not-depend': (v) => `${v.from} darf nicht von ${v.to} abhängen`,
@@ -485,6 +488,12 @@ export const DE: Wording<Codes> = {
     `${listed(v.members)} hängen in einem Zyklus voneinander ab${v.members.length > 2 ? `, zum Beispiel ${tripOf(v.roundTrip)}` : ''}${v.weakest ? `, mit ${v.weakest.join(' -> ')} als schwächster Abhängigkeit` : ''}`,
   threshold: (v) =>
     `Die Metrik ${v.metric} ${thresholdSubject(v)} ist ${formatNumber(v.value)} und liegt ${v.bound === 'max' ? 'über dem Höchstwert' : 'unter dem Mindestwert'} von ${formatNumber(v.limit)}`,
+  library: (v) =>
+    v.scope === 'not-in'
+      ? `${v.component} darf ${v.library} nicht verwenden`
+      : v.component === UNASSIGNED
+        ? `Quelldateien, die zu keiner Komponente gehören, verwenden ${v.library}, das nur ${listed(v.allowed ?? [])} verwenden darf`
+        : `${v.component} verwendet ${v.library}, das nur ${listed(v.allowed ?? [])} verwenden darf`,
   'violation-at': (v) => `${german(v.violation)}: ${v.file}:${v.line} importiert ${v.imports}.`,
   'violation-alone': (v) => `${german(v.violation)}.`,
 

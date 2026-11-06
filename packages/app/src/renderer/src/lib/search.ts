@@ -1,4 +1,5 @@
 import type { Adr } from '@adr-tool/core'
+import type { Ecosystem } from '@adr-tool/structure/model'
 
 /** A piece of an excerpt; `match` marks what was searched for. */
 export interface ExcerptPart {
@@ -372,4 +373,62 @@ export function searchSourceFiles(
         a.position - b.position
     )
     .map(({ hit }) => hit)
+}
+
+/** A Library the search found, by its name or a name the code imports it by. */
+export interface LibraryHit {
+  readonly ecosystem: Ecosystem
+  readonly name: string
+  readonly score: number
+}
+
+const foldedLibraries = new WeakMap<
+  readonly { name: string; imports: readonly string[] }[],
+  { names: string[]; parts: string[] }[]
+>()
+
+/**
+ * The Libraries whose name, or a name the code imports them by, holds every word of the query,
+ * best first: a name that is the word, a part of it that is — split at `/`, `.`, `:`, `-` and
+ * `_` —, one that starts with it, one that holds it. Libraries that match equally well keep the
+ * order of the inventory, which is by name.
+ */
+export function searchLibraries(
+  libraries: readonly {
+    readonly ecosystem: Ecosystem
+    readonly name: string
+    readonly imports: readonly string[]
+  }[],
+  query: string
+): LibraryHit[] {
+  const words = wordsOf(query)
+  if (words.length === 0) return []
+  let folded = foldedLibraries.get(libraries)
+  if (!folded) {
+    folded = libraries.map(({ name, imports }) => {
+      const names = [...new Set([name, ...imports].map(fold))]
+      return { names, parts: names.flatMap((one) => one.split(/[@/.:_-]+/).filter(Boolean)) }
+    })
+    foldedLibraries.set(libraries, folded)
+  }
+  const hits: LibraryHit[] = []
+  libraries.forEach((library, position) => {
+    const { names, parts } = folded[position]!
+    let score = 0
+    for (const word of words) {
+      const found = names.includes(word)
+        ? ARTEFACT_WEIGHT.whole
+        : parts.includes(word)
+          ? ARTEFACT_WEIGHT.segment
+          : parts.some((part) => part.startsWith(word))
+            ? ARTEFACT_WEIGHT.segmentStart
+            : names.some((name) => name.includes(word))
+              ? ARTEFACT_WEIGHT.inside
+              : 0
+      if (found === 0) return
+      score += found
+    }
+    hits.push({ ecosystem: library.ecosystem, name: library.name, score })
+  })
+  return hits.sort((a, b) => b.score - a.score)
 }

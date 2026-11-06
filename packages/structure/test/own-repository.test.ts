@@ -76,6 +76,7 @@ it('drafts the Components of this repository from its pnpm workspace', async () 
   expect(ids(structure.components).filter((id) => id.startsWith('structure/'))).toEqual([
     'structure/go',
     'structure/java',
+    'structure/libraries',
     'structure/python',
     'structure/typescript'
   ])

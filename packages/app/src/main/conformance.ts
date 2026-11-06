@@ -52,6 +52,8 @@ export async function conformanceView(
     ...(violation.file !== undefined &&
       ownerOf.get(violation.file) !== undefined && { owner: ownerOf.get(violation.file)! }),
     dependencies: violation.dependencies,
+    ...(violation.library !== undefined && { library: violation.library }),
+    ...(violation.uses && { uses: violation.uses }),
     ...(violation.exception && { exception: violation.exception })
   }))
   return {

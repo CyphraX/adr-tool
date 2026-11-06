@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { searchComponents, searchSourceFiles } from '../src/renderer/src/lib/search'
+import {
+  searchComponents,
+  searchLibraries,
+  searchSourceFiles
+} from '../src/renderer/src/lib/search'
 
-// docs/plan-vision.md, part 2: the search finds Components and Source Files beside ADRs.
+// docs/plan-vision.md, part 2: the search finds Components and Source Files beside ADRs; part
+// 15: and Libraries.
 
 const COMPONENTS = [
   { id: 'kernel', name: 'kernel' },
@@ -74,5 +79,27 @@ describe('the search over Source Files', () => {
       'packages/app/src/main/index.ts'
     ])
     expect(searchSourceFiles(FILES, 'nowhere')).toEqual([])
+  })
+})
+
+const LIBRARIES = [
+  { ecosystem: 'npm', name: '@codemirror/state', imports: ['@codemirror/state'] },
+  { ecosystem: 'npm', name: 'electron', imports: ['electron'] },
+  { ecosystem: 'npm', name: 'electron-vite', imports: ['electron-vite'] },
+  { ecosystem: 'maven', name: 'com.google.guava:guava', imports: ['com.google.common'] },
+  { ecosystem: 'python', name: 'PyYAML', imports: ['yaml', '_yaml'] }
+] as const
+
+describe('the search over Libraries', () => {
+  it('finds a Library by its name, a part of it, or a name the code imports it by', () => {
+    const found = (query: string) => searchLibraries(LIBRARIES, query).map((hit) => hit.name)
+    expect(found('electron')).toEqual(['electron', 'electron-vite'])
+    expect(found('codemirror')).toEqual(['@codemirror/state'])
+    expect(found('guava')).toEqual(['com.google.guava:guava'])
+    expect(found('common')).toEqual(['com.google.guava:guava'])
+    expect(found('yaml')).toEqual(['PyYAML'])
+    expect(found('vite electron')).toEqual(['electron-vite'])
+    expect(found('gradle')).toEqual([])
+    expect(searchLibraries(LIBRARIES, 'pyyaml')[0]).toMatchObject({ ecosystem: 'python' })
   })
 })
