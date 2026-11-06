@@ -5,6 +5,7 @@
     type ComponentHit,
     type SourceFileHit
   } from '../lib/search'
+  import { searchDiagrams, type DiagramHit } from '../lib/diagram-canvas'
   import { firstLine, linesOf, placeOf, searchAnnotations, type AnnotationHit } from '../lib/review'
   import { reviewing } from '../lib/reviewing.svelte'
   import { app, statusKey } from '../lib/state.svelte'
@@ -21,12 +22,14 @@
   const LIMIT = 12
   const COMPONENT_LIMIT = 6
   const SOURCE_FILE_LIMIT = 8
+  const DIAGRAM_LIMIT = 6
   const ANNOTATION_LIMIT = 6
 
   type Row =
     | { readonly kind: 'adr'; readonly key: string; readonly hit: PlacedHit }
     | { readonly kind: 'component'; readonly key: string; readonly hit: ComponentHit }
     | { readonly kind: 'sourceFile'; readonly key: string; readonly hit: SourceFileHit }
+    | { readonly kind: 'diagram'; readonly key: string; readonly hit: DiagramHit }
     | { readonly kind: 'annotation'; readonly key: string; readonly hit: AnnotationHit }
 
   let dialog = $state<HTMLDialogElement>()
@@ -64,6 +67,9 @@
   )
   const annotations = $derived(allAnnotations.slice(0, ANNOTATION_LIMIT))
   const components = $derived(allComponents.slice(0, COMPONENT_LIMIT))
+  // The Diagrams of the repository in front, by their ID and title.
+  const allDiagrams = $derived(searchDiagrams(app.active?.diagrams.overview?.diagrams ?? [], query))
+  const diagrams = $derived(allDiagrams.slice(0, DIAGRAM_LIMIT))
   const sourceFiles = $derived(allSourceFiles.slice(0, SOURCE_FILE_LIMIT))
   const draft = $derived(outline?.known?.origin === 'draft')
   // What the search says of Structure: still analysing, analysing again, or why it cannot.
@@ -79,8 +85,8 @@
           : undefined
   )
 
-  // One list for the keyboard, in the order it is shown: ADRs, Components, Source Files,
-  // Annotations.
+  // One list for the keyboard, in the order it is shown: ADRs, Components, Diagrams, Source
+  // Files, Annotations.
   const rows = $derived<Row[]>([
     ...found.map((hit) => ({
       kind: 'adr' as const,
@@ -88,6 +94,7 @@
       hit
     })),
     ...components.map((hit) => ({ kind: 'component' as const, key: `component:${hit.id}`, hit })),
+    ...diagrams.map((hit) => ({ kind: 'diagram' as const, key: `diagram:${hit.path}`, hit })),
     ...sourceFiles.map((hit) => ({ kind: 'sourceFile' as const, key: `file:${hit.path}`, hit })),
     ...annotations.map((hit) => ({
       kind: 'annotation' as const,
@@ -103,6 +110,12 @@
         heading: t.searching.components,
         shown: components.length,
         all: allComponents.length
+      },
+      {
+        kind: 'diagram' as const,
+        heading: t.diagrams.heading,
+        shown: diagrams.length,
+        all: allDiagrams.length
       },
       {
         kind: 'sourceFile' as const,
@@ -123,12 +136,15 @@
 
   /**
    * Open a hit in its module: an ADR in Decisions, a Component or a Source File in Structure,
-   * an Annotation in Review.
+   * a Diagram in Diagrams, an Annotation in Review.
    */
   function open(row: Row): void {
     if (row.kind === 'adr') app.jumpTo(row.hit.logPath, row.hit.adr.id, row.hit.repositoryId)
     else if (row.kind === 'component') app.showComponent(row.hit.id)
-    else if (row.kind === 'annotation') reviewing.open(row.hit.annotation.id)
+    else if (row.kind === 'diagram') {
+      app.stopSearching()
+      app.diagrams.reveal(row.hit.path)
+    } else if (row.kind === 'annotation') reviewing.open(row.hit.annotation.id)
     else app.showSourceFile(row.hit.path)
   }
 
@@ -227,6 +243,12 @@
                       {#if draft}
                         <span class="where">{t.searching.draft}</span>
                       {/if}
+                    </span>
+                  {:else if row.kind === 'diagram'}
+                    <span class="line">
+                      <span class="kind">{t.diagrams.diagramKind}</span>
+                      <span class="title">{row.hit.title ?? row.hit.id}</span>
+                      <code class="id">{row.hit.id}</code>
                     </span>
                   {:else if row.kind === 'annotation'}
                     {@const annotation = row.hit.annotation}

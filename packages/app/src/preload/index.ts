@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNEL, type Api, type OpenRepository } from '../shared/ipc'
+import { diagramsBridge } from './diagrams'
 
 // The typed bridge between the main process and the sandboxed renderer.
 // The renderer never gets more than what is listed here.
@@ -73,7 +74,8 @@ const api: Api = {
   },
   planReview: (repositoryId, request) =>
     ipcRenderer.invoke(CHANNEL.planReview, repositoryId, request),
-  gitUserName: (repositoryId) => ipcRenderer.invoke(CHANNEL.gitUserName, repositoryId)
+  gitUserName: (repositoryId) => ipcRenderer.invoke(CHANNEL.gitUserName, repositoryId),
+  ...diagramsBridge(ipcRenderer)
 }
 
 contextBridge.exposeInMainWorld('api', api)

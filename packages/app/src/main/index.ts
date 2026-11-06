@@ -16,6 +16,7 @@ import {
 import { isLanguage } from '../shared/language'
 import { analysisHost } from './analysis-host'
 import { Annotations, planReview } from './annotations'
+import { registerDiagrams } from './diagrams-ipc'
 import { ASSET_SCHEME, assetHandler } from './assets'
 import { exportPdf, writeExport } from './export'
 import { gitIn } from './git'
@@ -584,6 +585,7 @@ app.whenReady().then(() => {
     assetHandler((id) => repositories.rootOf(id))
   )
   registerIpc()
+  registerDiagrams(ipcMain, repositories, structures)
   createWindow()
 
   app.on('activate', () => {

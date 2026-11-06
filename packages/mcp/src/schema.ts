@@ -23,6 +23,7 @@ export type Schema =
     }
   | { readonly type: 'boolean'; readonly description?: string }
   | { readonly type: 'integer'; readonly description?: string; readonly minimum?: number }
+  | { readonly type: 'number'; readonly description?: string }
 
 /** What is wrong with `value`, said of `where`; `undefined` when it fits. */
 export function validate(schema: Schema, value: unknown, where: string): string | undefined {
@@ -82,5 +83,9 @@ export function validate(schema: Schema, value: unknown, where: string): string 
       }
       return undefined
     }
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value)
+        ? undefined
+        : `${where} must be a number.`
   }
 }

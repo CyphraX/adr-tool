@@ -100,7 +100,7 @@ export async function run(args: readonly string[], console: Console): Promise<nu
       )
       if (!checked) {
         console.err(
-          `adr check: Nothing to check in ${root}: no Decision Log is found there, neither .arch/components.yml nor .arch/rules.yml is there, and no Annotation is.\n`
+          `adr check: Nothing to check in ${root}: no Decision Log is found there, neither .arch/components.yml nor .arch/rules.yml is there, and neither a Diagram nor an Annotation is.\n`
         )
         return 2
       }

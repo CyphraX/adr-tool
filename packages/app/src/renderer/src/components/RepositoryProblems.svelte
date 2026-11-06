@@ -16,6 +16,7 @@
     prefixOf,
     repairLabel
   } from '../lib/wording'
+  import DiagramsProblems from './DiagramsProblems.svelte'
   import StatusMark from './StatusMark.svelte'
 
   // The Problems of the repository in front, of every module, in one list (docs/plan-vision.md,
@@ -77,6 +78,10 @@
       {:else if tab?.module === 'review'}
         <button onclick={() => reviewing.backToList()}>
           {t.repositoryProblems.backToAnnotations}
+        </button>
+      {:else if tab?.module === 'diagrams'}
+        <button onclick={() => app.diagrams.closeProblems()}>
+          {t.diagrams.backToDiagrams}
         </button>
       {:else}
         <button onclick={() => app.show('adrs')}>{t.backToAdrs}</button>
@@ -248,13 +253,13 @@
         {/if}
       </section>
 
+      <DiagramsProblems section={problems.diagrams} />
+
       {#if annotations}
         <section aria-label={t.modules.review}>
           <h3>
             {t.modules.review}
-            {#if annotations.state === 'known'}{@render count(
-                annotations.entries.length + (annotations.configUnreadable ? 1 : 0)
-              )}{/if}
+            {#if annotations.state === 'known'}{@render count(annotations.entries.length)}{/if}
           </h3>
           {#if annotations.state === 'reading'}
             <p class="empty" role="status">{t.annotations.problems.reading}</p>
@@ -264,15 +269,13 @@
             {#if annotations.again}
               <p class="empty" role="status">{t.annotations.problems.again}</p>
             {/if}
-            {#if annotations.entries.length === 0 && !annotations.configUnreadable}
+            {#if annotations.configUnreadable}
+              <!-- The Problem itself is under the settings, once for every module. -->
+              <p class="empty">{@render withCode(t.annotations.problems.configUnreadable)}</p>
+            {:else if annotations.entries.length === 0}
               <p class="empty">{t.repositoryProblems.noneHere}</p>
             {/if}
             <ul>
-              {#if annotations.configUnreadable}
-                <li class="group">
-                  <p class="what">{@render withCode(t.annotations.problems.configUnreadable)}</p>
-                </li>
-              {/if}
               {#each annotations.entries as entry, position (position)}
                 {@const problem = entry.problem}
                 <li class="group">

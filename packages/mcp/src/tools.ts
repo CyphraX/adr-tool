@@ -35,12 +35,12 @@ import {
 } from '@adr-tool/core'
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
 import { gitIn } from '@adr-tool/cli/git'
-import type { Plan as KernelPlan } from '@adr-tool/kernel'
 import { adrReferencesOf } from '@adr-tool/review'
 import { repositoryFiles } from './files'
+import { diagramToolsFor } from './diagrams'
+import { PLAN, READ, list, object, required, text } from './kit'
 import { Refusal, type Tool } from './protocol'
 import { reviewTools } from './review-tools'
-import type { Schema } from './schema'
 
 /** How many planned changes wait at most; the oldest is forgotten first. */
 const MAX_PLANNED = 50
@@ -60,25 +60,20 @@ interface Planned {
   readonly changeSet: ChangeSet
   readonly created?: { readonly id: string; readonly path: string }
   readonly renamed?: { readonly from: string; readonly to: string }
-  /** The Decision Log the change is in; none for a change of another module. */
+  /** The Decision Log a change of ADRs is in; none for a change of another module. */
   readonly log?: string
+  /** The Diagram a change is about. */
+  readonly diagram?: { readonly id: string; readonly path: string }
   /** What else the plan said, and the applied change says again: a new Annotation's ID. */
   readonly outcome?: Record<string, unknown>
 }
 
-const text = (description: string): Schema => ({ type: 'string', description })
-const required = (description: string): Schema => ({ type: 'string', description, minLength: 1 })
-const list = (description: string): Schema => ({
-  type: 'array',
-  description,
-  items: { type: 'string' }
-})
-const object = (properties: Record<string, Schema>, needed: string[] = []): Schema => ({
-  type: 'object',
-  properties,
-  required: needed,
-  additionalProperties: false
-})
+/** What a plan_* tool shows of a plan it holds; `hold` keeps it until it is applied or discarded. */
+export type Hold = (
+  plan: Plan,
+  held?: Omit<Planned, 'changeSet'>,
+  shown?: Record<string, unknown>
+) => Record<string, unknown>
 
 const LOG = text(
   'The directory of the Decision Log, e.g. "docs/adr"; "." for a log at the top of the repository. Can be left out when the repository has one log, or when the ID is found in one log only.'
@@ -93,19 +88,6 @@ const revisionOf = (body: string): string =>
 const ID = required(
   'The ADR\'s ID: its file name without ".md", e.g. "0007-use-kafka". "<log>/<ID>" names an ADR of another log.'
 )
-const READ = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false
-}
-/** A plan writes nothing either; it is held until it is applied or discarded. */
-const PLAN = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: false,
-  openWorldHint: false
-}
 
 /**
  * The tools of the server (docs/mcp.md): reading the Decision Logs, their ADRs and Problems,
@@ -194,38 +176,34 @@ export function toolsFor(options: ToolOptions): Tool[] {
     return adr
   }
 
-  /**
-   * Hold a plan, and show it: what each file becomes, as a diff, and what to look out for. A
-   * plan of Decisions is in a log; one of another module says what else it found in `outcome`.
-   */
-  const hold = (
-    log: DecisionLog | undefined,
-    plan: Plan | KernelPlan,
-    outcome?: Record<string, unknown>
-  ): Record<string, unknown> => {
+  /** Hold a plan, and show it: what each file becomes, as a diff, and what to look out for. */
+  const hold: Hold = (plan, held = {}, more = {}) => {
     if (!plan.ok) throw new Refusal(plan.reason)
-    const created = 'created' in plan ? plan.created : undefined
-    const renamed = 'renamed' in plan ? plan.renamed : undefined
     const changeId = randomUUID()
-    planned.set(changeId, {
-      changeSet: plan.changeSet,
-      ...(log && { log: log.path }),
-      ...(created && { created }),
-      ...(renamed && { renamed }),
-      ...(outcome && { outcome })
-    })
+    planned.set(changeId, { changeSet: plan.changeSet, ...held })
     while (planned.size > MAX_PLANNED) planned.delete(planned.keys().next().value!)
     return {
       changeId,
       files: plan.changeSet.files.map(fileOf),
       warnings: plan.warnings ?? [],
-      ...(created && log && { created: { log: shown(log.path), ...created } }),
-      ...(renamed && { renamed }),
-      ...outcome,
+      ...more,
       next: 'Nothing is written yet. Show the person the files and the warnings; apply_change with this changeId writes them, discard_change drops them.'
     }
   }
-  const preview = (log: DecisionLog, plan: Plan): Record<string, unknown> => hold(log, plan)
+  /** Hold a plan of ADRs in a log, with the ADR it creates or the one it renames. */
+  const preview = (log: DecisionLog, plan: Plan): Record<string, unknown> =>
+    hold(
+      plan,
+      {
+        log: log.path,
+        ...(plan.ok && plan.created && { created: plan.created }),
+        ...(plan.ok && plan.renamed && { renamed: plan.renamed })
+      },
+      {
+        ...(plan.ok && plan.created && { created: { log: shown(log.path), ...plan.created } }),
+        ...(plan.ok && plan.renamed && { renamed: plan.renamed })
+      }
+    )
 
   return [
     {
@@ -621,6 +599,9 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return preview(log, await planMigration(fs, log, id))
       }
     },
+    // The Diagrams: read as data with their Drift, and planned as every write is.
+    ...diagramToolsFor({ root: options.root, fs, hold }),
+    // The Annotations: read with where their lines are now, and planned as every write is.
     ...reviewTools({
       fs,
       root: options.root,
@@ -628,7 +609,7 @@ export function toolsFor(options: ToolOptions): Tool[] {
       now: options.now ?? (() => new Date()),
       author,
       adrs: async () => adrReferencesOf((await open()).repository.logs),
-      hold: (plan, outcome) => hold(undefined, plan, outcome)
+      hold: (plan, outcome) => hold(plan, outcome && { outcome }, outcome)
     }),
     {
       name: 'apply_change',
@@ -683,9 +664,9 @@ export function toolsFor(options: ToolOptions): Tool[] {
         return {
           applied: true,
           files: held.changeSet.files.map((file) => file.renameTo ?? file.path),
-          ...(held.created &&
-            held.log !== undefined && { created: { log: shown(held.log), ...held.created } }),
+          ...(held.created && { created: { log: shown(held.log ?? ''), ...held.created } }),
           ...(held.renamed && { renamed: held.renamed }),
+          ...(held.diagram && { diagram: held.diagram }),
           ...held.outcome
         }
       }

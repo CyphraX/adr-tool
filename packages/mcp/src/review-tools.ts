@@ -26,6 +26,7 @@ import {
   type ReviewProblem
 } from '@adr-tool/review'
 import { openStructure } from '@adr-tool/structure/model'
+import { PLAN, READ, object, required, text } from './kit'
 import { Refusal, type Tool } from './protocol'
 import type { Schema } from './schema'
 
@@ -44,15 +45,7 @@ export interface ReviewContext {
   readonly hold: (plan: Plan, outcome?: Record<string, unknown>) => Record<string, unknown>
 }
 
-const text = (description: string): Schema => ({ type: 'string', description })
-const required = (description: string): Schema => ({ type: 'string', description, minLength: 1 })
 const line = (description: string): Schema => ({ type: 'integer', description, minimum: 1 })
-const object = (properties: Record<string, Schema>, needed: string[] = []): Schema => ({
-  type: 'object',
-  properties,
-  required: needed,
-  additionalProperties: false
-})
 
 const ID = required(
   'The Annotation\'s ID: its file name without ".md", e.g. "20261102-why-is-the-total-computed".'
@@ -66,19 +59,6 @@ const PATH = required(
 )
 const START = line('The first line, counted from 1.')
 const END = line('The last line, counted from 1 and included; the first one when left out.')
-const READ = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false
-}
-const PLAN = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: false,
-  openWorldHint: false
-}
-
 /** What became of an Anchor, as the tools say it. */
 type AnchorState = Found['kind'] | 'unreadable'
 

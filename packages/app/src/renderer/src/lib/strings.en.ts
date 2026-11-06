@@ -1,6 +1,7 @@
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { AnnotationState, AnnotationType } from '@adr-tool/review'
 import type { Decision, LowerBound } from '../../../shared/ipc'
+import { DIAGRAMS_EN } from './strings.diagrams.en'
 import type { Refusal } from './views'
 
 /**
@@ -120,6 +121,7 @@ export const en = {
     label: 'Modules',
     decisions: 'Decisions',
     structure: 'Structure',
+    diagrams: 'Diagrams',
     review: 'Review'
   },
 
@@ -1014,7 +1016,7 @@ export const en = {
       again: 'The Anchors are being found again: these are the Problems of the last time.',
       failed: (reason: string): string => `The Annotations could not be read: ${reason}`,
       configUnreadable:
-        '`.arch/config.yml` cannot be read, so no Annotation is read. Fix it in an editor; the view follows.',
+        '`.arch/config.yml` cannot be read, so no Annotation is read. Its Problem is under Settings.',
       byHand:
         'The suite cannot know what was meant here. Fix the file in an editor; the view follows.'
     },
@@ -1185,5 +1187,8 @@ export const en = {
         'A dialog holds what you entered, and it has not been carried out. Closing the window now loses it.',
       action: 'Discard and close'
     }
-  }
+  },
+
+  /** The Diagrams module: strings.diagrams.en.ts. */
+  diagrams: DIAGRAMS_EN
 }

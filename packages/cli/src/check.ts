@@ -9,8 +9,8 @@ import {
 } from '@adr-tool/conformance'
 import {
   analyseDependencies,
-  extractorOf,
   openStructure,
+  type Dependencies,
   type NotAnalysed,
   type NotMeasured
 } from '@adr-tool/structure'
@@ -20,10 +20,12 @@ import {
   wordingOf,
   type StructureProblem
 } from '@adr-tool/structure/model'
+import { openDiagrams } from '@adr-tool/diagrams'
 import { openConfig, type Git, type UnreadableConfig } from '@adr-tool/kernel'
 import { adrReferencesOf } from '@adr-tool/review'
+import { extractorFor } from './analysis'
+import { checkDiagrams, diagramsNeedModel, type DiagramsCheck } from './check-diagrams'
 import { checkReview, type ReviewCheck } from './check-review'
-import { goReader, javaReader, pythonReader } from './readers'
 import { lintRepository, type LintReport } from './lint'
 
 /** A Problem of `.arch/components.yml`, as the command reports it. */
@@ -46,6 +48,7 @@ export interface CheckReport {
   /** That `.arch/config.yml` cannot be read: the one Problem of the file, said once for every module. */
   readonly config: UnreadableConfig | undefined
   readonly conformance: ConformanceReport
+  readonly diagrams: DiagramsCheck
   /** The Annotations of Review: their Problems, and the orphaned ones as notes. */
   readonly review: ReviewCheck
   /** What was not checked, and why: for standard error, not part of the result. */
@@ -55,9 +58,10 @@ export interface CheckReport {
 /**
  * Check the repository behind `fs`, whose files are `files` (`listRepository`): its Decision
  * Logs as `adr lint` does, its declaration of Components, its Rules against the code, and its
+ * Diagrams — their Problems, their pictures, and their Drift against the code —, and its
  * Annotations, whose Anchors are found again with `git`. `undefined` when there is nothing to
- * check: no Decision Log, no declaration, no Rules, no Annotation, and nothing wrong with
- * `.arch/config.yml`.
+ * check: no Decision Log, no declaration, no Rules, no Diagram, no Annotation, and nothing wrong
+ * with `.arch/config.yml`.
  */
 export async function check(
   fs: FileSystem,
@@ -68,12 +72,15 @@ export async function check(
   const rulesText = await fs.readText(RULES_PATH)
   const declared = (await fs.readText(DECLARATION_PATH)) !== undefined
   const config = await openConfig(fs)
+  const found = await openDiagrams(fs, config)
   const review = await checkReview(fs, git, adrReferencesOf(repository.logs))
   const nothing =
     lint === undefined &&
     rulesText === undefined &&
     !declared &&
     config.readable &&
+    found.problems.length === 0 &&
+    found.diagrams.length === 0 &&
     review.annotations === 0 &&
     review.problems.length === 0
   if (nothing) return undefined
@@ -89,17 +96,16 @@ export async function check(
     }
   }
 
-  // The code is analysed only for Rules that are checked: it takes a moment on a large repository.
-  let model: Awaited<ReturnType<typeof analyseDependencies>> | undefined
-  if (needsModel(rules, structure)) {
-    const has = (language: string): boolean =>
-      structure.sourceFiles.some((file) => file.language === language)
-    const extract = extractorOf({
-      java: has('java') ? await javaReader() : undefined,
-      python: has('python') ? await pythonReader() : undefined,
-      go: has('go') ? await goReader() : undefined
-    })
-    model = await analyseDependencies(fs, files, structure.sourceFiles, extract)
+  // The code is analysed only for Rules that are checked, and for Drift where a Diagram can
+  // have it: it takes a moment on a large repository.
+  let model: Dependencies | undefined
+  if (needsModel(rules, structure) || diagramsNeedModel(found, structure)) {
+    model = await analyseDependencies(
+      fs,
+      files,
+      structure.sourceFiles,
+      await extractorFor(structure)
+    )
     if (model.notAnalysed.length > 0) notes.push(notAnalysed(model.notAnalysed))
     if (model.notMeasured.length > 0) notes.push(notMeasured(model.notMeasured))
   }
@@ -109,6 +115,7 @@ export async function check(
     adrs: repository.logs.flatMap((log) => log.adrs.map((adr) => ({ log: log.path, id: adr.id })))
   }
   const conformance = checkConformance(rules, structure, model, decisions)
+  const diagrams = await checkDiagrams(fs, found, structure, model)
 
   return {
     lint,
@@ -123,6 +130,7 @@ export async function check(
     })),
     config: config.readable ? undefined : config.problem,
     conformance,
+    diagrams,
     review,
     notes
   }

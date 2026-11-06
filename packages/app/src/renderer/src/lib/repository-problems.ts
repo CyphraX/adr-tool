@@ -1,6 +1,12 @@
 import { repairsOf, type DecisionLog, type Problem, type Repair } from '@adr-tool/core'
 import { hasRepair, type StructureProblem } from '@adr-tool/structure/model'
 import type { OpenRepository, StructureOutline } from '../../../shared/ipc'
+import {
+  diagramsCount,
+  diagramsSection,
+  type DiagramsKnown,
+  type DiagramsSection
+} from './diagrams-problems'
 import { reviewSection, type ReviewKnown, type ReviewSection } from './review'
 import { problemsAcross, type Placed, type PlacedGroup } from './together'
 
@@ -24,6 +30,8 @@ export interface RepositoryProblems {
   readonly traces: readonly TraceProblem[]
   /** The Problems of the declaration of Components, as far as Structure knows them. */
   readonly structure: StructureSection
+  /** The Problems of the Diagrams, and of `.arch/config.yml` (lib/diagrams-problems.ts). */
+  readonly diagrams: DiagramsSection
   /** The Problems of the Annotations: of their files, of their Traces, and the orphaned. */
   readonly review: ReviewSection
   /** Every Problem known, each root cause once: what every sidebar shows. */
@@ -90,6 +98,7 @@ const isTrace = (problem: Problem): problem is TraceProblem['problem'] =>
 export function repositoryProblems(
   repository: OpenRepository,
   outline: OutlineKnown,
+  diagramsKnown: DiagramsKnown = { overview: undefined, reading: false, failed: undefined },
   review?: ReviewKnown
 ): RepositoryProblems {
   const [across] = problemsAcross([repository])
@@ -116,17 +125,17 @@ export function repositoryProblems(
   const structure = structureSection(outline)
   const decisionsCount = across!.own.length + logs.reduce((sum, log) => sum + log.groups.length, 0)
   const structureCount = structure.state === 'known' ? structure.entries.length : 0
+  const diagrams = diagramsSection(diagramsKnown)
+  // `.arch/config.yml` that cannot be read is counted once, with the Diagrams' settings.
   const annotations = reviewSection(review)
-  const reviewCount =
-    annotations.state === 'known'
-      ? annotations.entries.length + (annotations.configUnreadable ? 1 : 0)
-      : 0
+  const reviewCount = annotations.state === 'known' ? annotations.entries.length : 0
   return {
     decisions: { own: across!.own, logs },
     traces,
     structure,
+    diagrams,
     review: annotations,
-    count: decisionsCount + traces.length + structureCount + reviewCount
+    count: decisionsCount + traces.length + structureCount + diagramsCount(diagrams) + reviewCount
   }
 }
 

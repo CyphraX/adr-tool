@@ -15,6 +15,7 @@
   import { reviewing } from '../lib/reviewing.svelte'
   import { commonDirectory, nodeLabel, opens } from '../lib/structure'
   import { codeSpans, prefixOf } from '../lib/wording'
+  import ComponentDiagrams from './ComponentDiagrams.svelte'
   import StatusMark from './StatusMark.svelte'
   import StructureFunctions from './StructureFunctions.svelte'
 
@@ -214,6 +215,8 @@
       {/each}
     </ul>
   {/if}
+
+  <ComponentDiagrams id={page.id} />
 
   <h3>{t.annotations.component.heading}</h3>
   {@const annotations = openAnnotations(page.id)}

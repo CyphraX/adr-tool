@@ -1,6 +1,7 @@
 import type { RelationState, RelationType } from '@adr-tool/core'
 import type { Decision } from '../../../shared/ipc'
 import type { MetricKey, MetricWording, ReviewWording, en } from './strings.en'
+import { DIAGRAMS_DE } from './strings.diagrams.de'
 import type { Refusal } from './views'
 
 /**
@@ -70,6 +71,7 @@ export const de: typeof en = {
     label: 'Module',
     decisions: 'Entscheidungen',
     structure: 'Struktur',
+    diagrams: 'Diagramme',
     review: 'Review'
   },
 
@@ -959,7 +961,7 @@ export const de: typeof en = {
       failed: (reason: string): string =>
         `Die Annotationen konnten nicht gelesen werden: ${reason}`,
       configUnreadable:
-        '`.arch/config.yml` kann nicht gelesen werden, darum wird keine Annotation gelesen. Korrigieren Sie die Datei in einem Editor; die Ansicht folgt.',
+        '`.arch/config.yml` kann nicht gelesen werden, darum wird keine Annotation gelesen. Sein Problem steht unter Einstellungen.',
       byHand:
         'Die Suite kann nicht wissen, was hier gemeint war. Korrigieren Sie die Datei in einem Editor; die Ansicht folgt.'
     },
@@ -1135,5 +1137,7 @@ export const de: typeof en = {
         'Ein Dialog enthält, was Sie eingegeben haben, und es wurde nicht ausgeführt. Wenn Sie das Fenster jetzt schließen, geht es verloren.',
       action: 'Verwerfen und schließen'
     }
-  }
+  },
+
+  diagrams: DIAGRAMS_DE
 }

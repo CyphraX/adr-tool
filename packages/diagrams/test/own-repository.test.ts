@@ -83,12 +83,14 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
       'app > conformance',
       'app > core',
       'app > diagrams',
+      'app > kernel',
       'app > review',
       'app > structure',
       'assessment > kernel',
       'assessment > structure',
       'cli > conformance',
       'cli > core',
+      'cli > diagrams',
       'cli > kernel',
       'cli > review',
       'cli > structure',
@@ -99,6 +101,7 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
       'diagrams > structure',
       'mcp > cli',
       'mcp > core',
+      'mcp > diagrams',
       'mcp > kernel',
       'mcp > review',
       'mcp > structure',
@@ -107,15 +110,16 @@ describe('the Diagram of this repository’s packages', { timeout: 30_000 }, () 
       'structure > kernel'
     ])
     expect(suggested.every((connection) => connection.drawn)).toBe(true)
-    // The window's German takes the sentences of Diagrams and Assessment as types only; Review it runs.
-    for (const to of ['diagrams', 'assessment']) {
+    // The window's German takes the sentences of Assessment as types only; Diagrams and Review
+    // it runs.
+    expect(suggested.find((one) => one.from === 'app' && one.to === 'assessment')).toMatchObject({
+      typeOnly: true
+    })
+    for (const to of ['diagrams', 'review']) {
       expect(suggested.find((one) => one.from === 'app' && one.to === to)).toMatchObject({
-        typeOnly: true
+        typeOnly: false
       })
     }
-    expect(suggested.find((one) => one.from === 'app' && one.to === 'review')).toMatchObject({
-      typeOnly: false
-    })
     expect(driftOf(packages, structure, analysis)).toEqual([])
   })
 

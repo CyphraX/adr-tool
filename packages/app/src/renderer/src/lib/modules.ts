@@ -12,6 +12,8 @@ export const MODULES = [
   { id: 'decisions' },
   /** The Components of the code and their Dependencies (docs/contexts/structure/CONTEXT.md). */
   { id: 'structure' },
+  /** Pictures of the architecture, bound to the code (docs/contexts/diagrams/CONTEXT.md). */
+  { id: 'diagrams' },
   /** An architect's Annotations on lines of the code (docs/contexts/review/CONTEXT.md). */
   { id: 'review' }
 ] as const satisfies readonly { readonly id: string }[]

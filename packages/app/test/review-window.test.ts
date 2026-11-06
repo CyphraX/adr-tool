@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { memoryFileSystem, openRepository, type Repository } from '@adr-tool/core'
 import type { Anchor } from '@adr-tool/review'
 import type { AnnotationView, ReviewOverview, StructureOutline } from '../src/shared/ipc'
+import type { DiagramsOverview } from '../src/shared/diagrams'
 import { columnsOf, linesOnNumber, selectedLines } from '../src/renderer/src/lib/code-annotations'
 import { repositoryProblems } from '../src/renderer/src/lib/repository-problems'
 import {
@@ -266,14 +267,36 @@ describe('the Problems of Review among those of the repository', () => {
     const open = { id: 'r1', root: '/r1', name: 'shop', repository: repo }
     const outline = { known: OUTLINE, reading: false, failed: undefined }
     const known = { known: overview(), reading: false, failed: undefined }
-    expect(repositoryProblems(open, outline, known).count).toBe(2)
-    // An unreadable `.arch/config.yml` is one Problem more.
+    expect(repositoryProblems(open, outline, undefined, known).count).toBe(2)
+    // An unreadable `.arch/config.yml` is one Problem, counted once with the settings of the
+    // Diagrams: Review says that it reads no Annotation, and counts nothing for it.
     const unreadable = {
       known: overview({ configUnreadable: true, directory: undefined, problems: [] }),
       reading: false,
       failed: undefined
     }
-    expect(repositoryProblems(open, outline, unreadable).count).toBe(1)
+    const config = {
+      kind: 'unreadable-config',
+      path: '.arch/config.yml',
+      line: 1,
+      said: { code: 'config-not-map', values: {} }
+    } as const
+    const diagrams = {
+      overview: {
+        repositoryId: 'r1',
+        directory: undefined,
+        config,
+        problems: [],
+        declared: { origin: 'declared', unreadable: false, components: [] },
+        diagrams: [],
+        analysed: false
+      } satisfies DiagramsOverview,
+      reading: false,
+      failed: undefined
+    }
+    const both = repositoryProblems(open, outline, diagrams, unreadable)
+    expect(both.count).toBe(1)
+    expect(both.review).toMatchObject({ state: 'known', entries: [], configUnreadable: true })
   })
 })
 

@@ -10,6 +10,7 @@ import type {
   Said,
   Templates
 } from '@adr-tool/core'
+import type { DiagramsApi } from './diagrams'
 import type { Language as WindowLanguage } from './language'
 import type { Annotation, AnnotationType, Found, ReviewProblem } from '@adr-tool/review'
 import type {
@@ -571,7 +572,7 @@ export type ReviewRequest =
   | ({ readonly kind: 'attach'; readonly id: string } & SelectedLines)
   | { readonly kind: 'cite' | 'uncite'; readonly id: string; readonly adr: string }
 
-export interface Api {
+export interface Api extends DiagramsApi {
   /** `win32`, `darwin` or `linux`. */
   readonly platform: string
   /** Reopen what was open when the app was last closed. */
