@@ -42,6 +42,7 @@ function some(
     roundTrip: ['‹member-1›', '‹member-2›', '‹member-3›'],
     weakest: ['‹weak-from›', '‹weak-to›'],
     metrics: ['‹metric-1›'],
+    keys: ['‹key-1›', '‹key-2›'],
     by: 'rule',
     where: 'above',
     bound: 'max',

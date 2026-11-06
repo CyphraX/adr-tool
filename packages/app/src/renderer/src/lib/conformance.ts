@@ -6,7 +6,10 @@
  */
 import {
   componentMatcher,
+  fingerprintKindOfKeys,
+  fingerprintNames,
   METRICS,
+  readFingerprint,
   type MetricName,
   type Rule,
   type RuleDraft,
@@ -20,8 +23,8 @@ import type {
 } from '../../../shared/ipc'
 import { t, type MetricKey } from './strings'
 
-/** Each metric a threshold can be on, as Structure's pages name it. */
-export const METRIC_KEY: Record<MetricName, MetricKey> = {
+/** The metrics a threshold can be on that Structure's table has a column for, by its key. */
+const METRIC_KEY: Partial<Record<MetricName, MetricKey>> = {
   files: 'files',
   lines: 'lines',
   'efferent-coupling': 'efferent',
@@ -30,14 +33,39 @@ export const METRIC_KEY: Record<MetricName, MetricKey> = {
   'fan-out': 'fanOut',
   'fan-in': 'fanIn',
   'relational-cohesion': 'cohesion',
-  'internal-share': 'internalShare'
+  'internal-share': 'internalShare',
+  abstractness: 'abstractness',
+  distance: 'distance'
 }
+
+/** A metric a threshold can be on, in the words of the window: its name, its definition, a value. */
+export function metricWording(metric: MetricName): {
+  long: string
+  definition: string
+  value: (value: number) => string
+} {
+  const key = METRIC_KEY[metric]
+  if (key !== undefined) {
+    const { long, definition } = t.structure.metric[key]
+    return { long, definition, value: (value) => t.structure.value(key, value) }
+  }
+  const words = t.conformance.metric[metric as keyof typeof t.conformance.metric]
+  return {
+    ...words,
+    value: (value) =>
+      metric === 'propagation-cost' ? `${Math.round(value * 100)} %` : decimalOf(value)
+  }
+}
+
+/** A count or a measure, as the window writes numbers. */
+const decimalOf = (value: number): string =>
+  Number.isInteger(value) ? String(value) : value.toFixed(2)
 
 /** What a Rule says, in the words of the window. */
 export const ruleSays = (rule: Rule): string =>
   t.conformance.says(
     rule,
-    rule.kind === 'threshold' ? t.structure.metric[METRIC_KEY[rule.metric]].long : ''
+    rule.kind === 'threshold' ? metricWording(rule.metric).long : ''
   )
 
 /** A Rule as the form holds it while it is written: the keys of every kind, as typed. */
@@ -227,10 +255,12 @@ export function violationsOnLevel(
   }
   const nodes = new Map<string, ConformanceViolation[]>()
   for (const node of view.nodes) {
-    const found = open.filter(
-      ({ component }) =>
-        component !== undefined && (component === node.id || component.startsWith(`${node.id}/`))
-    )
+    // A threshold on a function or a class marks the box its Source File lies in.
+    const found = open.filter((violation) => {
+      const of = violation.component ?? violation.owner
+      const inFile = violation.file !== undefined && violation.file === node.id
+      return inFile || (of !== undefined && (of === node.id || of.startsWith(`${node.id}/`)))
+    })
     if (found.length > 0) nodes.set(node.id, found)
   }
   return { edges, nodes }
@@ -241,7 +271,10 @@ export function rulesNaming(rules: readonly Rule[], id: string): Rule[] {
   return rules.filter((rule) => rule.names.some(({ pattern }) => componentMatcher([pattern])(id)))
 }
 
-/** The Violations about a Component or one inside it: from it, to it, of it, or of its Cycle. */
+/**
+ * The Violations about a Component or one inside it: from it, to it, of it, of its Cycle, or of
+ * a function or class in its Source Files.
+ */
 export function violationsAbout(
   violations: readonly ConformanceViolation[],
   id: string
@@ -253,6 +286,7 @@ export function violationsAbout(
       about(violation.from) ||
       about(violation.to) ||
       about(violation.component) ||
+      about(violation.owner) ||
       (violation.cycle?.members.some(about) ?? false)
   )
 }
@@ -309,11 +343,14 @@ export function adrNamed<A extends { readonly id: string }>(
   return undefined
 }
 
-/** What an Exception names, as a title: `billing → web`, `a ⇄ b`, or a Component. */
-export function exceptionNames(
-  exception: Pick<ConformanceException, 'from' | 'to' | 'cycle' | 'component'>
-): string {
-  if (exception.cycle) return exception.cycle.join(' ⇄ ')
-  if (exception.component !== undefined) return exception.component
-  return `${exception.from ?? ''} → ${exception.to ?? ''}`
+/** What an Exception names, without its Rule: `billing → web`, `a ⇄ b`, `parse (src/a.ts)`. */
+export function exceptionNames(exception: ConformanceException): string {
+  return fingerprintNames(
+    exception.fingerprint ??
+      readFingerprint(fingerprintKindOfKeys(exception), exception.rule, exception) ?? {
+        kind: 'component',
+        rule: exception.rule,
+        component: '–'
+      }
+  )
 }

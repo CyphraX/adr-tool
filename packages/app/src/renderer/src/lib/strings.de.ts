@@ -756,6 +756,23 @@ export const de: typeof en = {
 
   conformance: {
     label: 'Regeln, Ausnahmen und was die Prüfung gefunden hat',
+    metric: {
+      complexity: {
+        long: 'Zyklomatische Komplexität einer Funktion',
+        definition:
+          'Zyklomatische Komplexität: 1 und eins mehr für jede Entscheidung in einer Funktion, jede Sprache gezählt, wie ihr übliches Werkzeug sie zählt — ESLint, Checkstyle, radon, gocyclo. Geprüft für jede Funktion in den Quelldateien der Komponenten, die die Regel nennt.'
+      },
+      lcom4: {
+        long: 'LCOM4 einer Klasse',
+        definition:
+          'LCOM4: die Gruppen von Methoden einer Klasse, die kein Feld teilen und keine Methode einer anderen Gruppe aufrufen. Mehr als eine, und die Klasse ließe sich teilen. Geprüft für jede Klasse in den Quelldateien der Komponenten, die die Regel nennt.'
+      },
+      'propagation-cost': {
+        long: 'Ausbreitungskosten einer Ebene',
+        definition:
+          'Ausbreitungskosten: unter allen geordneten Paaren von Knoten einer Ebene der Anteil, in dem der erste den zweiten über Abhängigkeiten erreicht. Geprüft für die Ebene unter jeder Komponente, die die Regel nennt, / für die oberste Ebene.'
+      }
+    },
     rules: 'Regeln',
     all: 'Alle Verstöße',
     allHint: 'Die Verstöße aller Regeln',

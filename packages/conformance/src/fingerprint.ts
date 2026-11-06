@@ -147,7 +147,8 @@ export function fingerprintFrom(value: unknown): Fingerprint | undefined {
  * the first kind whose keys are all there, `dependency` where none is. A function and a class
  * are named alike, and taken for a function.
  */
-export function fingerprintKindOfKeys(keys: Readonly<Record<string, unknown>>): Fingerprint['kind'] {
+export function fingerprintKindOfKeys(written: object): Fingerprint['kind'] {
+  const keys = written as Readonly<Record<string, unknown>>
   return (
     FINGERPRINT_KINDS.find((kind) =>
       FINGERPRINT_SHAPES[kind].every(([key]) => keys[key] !== undefined)

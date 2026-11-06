@@ -803,6 +803,24 @@ export const en = {
   /** The Rules of the repository and where the code breaks them (docs/plan-vision.md, part 4). */
   conformance: {
     label: 'Rules, Exceptions and what the check found',
+    /** The metrics a threshold can be on that are no column of Structure's table. */
+    metric: {
+      complexity: {
+        long: 'Cyclomatic complexity of a function',
+        definition:
+          'Cyclomatic complexity: 1 and one more for each decision in a function, each language counted as its usual tool counts it — ESLint, Checkstyle, radon, gocyclo. Checked for each function in the Source Files of the Components the Rule names.'
+      },
+      lcom4: {
+        long: 'LCOM4 of a class',
+        definition:
+          'LCOM4: the groups of methods of a class that share no field and call no one of another group. More than one, and the class could be split. Checked for each class in the Source Files of the Components the Rule names.'
+      },
+      'propagation-cost': {
+        long: 'Propagation cost of a level',
+        definition:
+          'Propagation cost: of all ordered pairs of nodes of a level, the share where the first reaches the second through Dependencies. Checked for the level below each Component the Rule names, / for the top level.'
+      }
+    },
     rules: 'Rules',
     all: 'All Violations',
     allHint: 'The Violations of every Rule',

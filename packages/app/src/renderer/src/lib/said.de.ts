@@ -131,15 +131,14 @@ function thresholdSubject(
   v: Parameters<(typeof CONFORMANCE_SENTENCES)['threshold']>[0]
 ): string {
   switch (v.subject) {
-    case undefined:
-    case 'component':
-      return `von ${v.component}`
     case 'level':
       return v.component === TOP_LEVEL ? 'der obersten Ebene' : `der Ebene unter ${v.component}`
     case 'function':
       return `der Funktion ${v.name} in ${v.file}:${v.line}`
     case 'class':
       return `der Klasse ${v.name} in ${v.file}:${v.line}`
+    default:
+      return `von ${v.component}`
   }
 }
 

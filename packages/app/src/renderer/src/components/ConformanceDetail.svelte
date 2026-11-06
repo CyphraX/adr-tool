@@ -5,7 +5,7 @@
     ConformanceView,
     ConformanceViolation
   } from '../../../shared/ipc'
-  import { adrNamed, exceptionNames, METRIC_KEY, referenceOf, ruleSays } from '../lib/conformance'
+  import { adrNamed, exceptionNames, metricWording, referenceOf, ruleSays } from '../lib/conformance'
   import { wordConformance } from '../lib/said'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -242,10 +242,10 @@
   {/if}
 
   {#if violation.value !== undefined && rule?.kind === 'threshold'}
-    {@const key = METRIC_KEY[rule.metric]}
+    {@const metric = metricWording(rule.metric)}
     <h3>{t.conformance.detail.value}</h3>
-    <p title={t.structure.metric[key].definition}>
-      {t.structure.metric[key].long}: {t.structure.value(key, violation.value)}
+    <p title={metric.definition}>
+      {metric.long}: {metric.value(violation.value)}
     </p>
   {/if}
 

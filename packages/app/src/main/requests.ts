@@ -1,9 +1,9 @@
 import {
+  fingerprintFrom,
   METRICS,
   RULE_KIND_NAMES,
   type ConformanceRepair,
   type ExceptionDraft,
-  type Fingerprint,
   type RuleDraft
 } from '@adr-tool/conformance'
 import { BACK_REFERENCE_KEYS, METADATA_KEYS, RELATION_TYPES, type Repair } from '@adr-tool/core'
@@ -225,7 +225,7 @@ function ruleDraft(value: unknown): RuleDraft | undefined {
 /** The Violation an Exception is to accept, why, and the ADR that justifies it. */
 export function exceptionRequest(request: unknown): ExceptionDraft | undefined {
   const { fingerprint, reason, justifiedBy } = record(request)
-  const named = fingerprintOf(fingerprint)
+  const named = fingerprintFrom(fingerprint)
   if (named === undefined || typeof reason !== 'string') return undefined
   if (justifiedBy !== undefined && typeof justifiedBy !== 'string') return undefined
   return { fingerprint: named, reason, ...(justifiedBy !== undefined && { justifiedBy }) }
@@ -234,30 +234,14 @@ export function exceptionRequest(request: unknown): ExceptionDraft | undefined {
 /** A Repair of the Rules file, as `repairOf` made it. */
 export function conformanceRepairRequest(request: unknown): ConformanceRepair | undefined {
   const { kind, line, fingerprint, members } = record(request)
-  const named = fingerprintOf(fingerprint)
+  const named = fingerprintFrom(fingerprint)
   if (named === undefined || typeof line !== 'number' || !Number.isInteger(line)) return undefined
   if (kind === 'remove-exception') return { kind, line, fingerprint: named }
-  if (kind === 'narrow-exception' && isStrings(members)) {
+  // Narrowed to a Cycle: two members at least, which `conformance` holds against the Exception.
+  if (kind === 'narrow-exception' && isStrings(members) && (members as string[]).length >= 2) {
     return { kind, line, fingerprint: named, members: members as string[] }
   }
   return undefined
-}
-
-function fingerprintOf(value: unknown): Fingerprint | undefined {
-  const { kind, rule, from, to, cycle, component } = record(value)
-  if (typeof rule !== 'string') return undefined
-  switch (kind) {
-    case 'dependency':
-      return typeof from === 'string' && typeof to === 'string'
-        ? { kind, rule, from, to }
-        : undefined
-    case 'cycle':
-      return isStrings(cycle) ? { kind, rule, cycle: cycle as string[] } : undefined
-    case 'component':
-      return typeof component === 'string' ? { kind, rule, component } : undefined
-    default:
-      return undefined
-  }
 }
 
 function record(value: unknown): Record<string, unknown> {

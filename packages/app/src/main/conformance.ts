@@ -34,6 +34,7 @@ export async function conformanceView(
   const { structure, dependencies } = analysis
   const model = needsModel(file, structure) ? dependencies : undefined
   const report = conformanceOf(file, structure, model, repository)
+  const ownerOf = new Map(structure.sourceFiles.map((one) => [one.path, one.component]))
   const violations = report.violations.map((violation) => ({
     key: fingerprintKey(violation.fingerprint),
     rule: violation.rule.id,
@@ -45,6 +46,11 @@ export async function conformanceView(
     ...(violation.cycle && { cycle: violation.cycle }),
     ...(violation.component !== undefined && { component: violation.component }),
     ...(violation.value !== undefined && { value: violation.value }),
+    ...(violation.file !== undefined && { file: violation.file }),
+    ...(violation.line !== undefined && { line: violation.line }),
+    ...(violation.name !== undefined && { name: violation.name }),
+    ...(violation.file !== undefined &&
+      ownerOf.get(violation.file) !== undefined && { owner: ownerOf.get(violation.file)! }),
     dependencies: violation.dependencies,
     ...(violation.exception && { exception: violation.exception })
   }))

@@ -445,6 +445,12 @@ export interface ConformanceViolation {
   readonly cycle?: Violation['cycle']
   readonly component?: string
   readonly value?: number
+  /** Of a threshold on a function or a class: its Source File, the line of its name, its name. */
+  readonly file?: string
+  readonly line?: number
+  readonly name?: string
+  /** Of a threshold on a function or a class: the Component its Source File lies in. */
+  readonly owner?: string
   /** The Source File Dependencies behind it, with the lines of their imports. */
   readonly dependencies: readonly Dependency[]
   /** The Exception that accepts it, if one does. */

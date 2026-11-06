@@ -1,6 +1,6 @@
 <script lang="ts">
   import { isRuleId, METRICS, RULE_KIND_NAMES } from '@adr-tool/conformance'
-  import { METRIC_KEY, missingOf, numberOf, type RuleForm } from '../lib/conformance'
+  import { metricWording, missingOf, numberOf, type RuleForm } from '../lib/conformance'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import { codeSpans } from '../lib/wording'
@@ -165,10 +165,10 @@
       <span class="name">{words.metric}</span>
       <select bind:value={form.metric}>
         {#each METRICS as metric (metric)}
-          <option value={metric}>{t.structure.metric[METRIC_KEY[metric]].long}</option>
+          <option value={metric}>{metricWording(metric).long}</option>
         {/each}
       </select>
-      <span class="note">{t.structure.metric[METRIC_KEY[form.metric]].definition}</span>
+      <span class="note">{metricWording(form.metric).definition}</span>
     </label>
     <div class="limits">
       <label class="field">
