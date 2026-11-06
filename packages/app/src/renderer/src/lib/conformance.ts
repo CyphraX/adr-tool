@@ -63,10 +63,7 @@ const decimalOf = (value: number): string =>
 
 /** What a Rule says, in the words of the window. */
 export const ruleSays = (rule: Rule): string =>
-  t.conformance.says(
-    rule,
-    rule.kind === 'threshold' ? metricWording(rule.metric).long : ''
-  )
+  t.conformance.says(rule, rule.kind === 'threshold' ? metricWording(rule.metric).long : '')
 
 /** A Rule as the form holds it while it is written: the keys of every kind, as typed. */
 export interface RuleForm {

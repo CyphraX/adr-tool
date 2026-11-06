@@ -66,7 +66,10 @@ export function fingerprintKey(fingerprint: Fingerprint): string {
  * the file's, the window's, the MCP server's — knows it.
  */
 export const FINGERPRINT_SHAPES: {
-  readonly [K in Fingerprint['kind']]: readonly (readonly [key: string, value: 'name' | 'members'])[]
+  readonly [K in Fingerprint['kind']]: readonly (readonly [
+    key: string,
+    value: 'name' | 'members'
+  ])[]
 } = {
   dependency: [
     ['from', 'name'],
