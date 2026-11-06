@@ -847,7 +847,6 @@ export const de: typeof en = {
       noImports:
         'Hinter einem Schwellenwert steht kein Import: Gemessen wird, worauf er sich bezieht, als Ganzes.',
       inCode: 'Im Code',
-      at: (file: string, line: number): string => `${file}:${line}`,
       roundTrip: 'Zum Beispiel',
       weakest: 'Schwächste Abhängigkeit',
       value: 'Wert',

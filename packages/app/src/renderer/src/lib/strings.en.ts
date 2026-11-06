@@ -892,7 +892,6 @@ export const en = {
       noImports: 'A threshold has no import behind it: what it is of is measured as a whole.',
       /** Of a function or a class: where it begins. */
       inCode: 'In the code',
-      at: (file: string, line: number): string => `${file}:${line}`,
       roundTrip: 'For example',
       weakest: 'Weakest Dependency',
       value: 'Value',
