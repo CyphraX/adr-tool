@@ -866,7 +866,7 @@ describe('what the writer keeps, and where it refuses', () => {
     const removed = await planRemoveRule(fs, 'a')
     if (!removed.ok) throw new Error(removed.reason)
     expect(removed.changeSet.files[0]!.after).toBe('rules:\r\nexceptions:\r\n')
-    const bom = `﻿${blockTo}`
+    const bom = `\uFEFF${blockTo}`
     expect(after(bom, changeRuleEdits(bom, 'a', to(['db', 'net'])))).toBe(
       bom.replace('      - files', '      - net')
     )
@@ -922,7 +922,7 @@ describe('what the writer keeps, and where it refuses', () => {
   })
 
   it('escapes what a reader would not see, or would take for a line break', () => {
-    const why = 'A B\u0085C\u007fD\u0007.'
+    const why = 'A\u2028B\u0085C\u007fD\u0007.'
     const written = after(blockTo, changeRuleEdits(blockTo, 'a', { ...to(['db', 'files']), why }))
     expect(written).toBe(
       blockTo.replace('    why: A.', '    why: "A\\u2028B\\u0085C\\u007fD\\u0007."')

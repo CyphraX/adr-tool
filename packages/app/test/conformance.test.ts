@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { draftOf, readRules, type Rule } from '@adr-tool/conformance'
+import { memoryFileSystem } from '@adr-tool/core'
+import { analyseDependencies, openStructure } from '@adr-tool/structure'
+import { conformanceView, planException, planRule } from '../src/main/conformance'
 import type { ConformanceException, ConformanceViolation, StructureView } from '../src/shared/ipc'
 import {
   adrNamed,
@@ -239,5 +242,130 @@ describe('what names a Component, and what an ADR justifies', () => {
     expect(adrNamed('./0001-top', logs)).toEqual({ log: '', adr: { id: '0001-top' } })
     expect(adrNamed('docs/adr/0009-dates', logs)?.log).toBe('docs/adr')
     expect(adrNamed('0009-dates', logs)).toBeUndefined()
+  })
+})
+
+describe('the Rules as the main process checks and plans them', () => {
+  const adr = [
+    '---',
+    'status: accepted',
+    'created: 2026-11-01',
+    'decided: 2026-11-01',
+    'decision-makers: [Kim Becker]',
+    '---',
+    '',
+    '# The invoice formats dates like the web',
+    '',
+    'It does.',
+    ''
+  ].join('\n')
+  const files = {
+    '.arch/components.yml': [
+      'components:',
+      '  web:',
+      '    paths: [src/web/**]',
+      '  billing:',
+      '    paths: [src/billing/**]',
+      ''
+    ].join('\n'),
+    '.arch/rules.yml': [
+      'rules:',
+      '  - id: billing-not-web',
+      '    why: Billing is the domain.',
+      '    kind: must-not-depend',
+      '    from: billing',
+      '    to: web',
+      '  - id: simple',
+      '    why: Simple functions.',
+      '    kind: threshold',
+      '    metric: complexity',
+      '    max: 1',
+      '    of: web',
+      'exceptions:',
+      '  - rule: billing-not-web',
+      '    from: billing',
+      '    to: web',
+      '    reason: The invoice formats dates like the web.',
+      '    justified-by: 0001-dates',
+      ''
+    ].join('\n'),
+    'docs/adr/0001-dates.md': adr,
+    'src/web/format.ts': [
+      'export function format(d: Date | undefined): string {',
+      "  return d ? d.toISOString() : ''",
+      '}',
+      ''
+    ].join('\n'),
+    'src/billing/invoice.ts':
+      "import { format } from '../web/format'\nexport const invoice = format\n"
+  }
+
+  async function viewOf(fs: ReturnType<typeof memoryFileSystem>) {
+    const paths = Object.keys(files)
+    const structure = await openStructure(fs, paths)
+    const dependencies = await analyseDependencies(fs, paths, structure.sourceFiles)
+    return conformanceView(
+      'r1',
+      fs,
+      { structure, dependencies, milliseconds: 0 },
+      {
+        current: true,
+        analysedAt: 0
+      }
+    )
+  }
+
+  it('gives each Violation its key, the file and the Component of a function, and each Exception what it accepts', async () => {
+    const view = await viewOf(memoryFileSystem(files))
+    expect(view.problems).toEqual([])
+    const [dependency, complex] = view.violations
+    expect(dependency).toMatchObject({
+      rule: 'billing-not-web',
+      from: 'billing',
+      to: 'web',
+      exception: { line: 14 }
+    })
+    expect(complex).toMatchObject({
+      rule: 'simple',
+      file: 'src/web/format.ts',
+      line: 1,
+      name: 'format',
+      owner: 'web',
+      value: 2,
+      fingerprint: { kind: 'function', rule: 'simple', file: 'src/web/format.ts', name: 'format' }
+    })
+    expect(view.exceptions).toMatchObject([
+      {
+        line: 14,
+        fingerprint: { kind: 'dependency', rule: 'billing-not-web', from: 'billing', to: 'web' },
+        accepts: [dependency!.key]
+      }
+    ])
+  })
+
+  it('plans a Rule with a warning for a name the declaration does not have, and an Exception by an ADR there is', async () => {
+    const fs = memoryFileSystem(files)
+    const added = await planRule(fs, {
+      action: 'add',
+      draft: { id: 'apart', why: 'W.', kind: 'no-cycles', scope: 'among', components: ['shop'] }
+    })
+    expect(added).toMatchObject({ ok: true, warned: [{ code: 'unknown-component' }] })
+    expect(await planRule(fs, { action: 'remove', id: 'simple' })).toMatchObject({ ok: true })
+    const fingerprint = {
+      kind: 'function' as const,
+      rule: 'simple',
+      file: 'src/web/format.ts',
+      name: 'format'
+    }
+    const accepted = await planException(fs, {
+      fingerprint,
+      reason: 'R.',
+      justifiedBy: '0001-dates'
+    })
+    if (!accepted.ok) throw new Error(accepted.reason)
+    expect(accepted.changeSet.files[0]!.after).toContain('    name: format\n')
+    expect(
+      await planException(fs, { fingerprint, reason: 'R.', justifiedBy: '0099-never' })
+    ).toMatchObject({ ok: false, said: { code: 'unknown-justification' } })
   })
 })
