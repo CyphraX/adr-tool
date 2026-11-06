@@ -440,6 +440,13 @@ function violationOf(
     }
     return { kind: 'cycle', rule, cycle: members as string[] }
   }
+  // A use of a Library names its Component too: the Library tells it from a threshold's.
+  if (has('library')) {
+    const [component, library] = [text('component'), text('library')]
+    if (component === undefined) return needs('component')
+    if (library === undefined) return needs('library')
+    return { kind: 'library', rule, component, library }
+  }
   if (has('component')) {
     const component = text('component')
     return component === undefined ? needs('component') : { kind: 'component', rule, component }

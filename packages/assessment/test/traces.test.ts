@@ -214,6 +214,35 @@ describe('the Traces of an Assessment', () => {
       'violation-gone'
     ])
   })
+
+  it('name a use of a Library by its Component and the Library, apart from a threshold (part 15)', async () => {
+    const rule = 'only-the-window-uses-electron'
+    const read = await reading(
+      'date: 2026-11-03',
+      `evidence:\n  - violation: ${rule}\n    component: core\n    library: electron`
+    )
+    expect(read.assessments[0]!.findings[0]!.evidence).toEqual([
+      {
+        kind: 'violation',
+        violation: { kind: 'library', rule, component: 'core', library: 'electron' },
+        line: expect.any(Number)
+      }
+    ])
+    const found = (violations: Known['violations']): string[] =>
+      traceProblems(read, { violations }).map((problem) => problem.kind)
+    expect(found([{ kind: 'library', rule, component: 'core', library: 'electron' }])).toEqual([])
+    expect(found([{ kind: 'library', rule, component: 'core', library: 'chokidar' }])).toEqual([
+      'violation-gone'
+    ])
+    expect(found([{ kind: 'component', rule, component: 'core' }])).toEqual(['violation-gone'])
+    expect(citingComponent(read, 'core').findings).toHaveLength(1)
+    // Without its Component, the Library names no Violation.
+    const incomplete = await reading(
+      'date: 2026-11-03',
+      `evidence:\n  - violation: ${rule}\n    library: electron`
+    )
+    expect(incomplete.problems.map((problem) => problem.kind)).toContain('invalid-evidence')
+  })
 })
 
 describe('the other direction of a Trace', () => {

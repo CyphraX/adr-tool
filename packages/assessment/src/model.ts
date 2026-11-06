@@ -15,7 +15,8 @@ import type {
 /**
  * A Violation as a Finding names it: its Rule, and what it is about, by the kind of the Rule
  * (docs/conformance-format.md, section 3). `inside` is a function or a class in a Source File,
- * whichever the Rule's metric is about (part 13).
+ * whichever the Rule's metric is about (part 13); `library` a Component that uses a Library,
+ * by the name the code uses (part 15).
  */
 export type NamedViolation =
   | {
@@ -27,11 +28,18 @@ export type NamedViolation =
   | { readonly kind: 'cycle'; readonly rule: string; readonly cycle: readonly string[] }
   | { readonly kind: 'component'; readonly rule: string; readonly component: string }
   | { readonly kind: 'inside'; readonly rule: string; readonly file: string; readonly name: string }
+  | {
+      readonly kind: 'library'
+      readonly rule: string
+      readonly component: string
+      readonly library: string
+    }
 
 /**
  * The fingerprint of a Violation the code has now, as Conformance gives it: `assessment` does
  * not know Conformance (ADR-0006), and its caller hands these in. Each of Conformance's
- * fingerprints is one of these, part 13's per function and per class among them.
+ * fingerprints is one of these, part 13's per function and per class and part 15's of a
+ * Library among them.
  */
 export type ViolationFingerprint =
   | {
@@ -47,6 +55,12 @@ export type ViolationFingerprint =
       readonly rule: string
       readonly file: string
       readonly name: string
+    }
+  | {
+      readonly kind: 'library'
+      readonly rule: string
+      readonly component: string
+      readonly library: string
     }
 
 /** What a metric value is of: a Component (`/` for the top level, of a level's metric), or a function or class in a Source File. */

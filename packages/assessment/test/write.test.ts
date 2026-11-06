@@ -637,6 +637,22 @@ describe('evidence', () => {
     ).toBe('F1 cites the Annotation 20261102-there already.')
   })
 
+  it('names a use of a Library by its Component and the Library (part 15)', async () => {
+    const fs = memoryFileSystem({ [PATH]: SHOP })
+    const plan = await planEvidence(fs, '20261103-the-shop', 'F1', {
+      kind: 'violation',
+      violation: {
+        kind: 'library',
+        rule: 'no-orm-in-web',
+        component: 'web',
+        library: 'org.hibernate'
+      }
+    })
+    expect(inserted(SHOP, await textAfter(plan), '  - annotation: 20261102-there\n')).toBe(
+      '  - violation: no-orm-in-web\n    component: web\n    library: org.hibernate\n'
+    )
+  })
+
   it('gets its key where the Finding has none', async () => {
     const text = SHOP.replace('evidence:\n  - annotation: 20261102-there\n', '')
     const fs = memoryFileSystem({ [PATH]: text })
