@@ -90,8 +90,10 @@
     violating(edge) ? Math.max(2.6, strokeOf(edge.weight)) : strokeOf(edge.weight)
 
   // A level that is drawn anew shows what is selected on it, or else the first thing that
-  // breaks a Rule, wherever it lies in the drawing: scrolled only as far as it takes to see it
-  // whole, and only when the level or the selection changed — not on every refresh.
+  // breaks a Rule, wherever it lies in the drawing — a line with the boxes at its two ends.
+  // It is scrolled only when the level or the selection changed, not on every refresh, and
+  // only where it is not in sight already: up or down to the middle, sideways as little as
+  // it takes, so that the boxes beside it stay where they are.
   let canvas = $state<HTMLDivElement>()
   let shownFor: string | undefined
   $effect(() => {
@@ -100,17 +102,37 @@
     if (at === shownFor) return
     shownFor = at
     const target =
-      canvas.querySelector('.node.selected, .line.violating.highlighted') ??
-      canvas.querySelector('.line.violating, .node.violating')
+      canvas.querySelector<HTMLElement | SVGElement>(
+        '.node.selected, .line.violating.highlighted'
+      ) ?? canvas.querySelector<HTMLElement | SVGElement>('.line.violating, .node.violating')
     if (!target) return
-    const box = target.getBoundingClientRect()
+    const ends = [target.dataset.from, target.dataset.to].flatMap((id) =>
+      id === undefined ? [] : [canvas!.querySelector(`.node[data-id="${CSS.escape(id)}"]`)]
+    )
+    const boxes = [target, ...ends].flatMap((one) => (one ? [one.getBoundingClientRect()] : []))
+    const left = Math.min(...boxes.map((box) => box.left))
+    const right = Math.max(...boxes.map((box) => box.right))
+    const top = Math.min(...boxes.map((box) => box.top))
+    const bottom = Math.max(...boxes.map((box) => box.bottom))
     const frame = canvas.getBoundingClientRect()
-    const whole =
-      box.left >= frame.left &&
-      box.right <= frame.right &&
-      box.top >= frame.top &&
-      box.bottom <= frame.bottom
-    if (!whole) target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    const seen = {
+      left: frame.left,
+      top: frame.top,
+      right: frame.left + canvas.clientWidth,
+      bottom: frame.top + canvas.clientHeight
+    }
+    const margin = 16
+    const down =
+      top >= seen.top && bottom <= seen.bottom
+        ? 0
+        : (top + bottom) / 2 - (seen.top + seen.bottom) / 2
+    const across =
+      left < seen.left
+        ? left - seen.left - margin
+        : right > seen.right
+          ? Math.min(right - seen.right + margin, left - seen.left - margin)
+          : 0
+    if (down !== 0 || across !== 0) canvas.scrollBy({ left: across, top: down })
   })
 </script>
 
@@ -139,6 +161,8 @@
             {@const d = pathOf(line)}
             <path
               class="line"
+              data-from={edge.from}
+              data-to={edge.to}
               class:type-only={edge.typeOnly}
               class:in-cycle={inCycle(edge) || violating(edge)}
               class:violating={violating(edge)}
@@ -167,6 +191,7 @@
           {#if node}
             <button
               class="node {node.kind}"
+              data-id={node.id}
               class:draft={view.origin === 'draft'}
               class:violating={violations?.nodes.has(node.id)}
               class:selected={selection?.kind === 'node' && selection.id === node.id}
