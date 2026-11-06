@@ -5,7 +5,13 @@
     ConformanceView,
     ConformanceViolation
   } from '../../../shared/ipc'
-  import { adrNamed, exceptionNames, metricWording, referenceOf, ruleSays } from '../lib/conformance'
+  import {
+    adrNamed,
+    exceptionNames,
+    metricWording,
+    referenceOf,
+    ruleSays
+  } from '../lib/conformance'
   import { wordConformance } from '../lib/said'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -246,6 +252,14 @@
     <h3>{t.conformance.detail.value}</h3>
     <p title={metric.definition}>
       {metric.long}: {metric.value(violation.value)}
+    </p>
+  {/if}
+
+  {#if violation.file !== undefined && violation.line !== undefined}
+    <h3>{t.conformance.detail.inCode}</h3>
+    <p>
+      {@render fileLink(violation.file, [violation.line])}
+      {@render lineLinks(violation.file, [violation.line])}
     </p>
   {/if}
 

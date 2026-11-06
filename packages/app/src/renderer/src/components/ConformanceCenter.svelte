@@ -122,6 +122,8 @@
       <code>{violation.rule}</code>
       {#if violation.dependencies.length > 0}
         <span>{t.structure.graph.weight(violation.dependencies.length)}</span>
+      {:else if violation.file !== undefined && violation.line !== undefined}
+        <span>{t.conformance.detail.at(violation.file, violation.line)}</span>
       {/if}
     </span>
   </div>

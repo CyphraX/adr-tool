@@ -889,7 +889,10 @@ export const en = {
       notAnAdr: (reference: string): string => `${reference} — not an ADR of this repository`,
       preview: 'Preview',
       imports: 'Source File Dependencies',
-      noImports: 'A threshold has no import behind it: the Component as a whole is measured.',
+      noImports: 'A threshold has no import behind it: what it is of is measured as a whole.',
+      /** Of a function or a class: where it begins. */
+      inCode: 'In the code',
+      at: (file: string, line: number): string => `${file}:${line}`,
       roundTrip: 'For example',
       weakest: 'Weakest Dependency',
       value: 'Value',
