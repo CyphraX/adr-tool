@@ -125,32 +125,32 @@
     <text class="label" x="540" y="137.6" text-anchor="middle">serves ADRs</text>
     <rect class="ground" x="702.5" y="176" width="115" height="16"/>
     <text class="label" x="760" y="187.6" text-anchor="middle">runs git, analyses</text>
-    <rect class="ground" x="599.5" y="366" width="101" height="16"/>
-    <text class="label" x="650" y="377.6" text-anchor="middle">plans Diagrams</text>
-    <rect class="ground" x="390" y="266" width="80" height="16"/>
-    <text class="label" x="430" y="277.6" text-anchor="middle">the settings</text>
+    <rect class="ground" x="603.81" y="356.98" width="101" height="16"/>
+    <text class="label" x="654.31" y="368.58" text-anchor="middle">plans Diagrams</text>
+    <rect class="ground" x="603.99" y="181.7" width="80" height="16"/>
+    <text class="label" x="643.99" y="193.3" text-anchor="middle">the settings</text>
     <rect class="ground" x="485.5" y="166" width="109" height="16"/>
     <text class="label" x="540" y="177.6" text-anchor="middle">lints and exports</text>
     <rect class="ground" x="614" y="306" width="112" height="16"/>
     <text class="label" x="670" y="317.6" text-anchor="middle">checks the Rules</text>
-    <rect class="ground" x="583" y="406" width="134" height="16"/>
-    <text class="label" x="650" y="417.6" text-anchor="middle">checks the Diagrams</text>
+    <rect class="ground" x="567.97" y="431.96" width="134" height="16"/>
+    <text class="label" x="634.97" y="443.56" text-anchor="middle">checks the Diagrams</text>
     <rect class="ground" x="393" y="306" width="74" height="16"/>
     <text class="label" x="430" y="317.6" text-anchor="middle">the git port</text>
     <rect class="ground" x="636.5" y="256" width="67" height="16"/>
     <text class="label" x="670" y="267.6" text-anchor="middle">Decisions</text>
-    <rect class="ground" x="637.5" y="356" width="65" height="16"/>
-    <text class="label" x="670" y="367.6" text-anchor="middle">Structure</text>
+    <rect class="ground" x="716.98" y="365.08" width="65" height="16"/>
+    <text class="label" x="749.48" y="376.68" text-anchor="middle">Structure</text>
     <rect class="ground" x="733" y="396" width="134" height="16"/>
     <text class="label" x="800" y="407.6" text-anchor="middle">renames in the Rules</text>
     <rect class="ground" x="855" y="306" width="70" height="16"/>
     <text class="label" x="890" y="317.6" text-anchor="middle">the export</text>
     <rect class="ground" x="747.5" y="496" width="65" height="16"/>
     <text class="label" x="780" y="507.6" text-anchor="middle">Diagrams</text>
-    <rect class="ground" x="520" y="396" width="80" height="16"/>
-    <text class="label" x="560" y="407.6" text-anchor="middle">the settings</text>
-    <rect class="ground" x="720" y="306" width="120" height="16"/>
-    <text class="label" x="780" y="317.6" text-anchor="middle">German sentences</text>
+    <rect class="ground" x="430" y="396" width="80" height="16"/>
+    <text class="label" x="470" y="407.6" text-anchor="middle">the settings</text>
+    <rect class="ground" x="729.36" y="309.51" width="120" height="16"/>
+    <text class="label" x="789.36" y="321.11" text-anchor="middle">German sentences</text>
     <rect class="ground" x="580" y="486" width="120" height="16"/>
     <text class="label" x="640" y="497.6" text-anchor="middle">German sentences</text>
     <rect class="ground" x="874.96" y="486" width="131" height="16"/>

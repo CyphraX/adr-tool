@@ -310,6 +310,8 @@ function layout(
   const boxOfId = new Map(boxes.map((box) => [box.element.id, box]))
   const connections = connectionsOf(diagram)
   const pairs = new Set(connections.map(({ from, to }) => `${from}\n${to}`))
+  // A label stands on its line where it covers no box and no label placed before it.
+  const grounds: Rect[] = []
   const lines = connections.flatMap((connection) => {
     const both = pairs.has(`${connection.to}\n${connection.from}`)
     const line = lineBetween(
@@ -318,9 +320,47 @@ function layout(
       both,
       connection.label
     )
-    return line ? [{ ends: { from: connection.from, to: connection.to }, line }] : []
+    if (!line) return []
+    const ends = { from: connection.from, to: connection.to }
+    if (!line.label) return [{ ends, line }]
+    const ground = clearGround(line, line.label.ground, [...boxes, ...grounds])
+    grounds.push(ground)
+    return [{ ends, line: { ...line, label: { ...line.label, ground } } }]
   })
   return { boxes, lines }
+}
+
+/** How far a label keeps from a box or another label, and how far it is moved at a time. */
+const CLEARANCE = 3
+const LABEL_STEP = 10
+
+const overlaps = (a: Rect, b: Rect): boolean =>
+  a.x < b.x + b.width + CLEARANCE &&
+  b.x < a.x + a.width + CLEARANCE &&
+  a.y < b.y + b.height + CLEARANCE &&
+  b.y < a.y + a.height + CLEARANCE
+
+/**
+ * Where the ground of a label stands on its line: in the middle where it covers nothing, else
+ * moved along the line, a step at a time to either side, to the first place that covers no box
+ * and no other label; in the middle where there is none.
+ */
+function clearGround(line: Line, middle: Rect, taken: readonly Rect[]): Rect {
+  const along = { x: line.to.x - line.from.x, y: line.to.y - line.from.y }
+  const length = Math.sqrt(along.x * along.x + along.y * along.y)
+  if (length === 0) return middle
+  const unit = { x: along.x / length, y: along.y / length }
+  for (let step = 0; step * LABEL_STEP <= length / 2; step++) {
+    for (const side of step === 0 ? [0] : [-1, 1]) {
+      const shift = side * step * LABEL_STEP
+      const ground =
+        shift === 0
+          ? middle
+          : { ...middle, x: middle.x + unit.x * shift, y: middle.y + unit.y * shift }
+      if (!taken.some((rect) => overlaps(ground, rect))) return ground
+    }
+  }
+  return middle
 }
 
 /**

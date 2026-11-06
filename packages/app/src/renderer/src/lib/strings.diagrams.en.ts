@@ -77,6 +77,10 @@ export const DIAGRAMS_EN = {
 
   /** The list beside the canvas: what the Diagram says, as sentences, then its Drift. */
   says: 'What the Diagram says',
+  hideSays: 'Hide',
+  hideSaysHint: 'Fold the list away, for more room for the canvas',
+  showSays: 'What the Diagram says',
+  showSaysHint: 'Show the list of what the Diagram says, and its Drift, beside the canvas',
   saysNothing: 'The Diagram shows nothing yet.',
   isElement: (name: string, kind: ElementKind, description: string | undefined): string =>
     `${name} is ${kind === 'component' ? 'a Component' : kind === 'external' ? 'an External System' : 'this repository'}${description === undefined ? '.' : `: ${description}`}`,

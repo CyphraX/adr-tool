@@ -33,6 +33,13 @@
   const name = (id: string): string => nameOf.get(id) ?? id
   const ids = $derived(new Set(diagram.elements.map((element) => element.id)))
 
+  // "What the Diagram says" stands beside the canvas in a window wide enough for both, until it
+  // is shown or folded away by hand.
+  const WIDE = 1600
+  let innerWidth = $state(window.innerWidth)
+  const saysShown = $derived(diagrams.saysShown ?? innerWidth >= WIDE)
+  const driftCount = $derived(current?.drift.length ?? 0)
+
   /** What a tool of the head has open: the picker of Components, or the form of an External System. */
   let adding = $state<'component' | 'external' | undefined>(undefined)
   let external = $state({ name: '', description: '', id: '', idWritten: false })
@@ -102,6 +109,8 @@
   )
   const title = $derived(entry.title ?? entry.id)
 </script>
+
+<svelte:window bind:innerWidth />
 
 {#snippet withCode(text: string)}
   {#each codeSpans(text) as part, position (position)}{#if part.code}<code>{part.text}</code
@@ -212,88 +221,114 @@
   <div class="body">
     <DiagramCanvas {diagram} {declared} drift={current?.drift} selection={diagrams.selection} />
 
-    <aside class="says" aria-label={t.diagrams.says}>
-      <h3>{t.diagrams.says}</h3>
-      {#if diagram.description}<p class="what">{diagram.description}</p>{/if}
-      {#if sentences.length === 0}<p class="faint">{t.diagrams.saysNothing}</p>{/if}
-      <ul>
-        {#each sentences as box (box.id)}
-          <li>
-            <button
-              class:selected={diagrams.selection?.kind === 'element' &&
-                diagrams.selection.id === box.id}
-              onclick={() => app.diagrams.select({ kind: 'element', id: box.id })}
-            >
-              {t.diagrams.isElement(box.name, box.kind, box.lines.join(' ') || undefined)}
-            </button>
-          </li>
-        {/each}
-        {#each diagram.connections as connection (`${connection.from}\n${connection.to}`)}
-          <li>
-            <button
-              class:selected={diagrams.selection?.kind === 'connection' &&
-                diagrams.selection.from === connection.from &&
-                diagrams.selection.to === connection.to}
-              onclick={() =>
-                app.diagrams.select({
-                  kind: 'connection',
-                  from: connection.from,
-                  to: connection.to
-                })}
-            >
-              {t.diagrams.uses(name(connection.from), name(connection.to), connection.label)}
-            </button>
-          </li>
-        {/each}
-      </ul>
-
-      <h3>{t.diagrams.drift}</h3>
-      {#if overview.declared.origin === 'draft'}
-        <p class="faint">{t.diagrams.draftNoDrift}</p>
-      {:else if !current}
-        <p class="faint" role="status">{t.diagrams.analysing}</p>
-      {:else if current.drift.length === 0}
-        <p class="faint">{t.diagrams.noDrift}</p>
-      {:else}
-        <ul class="drift">
-          {#each current.drift as one, position (position)}
+    {#if !saysShown}
+      <aside class="says folded">
+        <button
+          class="unfold"
+          aria-expanded="false"
+          title={t.diagrams.showSaysHint}
+          onclick={() => app.diagrams.showSays(true)}
+        >
+          <span class="vertical">{t.diagrams.showSays}</span>
+          {#if driftCount > 0}
+            <span class="count" title={t.diagrams.driftCount(driftCount)}>{driftCount}</span>
+          {/if}
+        </button>
+      </aside>
+    {:else}
+      <aside class="says" aria-label={t.diagrams.says}>
+        <div class="says-head">
+          <h3>{t.diagrams.says}</h3>
+          <button
+            class="fold"
+            aria-expanded="true"
+            title={t.diagrams.hideSaysHint}
+            onclick={() => app.diagrams.showSays(false)}>{t.diagrams.hideSays}</button
+          >
+        </div>
+        {#if diagram.description}<p class="what">{diagram.description}</p>{/if}
+        {#if sentences.length === 0}<p class="faint">{t.diagrams.saysNothing}</p>{/if}
+        <ul>
+          {#each sentences as box (box.id)}
             <li>
-              {#if hasConnection(one) && one.kind === 'connection-not-in-code'}
-                <button
-                  onclick={() =>
-                    app.diagrams.select({ kind: 'connection', from: one.from, to: one.to })}
-                >
-                  {driftOf(one)}
-                </button>
-              {:else}
-                <span>{driftOf(one)}</span>
-              {/if}
-              {#if drawable(one) && one.kind === 'dependency-not-in-diagram'}
-                <button
-                  class="draw"
-                  onclick={() => {
-                    if (app.diagrams.edit({ kind: 'add-connection', from: one.from, to: one.to })) {
-                      app.diagrams.select({ kind: 'connection', from: one.from, to: one.to })
-                    }
-                  }}
-                >
-                  {t.diagrams.draw}
-                </button>
-              {/if}
+              <button
+                class:selected={diagrams.selection?.kind === 'element' &&
+                  diagrams.selection.id === box.id}
+                onclick={() => app.diagrams.select({ kind: 'element', id: box.id })}
+              >
+                {t.diagrams.isElement(box.name, box.kind, box.lines.join(' ') || undefined)}
+              </button>
+            </li>
+          {/each}
+          {#each diagram.connections as connection (`${connection.from}\n${connection.to}`)}
+            <li>
+              <button
+                class:selected={diagrams.selection?.kind === 'connection' &&
+                  diagrams.selection.from === connection.from &&
+                  diagrams.selection.to === connection.to}
+                onclick={() =>
+                  app.diagrams.select({
+                    kind: 'connection',
+                    from: connection.from,
+                    to: connection.to
+                  })}
+              >
+                {t.diagrams.uses(name(connection.from), name(connection.to), connection.label)}
+              </button>
             </li>
           {/each}
         </ul>
-      {/if}
 
-      {#if (current?.problems ?? entry.problems).length > 0}
-        <h3>{t.diagrams.problems}</h3>
-        <ul class="drift">
-          {#each current?.problems ?? entry.problems as problem, position (position)}
-            <li><span>{@render withCode(wordDiagramProblem(problem))}</span></li>
-          {/each}
-        </ul>
-      {/if}
-    </aside>
+        <h3>{t.diagrams.drift}</h3>
+        {#if overview.declared.origin === 'draft'}
+          <p class="faint">{t.diagrams.draftNoDrift}</p>
+        {:else if !current}
+          <p class="faint" role="status">{t.diagrams.analysing}</p>
+        {:else if current.drift.length === 0}
+          <p class="faint">{t.diagrams.noDrift}</p>
+        {:else}
+          <ul class="drift">
+            {#each current.drift as one, position (position)}
+              <li>
+                {#if hasConnection(one) && one.kind === 'connection-not-in-code'}
+                  <button
+                    onclick={() =>
+                      app.diagrams.select({ kind: 'connection', from: one.from, to: one.to })}
+                  >
+                    {driftOf(one)}
+                  </button>
+                {:else}
+                  <span>{driftOf(one)}</span>
+                {/if}
+                {#if drawable(one) && one.kind === 'dependency-not-in-diagram'}
+                  <button
+                    class="draw"
+                    onclick={() => {
+                      if (
+                        app.diagrams.edit({ kind: 'add-connection', from: one.from, to: one.to })
+                      ) {
+                        app.diagrams.select({ kind: 'connection', from: one.from, to: one.to })
+                      }
+                    }}
+                  >
+                    {t.diagrams.draw}
+                  </button>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+
+        {#if (current?.problems ?? entry.problems).length > 0}
+          <h3>{t.diagrams.problems}</h3>
+          <ul class="drift">
+            {#each current?.problems ?? entry.problems as problem, position (position)}
+              <li><span>{@render withCode(wordDiagramProblem(problem))}</span></li>
+            {/each}
+          </ul>
+        {/if}
+      </aside>
+    {/if}
   </div>
 
   <footer>
@@ -490,6 +525,57 @@
     background: var(--paper);
     font-size: 12.5px;
     line-height: 1.45;
+  }
+
+  .says-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .says-head .fold {
+    padding: 1px 6px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+
+  /* Folded away: a strip that says what it holds, and how much Drift. */
+  .says.folded {
+    width: auto;
+    padding: 0;
+  }
+
+  .unfold {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+    padding: 12px 6px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: var(--ink-soft);
+  }
+
+  .unfold:hover {
+    background: var(--hover);
+  }
+
+  .unfold .vertical {
+    writing-mode: vertical-rl;
+    font-size: 12px;
+  }
+
+  .unfold .count {
+    min-width: 18px;
+    padding: 1px 5px;
+    border-radius: 9px;
+    background: var(--problem);
+    color: var(--paper);
+    font-size: 11px;
+    font-weight: 600;
   }
 
   .says h3 {

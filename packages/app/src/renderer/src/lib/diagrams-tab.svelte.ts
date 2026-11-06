@@ -70,6 +70,13 @@ export class DiagramsTab {
   /** The centre shows the Problems of the repository instead of the canvas. */
   problems = $state(false)
   selection = $state<DiagramSelection | undefined>(undefined)
+  /** The size the canvas draws at, and of which Diagram: a Diagram opens fitted to the pane. */
+  zoom = $state<{ readonly path: string; readonly scale: number } | undefined>(undefined)
+  /**
+   * Whether "What the Diagram says" stands beside the canvas; `undefined` until it is chosen,
+   * when it stands there only in a window wide enough for both.
+   */
+  saysShown = $state<boolean | undefined>(undefined)
   held = $state<Held | undefined>(undefined)
   /** What the code says of the Diagram as the canvas holds it, and of which text. */
   look = $state.raw<{ readonly text: string; readonly look: DiagramLook } | undefined>(undefined)
@@ -243,6 +250,18 @@ export class DiagramsModule {
   select(selection: DiagramSelection | undefined): void {
     const tab = this.host.active
     if (tab) tab.diagrams.selection = selection
+  }
+
+  /** Draw the Diagram on the canvas at another size. */
+  zoomTo(scale: number): void {
+    const diagrams = this.host.active?.diagrams
+    if (diagrams?.path !== undefined) diagrams.zoom = { path: diagrams.path, scale }
+  }
+
+  /** Show "What the Diagram says" beside the canvas, or fold it away. */
+  showSays(shown: boolean): void {
+    const diagrams = this.host.active?.diagrams
+    if (diagrams) diagrams.saysShown = shown
   }
 
   /**

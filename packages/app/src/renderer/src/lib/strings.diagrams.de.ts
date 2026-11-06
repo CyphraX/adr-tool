@@ -87,6 +87,11 @@ export const DIAGRAMS_DE: typeof DIAGRAMS_EN = {
   leftOut: 'Drift: im Code, ausgelassen; ein Klick zeichnet sie',
 
   says: 'Was das Diagramm sagt',
+  hideSays: 'Ausblenden',
+  hideSaysHint: 'Die Liste einklappen, damit die Zeichenfläche mehr Platz hat',
+  showSays: 'Was das Diagramm sagt',
+  showSaysHint:
+    'Die Liste dessen, was das Diagramm sagt, und seine Drift neben der Zeichenfläche zeigen',
   saysNothing: 'Das Diagramm zeigt noch nichts.',
   isElement: (name: string, kind: ElementKind, description: string | undefined): string =>
     `${name} ist ${KIND_IN_A_SENTENCE[kind]}${description === undefined ? '.' : `: ${description}`}`,

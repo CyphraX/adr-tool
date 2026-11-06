@@ -10,6 +10,14 @@
   } from '@adr-tool/diagrams'
   import type { DiagramSelection } from '../lib/diagrams-tab.svelte'
   import { GRID, boxAt, readingOrder, snapPoint } from '../lib/diagram-canvas'
+  import {
+    ZOOM,
+    clampScale,
+    fitScale,
+    scrollAfterZoom,
+    stepScale,
+    wheelScale
+  } from '../lib/graph-layout'
   import { tick } from 'svelte'
   import { app } from '../lib/state.svelte'
   import { t } from '../lib/strings'
@@ -34,6 +42,12 @@
   /** The room around the drawing, and beyond it to drag a box into. */
   const PAD = 40
   const ROOM = 320
+  /** A Diagram that does not fit its pane opens fitted, but never smaller than this. */
+  const OPENS_AT_LEAST = 0.5
+
+  let view = $state<HTMLDivElement>()
+  const zoom = $derived(app.active?.diagrams.zoom)
+  const scale = $derived(zoom?.path === diagram.path ? zoom.scale : 1)
 
   /** A box being dragged: where it was, where the pointer took it, and where the drawing stood. */
   let drag = $state<
@@ -104,11 +118,73 @@
   const touches = (from: string, to: string): boolean =>
     selection?.kind === 'element' && (selection.id === from || selection.id === to)
 
-  /** A point of the window as a point of the drawing. */
+  /** A point of the window as a point of the drawing, at whatever size it is drawn. */
   function onDrawing(event: PointerEvent | MouseEvent): Point {
     const rect = drawing!.getBoundingClientRect()
-    return { x: event.clientX - rect.left + origin.x, y: event.clientY - rect.top + origin.y }
+    return {
+      x: (event.clientX - rect.left) / scale + origin.x,
+      y: (event.clientY - rect.top) / scale + origin.y
+    }
   }
+
+  /** What the Diagram holds, without the room to drag into: what Fit shows. */
+  const content = $derived({
+    width: extent.right - ROOM + PAD - origin.x,
+    height: extent.bottom - ROOM + PAD - origin.y
+  })
+
+  /**
+   * Draw at another size, the point at `at` — from the pane's top left corner — staying where
+   * it is: the point under the cursor, or the middle of the pane.
+   */
+  async function zoomTo(next: number, at?: Point): Promise<void> {
+    const from = scale
+    if (!view || next === from) return
+    const point = at ?? { x: view.clientWidth / 2, y: view.clientHeight / 2 }
+    const scroll = scrollAfterZoom(
+      { left: view.scrollLeft, top: view.scrollTop },
+      point,
+      from,
+      next
+    )
+    app.diagrams.zoomTo(next)
+    await tick()
+    view.scrollLeft = scroll.left
+    view.scrollTop = scroll.top
+  }
+
+  async function fit(least = ZOOM.min): Promise<void> {
+    if (!view) return
+    const fits = fitScale(content, { width: view.clientWidth, height: view.clientHeight })
+    app.diagrams.zoomTo(clampScale(Math.max(least, fits)))
+    await tick()
+    view.scrollLeft = 0
+    view.scrollTop = 0
+  }
+
+  // A Diagram opens at its actual size where it fits the pane, and fitted to it where not.
+  $effect(() => {
+    if (!view || zoom?.path === diagram.path) return
+    void fit(OPENS_AT_LEAST)
+  })
+
+  // Ctrl and the wheel — ⌘ on a Mac, and a pinch on a trackpad — zoom the drawing rather
+  // than the window, as the Relations graph does.
+  $effect(() => {
+    const target = view
+    if (!target) return
+    const onwheel = (event: WheelEvent): void => {
+      if (!event.ctrlKey && !event.metaKey) return
+      event.preventDefault()
+      const box = target.getBoundingClientRect()
+      void zoomTo(wheelScale(scale, event.deltaY, event.deltaMode), {
+        x: event.clientX - box.left,
+        y: event.clientY - box.top
+      })
+    }
+    target.addEventListener('wheel', onwheel, { passive: false })
+    return () => target.removeEventListener('wheel', onwheel)
+  })
 
   function edit(change: DiagramEdit): boolean {
     return app.diagrams.edit(change)
@@ -133,8 +209,8 @@
 
   function moveDrag(event: PointerEvent): void {
     if (!drag) return
-    const dx = event.clientX - drag.pointer.x
-    const dy = event.clientY - drag.pointer.y
+    const dx = (event.clientX - drag.pointer.x) / scale
+    const dy = (event.clientY - drag.pointer.y) / scale
     if (!drag.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return
     drag.moved = true
     drag.at = snapPoint({ x: drag.start.x + dx, y: drag.start.y + dy })
@@ -258,7 +334,6 @@
 
   // A box selected from elsewhere — added, found, or chosen beside the canvas — is brought into
   // view when none of it is in view; one that is clicked or dragged stays where it is.
-  let view = $state<HTMLDivElement>()
   $effect(() => {
     const id = selection?.kind === 'element' ? selection.id : undefined
     if (id === undefined || !view) return
@@ -284,185 +359,265 @@
 
 <!-- The canvas itself takes the focus where a box it had is gone, so that the keys still work. -->
 <!-- svelte-ignore a11y_no_static_element_interactions, a11y_no_noninteractive_tabindex -->
-<div class="canvas" bind:this={view} tabindex="-1" onkeydown={onKey}>
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div
-    class="drawing"
-    class:dragging={drag?.moved || connecting}
-    bind:this={drawing}
-    style:width="{width}px"
-    style:height="{height}px"
-    style:--grid="{GRID}px"
-    style:background-position="{-origin.x}px {-origin.y}px"
-    onclick={(event) => {
-      if (event.target === drawing) app.diagrams.select(undefined)
-    }}
-  >
-    <svg {width} {height} viewBox="{origin.x} {origin.y} {width} {height}" aria-hidden="true">
-      <defs>
-        <marker
-          id="diagram-arrow"
-          viewBox="0 0 8 8"
-          refX="3.5"
-          refY="4"
-          markerWidth="8"
-          markerHeight="8"
-          markerUnits="userSpaceOnUse"
-          orient="auto"
-        >
-          <path class="arrowhead" d="M0 0.5L7.5 4L0 7.5z" />
-        </marker>
-      </defs>
+<div class="view">
+  <div class="canvas" bind:this={view} tabindex="-1" onkeydown={onKey}>
+    <div class="extent" style:width="{width * scale}px" style:height="{height * scale}px">
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div
+        class="drawing"
+        class:dragging={drag?.moved || connecting}
+        bind:this={drawing}
+        style:width="{width}px"
+        style:height="{height}px"
+        style:transform={scale === 1 ? undefined : `scale(${scale})`}
+        style:--grid="{GRID}px"
+        style:background-position="{-origin.x}px {-origin.y}px"
+        onclick={(event) => {
+          if (event.target === drawing) app.diagrams.select(undefined)
+        }}
+      >
+        <svg {width} {height} viewBox="{origin.x} {origin.y} {width} {height}" aria-hidden="true">
+          <defs>
+            <marker
+              id="diagram-arrow"
+              viewBox="0 0 8 8"
+              refX="3.5"
+              refY="4"
+              markerWidth="8"
+              markerHeight="8"
+              markerUnits="userSpaceOnUse"
+              orient="auto"
+            >
+              <path class="arrowhead" d="M0 0.5L7.5 4L0 7.5z" />
+            </marker>
+          </defs>
 
-      {#each leftOut as one (key(one.from, one.to))}
-        {@const d = `M${one.line.from.x} ${one.line.from.y}L${one.line.to.x} ${one.line.to.y}`}
-        <path class="line left-out" {d} marker-end="url(#diagram-arrow)" />
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <path
-          class="hit"
-          {d}
-          onclick={() => {
-            if (edit({ kind: 'add-connection', from: one.from, to: one.to })) {
-              app.diagrams.select({ kind: 'connection', from: one.from, to: one.to })
-            }
-          }}
-        >
-          <title>{t.diagrams.leftOutHint(nameOf(one.from), nameOf(one.to))}</title>
-        </path>
-      {/each}
+          {#each leftOut as one (key(one.from, one.to))}
+            {@const d = `M${one.line.from.x} ${one.line.from.y}L${one.line.to.x} ${one.line.to.y}`}
+            <path class="line left-out" {d} marker-end="url(#diagram-arrow)" />
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+            <path
+              class="hit"
+              {d}
+              onclick={() => {
+                if (edit({ kind: 'add-connection', from: one.from, to: one.to })) {
+                  app.diagrams.select({ kind: 'connection', from: one.from, to: one.to })
+                }
+              }}
+            >
+              <title>{t.diagrams.leftOutHint(nameOf(one.from), nameOf(one.to))}</title>
+            </path>
+          {/each}
 
-      {#each geometry.lines as line (key(line.ends.from, line.ends.to))}
-        {@const { from, to } = line.ends}
-        {@const off = notInCode.get(key(from, to))}
-        {@const d = `M${line.from.x} ${line.from.y}L${line.to.x} ${line.to.y}`}
-        <path
-          class="line"
-          class:not-in-code={off && !off.uncertain}
-          class:perhaps={off?.uncertain}
-          class:highlighted={isSelected(from, to) || touches(from, to)}
-          {d}
-          marker-end="url(#diagram-arrow)"
-        />
-        <!-- The keyboard reaches each connection through the list beside the canvas. -->
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <path
-          class="hit"
-          {d}
-          onclick={() => app.diagrams.select({ kind: 'connection', from, to })}
-          ondblclick={() => startLabelling(from, to)}
-        >
-          <title>{t.diagrams.uses(nameOf(from), nameOf(to), line.label?.text)}</title>
-        </path>
-      {/each}
-
-      <!-- The labels lie over every line, as in the picture the export draws. -->
-      {#each geometry.lines as line (key(line.ends.from, line.ends.to))}
-        {@const { from, to } = line.ends}
-        {#if line.label && !(labelling?.from === from && labelling.to === to)}
-          {@const ground = line.label.ground}
-          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <g
-            class="label"
-            class:highlighted={isSelected(from, to)}
-            onclick={() => app.diagrams.select({ kind: 'connection', from, to })}
-            ondblclick={() => startLabelling(from, to)}
-          >
-            <rect
-              class="ground"
-              x={ground.x}
-              y={ground.y}
-              width={ground.width}
-              height={ground.height}
-              rx="2"
+          {#each geometry.lines as line (key(line.ends.from, line.ends.to))}
+            {@const { from, to } = line.ends}
+            {@const off = notInCode.get(key(from, to))}
+            {@const d = `M${line.from.x} ${line.from.y}L${line.to.x} ${line.to.y}`}
+            <path
+              class="line"
+              class:not-in-code={off && !off.uncertain}
+              class:perhaps={off?.uncertain}
+              class:highlighted={isSelected(from, to) || touches(from, to)}
+              {d}
+              marker-end="url(#diagram-arrow)"
             />
-            <text x={ground.x + ground.width / 2} y={ground.y + ground.height / 2 + 4}>
-              {line.label.text}
-            </text>
-          </g>
-        {/if}
-      {/each}
+            <!-- The keyboard reaches each connection through the list beside the canvas. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+            <path
+              class="hit"
+              {d}
+              onclick={() => app.diagrams.select({ kind: 'connection', from, to })}
+              ondblclick={() => startLabelling(from, to)}
+            >
+              <title>{t.diagrams.uses(nameOf(from), nameOf(to), line.label?.text)}</title>
+            </path>
+          {/each}
 
-      {#if connecting}
-        {@const start = boxOf.get(connecting.from)}
-        {#if start}
-          <path
-            class="line drawing-line"
-            d="M{start.x + start.width} {start.y + start.height / 2}L{connecting.to.x} {connecting
-              .to.y}"
-            marker-end="url(#diagram-arrow)"
+          <!-- The labels lie over every line, as in the picture the export draws. -->
+          {#each geometry.lines as line (key(line.ends.from, line.ends.to))}
+            {@const { from, to } = line.ends}
+            {#if line.label && !(labelling?.from === from && labelling.to === to)}
+              {@const ground = line.label.ground}
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+              <g
+                class="label"
+                class:highlighted={isSelected(from, to)}
+                onclick={() => app.diagrams.select({ kind: 'connection', from, to })}
+                ondblclick={() => startLabelling(from, to)}
+              >
+                <rect
+                  class="ground"
+                  x={ground.x}
+                  y={ground.y}
+                  width={ground.width}
+                  height={ground.height}
+                  rx="2"
+                />
+                <text x={ground.x + ground.width / 2} y={ground.y + ground.height / 2 + 4}>
+                  {line.label.text}
+                </text>
+              </g>
+            {/if}
+          {/each}
+
+          {#if connecting}
+            {@const start = boxOf.get(connecting.from)}
+            {#if start}
+              <path
+                class="line drawing-line"
+                d="M{start.x + start.width} {start.y + start.height / 2}L{connecting.to
+                  .x} {connecting.to.y}"
+                marker-end="url(#diagram-arrow)"
+              />
+            {/if}
+          {/if}
+        </svg>
+
+        {#each boxes as box (box.id)}
+          {@const selected = selection?.kind === 'element' && selection.id === box.id}
+          <button
+            class="box {box.kind}"
+            data-element={box.id}
+            class:selected
+            class:dragged={drag?.id === box.id && drag.moved}
+            style:left="{box.x - origin.x}px"
+            style:top="{box.y - origin.y}px"
+            style:width="{box.width}px"
+            style:height="{box.height}px"
+            aria-pressed={selected}
+            aria-label={t.diagrams.isElement(box.name, box.kind, box.lines.join(' ') || undefined)}
+            onpointerdown={(event) => startDrag(event, box.id)}
+            onclick={() => app.diagrams.select({ kind: 'element', id: box.id })}
+            onkeydown={(event) => onBoxKey(event, box.id)}
+          >
+            <span class="name">{box.name}</span>
+            {#each box.lines as text, position (position)}
+              <span class="description">{text}</span>
+            {/each}
+          </button>
+          {#if selected && !drag?.moved}
+            <button
+              class="handle"
+              style:left="{box.x - origin.x + box.width - 6}px"
+              style:top="{box.y - origin.y + box.height / 2 - 6}px"
+              tabindex="-1"
+              aria-hidden="true"
+              title={t.diagrams.connectFrom(box.name)}
+              onpointerdown={(event) => startConnecting(event, box.id)}
+            ></button>
+          {/if}
+        {/each}
+
+        {#if labelling}
+          {@const place = labelPlace(labelling.from, labelling.to)}
+          <input
+            class="label-field"
+            style:left="{place.x - origin.x}px"
+            style:top="{place.y - origin.y - 3}px"
+            bind:value={labelling.text}
+            aria-label={t.diagrams.labelOf(nameOf(labelling.from), nameOf(labelling.to))}
+            spellcheck="false"
+            use:focused
+            onkeydown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                endLabelling(true)
+              } else if (event.key === 'Escape') {
+                event.preventDefault()
+                event.stopPropagation()
+                endLabelling(false)
+              }
+            }}
+            onblur={() => endLabelling(true)}
           />
         {/if}
-      {/if}
-    </svg>
-
-    {#each boxes as box (box.id)}
-      {@const selected = selection?.kind === 'element' && selection.id === box.id}
-      <button
-        class="box {box.kind}"
-        data-element={box.id}
-        class:selected
-        class:dragged={drag?.id === box.id && drag.moved}
-        style:left="{box.x - origin.x}px"
-        style:top="{box.y - origin.y}px"
-        style:width="{box.width}px"
-        style:height="{box.height}px"
-        aria-pressed={selected}
-        aria-label={t.diagrams.isElement(box.name, box.kind, box.lines.join(' ') || undefined)}
-        onpointerdown={(event) => startDrag(event, box.id)}
-        onclick={() => app.diagrams.select({ kind: 'element', id: box.id })}
-        onkeydown={(event) => onBoxKey(event, box.id)}
-      >
-        <span class="name">{box.name}</span>
-        {#each box.lines as text, position (position)}
-          <span class="description">{text}</span>
-        {/each}
-      </button>
-      {#if selected && !drag?.moved}
-        <button
-          class="handle"
-          style:left="{box.x - origin.x + box.width - 6}px"
-          style:top="{box.y - origin.y + box.height / 2 - 6}px"
-          tabindex="-1"
-          aria-hidden="true"
-          title={t.diagrams.connectFrom(box.name)}
-          onpointerdown={(event) => startConnecting(event, box.id)}
-        ></button>
-      {/if}
-    {/each}
-
-    {#if labelling}
-      {@const place = labelPlace(labelling.from, labelling.to)}
-      <input
-        class="label-field"
-        style:left="{place.x - origin.x}px"
-        style:top="{place.y - origin.y - 3}px"
-        bind:value={labelling.text}
-        aria-label={t.diagrams.labelOf(nameOf(labelling.from), nameOf(labelling.to))}
-        spellcheck="false"
-        use:focused
-        onkeydown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault()
-            endLabelling(true)
-          } else if (event.key === 'Escape') {
-            event.preventDefault()
-            event.stopPropagation()
-            endLabelling(false)
-          }
-        }}
-        onblur={() => endLabelling(true)}
-      />
-    {/if}
+      </div>
+    </div>
+  </div>
+  <!-- The size of the drawing, in the corner of the canvas. -->
+  <div class="zoom" role="group" aria-label={t.graph.zoom(window.api.platform === 'darwin')}>
+    <button
+      title={t.graph.smaller}
+      aria-label={t.graph.smaller}
+      disabled={scale <= ZOOM.min}
+      onclick={() => zoomTo(stepScale(scale, -1))}>−</button
+    >
+    <button class="percent" title={t.graph.actualSize} onclick={() => zoomTo(1)}>
+      {t.graph.percent(Math.round(scale * 100))}
+    </button>
+    <button
+      title={t.graph.larger}
+      aria-label={t.graph.larger}
+      disabled={scale >= ZOOM.max}
+      onclick={() => zoomTo(stepScale(scale, 1))}>+</button
+    >
+    <button title={t.graph.fitHint} onclick={() => fit()}>{t.graph.fit}</button>
   </div>
 </div>
 
 <style>
+  .view {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+
   .canvas {
     flex: 1;
     min-width: 0;
     min-height: 0;
     overflow: auto;
     background: var(--panel-raised);
+  }
+
+  /* The drawing is laid out at its own size and scaled as a whole: boxes, lines and text. */
+  .extent {
+    position: relative;
+  }
+
+  .extent > .drawing {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+  }
+
+  .zoom {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    display: flex;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  }
+
+  .zoom button {
+    min-width: 28px;
+    padding: 3px 8px;
+    border-radius: 0;
+    background: var(--paper);
+  }
+
+  .zoom button + button {
+    margin-left: -1px;
+  }
+
+  .zoom button:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+
+  .zoom button:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+
+  .zoom .percent {
+    min-width: 54px;
+    color: var(--ink-soft);
+  }
+
+  .zoom button:disabled {
+    color: var(--ink-faint);
   }
 
   .canvas:focus {
