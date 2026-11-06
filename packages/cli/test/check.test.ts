@@ -195,6 +195,21 @@ describe('adr check (docs/cli.md)', () => {
     expect(report.violations[0].line).toBe(5)
   })
 
+  it('checks the rest of the code where the parser fails on one file, and names it', async () => {
+    // TypeScript's parser recurses: 5,000 nested ifs take it beyond the stack, however much of
+    // it the test runner has left.
+    const deep = `import '../billing/invoice'\nexport function deep(x: number): number {\n${'if (x) {\n'.repeat(5000)}${'}\n'.repeat(5000)}  return 0\n}\n`
+    const root = shopWith(EXCEPTIONS, { 'src/web/deep.ts': deep })
+    const { code, out, err } = await adrIn(root, 'check')
+    expect([code, out]).toEqual([
+      0,
+      'No Problems in 1 Decision Log.\n2 Rules hold, but for 2 Violations accepted as Exceptions.\n'
+    ])
+    expect(err).toBe(
+      'adr check: 1 Source File cannot be parsed and has no Dependencies of its own: src/web/deep.ts (It is nested too deeply for its parser: the parser ran out of stack.).\n'
+    )
+  })
+
   it('names an Exception that matches nothing any more as a Problem', async () => {
     const invoice = readFileSync(join(shop, 'src/billing/invoice.ts'), 'utf8')
     const fixed = invoice

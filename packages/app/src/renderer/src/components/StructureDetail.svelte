@@ -491,7 +491,11 @@
           <li>
             {#if file.line === undefined}
               <span class="path">{file.file}</span>
-              <span class="faint">{t.structure.detail.unreadable}</span>
+              {#if file.message === undefined}
+                <span class="faint">{t.structure.detail.unreadable}</span>
+              {:else}
+                <span>{wordOf(file.said, file.message)}</span>
+              {/if}
             {:else}
               {@render fileLink(file.file, [file.line])}
               {@render lineLinks(file.file, [file.line])}

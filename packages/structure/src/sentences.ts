@@ -101,7 +101,12 @@ export const SENTENCES = {
   'python-missing': (v: { what: string }): string => `Missing ${v.what}.`,
   'python-unreadable': (): string => 'Syntax that cannot be read.',
   'go-missing': (v: { what: string }): string => `Missing ${v.what}.`,
-  'go-unreadable': (): string => 'Syntax that cannot be read.'
+  'go-unreadable': (): string => 'Syntax that cannot be read.',
+  // Why a file of any language could not be read to its end: its parser or what reads its tree
+  // gave up on it, which takes down no other file.
+  'nested-too-deep': (): string =>
+    'It is nested too deeply for its parser: the parser ran out of stack.',
+  'reader-failed': (v: { message: string }): string => `Its reader failed on it: ${v.message}`
 } satisfies Sentences
 
 /** What `structure` may say: one of its codes, with the values of its sentence. */

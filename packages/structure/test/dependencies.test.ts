@@ -1,7 +1,12 @@
+import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 import { memoryFileSystem } from '@adr-tool/kernel'
 import { analyseDependencies } from '../src/dependencies'
-import type { Extract } from '../src/extraction'
+import { extractorOf, type Extract } from '../src/extraction'
+import { prepareGo } from '../src/go/outline'
+import { prepareJava } from '../src/java/outline'
+import { preparePython } from '../src/python/outline'
 import { measuring } from '../src/measures'
 import { sourceFilesAmong } from '../src/source-files'
 import { extractUses } from '../src/typescript/extract'
@@ -209,6 +214,86 @@ describe('Dependencies between Source Files (docs/structure-format.md, section 3
     expect([...result.measures.keys()]).toEqual(['src/b.ts'])
     expect(result.notMeasured).toEqual([
       { file: 'src/a.ts', message: 'Maximum call stack size exceeded' }
+    ])
+  })
+
+  it('analyse every other file where the parser of one fails on it, and say which one it is', async () => {
+    // TypeScript's parser recurses: 5,000 nested `if`s take it beyond the stack, however much of
+    // it the test runner has left.
+    const deep = `export function deep(x: number): number {\n${'if (x) {\n'.repeat(5000)}${'}\n'.repeat(5000)}  return 0\n}\n`
+    const result = await analyse({
+      'src/a.ts': "import './b'\n",
+      'src/b.ts': '',
+      'src/deep.ts': `import './a'\n${deep}`
+    })
+    expect(result.dependencies.map(({ from, to }) => `${from} > ${to}`)).toEqual([
+      'src/a.ts > src/b.ts'
+    ])
+    expect(result.notAnalysed).toEqual([
+      {
+        file: 'src/deep.ts',
+        message: 'It is nested too deeply for its parser: the parser ran out of stack.',
+        said: { code: 'nested-too-deep', values: {} }
+      }
+    ])
+    expect([...result.measures.keys()]).toEqual(['src/a.ts', 'src/b.ts'])
+  })
+})
+
+describe('a file of Java, Python or Go its reader fails on (docs/structure-format.md, section 2)', () => {
+  const require = createRequire(import.meta.url)
+  const grammar = async (language: string) => ({
+    runtime: await readFile(require.resolve('web-tree-sitter/web-tree-sitter.wasm')),
+    grammar: await readFile(require.resolve(`tree-sitter-${language}/tree-sitter-${language}.wasm`))
+  })
+  const nested = 5000
+  // Nested as deeply as TypeScript's parser cannot take.
+  const deep = {
+    'src/main/java/a/Deep.java': `package a;\nclass Deep { int f(int x) { return ${'('.repeat(nested)}x${')'.repeat(nested)}; } }\n`,
+    'src/a/deep.py': `def f(x):\n    return ${'('.repeat(nested)}x${')'.repeat(nested)}\n`,
+    'deep.go': `package a\nfunc f(x int) int { return ${'('.repeat(nested)}x${')'.repeat(nested)} }\n`
+  }
+
+  it('is read: tree-sitter and the walks over its tree keep stacks of their own', async () => {
+    const extract = extractorOf({
+      java: await prepareJava(await grammar('java')),
+      python: await preparePython(await grammar('python')),
+      go: await prepareGo(await grammar('go'))
+    })
+    for (const [path, text] of Object.entries(deep)) {
+      expect([path, extract(path, text)?.analysed]).toEqual([path, true])
+    }
+  })
+
+  it('is one file not analysed, whatever its reader throws', async () => {
+    const throws = (error: Error) => () => {
+      throw error
+    }
+    const extract = extractorOf({
+      java: throws(new RangeError('Maximum call stack size exceeded')),
+      python: throws(new Error('out of memory')),
+      go: throws(new RangeError('Maximum call stack size exceeded'))
+    })
+    const result = await analyse({ ...deep, 'src/a.ts': "import './b'\n", 'src/b.ts': '' }, extract)
+    expect(result.dependencies.map(({ from, to }) => `${from} > ${to}`)).toEqual([
+      'src/a.ts > src/b.ts'
+    ])
+    expect(result.notAnalysed).toEqual([
+      {
+        file: 'deep.go',
+        message: 'It is nested too deeply for its parser: the parser ran out of stack.',
+        said: { code: 'nested-too-deep', values: {} }
+      },
+      {
+        file: 'src/a/deep.py',
+        message: 'Its reader failed on it: out of memory',
+        said: { code: 'reader-failed', values: { message: 'out of memory' } }
+      },
+      {
+        file: 'src/main/java/a/Deep.java',
+        message: 'It is nested too deeply for its parser: the parser ran out of stack.',
+        said: { code: 'nested-too-deep', values: {} }
+      }
     ])
   })
 })
