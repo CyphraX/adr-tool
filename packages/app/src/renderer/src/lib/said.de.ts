@@ -466,6 +466,8 @@ export const DE: Wording<Codes> = {
   // Diagrams: a new Diagram, and the Rename of a Component in the Diagrams.
   'invalid-diagram-id': (v) =>
     `„${v.id}“ ist keine gültige Diagramm-ID. Eine Diagramm-ID besteht aus Kleinbuchstaben, Ziffern und Bindestrichen und beginnt und endet mit einem Buchstaben oder einer Ziffer.`,
+  'not-in-new-diagram': (v) =>
+    `Das neue Diagramm verbindet ${v.from} mit ${v.to}, zeigt aber kein Element ${v.id}.`,
   'no-diagrams-directory': (v) =>
     `${v.path} nennt kein Verzeichnis für die Diagramme, das sich verwenden lässt, darum kann kein Diagramm geschrieben werden. Das muss zuerst korrigiert werden.`,
   'cannot-rename-in-diagram': (v) =>

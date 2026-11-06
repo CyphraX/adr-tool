@@ -79,7 +79,7 @@ describe('a new Diagram', () => {
     expect(diagram.connections).toMatchObject([{ from: 'shop', to: 'bank', label: 'pays' }])
   })
 
-  it('is refused for an ID that is no segment, and a component view without its scope', () => {
+  it('is refused for an ID that is no segment, a component view without its scope, and a connection to nothing', () => {
     const said = (spec: NewDiagram): unknown => {
       try {
         newDiagramText(spec)
@@ -96,6 +96,10 @@ describe('a new Diagram', () => {
     expect(said({ ...containers, connections: [{ from: 'web', to: 'web' }] })).toEqual({
       code: 'connected-to-itself',
       values: { id: 'web' }
+    })
+    expect(said({ ...containers, connections: [{ from: 'web', to: 'shipping' }] })).toEqual({
+      code: 'not-in-new-diagram',
+      values: { from: 'web', to: 'shipping', id: 'shipping' }
     })
   })
 })

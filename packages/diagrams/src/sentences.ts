@@ -166,6 +166,8 @@ export const SENTENCES = {
   // A new Diagram, and the Rename of a Component in the Diagrams.
   'invalid-diagram-id': (v: { id: string }): string =>
     `"${v.id}" is not a valid Diagram ID. A Diagram ID consists of lowercase letters, digits and dashes, and starts and ends with a letter or a digit.`,
+  'not-in-new-diagram': (v: { from: string; to: string; id: string }): string =>
+    `The new Diagram connects ${v.from} to ${v.to}, but shows no element ${v.id}.`,
   'no-diagrams-directory': (v: { path: string }): string =>
     `${v.path} names no directory for the Diagrams that can be used, so no Diagram can be written. Fix it first.`,
   'cannot-rename-in-diagram': (v: { path: string; component: string }): string =>

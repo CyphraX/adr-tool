@@ -35,13 +35,21 @@ const asText = (text: string): string => text
 /**
  * The text of a new Diagram: the keys at the top in their order, then each element and each
  * connection as the editor adds them. Refused where the Diagram would not be one: an ID that is
- * no segment, a component view without its scope, an element shown twice, a connection to
- * nothing or of an element to itself.
+ * no segment, a component view without its scope, an element shown twice, a connection to an
+ * element it does not show or of an element to itself.
  */
 export function newDiagramText(spec: NewDiagram, path = `${spec.id}.yml`): string {
   if (!isSegment(spec.id)) refuse({ code: 'invalid-diagram-id', values: { id: spec.id } })
   if (spec.level === 'component' && (spec.scope === undefined || spec.scope === '')) {
     refuse({ code: 'no-scope', values: {} })
+  }
+  // A connection of a new Diagram ends at one of its elements, or it is not one: there is no
+  // file yet that could have changed under it.
+  const shown = new Set(spec.elements.map((element) => element.id))
+  for (const { from, to } of spec.connections) {
+    for (const id of [from, to]) {
+      if (!shown.has(id)) refuse({ code: 'not-in-new-diagram', values: { from, to, id } })
+    }
   }
   const words = (key: string, value: string | undefined): string[] =>
     value === undefined || value.trim() === '' ? [] : [`${key}: ${yamlText(value)}`]
