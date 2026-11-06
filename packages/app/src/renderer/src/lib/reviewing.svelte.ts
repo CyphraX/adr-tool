@@ -9,7 +9,7 @@
 import { untrack } from 'svelte'
 import type { AnnotationState } from '@adr-tool/review'
 import type { PlanResult, ReviewRequest } from '../../../shared/ipc'
-import { placeOf, type Facet, type Place, type ReviewFilter } from './review'
+import { attachPathOf, placeOf, type Facet, type Place, type ReviewFilter } from './review'
 import { reviewForms } from './review-tab.svelte'
 import { wordOf } from './said'
 import { app } from './state.svelte'
@@ -326,11 +326,8 @@ class Reviewing {
     tab.review.selectedId = id
     tab.review.problems = false
     tab.review.attaching = id
-    const path = annotation.anchor?.path
-    const there =
-      path !== undefined &&
-      (annotation.found?.kind !== 'orphaned' || annotation.found.file === 'there')
-    if (there) {
+    const path = attachPathOf(annotation)
+    if (path !== undefined) {
       const place = placeOf(annotation)
       this.openFile(path, place?.path === path ? place : undefined)
     } else {

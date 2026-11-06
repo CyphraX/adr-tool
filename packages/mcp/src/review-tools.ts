@@ -111,7 +111,10 @@ function anchorOf(annotation: FoundAnnotation): Record<string, unknown> | undefi
         ...(found.renamedFrom !== undefined && { renamedFrom: found.renamedFrom })
       }
     }),
-    ...(found?.kind === 'orphaned' && { file: found.file })
+    ...(found?.kind === 'orphaned' && { file: found.file }),
+    ...(found?.kind === 'orphaned' &&
+      found.path !== undefined &&
+      found.path !== anchor.path && { renamedTo: found.path })
   }
 }
 

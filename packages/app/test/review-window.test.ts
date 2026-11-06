@@ -7,6 +7,7 @@ import { columnsOf, selectedLines } from '../src/renderer/src/lib/code-annotatio
 import { repositoryProblems } from '../src/renderer/src/lib/repository-problems'
 import {
   anchorStateOf,
+  attachPathOf,
   citationOf,
   citedBy,
   citing,
@@ -301,5 +302,28 @@ describe('lines selected in the code viewer', () => {
       ])
     ).toEqual([1, 0, 0, 0])
     expect(columnsOf([])).toEqual([])
+  })
+})
+
+describe('Attach again', () => {
+  // It opened the Source File the Anchor names, which a rename had taken away.
+  it('opens the Source File where the lines are now, or where a rename took it', () => {
+    const renamed = annotation('20261102-renamed', {
+      found: {
+        kind: 'moved',
+        anchor: { ...anchor('cart/Basket.java', 20, 22), commit: 'c'.repeat(40) },
+        similarity: 0.8,
+        renamedFrom: 'cart/Cart.java'
+      }
+    })
+    expect(attachPathOf(renamed)).toBe('cart/Basket.java')
+    expect(attachPathOf(annotation('20261102-here'))).toBe('cart/Cart.java')
+    const lost = (found: AnnotationView['found']): AnnotationView =>
+      annotation('20261102-lost', { found })
+    expect(attachPathOf(lost({ kind: 'orphaned', file: 'there', path: 'cart/Basket.java' }))).toBe(
+      'cart/Basket.java'
+    )
+    expect(attachPathOf(lost({ kind: 'orphaned', file: 'there' }))).toBe('cart/Cart.java')
+    expect(attachPathOf(lost({ kind: 'orphaned', file: 'gone' }))).toBeUndefined()
   })
 })

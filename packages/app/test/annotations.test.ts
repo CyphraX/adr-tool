@@ -159,7 +159,11 @@ describe('the Annotations of a repository, in the main process', () => {
       kind: 'moved',
       anchor: { path: 'src/Cart.java', start: 6, end: 8 }
     })
-    expect(byId.get('20261103-is-count-used')?.found).toEqual({ kind: 'orphaned', file: 'there' })
+    expect(byId.get('20261103-is-count-used')?.found).toEqual({
+      kind: 'orphaned',
+      file: 'there',
+      path: 'src/Cart.java'
+    })
     expect(looked.overview.problems.map((problem) => problem.kind).sort()).toEqual([
       'orphaned',
       'unknown-adr'

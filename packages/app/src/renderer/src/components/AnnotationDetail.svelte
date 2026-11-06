@@ -216,9 +216,14 @@
             {@render withCode(
               found.file === 'gone'
                 ? t.annotations.detail.orphanedGone(written.path)
-                : t.annotations.detail.orphanedThere(written.path, written)
+                : t.annotations.detail.orphanedThere(found.path ?? written.path, written)
             )}
           </p>
+          {#if found.path !== undefined && found.path !== written.path}
+            <p class="faint">
+              {@render withCode(t.annotations.detail.renamedFrom(written.path))}
+            </p>
+          {/if}
         {/if}
         <h4>{t.annotations.detail.quoted}</h4>
         {@render quoteBlock(written.quote, written.start, t.annotations.detail.quoted)}

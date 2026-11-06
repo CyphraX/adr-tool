@@ -42,6 +42,16 @@ export function placeOf(annotation: AnnotationView): Place | undefined {
   return { path: at.path, start: at.start, end: at.end }
 }
 
+/**
+ * Where Attach again opens the code viewer: the Source File an Annotation's lines are in, or
+ * were in; `undefined` when it is gone, and a Source File is picked instead.
+ */
+export function attachPathOf(annotation: AnnotationView): string | undefined {
+  const { anchor, found } = annotation
+  if (found?.kind !== 'orphaned') return placeOf(annotation)?.path
+  return found.file === 'there' ? (found.path ?? anchor?.path) : undefined
+}
+
 /** The Source File an Annotation is about: where it is now, or the one its Anchor names. */
 export const sourceFileOf = (annotation: AnnotationView): string | undefined =>
   placeOf(annotation)?.path ?? annotation.anchor?.path

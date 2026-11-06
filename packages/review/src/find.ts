@@ -24,6 +24,11 @@ export type Found =
       readonly kind: 'orphaned'
       /** Whether the Source File, or a file it was renamed to, is there at all. */
       readonly file: 'there' | 'gone'
+      /**
+       * Where it is, when it is there: the Anchor's path, or the file it was renamed to when that
+       * one is gone — where a person looks for the lines to attach it to again.
+       */
+      readonly path?: string
     }
 
 /**
@@ -114,11 +119,11 @@ export async function findAnchor(anchor: Anchor, finding: Finding, date?: string
     anchor.path,
     ...(renamed !== undefined && renamed !== anchor.path ? [renamed] : [])
   ]
-  let there = false
+  let there: string | undefined
   for (const path of paths) {
     const text = await fs.readText(path)
     if (text === undefined) continue
-    there = true
+    there ??= path
     const lines = sourceLines(text)
     if (path === anchor.path && sameLines(lines, anchor)) return { kind: 'unchanged', anchor }
     const history =
@@ -138,7 +143,9 @@ export async function findAnchor(anchor: Anchor, finding: Finding, date?: string
       ...(path !== anchor.path && { renamedFrom: anchor.path })
     }
   }
-  return { kind: 'orphaned', file: there ? 'there' : 'gone' }
+  return there === undefined
+    ? { kind: 'orphaned', file: 'gone' }
+    : { kind: 'orphaned', file: 'there', path: there }
 }
 
 /**

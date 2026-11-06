@@ -124,7 +124,11 @@ describe('finding an Anchor again in a git repository', () => {
   it('is orphaned when the quoted lines are deleted', async () => {
     const { commit, finding, anchor } = annotated()
     commit({ 'src/cart.ts': text([...CART.slice(0, 7), ...CART.slice(11)]) }, 'No total')
-    expect(await findAnchor(anchor, finding())).toEqual({ kind: 'orphaned', file: 'there' })
+    expect(await findAnchor(anchor, finding())).toEqual({
+      kind: 'orphaned',
+      file: 'there',
+      path: 'src/cart.ts'
+    })
   })
 
   it('follows the Source File when it is renamed', async () => {
