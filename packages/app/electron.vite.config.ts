@@ -1,6 +1,7 @@
 import { defineConfig } from 'electron-vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { treeSitterWasm } from '../cli/command.config'
+import { notices } from './build/notices'
 
 // Everything the main process and its analysis worker run is bundled into `out/`, so that the
 // packaged app holds no `node_modules` and pnpm's links never have to be followed
@@ -8,10 +9,11 @@ import { treeSitterWasm } from '../cli/command.config'
 // those as runtime requires. The workspace packages are source-only and are bundled the same
 // way. TypeScript, about 9 MB, ends up in the worker alone, the one place that loads it
 // (ADR-0008), and the WebAssembly of tree-sitter goes into the worker as base64, as into the
-// command line, so that the packaged app has no file to find.
+// command line, so that the packaged app has no file to find. Each build writes the notices of
+// what it bundled beside it, and the installers carry them (build/notices.ts).
 export default defineConfig({
   main: {
-    plugins: [treeSitterWasm()],
+    plugins: [treeSitterWasm(), notices()],
     build: {
       // The worker is large on purpose: TypeScript alone is most of it.
       chunkSizeWarningLimit: 20_000,
@@ -27,6 +29,6 @@ export default defineConfig({
   },
   preload: {},
   renderer: {
-    plugins: [svelte()]
+    plugins: [svelte(), notices()]
   }
 })

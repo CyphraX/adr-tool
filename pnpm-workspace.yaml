@@ -10,3 +10,6 @@ allowBuilds:
   tree-sitter-go: false
   tree-sitter-java: false
   tree-sitter-python: false
+  # electron-builder brings it for Squirrel.Windows, which the release does not build (NSIS
+  # and a portable exe instead; docs/release.md).
+  electron-winstaller: false
