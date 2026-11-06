@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import type { AnnotationView } from '../../../shared/ipc'
   import type { CodeAnnotation, Lines } from '../lib/code-annotations'
-  import { createCodeViewer, type CodeViewer } from '../lib/code-viewer'
+  import { createCodeViewer, quotedLines, type CodeViewer } from '../lib/code-viewer'
   import { firstLine, onFile, placeOf } from '../lib/review'
   import { reviewing } from '../lib/reviewing.svelte'
   import { app, type CodeView } from '../lib/state.svelte'
@@ -91,7 +91,7 @@
 
   /** The lines selected, as the file has them: what a new Annotation quotes. */
   function quoted(selection: Lines): string[] {
-    return (code.file?.text ?? '').split(/\r\n?|\n/).slice(selection.start - 1, selection.end)
+    return quotedLines(code.file?.text ?? '', selection.start, selection.end)
   }
 </script>
 

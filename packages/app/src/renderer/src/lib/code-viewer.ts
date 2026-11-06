@@ -60,6 +60,20 @@ export function languageFor(path: string): LanguageSupport | undefined {
 const marked = Decoration.line({ class: 'cm-marked' })
 
 /**
+ * The text as the viewer shows it, line for line as an Anchor counts lines (docs/review-format.md,
+ * section 2): a line ends with LF or CRLF. A carriage return that ends no line is shown as ␍
+ * inside its line, as git shows it, so that line 12 of the viewer is line 12 of an Annotation.
+ */
+export const viewedText = (text: string): string =>
+  text.replace(/\r\n/g, '\n').replace(/\r/g, '\u240d')
+
+/** Lines `start` to `end` of a text, counted from 1 as an Anchor counts them: what it quotes. */
+export const quotedLines = (text: string, start: number, end: number): string[] =>
+  viewedText(text)
+    .split('\n')
+    .slice(start - 1, end)
+
+/**
  * The lines to mark, counted from 1. A line the text no longer has — the file changed since
  * it was analysed — is left out.
  */
@@ -174,7 +188,7 @@ export function createCodeViewer(parent: HTMLElement, events: CodeViewerEvents =
     show(file, lines, line) {
       if (shown?.path !== file.path || shown.text !== file.text) {
         view.dispatch({
-          changes: { from: 0, to: view.state.doc.length, insert: file.text },
+          changes: { from: 0, to: view.state.doc.length, insert: viewedText(file.text) },
           effects: language.reconfigure(languageFor(file.path) ?? []),
           selection: { anchor: 0 }
         })
