@@ -7,6 +7,14 @@ import { notices } from './notices'
 
 const require = createRequire(import.meta.url)
 
+/** The WebAssembly of tree-sitter, by the name `src/tree-sitter-wasm.ts` exports it under. */
+const WASM = {
+  runtime: 'web-tree-sitter/web-tree-sitter.wasm',
+  javaGrammar: 'tree-sitter-java/tree-sitter-java.wasm',
+  pythonGrammar: 'tree-sitter-python/tree-sitter-python.wasm',
+  goGrammar: 'tree-sitter-go/tree-sitter-go.wasm'
+} as const
+
 /**
  * The WebAssembly of tree-sitter goes into the command as base64 text (ADR-0017), so that the
  * one file reads Java, Python and Go wherever it is copied to: `src/tree-sitter-wasm.ts`, which
@@ -15,24 +23,39 @@ const require = createRequire(import.meta.url)
  */
 export function treeSitterWasm(): Plugin {
   const file = fileURLToPath(new URL('src/tree-sitter-wasm.ts', import.meta.url))
+  const embedded = (name: string): string => `export const ${name} = () => Buffer.from(`
   return {
     name: 'tree-sitter-wasm',
     enforce: 'pre',
     load(id) {
       if (normalize(id.split('?')[0]!) !== file) return undefined
       // Each file read is announced to the build, whose notices list its package too.
-      const constant = (name: string, path: string): string => {
-        const wasm = require.resolve(path)
-        this.addWatchFile(wasm)
-        const base64 = readFileSync(wasm).toString('base64')
-        return `export const ${name} = () => Buffer.from(${JSON.stringify(base64)}, 'base64')`
+      return Object.entries(WASM)
+        .map(([name, path]) => {
+          const wasm = require.resolve(path)
+          this.addWatchFile(wasm)
+          const base64 = JSON.stringify(readFileSync(wasm).toString('base64'))
+          return `${embedded(name)}${base64}, 'base64')`
+        })
+        .join('\n')
+    },
+    // Should the module be bundled as it is — its id not the one above, as a path can be
+    // written another way on Windows —, it would look for the files at runtime, where the
+    // packaged app and a copied command have none, and Java, Python and Go would go unread
+    // without a word. The build fails instead, in development as in a release.
+    buildEnd(error) {
+      if (error) return
+      for (const id of this.getModuleIds()) {
+        if (!id.split('?')[0]!.replaceAll('\\', '/').endsWith('/cli/src/tree-sitter-wasm.ts'))
+          continue
+        const code = this.getModuleInfo(id)?.code ?? ''
+        const missing = Object.keys(WASM).filter((name) => !code.includes(embedded(name)))
+        if (missing.length > 0) {
+          this.error(
+            `${id} was bundled without the WebAssembly of tree-sitter (${missing.join(', ')}): the plugin expected it at ${file}.`
+          )
+        }
       }
-      return [
-        constant('runtime', 'web-tree-sitter/web-tree-sitter.wasm'),
-        constant('javaGrammar', 'tree-sitter-java/tree-sitter-java.wasm'),
-        constant('pythonGrammar', 'tree-sitter-python/tree-sitter-python.wasm'),
-        constant('goGrammar', 'tree-sitter-go/tree-sitter-go.wasm')
-      ].join('\n')
     }
   }
 }
