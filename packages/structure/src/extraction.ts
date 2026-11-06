@@ -7,7 +7,7 @@ import type { GoOutline, GoReader } from './go/outline'
 import type { JavaOutline, JavaReader } from './java/outline'
 import type { FileMeasures } from './measures'
 import type { PythonOutline, PythonReader } from './python/outline'
-import type { StructureSaid } from './sentences'
+import { detailed, type StructureSaid } from './sentences'
 import { languageOf } from './source-files'
 import { extractUses, type Use } from './typescript/extract'
 
@@ -37,12 +37,13 @@ export type Extraction =
   /**
    * The file cannot be parsed. It keeps its Component and has no Dependencies of its own
    * (section 2, "Files that cannot be read"). `line` and `message` are the parser's first
-   * complaint; `said` is the message as a code, where it is the suite's own and not the
+   * complaint, without a line where the parser or the reading of its tree failed on the file as
+   * a whole; `said` is the message as a code, where it is the suite's own and not the
    * TypeScript compiler's.
    */
   | {
       readonly analysed: false
-      readonly line: number
+      readonly line?: number
       readonly message: string
       readonly said?: StructureSaid
     }
@@ -68,15 +69,36 @@ export interface Readers {
 export function extractorOf(readers: Readers = {}): Extract {
   return (path, text) => {
     const language = languageOf(path)
-    switch (language) {
-      case 'java':
-      case 'python':
-      case 'go':
-        return readers[language]?.(text)
-      case undefined:
-        return undefined
-      default:
-        return extractUses(path, text)
+    if (language === undefined) return undefined
+    try {
+      switch (language) {
+        case 'java':
+        case 'python':
+        case 'go':
+          return readers[language]?.(text)
+        default:
+          return extractUses(path, text)
+      }
+    } catch (error) {
+      return failed(error)
     }
   }
+}
+
+/**
+ * A file its parser, or what reads its tree, fails on — TypeScript's parser recurses, and runs
+ * out of stack on a function of a few thousand nested `if`s — is one file that is not analysed:
+ * the others are analysed all the same.
+ */
+function failed(error: unknown): Extraction {
+  const tooDeep = error instanceof RangeError && /call stack/i.test(error.message)
+  const { detail: message, said } = detailed(
+    tooDeep
+      ? { code: 'nested-too-deep', values: {} }
+      : {
+          code: 'reader-failed',
+          values: { message: error instanceof Error ? error.message : String(error) }
+        }
+  )
+  return { analysed: false, message, said }
 }
