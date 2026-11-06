@@ -8,6 +8,8 @@
     type SourceFileHit
   } from '../lib/search'
   import { searchDiagrams, type DiagramHit } from '../lib/diagram-canvas'
+  import { firstLine, linesOf, placeOf, searchAnnotations, type AnnotationHit } from '../lib/review'
+  import { reviewing } from '../lib/reviewing.svelte'
   import { app, statusKey } from '../lib/state.svelte'
   import { t } from '../lib/strings'
   import { searchAll, type PlacedHit } from '../lib/together'
@@ -17,12 +19,14 @@
   // Full-text search with quick jump: type, arrow, Enter. It searches every Decision Log of
   // every open repository, the one in front first, in what is already loaded — nothing is
   // read for it. Below the ADRs, the Components, Source Files and Libraries of the repository in
-  // front, as far as Structure's analysis knows them (docs/plan-vision.md, parts 2 and 15).
+  // front, as far as Structure's analysis knows them (docs/plan-vision.md, parts 2 and 15), and
+  // its Annotations, by their text, their Replies and their ID (part 9).
   const LIMIT = 12
   const COMPONENT_LIMIT = 6
   const SOURCE_FILE_LIMIT = 8
   const DIAGRAM_LIMIT = 6
   const LIBRARY_LIMIT = 6
+  const ANNOTATION_LIMIT = 6
 
   type Row =
     | { readonly kind: 'adr'; readonly key: string; readonly hit: PlacedHit }
@@ -30,6 +34,7 @@
     | { readonly kind: 'sourceFile'; readonly key: string; readonly hit: SourceFileHit }
     | { readonly kind: 'diagram'; readonly key: string; readonly hit: DiagramHit }
     | { readonly kind: 'library'; readonly key: string; readonly hit: LibraryHit }
+    | { readonly kind: 'annotation'; readonly key: string; readonly hit: AnnotationHit }
 
   let dialog = $state<HTMLDialogElement>()
   let chosen = $state(0)
@@ -64,6 +69,10 @@
   const allLibraries = $derived(
     outline?.known ? searchLibraries(outline.known.libraries, query) : []
   )
+  const allAnnotations = $derived(
+    searchAnnotations(app.active?.review.known?.annotations ?? [], query)
+  )
+  const annotations = $derived(allAnnotations.slice(0, ANNOTATION_LIMIT))
   const components = $derived(allComponents.slice(0, COMPONENT_LIMIT))
   // The Diagrams of the repository in front, by their ID and title.
   const allDiagrams = $derived(searchDiagrams(app.active?.diagrams.overview?.diagrams ?? [], query))
@@ -85,7 +94,7 @@
   )
 
   // One list for the keyboard, in the order it is shown: ADRs, Components, Diagrams, Source
-  // Files, Libraries.
+  // Files, Libraries, Annotations.
   const rows = $derived<Row[]>([
     ...found.map((hit) => ({
       kind: 'adr' as const,
@@ -98,6 +107,11 @@
     ...libraries.map((hit) => ({
       kind: 'library' as const,
       key: `library:${hit.ecosystem}:${hit.name}`,
+      hit
+    })),
+    ...annotations.map((hit) => ({
+      kind: 'annotation' as const,
+      key: `annotation:${hit.annotation.id}`,
       hit
     }))
   ])
@@ -127,13 +141,22 @@
         heading: t.searching.libraries,
         shown: libraries.length,
         all: allLibraries.length
+      },
+      {
+        kind: 'annotation' as const,
+        heading: t.searching.annotations,
+        shown: annotations.length,
+        all: allAnnotations.length
       }
     ].filter((section) => section.shown > 0)
   )
   // The files can change under an open palette, and the list with them.
   const position = $derived(Math.min(chosen, rows.length - 1))
 
-  /** Open a hit in its module: an ADR in Decisions; a Component, Source File or Library in Structure. */
+  /**
+   * Open a hit in its module: an ADR in Decisions, a Component, a Source File or a Library in
+   * Structure, a Diagram in Diagrams, an Annotation in Review.
+   */
   function open(row: Row): void {
     if (row.kind === 'adr') app.jumpTo(row.hit.logPath, row.hit.adr.id, row.hit.repositoryId)
     else if (row.kind === 'component') app.showComponent(row.hit.id)
@@ -141,7 +164,8 @@
     else if (row.kind === 'diagram') {
       app.stopSearching()
       app.diagrams.reveal(row.hit.path)
-    } else app.showSourceFile(row.hit.path)
+    } else if (row.kind === 'annotation') reviewing.open(row.hit.annotation.id)
+    else app.showSourceFile(row.hit.path)
   }
 
   /** A path as its directory and its file name, to set the name apart. */
@@ -253,6 +277,25 @@
                       <span class="title">{row.hit.title ?? row.hit.id}</span>
                       <code class="id">{row.hit.id}</code>
                     </span>
+                  {:else if row.kind === 'annotation'}
+                    {@const annotation = row.hit.annotation}
+                    {@const place = placeOf(annotation) ?? annotation.anchor}
+                    <span class="line">
+                      <span class="kind"
+                        >{annotation.type
+                          ? t.annotations.types[annotation.type]
+                          : t.searching.annotation}</span
+                      >
+                      <span class="title">{firstLine(annotation.text) || annotation.id}</span>
+                      <code class="where">{annotation.id}</code>
+                    </span>
+                    {#if place}
+                      <span class="excerpt"
+                        ><code>{place.path}:{linesOf(place)}</code
+                        >{#if annotation.state === 'resolved'}
+                          · {t.annotations.states.resolved}{/if}</span
+                      >
+                    {/if}
                   {:else}
                     {@const path = split(row.hit.path)}
                     <span class="line">

@@ -322,6 +322,9 @@ describe('the sentences of review', () => {
     expect(wordingOf(problem)).toBe(
       'a is orphaned: the quoted lines 8-10 of src/cart.ts are no longer found in it. Attach it again to the lines it is about.'
     )
+    expect(wordingOf({ ...problem, lines: '9' })).toBe(
+      'a is orphaned: the quoted line 9 of src/cart.ts is no longer found in it. Attach it again to the lines it is about.'
+    )
     expect(wordingOf({ ...problem, file: 'gone' })).toBe(
       'a is orphaned: src/cart.ts is gone, and no file it was renamed to has its quoted lines. Attach it again to the lines it is about.'
     )

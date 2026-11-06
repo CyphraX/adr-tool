@@ -133,7 +133,24 @@ describe('finding an Anchor again', () => {
   it('is orphaned when the quoted lines are deleted', async () => {
     const lines = [...CART.slice(0, 7), ...CART.slice(11)]
     const repository = after({ ...first.files, 'src/cart.ts': text(lines) })
-    expect(await findAnchor(ANCHOR, repository)).toEqual({ kind: 'orphaned', file: 'there' })
+    expect(await findAnchor(ANCHOR, repository)).toEqual({
+      kind: 'orphaned',
+      file: 'there',
+      path: 'src/cart.ts'
+    })
+  })
+
+  it('says where the Source File is when it was renamed and the quoted lines are gone from it', async () => {
+    const lines = [...CART.slice(0, 7), ...CART.slice(11)]
+    const repository = after({
+      'src/basket.ts': text(lines),
+      'src/line.ts': first.files['src/line.ts']!
+    })
+    expect(await findAnchor(ANCHOR, repository)).toEqual({
+      kind: 'orphaned',
+      file: 'there',
+      path: 'src/basket.ts'
+    })
   })
 
   it('follows the Source File when it is renamed', async () => {
@@ -245,7 +262,11 @@ describe('what counts as the Anchor’s lines', () => {
   it('does not take a look-alike that was there before for lines that were deleted', async () => {
     const deleted = [...LOOK_ALIKE.slice(0, 7), ...LOOK_ALIKE.slice(11)]
     const repository = after({ 'src/cart.ts': text(deleted) }, [withLookAlike])
-    expect(await findAnchor(ANCHOR, repository)).toEqual({ kind: 'orphaned', file: 'there' })
+    expect(await findAnchor(ANCHOR, repository)).toEqual({
+      kind: 'orphaned',
+      file: 'there',
+      path: 'src/cart.ts'
+    })
   })
 
   it('does not take the look-alike either when the whole file is re-indented in the same commit', async () => {
@@ -255,7 +276,11 @@ describe('what counts as the Anchor’s lines', () => {
       (line: string) => line.replace(/^ +/, (spaces) => '\t'.repeat(spaces.length / 2))
     ]) {
       const repository = after({ 'src/cart.ts': text(deleted.map(indent)) }, [withLookAlike])
-      expect(await findAnchor(ANCHOR, repository)).toEqual({ kind: 'orphaned', file: 'there' })
+      expect(await findAnchor(ANCHOR, repository)).toEqual({
+        kind: 'orphaned',
+        file: 'there',
+        path: 'src/cart.ts'
+      })
     }
   })
 
@@ -285,7 +310,8 @@ describe('what counts as the Anchor’s lines', () => {
     const deleted = [...twice.slice(0, 1), ...twice.slice(4)]
     expect(await findAnchor(anchor, after({ 'src/a.ts': text(deleted) }, [start]))).toEqual({
       kind: 'orphaned',
-      file: 'there'
+      file: 'there',
+      path: 'src/a.ts'
     })
 
     // One line of boilerplate, quoted where it was deleted, and kept in the other function.
@@ -304,7 +330,8 @@ describe('what counts as the Anchor’s lines', () => {
     const without = [...checks.slice(0, 1), ...checks.slice(2)]
     expect(await findAnchor(line, after({ 'src/a.ts': text(without) }, [withChecks]))).toEqual({
       kind: 'orphaned',
-      file: 'there'
+      file: 'there',
+      path: 'src/a.ts'
     })
   })
 
@@ -349,7 +376,8 @@ describe('what counts as the Anchor’s lines', () => {
     ]
     expect(await findAnchor(ANCHOR, after({ 'src/cart.ts': text(lines) }))).toEqual({
       kind: 'orphaned',
-      file: 'there'
+      file: 'there',
+      path: 'src/cart.ts'
     })
   })
 

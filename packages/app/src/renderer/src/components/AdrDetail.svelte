@@ -21,6 +21,8 @@
   } from '../lib/wording'
   import { outsideOf } from '../lib/together'
   import { baseOf } from '../lib/markdown'
+  import { citing, firstLine } from '../lib/review'
+  import { reviewing } from '../lib/reviewing.svelte'
   import BodyEditor from './BodyEditor.svelte'
   import MarkdownDocument from './MarkdownDocument.svelte'
   import StatusMark from './StatusMark.svelte'
@@ -56,6 +58,19 @@
       log.path,
       adr.id
     )
+  )
+
+  // The Annotations that cite this ADR: the other direction of their Traces (docs/plan-vision.md,
+  // part 9), which only the Annotations record.
+  const citedBy = $derived(
+    app.active
+      ? citing(
+          app.active.review.known?.annotations ?? [],
+          app.active.repository.repository,
+          log.path,
+          adr.id
+        )
+      : []
   )
 
   // What git says: absent without git, and then there is no history to offer either.
@@ -288,6 +303,30 @@
                   app.showInConformanceModule({ kind: 'exception', line: exception.line })}
                 ><code>{exception.rule}</code> {exceptionNames(exception)}</button
               >
+            {/each}
+          </span>
+        </li>
+      </ul>
+    {/if}
+
+    {#if citedBy.length > 0}
+      <ul class="annotations" aria-label={t.annotations.adr.label}>
+        <li>
+          <span class="kind">{t.annotations.adr.citedBy}</span>
+          <span class="cited">
+            {#each citedBy as annotation (annotation.id)}
+              <button
+                class:resolved={annotation.state === 'resolved'}
+                title={t.annotations.adr.show(annotation.id)}
+                onclick={() => reviewing.open(annotation.id)}
+              >
+                <span class="type"
+                  >{annotation.type
+                    ? t.annotations.types[annotation.type]
+                    : t.annotations.kind}</span
+                >
+                {firstLine(annotation.text) || annotation.id}
+              </button>
             {/each}
           </span>
         </li>
@@ -566,6 +605,38 @@
   .components .missing {
     color: var(--problem);
     text-decoration: line-through;
+  }
+
+  .cited {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .cited button {
+    min-width: 0;
+    text-align: left;
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+  }
+
+  .cited button:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .cited button.resolved {
+    color: var(--ink-soft);
+  }
+
+  .cited .type {
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-decoration: none;
   }
 
   .note {

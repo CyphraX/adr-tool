@@ -20,6 +20,17 @@ export interface CitedAdr {
   readonly ambiguous?: readonly string[]
 }
 
+/**
+ * The ADRs of Decision Logs as a `cites` item names them: by the directory of their log, `.`
+ * at the top. `logs` as `core` has them, the root's with the path `''`.
+ */
+export const adrReferencesOf = (
+  logs: readonly { readonly path: string; readonly adrs: readonly { readonly id: string }[] }[]
+): AdrReference[] =>
+  logs.flatMap((log) =>
+    log.adrs.map((adr) => ({ log: log.path === '' ? '.' : log.path, id: adr.id }))
+  )
+
 /** The reference of an ADR as an item of `cites` names it from outside its log. */
 export const qualified = (adr: AdrReference): string => `${adr.log}/${adr.id}`
 

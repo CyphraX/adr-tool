@@ -35,11 +35,13 @@ import {
 } from '@adr-tool/core'
 import { DECLARATION_PATH, everyComponent, readDeclaration } from '@adr-tool/structure/model'
 import { gitIn } from '@adr-tool/cli/git'
+import { adrReferencesOf } from '@adr-tool/review'
 import { architectureTools } from './architecture'
 import { repositoryFiles } from './files'
 import { diagramToolsFor } from './diagrams'
 import { PLAN, READ, list, object, required, text } from './kit'
 import { Refusal, type Tool } from './protocol'
+import { reviewTools } from './review-tools'
 
 /** How many planned changes wait at most; the oldest is forgotten first. */
 const MAX_PLANNED = 50
@@ -49,18 +51,22 @@ export interface ToolOptions {
   readonly root: string
   /** Today's date, `YYYY-MM-DD`, as the person sees it. */
   readonly today?: () => string
-  /** Who a Correction is recorded for when the agent names nobody: git's `user.name`. */
+  /** Who a Correction, an Annotation or a Reply is recorded for when the agent names nobody: git's `user.name`. */
   readonly author?: () => Promise<string | undefined>
+  /** The moment a Reply is written at. */
+  readonly now?: () => Date
 }
 
 interface Planned {
   readonly changeSet: ChangeSet
   readonly created?: { readonly id: string; readonly path: string }
   readonly renamed?: { readonly from: string; readonly to: string }
-  /** The Decision Log a change of ADRs is in; none for a change of a Diagram. */
+  /** The Decision Log a change of ADRs is in; none for a change of another module. */
   readonly log?: string
   /** The Diagram a change is about. */
   readonly diagram?: { readonly id: string; readonly path: string }
+  /** What else the plan said, and the applied change says again: a new Annotation's ID. */
+  readonly outcome?: Record<string, unknown>
 }
 
 /** What a plan_* tool shows of a plan it holds; `hold` keeps it until it is applied or discarded. */
@@ -186,7 +192,6 @@ export function toolsFor(options: ToolOptions): Tool[] {
       next: 'Nothing is written yet. Show the person the files and the warnings; apply_change with this changeId writes them, discard_change drops them.'
     }
   }
-
   /** Hold a plan of ADRs in a log, with the ADR it creates or the one it renames. */
   const preview = (log: DecisionLog, plan: Plan): Record<string, unknown> =>
     hold(
@@ -607,6 +612,16 @@ export function toolsFor(options: ToolOptions): Tool[] {
     ...architecture.plans,
     // The Diagrams: read as data with their Drift, and planned as every write is.
     ...diagramToolsFor({ root: options.root, fs, hold }),
+    // The Annotations: read with where their lines are now, and planned as every write is.
+    ...reviewTools({
+      fs,
+      root: options.root,
+      today,
+      now: options.now ?? (() => new Date()),
+      author,
+      adrs: async () => adrReferencesOf((await open()).repository.logs),
+      hold: (plan, outcome) => hold(plan, outcome && { outcome }, outcome)
+    }),
     {
       name: 'apply_change',
       title: 'Apply a planned change',
@@ -662,7 +677,8 @@ export function toolsFor(options: ToolOptions): Tool[] {
           files: held.changeSet.files.map((file) => file.renameTo ?? file.path),
           ...(held.created && { created: { log: shown(held.log ?? ''), ...held.created } }),
           ...(held.renamed && { renamed: held.renamed }),
-          ...(held.diagram && { diagram: held.diagram })
+          ...(held.diagram && { diagram: held.diagram }),
+          ...held.outcome
         }
       }
     },

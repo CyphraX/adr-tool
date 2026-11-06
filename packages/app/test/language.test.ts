@@ -43,6 +43,10 @@ const SAME_IN_GERMAN = new Set([
   'H',
   'Fan-in',
   'Fan-out',
+  'Review',
+  'Annotation',
+  'Text',
+  'Markdown',
   'A',
   'D',
   'Version',
@@ -82,6 +86,8 @@ const SAME_AT = new Set([
   'structure.graph.directory',
   'structure.value',
   'structure.page.filesIn',
+  'annotations.about',
+  'annotations.detail.written',
   // The symbols of the metrics, and their values.
   'structure.sequence.point'
 ])

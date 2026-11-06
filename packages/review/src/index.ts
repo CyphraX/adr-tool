@@ -25,6 +25,7 @@ export {
   type AnnotationsReading
 } from './read'
 export {
+  adrReferencesOf,
   annotationsCiting,
   citedAdr,
   qualified,

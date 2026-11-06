@@ -33,6 +33,7 @@ import { draftOfForm, ruleFormOf, type RuleForm } from './conformance'
 import { chooseLanguage } from './language'
 import type { Module } from './modules'
 import { repositoryProblems } from './repository-problems'
+import { ReviewTab, reviewForms } from './review-tab.svelte'
 import { wordOf } from './said'
 import { t } from './strings'
 import { logName, prefixOf } from './wording'
@@ -190,6 +191,8 @@ interface Tab {
   outline: OutlineTab
   conformance: ConformanceTab
   branches: BranchesTab
+  /** The Review module: the Annotations and what is looked at of them (docs/plan-vision.md, part 9). */
+  review: ReviewTab
   /** How the Relations graph is shown: the Relation types it draws, and its scale. */
   graph: { types: RelationType[]; scale: number }
   /** The Diagrams of the repository, and the one on the canvas (lib/diagrams-tab.svelte.ts). */
@@ -405,7 +408,8 @@ class AppState {
         this.active.repository,
         this.active.outline,
         this.active.conformance,
-        this.active.diagrams
+        this.active.diagrams,
+        this.active.review
       )
   )
 
@@ -424,7 +428,9 @@ class AppState {
 
   /** Whether a dialog holds what was entered and not yet carried out: picks, a typed title. */
   readonly dialogDirty = $derived(
-    this.metadataDirty || (this.creating !== undefined && this.creating.title.trim() !== '')
+    this.metadataDirty ||
+      (this.creating !== undefined && this.creating.title.trim() !== '') ||
+      reviewForms.dirty
   )
 
   /** Whether closing the window now would lose anything that was typed, picked or drawn. */
@@ -667,7 +673,7 @@ class AppState {
    * The outline as of now, for a view that lists or searches it: analysed again where it may
    * be older than the files, which the cache of the analysis makes cheap.
    */
-  private freshOutline(tab: Tab | undefined): void {
+  freshOutline(tab: Tab | undefined): void {
     if (!tab) return
     const { known, reading } = tab.outline
     if (known && !known.current && !reading) void this.loadOutline(tab, true)
@@ -685,6 +691,11 @@ class AppState {
     } else if (tab.module === 'conformance') {
       tab.conformance.problems = true
       tab.conformance.code = undefined
+    } else if (tab.module === 'review') {
+      tab.review.problems = true
+      tab.review.code = undefined
+      tab.review.picking = false
+      tab.review.attaching = undefined
     } else if (tab.module === 'diagrams') {
       this.diagrams.showProblems()
     } else {
@@ -1922,6 +1933,7 @@ class AppState {
     const proceed = (): void => {
       this.creating = undefined
       this.editingMetadata = undefined
+      reviewForms.clear()
       then()
     }
     if (!this.dialogDirty) return proceed()
@@ -2049,6 +2061,7 @@ function newTab(repository: OpenRepository): Tab {
     },
     outline: new OutlineTab(),
     conformance: new ConformanceTab(),
+    review: new ReviewTab(),
     branches: {
       overview: undefined,
       loading: false,

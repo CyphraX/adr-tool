@@ -2,6 +2,8 @@
   import { onMount, type Snippet } from 'svelte'
   import AdrDetail from './components/AdrDetail.svelte'
   import AdrList from './components/AdrList.svelte'
+  import AnnotationDetail from './components/AnnotationDetail.svelte'
+  import AnnotationDialog from './components/AnnotationDialog.svelte'
   import BoardView from './components/BoardView.svelte'
   import BranchAdrDetail from './components/BranchAdrDetail.svelte'
   import BranchList from './components/BranchList.svelte'
@@ -22,6 +24,8 @@
   import ProblemsList from './components/ProblemsList.svelte'
   import RelationsGraph from './components/RelationsGraph.svelte'
   import RepositoryProblems from './components/RepositoryProblems.svelte'
+  import ReviewCenter from './components/ReviewCenter.svelte'
+  import ReviewSidebar from './components/ReviewSidebar.svelte'
   import SearchPalette from './components/SearchPalette.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import StructureDetail from './components/StructureDetail.svelte'
@@ -40,12 +44,16 @@
     type PaneSizes
   } from './lib/panes'
   import type { Module } from './lib/modules'
+  import { reviewing } from './lib/reviewing.svelte'
   import { app } from './lib/state.svelte'
   import { t } from './lib/strings'
   import { wordDiagramProblem } from './lib/diagram-words'
   import { codeSpans, describeProblem } from './lib/wording'
 
-  onMount(() => void app.start())
+  onMount(() => {
+    void app.start()
+    reviewing.start()
+  })
 
   /** The tab in front, with a repository open. */
   type Active = NonNullable<typeof app.active>
@@ -56,7 +64,8 @@
     decisions: decisionsFrame,
     structure: structureFrame,
     conformance: conformanceFrame,
-    diagrams: diagramsFrame
+    diagrams: diagramsFrame,
+    review: reviewFrame
   }
 
   // The main process holds the window open while there is something to lose — text in the
@@ -148,6 +157,7 @@
   <HistoryDialog />
   <CommitDialog />
   <NewDiagramDialog />
+  <AnnotationDialog />
   <SearchPalette />
   <ChangeDialog />
 {/if}
@@ -282,6 +292,20 @@
     {:else}
       <aside class="no-detail"></aside>
     {/if}
+  </div>
+{/snippet}
+
+{#snippet reviewFrame(active: Active)}
+  <!-- What the Annotations are, by state, Anchor, type, Component and author; the ones the
+       filters leave, or a Source File with them beside their lines; and the one selected. -->
+  <div
+    class="panes review"
+    class:code={active.review.code !== undefined}
+    style:--sidebar="{sidebarWidth}px"
+  >
+    <ReviewSidebar />
+    <ReviewCenter />
+    <AnnotationDetail />
   </div>
 {/snippet}
 
@@ -440,6 +464,16 @@
   /* The Diagrams: the canvas wants the room; the detail is there to be glanced at. */
   .panes.diagrams {
     grid-template-columns: var(--sidebar) minmax(0, 3fr) minmax(260px, 1fr);
+  }
+
+  /* Review: the filters, the Annotations or a Source File, and the Annotation selected. The
+     code viewer wants the room a list does not. */
+  .panes.review {
+    grid-template-columns: var(--sidebar) minmax(0, 1.25fr) minmax(340px, 1fr);
+  }
+
+  .panes.review.code {
+    grid-template-columns: var(--sidebar) minmax(0, 1.8fr) minmax(320px, 1fr);
   }
 
   /* A drawing needs room; the ADR next to it is there to be glanced at. So it is in Structure —
