@@ -59,3 +59,10 @@ rules:
     why: A package in a Cycle can be neither understood nor tested on its own.
     kind: no-cycles
     among: '*'
+
+exceptions:
+  - rule: only-the-window-uses-electron
+    component: app
+    library: electron
+    reason: scripts/render-icon.mjs draws the icon in Electron's Chromium when the icon changes; it runs on the machine of whoever changes the icon and is not shipped.
+    justified-by: 0023-everything-a-release-runs-is-bundled-and-electron-builder

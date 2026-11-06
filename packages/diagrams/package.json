@@ -1,6 +1,6 @@
 {
   "name": "@adr-tool/diagrams",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "description": "The UI-free core of the Diagrams module: Diagrams bound to Structure's Components, their Drift, and their SVG. No Electron, no DOM, no disk access of its own",

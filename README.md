@@ -26,7 +26,7 @@ The suite is planned as one workbench of several modules for software architects
 The app runs locally: there is no backend, no account and no telemetry.
 
 > [!NOTE]
-> Early development. The Decisions, Structure, Diagrams and Review modules are built, and so is the rest of the roadmap; the other modules of the suite are being built part by part ([plan-vision.md](docs/plan-vision.md)). There are no installers yet: the app runs from source.
+> Early development. The Decisions, Structure, Diagrams and Review modules are built, and so is the rest of the roadmap; the other modules of the suite are being built part by part ([plan-vision.md](docs/plan-vision.md)). Release 0.1.0 has [installers](#download) for Linux, Windows and macOS. They are not signed yet, and those for Windows and macOS are built but not yet tried by hand.
 
 ## Table of Contents
 
@@ -37,6 +37,8 @@ The app runs locally: there is no backend, no account and no telemetry.
   - [Diagrams](#diagrams)
   - [Review](#review)
 - [Install](#install)
+  - [Download](#download)
+  - [From source](#from-source)
 - [Usage](#usage)
   - [Checking ADRs in CI](#checking-adrs-in-ci)
   - [Checking the code against its Rules and Diagrams](#checking-the-code-against-its-rules-and-diagrams)
@@ -207,6 +209,37 @@ Every write — a new Annotation, a Reply, Resolve, Update the Anchor, Attach ag
 
 ## Install
 
+### Download
+
+The [release page](https://github.com/CyphraX/adr-tool/releases) of each version has the app for each system, and the command line and the MCP server as one file each. `SHA256SUMS` beside them holds the checksum of every file. What changed is in [CHANGELOG.md](CHANGELOG.md).
+
+> [!WARNING]
+> 0.1 is not signed with a certificate, so Windows and macOS warn before its first start; how to open it anyway is below. The installers for Windows and macOS are built in CI, but nobody has tried them by hand yet. The app does not update itself: to update, install the next version over this one. The repositories it had open stay.
+
+| System | File |
+| --- | --- |
+| Linux, x64 | `softarch-suite_0.1.0_amd64.deb`, `Softarch-Suite-0.1.0-linux-x86_64.AppImage` or `Softarch-Suite-0.1.0-linux-x64.tar.gz` |
+| Windows, x64 | `Softarch-Suite-0.1.0-win-x64-setup.exe`, or `Softarch-Suite-0.1.0-win-x64-portable.exe` to run without installing |
+| macOS, Apple silicon | `Softarch-Suite-0.1.0-mac-arm64.dmg`, or the `.zip` |
+| macOS, Intel | `Softarch-Suite-0.1.0-mac-x64.dmg`, or the `.zip` |
+| Node.js 22.12 or newer | `adr.mjs`, the command line, and `adr-mcp.mjs`, the MCP server |
+
+**Linux.** Install the `.deb` with `sudo apt install ./softarch-suite_0.1.0_amd64.deb`; the app is then in the menu, and `softarch-suite` starts it. On Ubuntu 24.04 and later, take the `.deb`: it installs the AppArmor profile that the sandbox of Chromium needs there. The AppImage runs where it is, after `chmod +x`, and needs FUSE 2 (the package `libfuse2`, on Ubuntu 24.04 `libfuse2t64`). The `.tar.gz` unpacks into a folder whose `softarch-suite` starts the app.
+
+**Windows.** The setup installs the app for your account, without administrator rights, and adds it to the Start menu; the portable `.exe` runs as it is. SmartScreen stops the first start with "Windows protected your PC": click **More info**, then **Run anyway**.
+
+**macOS.** Open the `.dmg` and drag Softarch Suite into Applications. The first start is refused, because the app comes from an unidentified developer: in Applications, right-click the app (or Control-click it), choose **Open**, and confirm with **Open**. Where macOS offers no **Open** there — from macOS 15 on —, click **Done**, then **Open Anyway** for Softarch Suite in **System Settings → Privacy & Security**, and confirm. Should macOS call the app damaged instead, take the download's quarantine off it with `xattr -dr com.apple.quarantine "/Applications/Softarch Suite.app"`. From the second start on it opens as any other app.
+
+**The command line and the MCP server.** `adr.mjs` and `adr-mcp.mjs` need Node.js 22.12 or later and nothing beside them; they run wherever they are copied to:
+
+```sh
+node adr.mjs --version                                  # 0.1.0
+node adr.mjs check path/to/repository                   # docs/cli.md
+claude mcp add softarch -- node "$PWD/adr-mcp.mjs" .    # docs/mcp.md
+```
+
+### From source
+
 Requirements:
 
 - [Node.js](https://nodejs.org/) 22.12 or newer.
@@ -219,11 +252,11 @@ cd adr-tool
 pnpm install
 ```
 
-`pnpm install` also downloads Electron. CI builds and tests on Linux. Windows and macOS are switched off in CI until distribution (see the [roadmap](docs/roadmap.md)).
+`pnpm install` also downloads Electron. CI builds and tests on Linux. The release workflow builds the installers on Linux, Windows and macOS, but the tests do not run on Windows and macOS yet (see the [roadmap](docs/roadmap.md)). How a release is made is in [docs/release.md](docs/release.md).
 
 ## Usage
 
-Start the app in development mode:
+Start the installed app, or, from source, the app in development mode:
 
 ```bash
 pnpm dev
@@ -251,7 +284,7 @@ docs/adr/0003-new-database.md:6: unknown-target: depends-on names 0042-never-wri
 10 Problems in 1 Decision Log.
 ```
 
-The command is one file with nothing beside it, for any repository: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs `adr check`, which does the same and checks its Rules and its Diagrams too, on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
+The command is one file with nothing beside it, for any repository — each release carries it as `adr.mjs`: `--format github` puts each Problem on its line of a pull request, and `--format json` is for machines. This repository runs `adr check`, which does the same and checks its Rules and its Diagrams too, on itself in CI. The contract — what it prints, the codes, the exit codes — is [docs/cli.md](docs/cli.md).
 
 ### Checking the code against its Rules and Diagrams
 
@@ -303,7 +336,7 @@ $ claude mcp add softarch -- node "$PWD/packages/mcp/dist/adr-mcp.mjs" .
 
 `list_libraries` gives the agent the Libraries of the repository or of one Component, each with its versions, the files that use it and its licence.
 
-Any client that starts a server as a process works the same way. The tools and what they answer are in [docs/mcp.md](docs/mcp.md).
+With `adr-mcp.mjs` from a release, it is `node /path/to/adr-mcp.mjs` instead. Any client that starts a server as a process works the same way. The tools and what they answer are in [docs/mcp.md](docs/mcp.md).
 
 ### Sample repositories
 
@@ -413,6 +446,7 @@ The kinds of Rules, the fingerprint an Exception names and the Problems of the f
 | `pnpm adr lint` | Checks this repository's ADRs with the built command line |
 | `pnpm adr check` | Checks them too, this repository's code against `.arch/rules.yml`, and its Diagram |
 | `pnpm adr export --out <dir>` | Exports this repository's ADRs as HTML pages |
+| `pnpm --filter @adr-tool/app package` | Packages the app for the system it runs on into `packages/app/dist`, after `pnpm build` ([docs/release.md](docs/release.md)) |
 | `pnpm --filter @adr-tool/diagrams export-own` | Draws this repository's Diagram again, into `docs/architecture/diagrams/packages.svg`; a test fails while the picture is stale |
 
 CI runs `lint`, `format:check`, `typecheck`, `test` and `build` on every pull request, then `adr check` on the repository itself: its Decision Log, its declaration of Components, its code against `.arch/rules.yml`, and its Diagram with its picture.
@@ -462,6 +496,8 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
 | [docs/configuration.md](docs/configuration.md) | The contract of `.arch/config.yml`, the suite's settings: one key per module, and what happens when the file cannot be read |
 | [docs/cli.md](docs/cli.md) | The contract of the command line: `adr lint` and `adr check` with their output, codes and exit codes — the Diagrams' among them —, and `adr export` |
 | [docs/mcp.md](docs/mcp.md) | The contract of the MCP server: its tools, what they answer, and how agents write |
+| [docs/release.md](docs/release.md) | How a release is built and published, what it contains, and why it is packaged as it is |
+| [CHANGELOG.md](CHANGELOG.md) | What each release contains |
 | [docs/adr/](docs/adr/) | The decisions this project rests on |
 | [CONTEXT.md](CONTEXT.md), [CONTEXT-MAP.md](CONTEXT-MAP.md) | The domain language and how its contexts relate |
 
@@ -482,7 +518,7 @@ A pnpm monorepo. Each module of the suite has one UI-free core package. The modu
   - the window in German (built);
   - the repositories in the window seen together (built).
 - **The other modules** are being built part by part ([plan-vision.md](docs/plan-vision.md)): Conformance — Rules, Patterns, Violations and `adr check` —, Diagrams bound to the code, Review with Annotations that survive change, Assessment with reports, the Next tiers of Structure — more metrics, history analysis, Libraries (built) —, Documentation as arc42, the System across repositories, and more languages.
-- **Deferred:** distribution — installers, code signing and auto-update.
+- **Distribution** has begun: release 0.1.0 has installers for Linux, Windows and macOS, built in CI ([docs/release.md](docs/release.md)). Code signing, auto-update and the tests on Windows and macOS are still open.
 
 The details are in [docs/roadmap.md](docs/roadmap.md).
 

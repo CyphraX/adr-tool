@@ -61,6 +61,16 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       22,
       '0022-a-rule-about-libraries-names-them-as-the-code-imports-them',
       expect.stringMatching(/^(proposed|accepted)$/)
+    ],
+    [
+      23,
+      '0023-everything-a-release-runs-is-bundled-and-electron-builder',
+      expect.stringMatching(/^(proposed|accepted)$/)
+    ],
+    [
+      24,
+      '0024-unmodified-modules-under-epl-2-0-or-the-unlicense-may-ship',
+      expect.stringMatching(/^(proposed|accepted)$/)
     ]
   ])
   expect(log.adrs[1]!.title).toBe('The tool never re-serializes Markdown')
@@ -214,6 +224,55 @@ it('reads the Decision Log of this repository without a Problem', async () => {
       to,
       state:
         log.adrs.find((adr) => adr.number === 22)!.metadata.status === 'proposed'
+          ? 'pending'
+          : 'in-effect'
+    })),
+    // So are those of ADR-0023, the packaging of the release, and ADR-0024, which amends ADR-0010.
+    ...(
+      [
+        [
+          23,
+          '0023-everything-a-release-runs-is-bundled-and-electron-builder',
+          'relates-to',
+          '0008-dependencies-come-from-parsers-alone-without-a-type-checker'
+        ],
+        [
+          23,
+          '0023-everything-a-release-runs-is-bundled-and-electron-builder',
+          'relates-to',
+          '0010-the-suite-is-open-source-under-the-mit-licence'
+        ],
+        [
+          23,
+          '0023-everything-a-release-runs-is-bundled-and-electron-builder',
+          'relates-to',
+          '0011-the-product-is-called-softarch-suite'
+        ],
+        [
+          24,
+          '0024-unmodified-modules-under-epl-2-0-or-the-unlicense-may-ship',
+          'amends',
+          '0010-the-suite-is-open-source-under-the-mit-licence'
+        ],
+        [
+          24,
+          '0024-unmodified-modules-under-epl-2-0-or-the-unlicense-may-ship',
+          'relates-to',
+          '0016-mermaid-is-drawn-in-the-renderer-and-exported-as-an-image'
+        ],
+        [
+          24,
+          '0024-unmodified-modules-under-epl-2-0-or-the-unlicense-may-ship',
+          'relates-to',
+          '0023-everything-a-release-runs-is-bundled-and-electron-builder'
+        ]
+      ] as const
+    ).map(([number, from, type, to]) => ({
+      type,
+      from,
+      to,
+      state:
+        log.adrs.find((adr) => adr.number === number)!.metadata.status === 'proposed'
           ? 'pending'
           : 'in-effect'
     }))

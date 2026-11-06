@@ -72,6 +72,12 @@
   // editor, what a dialog holds — and asks back.
   $effect(() => void window.api.setUnsaved(app.holdsUnsaved))
 
+  // A reload would lose it too, and the window does not unload while it holds such text: the
+  // main process asks the person instead (`will-prevent-unload`).
+  function onbeforeunload(event: BeforeUnloadEvent): void {
+    if (app.holdsUnsaved) event.preventDefault()
+  }
+
   const repository = $derived(app.active?.repository.repository)
 
   // The panes are as wide as they were dragged, within what leaves the others readable;
@@ -131,7 +137,7 @@
   }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} {onbeforeunload} />
 
 {#snippet withCode(text: string)}
   {#each codeSpans(text) as part, position (position)}{#if part.code}<code>{part.text}</code

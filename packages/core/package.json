@@ -1,6 +1,6 @@
 {
   "name": "@adr-tool/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "description": "The UI-free core of the Decisions module of Softarch Suite: no Electron, no DOM, no disk access of its own",

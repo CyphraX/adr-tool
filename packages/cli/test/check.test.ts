@@ -84,8 +84,9 @@ describe('adr check (docs/cli.md)', () => {
   it('finds nothing in this repository, and ends with 0', async () => {
     const { code, out, err } = await adr('check')
     expect([code, err]).toEqual([0, ''])
+    // One Violation is accepted: the icon script of the release uses Electron (ADR-0023).
     expect(out).toMatch(
-      /^No Problems in 1 Decision Log\.\n\d+ Rules hold\.\n1 Diagram: no Problem, no Drift\.\n$/
+      /^No Problems in 1 Decision Log\.\n\d+ Rules hold, but for 1 Violation accepted as an Exception\.\n1 Diagram: no Problem, no Drift\.\n$/
     )
     // The whole code of this repository is read, which takes a while on a busy machine.
   }, 30_000)
@@ -629,7 +630,14 @@ describe('adr check on Rules about Libraries (docs/cli.md)', () => {
 
   it('fails on a copy of this repository whose core imports Electron, at the import', async () => {
     const root = copyOf(undefined)
-    for (const path of ['.arch', 'package.json', 'pnpm-workspace.yaml', 'tsconfig.base.json']) {
+    // docs/adr holds the ADR that justifies the Exception of the icon script (ADR-0023).
+    for (const path of [
+      '.arch',
+      'docs/adr',
+      'package.json',
+      'pnpm-workspace.yaml',
+      'tsconfig.base.json'
+    ]) {
       cpSync(join(repository, path), join(root, path), { recursive: true })
     }
     cpSync(join(repository, 'packages'), join(root, 'packages'), {
@@ -642,7 +650,9 @@ describe('adr check on Rules about Libraries (docs/cli.md)', () => {
     expect(lines(out)[0]).toBe(
       '::error file=packages/core/src/window.ts,line=1,title=only-the-window-uses-electron::core uses electron, which only app/main and app/preload may use: packages/core/src/window.ts:1 imports electron. Only the window runs in Electron; the cores, the command line and the MCP server run in Node.js alone, wherever they are copied to.'
     )
-    expect(lines(out).at(-1)).toMatch(/^1 Violation of \d+ Rules\.$/)
+    expect(lines(out).at(-1)).toMatch(
+      /^1 Violation of \d+ Rules, and 1 accepted as an Exception\.$/
+    )
   }, 30_000)
 })
 

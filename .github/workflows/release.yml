@@ -1,0 +1,156 @@
+name: Release
+
+# Builds the installers of the desktop app on Linux, Windows and macOS, and the two commands,
+# and publishes them as the GitHub release of the tag that was pushed (docs/release.md).
+# Started by hand on a branch, it builds everything and keeps it as the run's artifacts, and
+# publishes nothing; started by hand on a tag, it publishes that tag's release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # What CI checks on every pull request, once more for the commit that is released, so that a
+  # broken tag publishes nothing. Its build is where adr.mjs and adr-mcp.mjs come from.
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      # A tag names the version it releases: v0.2.0 is the 0.2.0 of every package.json.
+      - name: The tag is the version
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(node -p "require('./packages/app/package.json').version")"
+          if [ "${TAG#v}" != "$version" ]; then
+            echo "::error file=packages/app/package.json::The tag ${TAG} is not the version of the app, ${version}."
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: node packages/cli/dist/adr.mjs check --format github
+      - run: |
+          mkdir commands
+          cp packages/cli/dist/adr.mjs packages/mcp/dist/adr-mcp.mjs commands/
+      - uses: actions/upload-artifact@v6
+        with:
+          name: commands
+          path: commands/*.mjs
+          if-no-files-found: error
+
+  package:
+    name: Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @adr-tool/app build
+      # packages/app/electron-builder.yml says what is built on each system. 0.1 is not signed
+      # with a certificate: nothing is looked for in a keychain (the Mac is signed ad hoc), and
+      # Windows is not signed at all.
+      - run: pnpm --filter @adr-tool/app package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v6
+        with:
+          name: installers-${{ runner.os }}
+          # The installers alone: not the unpacked app, the block maps or NSIS's uninstaller.
+          path: |
+            packages/app/dist/Softarch-Suite-*.AppImage
+            packages/app/dist/Softarch-Suite-*.tar.gz
+            packages/app/dist/softarch-suite_*.deb
+            packages/app/dist/Softarch-Suite-*.exe
+            packages/app/dist/Softarch-Suite-*.dmg
+            packages/app/dist/Softarch-Suite-*.zip
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: [check, package]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: release
+          merge-multiple: true
+      - name: Checksums
+        working-directory: release
+        run: |
+          ls -l
+          sha256sum -- * > ../SHA256SUMS
+          mv ../SHA256SUMS .
+          cat SHA256SUMS
+      # The notes are the tag's section of CHANGELOG.md, without its heading, its links into the
+      # repository made absolute at the tag, and what has to be known about an unsigned build.
+      - name: Notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          # The section is headed `## [0.2.0] — 2026-12-01` once it is released; until then it
+          # says `unreleased`, and a tag of it publishes nothing.
+          heading="$(awk -v heading="## [${version}]" 'index($0, heading) == 1 { print; exit }' CHANGELOG.md)"
+          if printf '%s' "$heading" | grep -qi 'unreleased'; then
+            echo "::error file=CHANGELOG.md::The section of ${version} in CHANGELOG.md is headed \"${heading}\": give it the date of the release."
+            exit 1
+          fi
+          awk -v heading="## [${version}]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error file=CHANGELOG.md::CHANGELOG.md has no section ## [${version}]."
+            exit 1
+          fi
+          sed -i -E "s#\]\((docs/|README\.md|CHANGELOG\.md)#](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/\1#g" notes.md
+          cat >> notes.md <<'EOF'
+
+          ---
+
+          The installers are not signed with a certificate yet: the README says how to open them
+          on macOS and Windows. `adr.mjs` and `adr-mcp.mjs` run with Node.js 22.12 or later.
+          `SHA256SUMS` holds the checksum of each file.
+          EOF
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* --title "$TAG" --notes-file notes.md --verify-tag
+          fi

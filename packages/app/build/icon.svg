@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Softarch Suite</title>
+  <!--
+    The icon of Softarch Suite: four Components and the Dependencies between them, drawn as
+    the window draws a graph (docs/design.md) - each box to the right of what it depends on.
+    The one on the left, what everything rests on, is in the green of what is decided.
+    The tile is the ink of the window on the 824 px grid of a macOS icon, so that it sits
+    beside the other icons of a Dock; render-icon.mjs draws it into icon.png.
+  -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="#1c2230" />
+  <g transform="translate(512 512) scale(1.15) translate(-512 -512)">
+    <g fill="none" stroke="#737d91" stroke-width="26" stroke-linecap="round">
+      <path d="M 330 512 L 512 360" />
+      <path d="M 330 512 L 512 664" />
+      <path d="M 512 360 L 694 512" />
+      <path d="M 512 664 L 694 512" />
+    </g>
+    <rect x="246" y="448" width="168" height="128" rx="28" fill="#62c088" />
+    <rect x="436" y="306" width="152" height="108" rx="26" fill="#e4e7ee" />
+    <rect x="436" y="610" width="152" height="108" rx="26" fill="#e4e7ee" />
+    <rect x="626" y="458" width="136" height="108" rx="26" fill="#a5aec0" />
+  </g>
+</svg>

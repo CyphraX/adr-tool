@@ -1,0 +1,89 @@
+# How the desktop app is packaged (docs/release.md). The release workflow runs electron-builder
+# with this file on Linux, Windows and macOS (.github/workflows/release.yml); version and
+# description come from package.json.
+appId: io.github.cyphrax.softarch-suite
+productName: Softarch Suite
+copyright: Copyright © 2026 Philipp Saal
+# The name of the package in the workspace is @adr-tool/app, which Windows would make the
+# folder of the per-user install (@adr-toolapp). The app's name, and the folder of its user
+# data, come from productName, in development as installed.
+extraMetadata:
+  name: softarch-suite
+artifactName: Softarch-Suite-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: dist
+  buildResources: build
+
+# Everything the app runs is bundled into out/ by electron-vite (electron.vite.config.ts), so
+# the package takes out/ and its package.json and nothing of node_modules: package.json lists no
+# dependencies, and there is nothing to rebuild.
+files:
+  - out/**/*
+  - '!out/**/THIRD-PARTY-NOTICES.txt'
+npmRebuild: false
+nodeGypRebuild: false
+asar: true
+
+# The licence of the suite and the notices of what it bundles, beside the app where people can
+# read them (ADR-0010); electron-builder adds those of Electron and Chromium.
+extraResources:
+  - from: ../../LICENSE
+    to: LICENSE.txt
+  - from: out/main/THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES-main.txt
+  - from: out/renderer/THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES-window.txt
+
+# Releases are made by the workflow with gh, never by electron-builder.
+publish: null
+
+linux:
+  target:
+    - AppImage
+    - tar.gz
+    - deb
+  # One PNG per size, 16 to 512 px, for the hicolor theme: a desktop looks the icon of the menu
+  # and the dock up by size, and a theme with a 1024 px icon alone has none it asks for.
+  icon: build/icons
+  category: Development
+  synopsis: A desktop workbench for the architecture that lives in a git repository
+  maintainer: Philipp Saal <63289319+CyphraX@users.noreply.github.com>
+  executableName: softarch-suite
+  # The .desktop file is named after desktopName in package.json, the app_id and WM_CLASS
+  # Electron gives the window, so that the desktop puts the window under its launcher.
+  syncDesktopName: true
+
+deb:
+  artifactName: softarch-suite_${version}_${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.png
+
+# Installs for the person who runs it, without asking for administrator rights.
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: Softarch-Suite-${version}-win-${arch}-setup.${ext}
+
+portable:
+  artifactName: Softarch-Suite-${version}-win-${arch}-portable.${ext}
+
+# 0.1 is not signed with a certificate. "-" signs ad hoc, which needs none: an Apple Silicon Mac
+# runs no code without a signature, and electron-builder's changes break the one Electron comes
+# with. The hardened runtime is for notarization, which comes with a certificate.
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  icon: build/icon.png
+  category: public.app-category.developer-tools
+  identity: '-'
+  hardenedRuntime: false

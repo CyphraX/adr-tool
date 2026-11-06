@@ -1,6 +1,6 @@
 {
   "name": "@adr-tool/cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "description": "The command line of Softarch Suite: `adr lint` checks the Decision Logs of a repository and `adr check` its Rules and its Diagrams against the code, for CI; `adr export` writes the Decision Logs as HTML pages. It also holds the one way the suite runs git, which the app uses too",
@@ -14,7 +14,8 @@
     "./conformance": "./src/conformance.ts",
     "./export": "./src/export.ts",
     "./git": "./src/git.ts",
-    "./listing": "./src/listing.ts"
+    "./listing": "./src/listing.ts",
+    "./tree-sitter-wasm": "./src/tree-sitter-wasm.ts"
   },
   "scripts": {
     "build": "vite build",

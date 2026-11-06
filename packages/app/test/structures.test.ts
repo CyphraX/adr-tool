@@ -389,7 +389,13 @@ describe('this repository, as the window gets it', () => {
     expect(below.inventory).toBe(analysis.inventory)
     expect(top.libraries).toBe(analysis.inventory.libraries.length)
     const electron = top.inventory.libraries.find((library) => library.name === 'electron')!
-    expect(electron.usedBy.map((user) => user.component)).toEqual(['app/main', 'app/preload'])
+    // The window's main process and preload script, and the icon script of the release, which
+    // the Rules accept as an Exception (ADR-0023).
+    expect(electron.usedBy.map((user) => user.component)).toEqual([
+      'app',
+      'app/main',
+      'app/preload'
+    ])
     expect(electron.licence).toMatchObject({ kind: 'declared', licence: 'MIT' })
     // What the window reads of node_modules is what an installed package declares.
     const declared = top.inventory.libraries.filter((library) => library.installed)

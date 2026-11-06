@@ -16,7 +16,7 @@ pnpm adr lint                                 # the same, from this repository
 node packages/cli/dist/adr.mjs export --out site   # the Decision Logs as pages, into ./site
 ```
 
-It is not published to npm yet; that comes with distribution (roadmap, "Before the first public release").
+`adr --version` prints its version, `adr --help` how it is used. Each release of the suite carries the file as `adr.mjs` on its [GitHub release page](https://github.com/CyphraX/adr-tool/releases) ([release.md](release.md)); it is not published to npm.
 
 ## `adr lint [path] [--format text|json|github]`
 

@@ -1,6 +1,6 @@
 {
   "name": "adr-tool",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Softarch Suite: a desktop workbench for the Architecture Decision Records and the code structure of a git repository",
   "license": "MIT",
