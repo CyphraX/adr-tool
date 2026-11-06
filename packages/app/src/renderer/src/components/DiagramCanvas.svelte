@@ -358,7 +358,7 @@
 <svelte:window onkeydown={onWindowKey} />
 
 <!-- The canvas itself takes the focus where a box it had is gone, so that the keys still work. -->
-<!-- svelte-ignore a11y_no_static_element_interactions, a11y_no_noninteractive_tabindex -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="view">
   <div class="canvas" bind:this={view} tabindex="-1" onkeydown={onKey}>
     <div class="extent" style:width="{width * scale}px" style:height="{height * scale}px">
