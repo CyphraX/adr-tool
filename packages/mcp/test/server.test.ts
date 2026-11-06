@@ -451,6 +451,27 @@ describe('what the review found (PR #41)', () => {
     expect(text).toContain('# Batched')
   })
 
+  it('reads a file through one handle: within its limit, a directory as none, a FIFO not waited for', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'adr-read-once-'))
+    try {
+      writeFileSync(join(root, 'ten.txt'), '0123456789')
+      mkdirSync(join(root, 'dir'))
+      const fs = repositoryFiles(root)
+      expect(await fs.readText('ten.txt', { atMost: 10 })).toBe('0123456789')
+      expect(await fs.readText('ten.txt', { atMost: 9 })).toBeUndefined()
+      expect(await fs.readText('ten.txt')).toBe('0123456789')
+      expect(await fs.readText('dir')).toBeUndefined()
+      expect(await fs.readText('dir', { atMost: 10 })).toBeUndefined()
+      if (process.platform !== 'win32') {
+        execFileSync('mkfifo', [join(root, 'pipe')])
+        expect(await fs.readText('pipe', { atMost: 10 })).toBeUndefined()
+        expect(await fs.readText('pipe')).toBeUndefined()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('writes nothing through a symbolic link that leads nowhere, and says so', async () => {
     const outside = mkdtempSync(join(tmpdir(), 'adr-tool-mcp-outside-'))
     try {

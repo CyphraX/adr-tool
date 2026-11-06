@@ -37,7 +37,7 @@ export type {
   NotAnalysed,
   NotResolved
 } from './dependencies'
-export type { ManifestLibrary } from './manifests'
+export type { ManifestLibrary, ManifestNotRead } from './manifests'
 export {
   ecosystemOfManifest,
   librariesIn,

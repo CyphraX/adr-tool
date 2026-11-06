@@ -8,6 +8,7 @@
  * licence is what a package declares: nothing is guessed from a text.
  */
 import type { DirectoryEntry, FileSystem } from '@adr-tool/kernel'
+import { PYTHON_NAMESPACES } from './names'
 
 /** What a Library declares about its licence, or why it cannot be told. */
 export type Licence =
@@ -210,20 +211,33 @@ export function pythonLicence(
   return { kind: 'unknown', reason: 'not-declared' }
 }
 
-/** The top-level names a `RECORD` installs: `yaml` of `yaml/__init__.py`, `six` of `six.py`. */
+/** A name the code imports: an identifier, or two below a namespace package (`google.protobuf`). */
+const IMPORTABLE = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?$/
+
+/**
+ * The top-level names a `RECORD` installs: `yaml` of `yaml/__init__.py`, `six` of `six.py`.
+ * Below a namespace package that many distributions share, two: `google.protobuf` of
+ * `google/protobuf/__init__.py`.
+ */
 export function recordTopLevels(text: string): string[] {
   const names = new Set<string>()
   for (const line of text.split('\n')) {
     const path = line.slice(0, line.indexOf(',') === -1 ? line.length : line.indexOf(',')).trim()
     if (path === '' || path.startsWith('..') || path.startsWith('/')) continue
-    const slash = path.indexOf('/')
-    const first = slash === -1 ? path : path.slice(0, slash)
+    const [first, second, ...rest] = path.split('/') as [string, ...string[]]
     if (/\.(?:dist-info|egg-info|data)$/.test(first) || first === '__pycache__') continue
-    if (slash !== -1) names.add(first)
+    if (second !== undefined && PYTHON_NAMESPACES.has(first)) {
+      const module = second.replace(/\.py$/, '')
+      if (rest.length > 0 || second !== module) {
+        if (module !== '__init__' && module !== '__pycache__') names.add(`${first}.${module}`)
+        continue
+      }
+    }
+    if (second !== undefined) names.add(first)
     else if (first.endsWith('.py')) names.add(first.slice(0, -3))
     else if (/\.(?:so|pyd)$/.test(first)) names.add(first.slice(0, first.indexOf('.')))
   }
-  return [...names].filter((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)).sort()
+  return [...names].filter((name) => IMPORTABLE.test(name)).sort()
 }
 
 /**
@@ -277,15 +291,22 @@ export async function pythonDistributions(
       let imports =
         topLevel === undefined
           ? []
-          : topLevel
-              .split('\n')
-              .map((line) => line.trim())
-              .filter((line) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(line))
-      if (imports.length === 0) {
+          : [
+              ...new Set(
+                topLevel
+                  .split('\n')
+                  .map((line) => line.trim())
+                  .filter((line) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(line))
+              )
+            ]
+      // A namespace package (`google`) says nothing of which distribution it is: the RECORD
+      // names what is below it.
+      if (imports.length === 0 || imports.some((name) => PYTHON_NAMESPACES.has(name))) {
         const record = await fs
           .readText(`${path}/RECORD`, { atMost: LIMITS.record })
           .catch(() => undefined)
-        if (record !== undefined) imports = recordTopLevels(record)
+        const recorded = record === undefined ? [] : recordTopLevels(record)
+        if (recorded.length > 0) imports = recorded
       }
       let licence: Licence =
         text === undefined

@@ -196,7 +196,8 @@ describe('the Library inventory (docs/structure-format.md, section 3, "The Libra
         ].join('\n'),
         [`${site}/PyYAML-6.0.2.dist-info/METADATA`]:
           'Metadata-Version: 2.1\nName: PyYAML\nVersion: 6.0.2\nLicense: MIT\n\nThe long description.\nLicense: no header\n',
-        [`${site}/PyYAML-6.0.2.dist-info/top_level.txt`]: '_yaml\nyaml\n',
+        // A name written twice is one.
+        [`${site}/PyYAML-6.0.2.dist-info/top_level.txt`]: '_yaml\nyaml\nyaml\n',
         [`${site}/requests-2.32.3.dist-info/METADATA`]:
           'Name: requests\nVersion: 2.32.3\nLicense-Expression: Apache-2.0\nClassifier: License :: OSI Approved :: Apache Software License\n',
         [`${site}/requests-2.32.3.dist-info/RECORD`]:
@@ -271,6 +272,130 @@ describe('the Library inventory (docs/structure-format.md, section 3, "The Libra
     expect(libraries.find((library) => library.name === 'PyYAML')!.imports).toEqual([
       '_yaml',
       'yaml'
+    ])
+  })
+
+  it('counts the built-ins of Node as uses of @types/node, and a use that runs of x despite @types/x', async () => {
+    const files = {
+      'package.json': JSON.stringify({
+        name: 'shop',
+        devDependencies: { '@types/node': '^22', '@types/lodash': '^4' }
+      }),
+      'src/app.ts': '',
+      'src/types.ts': '',
+      'test/app.test.ts': ''
+    }
+    const fs = memoryFileSystem(files)
+    const sourceFiles: OwnedSourceFile[] = Object.keys(files)
+      .filter((path) => path.endsWith('.ts'))
+      .map((path) => ({
+        path,
+        language: 'typescript',
+        test: isTestByConvention(path),
+        component: 'web'
+      }))
+    const use = (file: string, library: string, lines: number[], typeOnly = false) => ({
+      file,
+      library,
+      lines,
+      typeOnly
+    })
+    const inventory = await libraryInventory(
+      fs,
+      Object.keys(files),
+      { sourceFiles },
+      {
+        libraries: [
+          use('src/app.ts', 'lodash', [2, 9]),
+          use('src/types.ts', 'lodash', [1], true),
+          use('test/app.test.ts', 'lodash', [4])
+        ],
+        builtIns: [use('src/app.ts', 'node', [1]), use('test/app.test.ts', 'node', [1])],
+        manifests: await manifestLibraries(fs, Object.keys(files)),
+        manifestsNotRead: [
+          { manifest: 'pom.xml', message: 'It is nested too deeply for its reader.' }
+        ]
+      }
+    )
+    expect(inventory.libraries.map(row)).toEqual([
+      {
+        name: '@types/lodash',
+        versions: ['package.json:^4'],
+        mapping: 'same',
+        usedBy: ['web 3'],
+        licence: 'not-installed'
+      },
+      {
+        name: '@types/node',
+        versions: ['package.json:^22'],
+        mapping: 'same',
+        usedBy: ['web 2'],
+        licence: 'not-installed'
+      },
+      // The types do not run: what does is lodash, which nothing declares.
+      {
+        name: 'lodash',
+        versions: [],
+        mapping: undefined,
+        usedBy: ['web 2 undeclared 2'],
+        licence: 'not-installed'
+      }
+    ])
+    // Each file with the lines of its imports, and which of them are tests.
+    const lodash = inventory.libraries.find((library) => library.name === 'lodash')!.usedBy[0]!
+    expect(lodash.lines).toEqual({ 'src/app.ts': [2, 9], 'test/app.test.ts': [4] })
+    expect(lodash.tests).toEqual(['test/app.test.ts'])
+    expect(inventory.notRead).toEqual([
+      { manifest: 'pom.xml', message: 'It is nested too deeply for its reader.' }
+    ])
+
+    // Without @types/node, a built-in is nothing of the inventory.
+    const without = await libraryInventory(
+      memoryFileSystem({ 'src/app.ts': '' }),
+      ['src/app.ts'],
+      { sourceFiles: [sourceFiles[0]!] },
+      { libraries: [], builtIns: [use('src/app.ts', 'node', [1])], manifests: [] }
+    )
+    expect(without).toEqual({ libraries: [] })
+  })
+
+  it('names a Python Library below a namespace package by two segments: google.protobuf, not google', async () => {
+    const site = '.venv/lib/python3.12/site-packages'
+    const files = {
+      'pyproject.toml': [
+        '[project]',
+        'dependencies = ["protobuf", "google-cloud-storage", "grpcio-status", "ruamel.yaml"]'
+      ].join('\n'),
+      [`${site}/protobuf-5.28.0.dist-info/METADATA`]: 'Name: protobuf\nVersion: 5.28.0\n',
+      [`${site}/protobuf-5.28.0.dist-info/top_level.txt`]: 'google\n',
+      [`${site}/protobuf-5.28.0.dist-info/RECORD`]: [
+        'google/protobuf/__init__.py,,',
+        'google/protobuf/message.py,,',
+        'google/_upb/_message.abi3.so,,',
+        'protobuf-5.28.0.dist-info/METADATA,,'
+      ].join('\n'),
+      'src/shop/app.py': '',
+      'src/shop/store.py': ''
+    }
+    const libraries = await inventoryOf(
+      files,
+      { 'src/shop/app.py': 'shop', 'src/shop/store.py': 'shop' },
+      {
+        'src/shop/app.py': ['google.protobuf', 'ruamel.yaml'],
+        'src/shop/store.py': ['google.cloud', 'google.auth']
+      }
+    )
+    expect(
+      libraries.map(
+        (library) => `${library.name} ${library.imports.join(',')} ${row(library).usedBy.join(';')}`
+      )
+    ).toEqual([
+      'google-cloud-storage google.cloud shop 1',
+      // Used, and declared by no manifest: what google-cloud-storage brings along.
+      'google.auth google.auth shop 1 undeclared 1',
+      'grpcio-status grpcio_status ',
+      'protobuf google._upb,google.protobuf shop 1',
+      'ruamel.yaml ruamel.yaml shop 1'
     ])
   })
 

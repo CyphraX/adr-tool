@@ -5,13 +5,14 @@
  * tool of its own, beside the tools of the Decision Logs: it analyses the code, which they never
  * do. It reads, and writes nothing; it looks nothing up outside the repository.
  */
-import { analyseRepository } from '@adr-tool/cli/analysis'
+import { analyseRepository, extractorFor } from '@adr-tool/cli/analysis'
 import {
   everyComponent,
   librariesIn,
   libraryInventory,
   UNASSIGNED,
   type LibraryUser,
+  type ManifestNotRead,
   type ScopedLibrary
 } from '@adr-tool/structure/model'
 import { repositoryFiles } from './files'
@@ -81,35 +82,30 @@ export function libraryTools(options: { readonly root: string }): Tool[] {
       },
       run: async (input) => {
         const component = typeof input.component === 'string' ? input.component : undefined
-        const { files, structure, dependencies } = await analyseRepository(options.root, fs)
-        const ids = everyComponent(structure.components).map((one) => one.id)
-        if (component !== undefined && !ids.includes(component)) {
+        if (component?.trim() === '') {
           throw new Refusal(
-            ids.length === 0
-              ? `There is no Component ${component}: the repository has none.`
-              : `There is no Component ${component}. list_components names the Components there are.`
+            'component is empty. Leave it out for the whole repository, or name a Component that list_components lists.'
           )
         }
+        // The Component is looked up in the declaration before the code is read.
+        const { files, structure, dependencies } = await analyseRepository(options.root, fs, {
+          extract: (structure) => {
+            const ids = everyComponent(structure.components).map((one) => one.id)
+            if (component !== undefined && !ids.includes(component)) {
+              throw new Refusal(
+                ids.length === 0
+                  ? `There is no Component ${component}: the repository has none.`
+                  : `There is no Component ${component}. list_components names the Components there are.`
+              )
+            }
+            return extractorFor(structure)
+          }
+        })
         const inventory = await libraryInventory(fs, files, structure, dependencies)
         const libraries = librariesIn(inventory, component)
         const count = (status: ScopedLibrary['status']): number =>
           libraries.filter((library) => library.status === status).length
-        const guessed = libraries.some(
-          ({ library }) => library.mapping === 'normalised' || library.mapping === 'group'
-        )
-        const java = libraries.some(({ library }) => library.ecosystem === 'maven')
-        const notes = [
-          ...(guessed
-            ? [
-                'A Library whose mapping is "normalised" or "group" has its import names guessed: from its name, or the group ID of a Maven artefact. One that shows no use may be used under another name.'
-              ]
-            : []),
-          ...(java
-            ? [
-                "The licence of a Java Library cannot be told: Maven's local repository lies outside the repository, and is not read."
-              ]
-            : [])
-        ]
+        const notes = libraryNotes(libraries, inventory.notRead ?? [])
         return {
           origin: structure.origin,
           ...(component !== undefined && { component }),
@@ -126,5 +122,32 @@ export function libraryTools(options: { readonly root: string }): Tool[] {
         }
       }
     }
+  ]
+}
+
+/** What the agent is to know of a list of Libraries: what is guessed, what cannot be told. */
+export function libraryNotes(
+  libraries: readonly ScopedLibrary[],
+  notRead: readonly ManifestNotRead[]
+): string[] {
+  const guessed = libraries.some(
+    ({ library }) => library.mapping === 'normalised' || library.mapping === 'group'
+  )
+  const java = libraries.some(({ library }) => library.ecosystem === 'maven')
+  return [
+    ...(guessed
+      ? [
+          'A Library whose mapping is "normalised" or "group" has its import names guessed: from its name, or the group ID of a Maven artefact. One that shows no use may be used under another name.'
+        ]
+      : []),
+    ...(java
+      ? [
+          "The licence of a Java Library cannot be told: Maven's local repository lies outside the repository, and is not read."
+        ]
+      : []),
+    ...notRead.map(
+      ({ manifest, message }) =>
+        `${manifest} could not be read and declares nothing here: ${message}`
+    )
   ]
 }

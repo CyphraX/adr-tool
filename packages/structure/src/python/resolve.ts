@@ -7,6 +7,7 @@
 import type { LibraryUseAt } from '../dependencies'
 import type { PythonImport, PythonOutline } from './outline'
 import type { PythonProject } from './projects'
+import { PYTHON_NAMESPACES } from '../libraries/names'
 import { PYTHON_STANDARD_LIBRARY } from './standard-library'
 
 /** One use of another file of the repository, on the line of its import. */
@@ -153,11 +154,26 @@ export function resolvePython(
      * repository's, or could be, it is not resolved; the standard library is no Library.
      */
     const outside = (dotted: string, entry: PythonImport): void => {
-      const top = dotted.split('.')[0]!
+      const segments = dotted.split('.')
+      const top = segments[0]!
       if (find(path, top) !== undefined) return notFound(dotted, entry)
       if (PYTHON_STANDARD_LIBRARY.has(top)) return
       if (topLevelSomewhere.has(top)) return notFound(dotted, entry)
-      libraries.push({ file: path, library: top, line: entry.line, typeOnly: entry.typeOnly })
+      // Below a namespace that many distributions share, a Library has two segments: those of
+      // `import google.protobuf`, or of `from google import protobuf`.
+      const second =
+        segments.length > 1
+          ? [segments[1]!]
+          : entry.level === 0 && entry.module === dotted && entry.names !== undefined
+            ? entry.names.filter((name) => name !== '*')
+            : []
+      const names =
+        PYTHON_NAMESPACES.has(top) && second.length > 0
+          ? second.map((name) => `${top}.${name}`)
+          : [top]
+      for (const library of names) {
+        libraries.push({ file: path, library, line: entry.line, typeOnly: entry.typeOnly })
+      }
     }
 
     for (const entry of outline.imports) {

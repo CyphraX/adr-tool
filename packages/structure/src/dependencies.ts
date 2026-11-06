@@ -86,6 +86,11 @@ export interface Dependencies {
   readonly notResolved: readonly NotResolved[]
   readonly libraries: readonly LibraryUse[]
   /**
+   * The uses of Node's built-in modules (`node:fs`), which are no Library, each as the use of
+   * `node` — whose types `@types/node` declares. Missing where there is none.
+   */
+  readonly builtIns?: readonly LibraryUse[]
+  /**
    * What the manifests declare — `package.json`, `pom.xml`, `build.gradle`, `pyproject.toml`,
    * `requirements.txt`, `go.mod` —, for the Library inventory. Read as text, in the order of
    * their paths.
@@ -164,12 +169,17 @@ export async function analyseDependencies(
     string,
     { file: string; library: string; typed: Map<number, boolean> }
   >()
-  const useLibrary = ({ file, library, line, typeOnly }: LibraryUseAt): void => {
-    const key = `${file}\n${library}`
-    const known = libraryUses.get(key) ?? { file, library, typed: new Map<number, boolean>() }
-    known.typed.set(line, (known.typed.get(line) ?? true) && typeOnly)
-    libraryUses.set(key, known)
-  }
+  const builtInUses: typeof libraryUses = new Map()
+  const usedIn =
+    (uses: typeof libraryUses) =>
+    ({ file, library, line, typeOnly }: LibraryUseAt): void => {
+      const key = `${file}\n${library}`
+      const known = uses.get(key) ?? { file, library, typed: new Map<number, boolean>() }
+      known.typed.set(line, (known.typed.get(line) ?? true) && typeOnly)
+      uses.set(key, known)
+    }
+  const useLibrary = usedIn(libraryUses)
+  const useBuiltIn = usedIn(builtInUses)
   const notAnalysed: NotAnalysed[] = []
   const java = new Map<string, JavaOutline>()
   const measures = new Map<string, FileMeasures>()
@@ -243,6 +253,8 @@ export async function analyseDependencies(
           notResolved.push({ file: path, specifier: use.specifier, line: use.line })
           break
         case 'built-in':
+          useBuiltIn({ file: path, library: 'node', line: use.line, typeOnly: use.typeOnly })
+          break
         case 'ignored':
           break
       }
@@ -283,12 +295,15 @@ export async function analyseDependencies(
       return { ...pair, lines, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
     })
     .sort((a, b) => byPath(a.from, b.from) || byPath(a.to, b.to))
-  const libraries: LibraryUse[] = [...libraryUses.values()].map(({ file, library, typed }) => {
-    const lines = [...typed.keys()].sort((a, b) => a - b)
-    const typeOnly = lines.every((line) => typed.get(line))
-    const typeOnlyLines = typeOnly ? [] : lines.filter((line) => typed.get(line))
-    return { file, library, lines, typeOnly, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
-  })
+  const usesOf = (uses: typeof libraryUses): LibraryUse[] =>
+    [...uses.values()].map(({ file, library, typed }) => {
+      const lines = [...typed.keys()].sort((a, b) => a - b)
+      const typeOnly = lines.every((line) => typed.get(line))
+      const typeOnlyLines = typeOnly ? [] : lines.filter((line) => typed.get(line))
+      return { file, library, lines, typeOnly, ...(typeOnlyLines.length > 0 && { typeOnlyLines }) }
+    })
+  const libraries = usesOf(libraryUses)
+  const builtIns = usesOf(builtInUses)
   const manifestsNotRead: ManifestNotRead[] = []
   const manifests = await manifestLibraries(fs, files, (manifest) =>
     manifestsNotRead.push(manifest)
@@ -299,6 +314,7 @@ export async function analyseDependencies(
     libraries,
     manifests,
     ...(manifestsNotRead.length > 0 && { manifestsNotRead }),
+    ...(builtIns.length > 0 && { builtIns }),
     notAnalysed,
     lineCounts,
     measures,

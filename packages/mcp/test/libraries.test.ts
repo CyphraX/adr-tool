@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
-import { libraryTools } from '../src/libraries'
+import { libraryNotes, libraryTools } from '../src/libraries'
 import { Refusal } from '../src/protocol'
 
 // docs/mcp.md, "list_libraries"; docs/structure-format.md, section 3, "The Library inventory".
@@ -167,6 +167,60 @@ describe('list_libraries (docs/mcp.md)', () => {
     await expect(list(shop, { component: 'billing' })).rejects.toThrow(
       new Refusal('There is no Component billing. list_components names the Components there are.')
     )
+    await expect(list(shop, { component: '' })).rejects.toThrow(
+      new Refusal(
+        'component is empty. Leave it out for the whole repository, or name a Component that list_components lists.'
+      )
+    )
+  })
+
+  it('refuses a Component it does not know before it reads the code', async () => {
+    // Code that takes seconds to read: refused at once all the same.
+    const code = (at: number) =>
+      Array.from(
+        { length: 4000 },
+        (_, n) =>
+          `import { a${n} } from './f${(at + 1) % 20}'\nexport const g${n} = (x: number) => a${n}(x)\n`
+      ).join('')
+    const root = repositoryOf({
+      '.arch/components.yml': 'components:\n  web:\n    paths: [src/**]\n',
+      ...Object.fromEntries(Array.from({ length: 20 }, (_, at) => [`src/f${at}.ts`, code(at)]))
+    })
+    const started = Date.now()
+    await expect(list(root, { component: 'billing' })).rejects.toThrow(
+      new Refusal('There is no Component billing. list_components names the Components there are.')
+    )
+    expect(Date.now() - started).toBeLessThan(2000)
+  })
+
+  it('says which manifest it could not read', () => {
+    expect(
+      libraryNotes(
+        [],
+        [{ manifest: 'pom.xml', message: 'It is nested too deeply for its reader.' }]
+      )
+    ).toEqual([
+      'pom.xml could not be read and declares nothing here: It is nested too deeply for its reader.'
+    ])
+  })
+
+  it('reads every manifest the review found to stop the analysis (PR #60)', async () => {
+    const root = repositoryOf({
+      'package.json': JSON.stringify({ name: 'shop', dependencies: { react: '^19' } }),
+      'pom.xml':
+        '<project><groupId>&#x110000;</groupId><dependencies>' +
+        '<a>'.repeat(50_000) +
+        '</b>'.repeat(50_000) +
+        '</dependencies></project>',
+      'gradle/libs.versions.toml': '[versions]\na = { ref = "b" }\nb = { ref = "a" }\n',
+      'build.gradle': "dependencies { implementation 'x:y:1' }\n",
+      'src/app.ts': "import 'react'\n"
+    })
+    const result = await list(root)
+    expect((result.libraries as { name: string }[]).map((library) => library.name)).toEqual([
+      'react',
+      'x:y'
+    ])
   })
 
   it('reads no licence through a link out of the repository, nor one larger than its limit', async () => {

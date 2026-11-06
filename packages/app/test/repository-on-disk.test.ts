@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import {
   chmodSync,
   existsSync,
@@ -69,6 +70,27 @@ describe('a repository on disk', () => {
     const size = statSync(join(showcase, path)).size
     expect(await fs.readText(path, { atMost: size })).toContain('# ')
     expect(await fs.readText(path, { atMost: size - 1 })).toBeUndefined()
+  })
+
+  it('reads a file through one handle: within its limit, a directory as none, a FIFO not waited for', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'adr-read-once-'))
+    try {
+      writeFileSync(join(root, 'ten.txt'), '0123456789')
+      mkdirSync(join(root, 'dir'))
+      const fs = nodeFileSystem(root)
+      expect(await fs.readText('ten.txt', { atMost: 10 })).toBe('0123456789')
+      expect(await fs.readText('ten.txt', { atMost: 9 })).toBeUndefined()
+      expect(await fs.readText('ten.txt')).toBe('0123456789')
+      expect(await fs.readText('dir')).toBeUndefined()
+      expect(await fs.readText('dir', { atMost: 10 })).toBeUndefined()
+      if (process.platform !== 'win32') {
+        execFileSync('mkfifo', [join(root, 'pipe')])
+        expect(await fs.readText('pipe', { atMost: 10 })).toBeUndefined()
+        expect(await fs.readText('pipe')).toBeUndefined()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('stays inside its root, whatever path it is handed', async () => {

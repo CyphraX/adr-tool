@@ -7,7 +7,7 @@
  */
 import type { FileSystem } from '@adr-tool/kernel'
 import type { LibraryUse } from '../dependencies'
-import type { ManifestLibrary } from '../manifests'
+import type { ManifestLibrary, ManifestNotRead } from '../manifests'
 import type { OwnedSourceFile } from '../ownership'
 import { isIgnoredByGo, isNeverLookedAt, type Language } from '../source-files'
 import {
@@ -18,7 +18,13 @@ import {
   type InstalledDistribution,
   type Licence
 } from './installed'
-import { JAVA_PACKAGES, normalisedPython, PYTHON_IMPORTS, typedPackage } from './names'
+import {
+  JAVA_PACKAGES,
+  normalisedPython,
+  PYTHON_IMPORTS,
+  PYTHON_NAMESPACES,
+  typedPackage
+} from './names'
 
 /** Where a Library comes from: which kind of manifest declares it, which language uses it. */
 export type Ecosystem = 'npm' | 'maven' | 'python' | 'go'
@@ -54,6 +60,10 @@ export interface LibraryUser {
   readonly component?: string
   /** The Source Files that use it, in path order. */
   readonly files: readonly string[]
+  /** The lines of each file's imports of it, by its path. */
+  readonly lines: Readonly<Record<string, readonly number[]>>
+  /** Those of them that are tests, in path order. */
+  readonly tests: readonly string[]
   /** Every one of them is a test. */
   readonly testOnly: boolean
   /** Those of them for which no manifest in their directory or above declares it. */
@@ -83,6 +93,8 @@ export interface InventoryLibrary {
 export interface LibraryInventory {
   /** By name, then ecosystem. */
   readonly libraries: readonly InventoryLibrary[]
+  /** The manifests whose reader failed on them: they declare nothing here. Missing where none did. */
+  readonly notRead?: readonly ManifestNotRead[]
 }
 
 const ECOSYSTEM_OF: Partial<Record<Language, Ecosystem>> = {
@@ -124,10 +136,15 @@ const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 const keyOf = (ecosystem: Ecosystem, name: string): string =>
   `${ecosystem}\n${ecosystem === 'python' ? normalisedPython(name) : name}`
 
+/** Whether a declared Library is a package of types alone, for the package it is named after. */
+const isTypesPackage = (ecosystem: Ecosystem, name: string): boolean =>
+  ecosystem === 'npm' && typedPackage(name) !== undefined
+
 /** How long the part of `used` is that `imported` names: a whole name, or a prefix of segments. */
 function matchLength(ecosystem: Ecosystem, imported: string, used: string): number {
   if (used === imported) return imported.length
-  const separator = ecosystem === 'go' ? '/' : ecosystem === 'maven' ? '.' : undefined
+  // A Go module names the packages below it; a Java or Python package, those inside it.
+  const separator = ecosystem === 'go' ? '/' : ecosystem === 'npm' ? undefined : '.'
   return separator !== undefined && used.startsWith(imported + separator) ? imported.length : 0
 }
 
@@ -143,7 +160,9 @@ export async function libraryInventory(
   structure: { readonly sourceFiles: readonly OwnedSourceFile[] },
   dependencies: {
     readonly libraries: readonly LibraryUse[]
+    readonly builtIns?: readonly LibraryUse[]
     readonly manifests: readonly ManifestLibrary[]
+    readonly manifestsNotRead?: readonly ManifestNotRead[]
   }
 ): Promise<LibraryInventory> {
   const owned = new Map(structure.sourceFiles.map((file) => [file.path, file]))
@@ -201,8 +220,8 @@ export async function libraryInventory(
     declared: LibraryDeclaration[]
     imports: string[]
     mapping?: Mapping
-    /** Per Component (`''` for none): the files, and those not declared for. */
-    users: Map<string, { files: Set<string>; undeclared: Set<string> }>
+    /** Per Component (`''` for none): the files with their lines, and those not declared for. */
+    users: Map<string, { files: Map<string, Set<number>>; undeclared: Set<string> }>
   }
   const entries = new Map<string, Entry>()
 
@@ -251,7 +270,10 @@ export async function libraryInventory(
   for (const entry of entries.values()) {
     byEcosystem.set(entry.ecosystem, [...(byEcosystem.get(entry.ecosystem) ?? []), entry])
   }
-  for (const use of dependencies.libraries) {
+  for (const use of [
+    ...dependencies.libraries.map((use) => ({ ...use, builtIn: false })),
+    ...(dependencies.builtIns ?? []).map((use) => ({ ...use, builtIn: true }))
+  ]) {
     const file = owned.get(use.file)
     const ecosystem = file === undefined ? undefined : ECOSYSTEM_OF[file.language]
     if (file === undefined || ecosystem === undefined) continue
@@ -268,32 +290,44 @@ export async function libraryInventory(
       best = length
       matching.push(entry)
     }
-    if (matching.length === 0) {
-      const key = keyOf(ecosystem, use.library)
-      let entry = entries.get(key)
-      if (!entry) {
-        entry = {
-          ecosystem,
-          name: use.library,
-          declared: [],
-          imports: [use.library],
-          users: new Map()
-        }
-        entries.set(key, entry)
-      }
-      matching = [entry]
+    // A built-in module of Node is no Library: it is a use of `@types/node` where that is
+    // declared, and of nothing else.
+    if (use.builtIn) {
+      if (matching.length === 0) continue
+    } else if (
+      // A package of types alone (`@types/x`) does not declare `x` for a use that runs: such a
+      // use is of `x` as well, declared or not.
+      matching.length > 0 &&
+      !use.typeOnly &&
+      matching.every((entry) => isTypesPackage(entry.ecosystem, entry.name))
+    ) {
+      matching = [...matching, undeclaredEntry(ecosystem, use.library)]
     }
+    if (matching.length === 0) matching = [undeclaredEntry(ecosystem, use.library)]
     for (const entry of matching) {
       const component = file.component ?? ''
       const user = entry.users.get(component) ?? {
-        files: new Set<string>(),
+        files: new Map<string, Set<number>>(),
         undeclared: new Set<string>()
       }
-      user.files.add(use.file)
+      const lines = user.files.get(use.file) ?? new Set<number>()
+      for (const line of use.lines) lines.add(line)
+      user.files.set(use.file, lines)
       if (!isDeclaredFor(ecosystem, keyOf(ecosystem, entry.name), use.file))
         user.undeclared.add(use.file)
       entry.users.set(component, user)
     }
+  }
+
+  /** The entry of a Library by the name the code uses, made where no manifest declares it. */
+  function undeclaredEntry(ecosystem: Ecosystem, library: string): Entry {
+    const key = keyOf(ecosystem, library)
+    let entry = entries.get(key)
+    if (!entry) {
+      entry = { ecosystem, name: library, declared: [], imports: [library], users: new Map() }
+      entries.set(key, entry)
+    }
+    return entry
   }
 
   // What is installed, and the licence it declares.
@@ -304,11 +338,16 @@ export async function libraryInventory(
     const usedBy = [...entry.users]
       .sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : compare(a, b)))
       .map(([component, user]): LibraryUser => {
-        const files = [...user.files].sort(compare)
+        const files = [...user.files.keys()].sort(compare)
+        const tests = files.filter((path) => owned.get(path)?.test === true)
         return {
           ...(component === '' ? {} : { component }),
           files,
-          testOnly: files.every((path) => owned.get(path)?.test === true),
+          lines: Object.fromEntries(
+            files.map((path) => [path, [...user.files.get(path)!].sort((a, b) => a - b)])
+          ),
+          tests,
+          testOnly: tests.length === files.length,
           undeclared: [...user.undeclared].sort(compare)
         }
       })
@@ -335,7 +374,8 @@ export async function libraryInventory(
       compare(a.name, b.name) ||
       compare(a.ecosystem, b.ecosystem)
   )
-  return { libraries }
+  const notRead = dependencies.manifestsNotRead ?? []
+  return { libraries, ...(notRead.length > 0 && { notRead }) }
 
   /** Where the entry is installed: from the manifests that declare it, or the files that use it. */
   async function installedOf(
@@ -347,7 +387,7 @@ export async function libraryInventory(
   ): Promise<Installed | undefined> {
     const from = [
       ...entry.declared.map((declaration) => manifestDirectory(declaration.manifest)),
-      ...[...entry.users.values()].flatMap((user) => [...user.files].map(directoryOf))
+      ...[...entry.users.values()].flatMap((user) => [...user.files.keys()].map(directoryOf))
     ]
     switch (entry.ecosystem) {
       case 'npm':
@@ -450,6 +490,11 @@ function mappingOf(
       }
       const known = PYTHON_IMPORTS.get(normalised)
       if (known) return { imports: [...known], mapping: 'known' }
+      // `google-cloud-storage` below the namespace `google`, as `google.cloud`.
+      const [top, second] = normalised.split('-')
+      if (second !== undefined && PYTHON_NAMESPACES.has(top!)) {
+        return { imports: [`${top}.${second}`], mapping: 'normalised' }
+      }
       return { imports: [normalised.replaceAll('-', '_')], mapping: 'normalised' }
     }
     case 'maven': {

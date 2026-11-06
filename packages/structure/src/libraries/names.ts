@@ -10,6 +10,22 @@
 export const normalisedPython = (name: string): string => name.toLowerCase().replace(/[-_.]+/g, '-')
 
 /**
+ * Top-level packages of Python that many distributions share as namespace packages (PEP 420):
+ * below them a Library is known by two segments — `google.cloud`, `google.protobuf`,
+ * `azure.storage` —, so that the distributions are told apart.
+ */
+export const PYTHON_NAMESPACES: ReadonlySet<string> = new Set([
+  'azure',
+  'backports',
+  'google',
+  'jaraco',
+  'opentelemetry',
+  'ruamel',
+  'sphinxcontrib',
+  'zope'
+])
+
+/**
  * Python distributions whose top-level packages are not their name, normalised: what the
  * code imports of each. Where a distribution's installed metadata is in the repository, that
  * is read instead.
@@ -29,7 +45,7 @@ export const PYTHON_IMPORTS: ReadonlyMap<string, readonly string[]> = new Map([
   ['opencv-python', ['cv2']],
   ['opencv-python-headless', ['cv2']],
   ['pillow', ['PIL']],
-  ['protobuf', ['google']],
+  ['protobuf', ['google.protobuf']],
   ['psycopg2-binary', ['psycopg2']],
   ['pycryptodome', ['Crypto']],
   ['pycryptodomex', ['Cryptodome']],
@@ -45,7 +61,7 @@ export const PYTHON_IMPORTS: ReadonlyMap<string, readonly string[]> = new Map([
   ['python-multipart', ['multipart', 'python_multipart']],
   ['pyyaml', ['yaml', '_yaml']],
   ['pyzmq', ['zmq']],
-  ['ruamel-yaml', ['ruamel']],
+  ['ruamel-yaml', ['ruamel.yaml']],
   ['scikit-image', ['skimage']],
   ['scikit-learn', ['sklearn']],
   ['setuptools', ['setuptools', 'pkg_resources', '_distutils_hack']]
