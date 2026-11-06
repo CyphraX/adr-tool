@@ -88,6 +88,11 @@ describe('a Problem of a Diagram to repair', () => {
     expect(diagramProblemRequest({ ...gone, extra: true })).toEqual(gone)
     const stale = { kind: 'stale-picture', path: 'd/a.yml', line: 1, picture: 'd/a.svg' }
     expect(diagramProblemRequest(stale)).toEqual(stale)
+    // The picture is the one beside the Diagram, not one the window names.
+    expect(diagramProblemRequest({ ...stale, picture: '../elsewhere.svg' })).toEqual(stale)
+    expect(diagramProblemRequest({ kind: 'stale-picture', path: 'd/a.yml', line: 1 })).toEqual(
+      stale
+    )
     expect(diagramProblemRequest({ kind: 'no-level', path: 'd/a.yml', line: 1 })).toBeUndefined()
     expect(diagramProblemRequest({ ...gone, line: '4' })).toBeUndefined()
   })

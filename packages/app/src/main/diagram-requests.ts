@@ -7,6 +7,7 @@
 import {
   readEdits,
   readNewDiagram,
+  svgPathOf,
   type DiagramEdit,
   type DiagramProblem,
   type NewDiagram
@@ -26,15 +27,16 @@ export const newDiagramRequest = (diagram: unknown): NewDiagram | undefined =>
 
 /**
  * A Problem of a Diagram to repair, rebuilt field by field: an element whose Component is
- * gone, or a picture that is not current. No other Problem has a Repair.
+ * gone, or a picture that is not current. No other Problem has a Repair. The picture is the one
+ * beside the Diagram, whatever the window says it is: the export writes no other.
  */
 export function diagramProblemRequest(problem: unknown): DiagramProblem | undefined {
-  const { kind, path, line, component, picture } = record(problem)
+  const { kind, path, line, component } = record(problem)
   if (typeof path !== 'string' || typeof line !== 'number' || !Number.isInteger(line)) {
     return undefined
   }
   if (kind === 'component-gone' && isWords(component)) return { kind, path, line, component }
-  if (kind === 'stale-picture' && typeof picture === 'string') return { kind, path, line, picture }
+  if (kind === 'stale-picture') return { kind, path, line, picture: svgPathOf({ path }) }
   return undefined
 }
 
