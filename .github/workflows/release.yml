@@ -29,6 +29,17 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # A tag names the version it releases: v0.2.0 is the 0.2.0 of every package.json.
+      - name: The tag is the version
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(node -p "require('./packages/app/package.json').version")"
+          if [ "${TAG#v}" != "$version" ]; then
+            echo "::error file=packages/app/package.json::The tag ${TAG} is not the version of the app, ${version}."
+            exit 1
+          fi
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm format:check
